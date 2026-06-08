@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  /* Registramos las variables del tema corporativo de Farenet en v4 */
+  --color-farenet-azul: #0033a0;
+  --color-farenet-rojo: #e4002b;
+  --color-farenet-gris: #f4f4f6;
+}
+
+body {
+  background-color: var(--color-farenet-gris);
+  color: #1e293b; /* slate-800 */
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
