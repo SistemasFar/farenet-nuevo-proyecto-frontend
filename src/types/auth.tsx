@@ -2,8 +2,8 @@ export interface UserSession {
   username: string;
   perfilId: string;
   personaDocumento?: string;
-  estado: boolean;
-  userType: string;
+  estado?: boolean;
+  userType?: string;
 }
 
 export interface PlantaAsignada {
@@ -12,12 +12,22 @@ export interface PlantaAsignada {
 }
 
 export interface LoginResponse {
-  status: string;
+  status?: string;
+  message?: string;
+
   accessToken?: string;
   refreshToken?: string;
+
   user?: UserSession;
   permisos?: string[];
-  plantas?: PlantaAsignada[]; // <-- AGREGA ESTA LÍNEA CRUCIAL
+
+  plantas?: PlantaAsignada[];
   plantaSeleccionada?: string;
   requiereSeleccionarPlanta?: boolean;
+}
+
+export interface CambiarPlantaResponse {
+  status: string;
+  plantaSeleccionada: string;
+  message?: string;
 }
