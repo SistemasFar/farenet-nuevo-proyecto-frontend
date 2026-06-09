@@ -232,3 +232,4 @@ export default function App() {
     />
   );
 }
+// Inicialización del proceso permanentemente en IPv4 local
