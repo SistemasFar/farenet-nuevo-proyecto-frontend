@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
 import { InicioView } from './InicioView';
@@ -10,14 +10,40 @@ import type {
 
 interface MainLayoutProps {
   user: UserSession | null;
-  plantaSeleccionada: string;
+  permisos: string[];
+  plantaSeleccionada: PlantaAsignada | null;
   plantasDisponibles: PlantaAsignada[];
   onCambiarPlanta: (plantaKey: string) => Promise<void> | void;
   onLogout: () => void;
 }
 
+const TAB_PERMISOS: Record<string, string[]> = {
+  inicio: [],
+  inspecciones: ['LISTA_INSPECCION', 'VER_INSPECCION', 'CREAR_INSPECCION'],
+  personas: ['EDITAR_PERSONA'],
+  vehiculos: ['EDITAR_VEHICULO'],
+  caja: ['CAJA_OPERAR'],
+  correlativos: ['EDITAR_MAESTRO'],
+  recibos: ['WEB_REPORTE_SUNAT'],
+  usuarios: ['EDITAR_MAESTRO'],
+  empresas: ['EDITAR_MAESTRO'],
+  descuentos: ['EDITAR_MAESTRO']
+};
+
+const tieneAlguno = (
+  permisosUsuario: string[],
+  permisosRequeridos: string[]
+) => {
+  if (permisosRequeridos.length === 0) return true;
+
+  return permisosRequeridos.some((permiso) =>
+    permisosUsuario.includes(permiso)
+  );
+};
+
 export function MainLayout({
   user,
+  permisos,
   plantaSeleccionada,
   plantasDisponibles,
   onCambiarPlanta,
@@ -30,21 +56,42 @@ export function MainLayout({
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  const plantaActual = plantasDisponibles.find(
-    (planta) => planta.key === plantaSeleccionada
-  );
-
   const plantaNombre =
-    plantaActual?.nombre ||
-    plantaSeleccionada ||
+    plantaSeleccionada?.nombre ||
     'Sin sede';
 
+  const plantaKey =
+    plantaSeleccionada?.key ||
+    '';
+
+  const puedeVerTab = useMemo(() => {
+    return (tab: string) => {
+      const requeridos = TAB_PERMISOS[tab] || [];
+      return tieneAlguno(permisos, requeridos);
+    };
+  }, [permisos]);
+
+  useEffect(() => {
+    if (!puedeVerTab(activeTab)) {
+      setActiveTab('inicio');
+    }
+  }, [activeTab, puedeVerTab]);
+
   const renderContent = () => {
+    if (!puedeVerTab(activeTab)) {
+      return (
+        <GenericView
+          title="Acceso restringido"
+          description="No tienes permisos para visualizar este módulo."
+        />
+      );
+    }
+
     switch (activeTab) {
       case 'inicio':
         return (
           <InicioView
-            plantaSeleccionada={plantaSeleccionada}
+            plantaSeleccionada={plantaKey}
             plantaNombre={plantaNombre}
           />
         );
@@ -124,7 +171,7 @@ export function MainLayout({
       default:
         return (
           <InicioView
-            plantaSeleccionada={plantaSeleccionada}
+            plantaSeleccionada={plantaKey}
             plantaNombre={plantaNombre}
           />
         );
@@ -136,6 +183,7 @@ export function MainLayout({
       <Sidebar
         collapsed={sidebarCollapsed}
         activeMenu={activeTab}
+        permisos={permisos}
         onTabChange={setActiveTab}
         onMouseEnterSidebar={() => {}}
         onMouseLeaveSidebar={() => {}}
@@ -145,7 +193,7 @@ export function MainLayout({
         <Header
           user={user}
           plantaName={plantaNombre}
-          plantaSeleccionada={plantaSeleccionada}
+          plantaSeleccionada={plantaKey}
           plantasDisponibles={plantasDisponibles}
           activeTab={activeTab}
           onCambiarPlanta={onCambiarPlanta}
@@ -160,4 +208,3 @@ export function MainLayout({
     </div>
   );
 }
-

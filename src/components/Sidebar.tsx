@@ -4,11 +4,13 @@ interface MenuItem {
   key: string;
   label: string;
   icon: ReactNode;
+  permisos?: string[];
 }
 
 interface SidebarProps {
   collapsed: boolean;
   activeMenu: string;
+  permisos: string[];
   onTabChange: (tab: string) => void;
   onMouseEnterSidebar: () => void;
   onMouseLeaveSidebar: () => void;
@@ -18,62 +20,125 @@ const menuItems: MenuItem[] = [
   {
     key: 'inicio',
     label: 'INICIO',
+    permisos: [],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
-        <path d="M3 10.5L12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.5Z"
-          stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <path
+          d="M3 10.5L12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V10.5Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
   {
     key: 'inspecciones',
     label: 'INSPECCIONES',
+    permisos: ['LISTA_INSPECCION', 'VER_INSPECCION', 'CREAR_INSPECCION'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
-        <path d="M9 5h6l1 2h3v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7h3l1-2Z"
-          stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="M9.5 13l1.8 1.8L15.8 10" stroke="currentColor" strokeWidth="1.8"
-          strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M9 5h6l1 2h3v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7h3l1-2Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M9.5 13l1.8 1.8L15.8 10"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
   {
     key: 'personas',
     label: 'PERSONAS',
+    permisos: ['EDITAR_PERSONA'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
-        <path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0Z" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        <path
+          d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <path
+          d="M4 21a8 8 0 0 1 16 0"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
   {
     key: 'vehiculos',
     label: 'VEHÍCULOS',
+    permisos: ['EDITAR_VEHICULO'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
-        <path d="M5 16l1.5-6A2 2 0 0 1 8.4 8h7.2a2 2 0 0 1 1.9 2L19 16" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="M6 16h12v3a1 1 0 0 1-1 1h-1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        <path d="M6 20H5a1 1 0 0 1-1-1v-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        <path d="M8 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" fill="currentColor" />
-        <path d="M16 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" fill="currentColor" />
+        <path
+          d="M5 16l1.5-6A2 2 0 0 1 8.4 8h7.2a2 2 0 0 1 1.9 2L19 16"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M6 16h12v3a1 1 0 0 1-1 1h-1"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <path
+          d="M6 20H5a1 1 0 0 1-1-1v-3"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <path
+          d="M8 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"
+          fill="currentColor"
+        />
+        <path
+          d="M16 20a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"
+          fill="currentColor"
+        />
       </svg>
     ),
   },
   {
     key: 'caja',
     label: 'CAJA',
+    permisos: ['CAJA_OPERAR'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
-        <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M20 10h-5a2 2 0 0 0 0 4h5" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="M16 12h.01" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+        <path
+          d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <path
+          d="M20 10h-5a2 2 0 0 0 0 4h5"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M16 12h.01"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
   {
     key: 'correlativos',
     label: 'CORRELATIVOS',
+    permisos: ['EDITAR_MAESTRO'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
         <path d="M10 4L8 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -86,9 +151,15 @@ const menuItems: MenuItem[] = [
   {
     key: 'recibos',
     label: 'RECIBOS',
+    permisos: ['WEB_REPORTE_SUNAT'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
-        <path d="M7 3h10a2 2 0 0 1 2 2v16l-2-1-2 1-2-1-2 1-2-1-2 1V5a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <path
+          d="M7 3h10a2 2 0 0 1 2 2v16l-2-1-2 1-2-1-2 1-2-1-2 1V5a2 2 0 0 1 2-2Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
         <path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     ),
@@ -96,6 +167,7 @@ const menuItems: MenuItem[] = [
   {
     key: 'usuarios',
     label: 'USUARIOS',
+    permisos: ['EDITAR_MAESTRO'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
         <path d="M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0Z" stroke="currentColor" strokeWidth="1.8" />
@@ -106,6 +178,7 @@ const menuItems: MenuItem[] = [
   {
     key: 'empresas',
     label: 'EMPRESAS',
+    permisos: ['EDITAR_MAESTRO'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
         <path d="M3 21h18M3 7h18M9 21V7m6 14V7M3 14h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -115,10 +188,15 @@ const menuItems: MenuItem[] = [
   {
     key: 'descuentos',
     label: 'DESCUENTOS',
+    permisos: ['EDITAR_MAESTRO'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
-        <path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.3L12 14.3l-4.8 2.5.9-5.3L4.2 7.7l5.4-.8L12 2Z"
-          stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <path
+          d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.3L12 14.3l-4.8 2.5.9-5.3L4.2 7.7l5.4-.8L12 2Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
@@ -127,10 +205,23 @@ const menuItems: MenuItem[] = [
 export function Sidebar({
   collapsed,
   activeMenu,
+  permisos,
   onTabChange,
   onMouseEnterSidebar,
   onMouseLeaveSidebar
 }: SidebarProps) {
+  const menuVisible = menuItems.filter((item) => {
+    const permisosRequeridos = item.permisos || [];
+
+    if (permisosRequeridos.length === 0) {
+      return true;
+    }
+
+    return permisosRequeridos.some((permiso) =>
+      permisos.includes(permiso)
+    );
+  });
+
   return (
     <aside
       onMouseEnter={onMouseEnterSidebar}
@@ -161,7 +252,7 @@ export function Sidebar({
       <div className="flex-1 overflow-y-auto px-1 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <nav>
           <ul className="flex flex-col gap-1.5">
-            {menuItems.map((item) => {
+            {menuVisible.map((item) => {
               const isActive = activeMenu === item.key;
 
               return (

@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import type { PlantaAsignada } from '../types/auth';
+import type {
+  PlantaAsignada,
+  UserSession
+} from '../types/auth';
 
 interface HeaderProps {
-  user: any;
+  user: UserSession | null;
   plantaName: string;
   plantaSeleccionada: string;
   plantasDisponibles: PlantaAsignada[];
@@ -48,8 +51,8 @@ export function Header({
   const pageTitle = routeToTitle(activeTab);
 
   const userName =
-    user?.username ||
-    'OPERADOR';
+  user?.username ??
+  'OPERADOR';
 
   const userInitial =
     userName.trim()[0]?.toUpperCase() ??

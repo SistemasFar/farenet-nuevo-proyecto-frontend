@@ -1,6 +1,8 @@
 import type {
   LoginResponse,
-  CambiarPlantaResponse
+  CambiarPlantaResponse,
+  PermisosResponse,
+  PlantaAsignada
 } from '../types/auth';
 
 const BASE_URL =
@@ -59,7 +61,7 @@ export const authApi = {
       },
       body: JSON.stringify({
         username: username.trim(),
-        plantaKey
+        plantaKey: plantaKey.trim()
       }),
     });
 
@@ -86,7 +88,7 @@ export const authApi = {
       },
       body: JSON.stringify({
         username: username.trim(),
-        plantaKey
+        plantaKey: plantaKey.trim()
       }),
     });
 
@@ -95,6 +97,40 @@ export const authApi = {
         await getErrorMessage(
           response,
           'Error al cambiar de sede.'
+        )
+      );
+    }
+
+    return response.json();
+  },
+
+  obtenerPermisosAsync: async (
+    username: string,
+    plantaKey?: string
+  ): Promise<PermisosResponse> => {
+    const params = new URLSearchParams();
+
+    if (plantaKey) {
+      params.append('plantaKey', plantaKey.trim());
+    }
+
+    const queryString = params.toString();
+    const url = queryString
+      ? `${BASE_URL}/auth/permisos/${username.trim()}?${queryString}`
+      : `${BASE_URL}/auth/permisos/${username.trim()}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          'Error al obtener permisos.'
         )
       );
     }
@@ -132,23 +168,65 @@ export const authApi = {
 };
 
 export const plantaSession = {
-  guardar: (plantaKey: string) => {
+  guardar: (planta: PlantaAsignada | string) => {
+    const plantaNormalizada: PlantaAsignada =
+      typeof planta === 'string'
+        ? { key: planta, nombre: planta }
+        : planta;
+
     sessionStorage.setItem(
       'plantaSeleccionada',
-      plantaKey
+      JSON.stringify(plantaNormalizada)
     );
   },
 
-  obtener: (): string => {
-    return (
-      sessionStorage.getItem('plantaSeleccionada') ||
-      ''
-    );
+  obtener: (): PlantaAsignada | null => {
+    const data = sessionStorage.getItem('plantaSeleccionada');
+
+    if (!data) return null;
+
+    try {
+      const parsed = JSON.parse(data) as PlantaAsignada;
+
+      if (!parsed?.key) return null;
+
+      return parsed;
+    } catch {
+      return {
+        key: data,
+        nombre: data
+      };
+    }
   },
 
   limpiar: () => {
-    sessionStorage.removeItem(
-      'plantaSeleccionada'
+    sessionStorage.removeItem('plantaSeleccionada');
+  }
+};
+
+export const permisosSession = {
+  guardar: (permisos: string[] = []) => {
+    sessionStorage.setItem(
+      'permisos',
+      JSON.stringify(permisos)
     );
+  },
+
+  obtener: (): string[] => {
+    const data = sessionStorage.getItem('permisos');
+
+    if (!data) return [];
+
+    try {
+      const parsed = JSON.parse(data);
+
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  limpiar: () => {
+    sessionStorage.removeItem('permisos');
   }
 };

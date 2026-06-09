@@ -22,13 +22,24 @@ export interface LoginResponse {
   permisos?: string[];
 
   plantas?: PlantaAsignada[];
-  plantaSeleccionada?: string;
+
+  plantaSeleccionada?: PlantaAsignada | null;
+
   requiereSeleccionarPlanta?: boolean;
 }
 
 export interface CambiarPlantaResponse {
   status: string;
-  plantaSeleccionada: string;
+  refreshToken?: string;
+  plantaSeleccionada: PlantaAsignada;
+  permisos?: string[];
   message?: string;
 }
 
+export interface PermisosResponse {
+  status: string;
+  username: string;
+  plantaKey?: string | null;
+  permisos: string[];
+  message?: string;
+}

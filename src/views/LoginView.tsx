@@ -13,9 +13,10 @@ interface LoginViewProps {
     token: string,
     user: UserSession,
     permisos: string[],
-    plantaSeleccionada?: string,
+    plantaSeleccionada?: PlantaAsignada | null,
     plantas?: PlantaAsignada[]
   ) => void;
+
   onRequirePlanta: (
     username: string,
     plantas: PlantaAsignada[],

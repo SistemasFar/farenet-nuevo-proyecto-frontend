@@ -6,7 +6,11 @@ import type {
   UserSession,
   PlantaAsignada
 } from './types/auth';
-import { authApi, plantaSession } from './services/api';
+import {
+  authApi,
+  plantaSession,
+  permisosSession
+} from './services/api';
 
 type AuthStep = 'LOGIN' | 'SELECT_PLANTA' | 'DASHBOARD';
 
@@ -16,51 +20,63 @@ export default function App() {
   const [usernameContext, setUsernameContext] = useState('');
   const [user, setUser] = useState<UserSession | null>(null);
   const [permisos, setPermisos] = useState<string[]>([]);
-  const [planta, setPlanta] = useState<string>('');
+  const [planta, setPlanta] = useState<PlantaAsignada | null>(null);
   const [plantasDisponibles, setPlantasDisponibles] = useState<PlantaAsignada[]>([]);
 
   useEffect(() => {
     const token = sessionStorage.getItem('accessToken');
     const userRaw = sessionStorage.getItem('user');
-    const permisosRaw = sessionStorage.getItem('permisos');
     const plantasRaw = sessionStorage.getItem('plantasDisponibles');
     const plantaSeleccionada = plantaSession.obtener();
 
     if (token && userRaw && plantaSeleccionada) {
       try {
         const userSession = JSON.parse(userRaw) as UserSession;
-        const permisosSession = permisosRaw
-          ? JSON.parse(permisosRaw)
-          : [];
+
         const plantasSession = plantasRaw
-          ? JSON.parse(plantasRaw)
+          ? JSON.parse(plantasRaw) as PlantaAsignada[]
           : [];
 
+        const permisosGuardados = permisosSession.obtener();
+
         setUser(userSession);
-        setPermisos(permisosSession);
+        setPermisos(permisosGuardados);
         setPlanta(plantaSeleccionada);
         setUsernameContext(userSession.username);
         setPlantasDisponibles(plantasSession);
         setStep('DASHBOARD');
       } catch (error) {
-        sessionStorage.clear();
-        plantaSession.limpiar();
-        setStep('LOGIN');
+        console.error('Error restaurando sesión:', error);
+        limpiarSesionFrontend();
       }
     }
   }, []);
+
+  const limpiarSesionFrontend = () => {
+    sessionStorage.clear();
+    plantaSession.limpiar();
+    permisosSession.limpiar();
+
+    setUser(null);
+    setPermisos([]);
+    setPlanta(null);
+    setUsernameContext('');
+    setPlantasDisponibles([]);
+    setStep('LOGIN');
+  };
 
   const guardarSesionFrontend = (
     token: string,
     userData: UserSession,
     userPermisos: string[],
-    plantaSeleccionada: string,
+    plantaSeleccionada: PlantaAsignada,
     plantas: PlantaAsignada[] = []
   ) => {
     sessionStorage.setItem('accessToken', token);
     sessionStorage.setItem('user', JSON.stringify(userData));
-    sessionStorage.setItem('permisos', JSON.stringify(userPermisos));
     sessionStorage.setItem('plantasDisponibles', JSON.stringify(plantas));
+
+    permisosSession.guardar(userPermisos);
     plantaSession.guardar(plantaSeleccionada);
 
     setUser(userData);
@@ -74,7 +90,7 @@ export default function App() {
     token: string,
     userData: UserSession,
     userPermisos: string[],
-    plantaSeleccionada?: string,
+    plantaSeleccionada?: PlantaAsignada | null,
     plantas: PlantaAsignada[] = []
   ) => {
     if (!plantaSeleccionada) {
@@ -109,7 +125,7 @@ export default function App() {
     }
 
     sessionStorage.setItem('plantasDisponibles', JSON.stringify(plantas));
-    sessionStorage.setItem('permisos', JSON.stringify(userPermisos));
+    permisosSession.guardar(userPermisos);
 
     setStep('SELECT_PLANTA');
   };
@@ -123,6 +139,10 @@ export default function App() {
       usernameContext,
       plantaKey
     );
+
+    if (!resp.plantaSeleccionada) {
+      throw new Error('El backend no retornó la sede seleccionada.');
+    }
 
     const userData: UserSession =
       resp.user ||
@@ -140,7 +160,7 @@ export default function App() {
       token,
       userData,
       permisosFinales,
-      resp.plantaSeleccionada || plantaKey,
+      resp.plantaSeleccionada,
       plantasDisponibles
     );
 
@@ -157,13 +177,17 @@ export default function App() {
       plantaKey
     );
 
-    const nuevaPlanta = resp.plantaSeleccionada || plantaKey;
+    if (!resp.plantaSeleccionada) {
+      throw new Error('El backend no retornó la nueva sede.');
+    }
 
-    plantaSession.guardar(nuevaPlanta);
-    setPlanta(nuevaPlanta);
+    const permisosActualizados = resp.permisos || permisos;
 
-    // Aquí luego se deberán recargar dashboard, inspecciones y demás módulos
-    // usando la nueva sede seleccionada.
+    plantaSession.guardar(resp.plantaSeleccionada);
+    permisosSession.guardar(permisosActualizados);
+
+    setPlanta(resp.plantaSeleccionada);
+    setPermisos(permisosActualizados);
   };
 
   const handleLogout = async () => {
@@ -174,15 +198,7 @@ export default function App() {
     } catch (err) {
       console.error('Error pasivo al notificar logout:', err);
     } finally {
-      sessionStorage.clear();
-      plantaSession.limpiar();
-
-      setUser(null);
-      setPermisos([]);
-      setPlanta('');
-      setUsernameContext('');
-      setPlantasDisponibles([]);
-      setStep('LOGIN');
+      limpiarSesionFrontend();
     }
   };
 
@@ -200,16 +216,7 @@ export default function App() {
       <SelectPlantaView
         plantas={plantasDisponibles}
         onConfirmPlanta={handleConfirmPlanta}
-        onCancel={() => {
-          sessionStorage.clear();
-          plantaSession.limpiar();
-          setUser(null);
-          setPermisos([]);
-          setPlanta('');
-          setUsernameContext('');
-          setPlantasDisponibles([]);
-          setStep('LOGIN');
-        }}
+        onCancel={limpiarSesionFrontend}
       />
     );
   }
@@ -217,6 +224,7 @@ export default function App() {
   return (
     <MainLayout
       user={user}
+      permisos={permisos}
       plantaSeleccionada={planta}
       plantasDisponibles={plantasDisponibles}
       onCambiarPlanta={handleCambiarPlanta}
