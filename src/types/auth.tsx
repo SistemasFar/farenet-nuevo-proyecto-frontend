@@ -31,3 +31,4 @@ export interface CambiarPlantaResponse {
   plantaSeleccionada: string;
   message?: string;
 }
+
