@@ -226,7 +226,20 @@ export function Sidebar({
     <aside
       onMouseEnter={onMouseEnterSidebar}
       onMouseLeave={onMouseLeaveSidebar}
-      className="bg-[#052a79] flex h-screen flex-col overflow-hidden transition-[width,padding] duration-300 ease-in-out shadow-xl border-r border-blue-900"
+      className="
+        relative
+        bg-[#052a79]
+        flex
+        h-screen
+        flex-col
+        transition-[width,padding]
+        duration-300
+        ease-in-out
+        shadow-2xl
+        border-r
+        border-blue-900
+        z-40
+      "
       style={{
         width: collapsed ? '90px' : '290px',
         padding: collapsed ? '0 8px' : '0 20px'
@@ -238,34 +251,73 @@ export function Sidebar({
           onClick={() => onTabChange('inicio')}
         >
           {collapsed ? (
-            <div className="h-10 w-10 bg-[#f2cc11] rounded-full flex items-center justify-center font-black text-[#052a79] text-xl shadow-md select-none">
+            <div
+              className="
+                h-12
+                w-12
+                bg-gradient-to-br
+                from-[#f2cc11]
+                to-yellow-300
+                rounded-2xl
+                flex
+                items-center
+                justify-center
+                font-black
+                text-[#052a79]
+                text-xl
+                shadow-lg
+                select-none
+              "
+            >
               F
             </div>
           ) : (
-            <h1 className="text-3xl font-black tracking-tight text-[#f2cc11] font-serif select-none drop-shadow-md">
-              FARENET
-            </h1>
+            <div className="text-center select-none">
+              <h1 className="text-3xl font-black tracking-tight text-[#f2cc11] font-serif drop-shadow-md">
+                FARENET
+              </h1>
+              <p className="text-[10px] tracking-[0.35em] text-blue-100 font-semibold mt-1">
+                SISTEMA
+              </p>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-1 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-visible px-1 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <nav>
           <ul className="flex flex-col gap-1.5">
             {menuVisible.map((item) => {
               const isActive = activeMenu === item.key;
 
               return (
-                <li key={item.key}>
+                <li
+                  key={item.key}
+                  className="relative group"
+                >
                   <button
+                    type="button"
                     onClick={() => onTabChange(item.key)}
-                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+                    title={collapsed ? item.label : undefined}
+                    className={`relative w-full flex items-center rounded-xl text-sm font-bold transition-all duration-200 ${
+                      collapsed
+                        ? 'justify-center px-0 py-3'
+                        : 'justify-start gap-4 px-4 py-3'
+                    } ${
                       isActive
-                        ? 'bg-[#f2cc11] text-[#052a79] shadow-lg scale-[1.01]'
-                        : 'text-slate-100 hover:bg-blue-800/60'
+                        ? 'bg-gradient-to-r from-[#f2cc11] to-yellow-300 text-[#052a79] shadow-lg scale-[1.02]'
+                        : 'text-slate-100 hover:bg-blue-800/60 hover:translate-x-1'
                     }`}
                   >
-                    <span className={isActive ? 'text-[#052a79]' : 'text-slate-300'}>
+                    {isActive && !collapsed && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-[#052a79]" />
+                    )}
+
+                    <span
+                      className={`shrink-0 transition-colors duration-200 ${
+                        isActive ? 'text-[#052a79]' : 'text-slate-300'
+                      }`}
+                    >
                       {item.icon}
                     </span>
 
@@ -275,12 +327,56 @@ export function Sidebar({
                       </span>
                     )}
                   </button>
+
+                  {collapsed && (
+                    <div
+                      className="
+                        pointer-events-none
+                        absolute
+                        left-[calc(100%+12px)]
+                        top-1/2
+                        -translate-y-1/2
+                        px-3
+                        py-2
+                        rounded-lg
+                        bg-slate-900
+                        text-white
+                        text-xs
+                        font-semibold
+                        whitespace-nowrap
+                        opacity-0
+                        invisible
+                        group-hover:opacity-100
+                        group-hover:visible
+                        group-hover:translate-x-1
+                        transition-all
+                        duration-200
+                        shadow-xl
+                        z-[999]
+                      "
+                    >
+                      {item.label}
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ul>
         </nav>
       </div>
+
+      {!collapsed && (
+        <div className="border-t border-blue-800/50 py-4 px-2">
+          <div className="rounded-2xl bg-blue-950/40 border border-blue-800/60 p-3">
+            <p className="text-[10px] uppercase tracking-wide text-blue-100 font-bold">
+              Menú dinámico
+            </p>
+            <p className="text-[11px] text-blue-100/80 mt-1 leading-relaxed">
+              Las opciones visibles dependen de los permisos del perfil activo.
+            </p>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

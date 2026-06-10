@@ -50,10 +50,21 @@ export function MainLayout({
   onLogout
 }: MainLayoutProps) {
   const [activeTab, setActiveTab] = useState('inicio');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const [sidebarPinned, setSidebarPinned] = useState(() => {
+    return localStorage.getItem('sidebarPinned') === 'true';
+  });
+
+  const [sidebarHover, setSidebarHover] = useState(false);
+
+  const sidebarCollapsed = !sidebarPinned && !sidebarHover;
 
   const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
+    setSidebarPinned((prev) => {
+      const nuevoValor = !prev;
+      localStorage.setItem('sidebarPinned', String(nuevoValor));
+      return nuevoValor;
+    });
   };
 
   const plantaNombre =
@@ -185,8 +196,8 @@ export function MainLayout({
         activeMenu={activeTab}
         permisos={permisos}
         onTabChange={setActiveTab}
-        onMouseEnterSidebar={() => {}}
-        onMouseLeaveSidebar={() => {}}
+        onMouseEnterSidebar={() => setSidebarHover(true)}
+        onMouseLeaveSidebar={() => setSidebarHover(false)}
       />
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -201,7 +212,7 @@ export function MainLayout({
           onLogout={onLogout}
         />
 
-        <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <main className="flex-1 overflow-y-auto p-6 bg-slate-50 transition-all duration-300">
           {renderContent()}
         </main>
       </div>
