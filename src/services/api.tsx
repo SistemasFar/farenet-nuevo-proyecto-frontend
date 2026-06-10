@@ -9,6 +9,18 @@ import type {
   InspeccionesResponse
 } from '../types/operacion';
 
+export interface AuditoriaAcceso {
+  id: number;
+  username: string | null;
+  evento: string;
+  exitoso: boolean;
+  mensaje: string | null;
+  planta_key: string | null;
+  ip_direccion: string | null;
+  user_agent: string | null;
+  fecha_evento: string;
+}
+
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
   'http://127.0.0.1:3000/api';
@@ -258,6 +270,70 @@ export const authApi = {
   }
 };
 
+export interface AuditoriaAccesoFiltro {
+  username?: string;
+  evento?: string;
+  exitoso?: string;
+  fechaInicio?: string;
+  fechaFin?: string;
+}
+
+export const auditoriaApi = {
+  listarAccesosAsync: async (
+    filtros: AuditoriaAccesoFiltro = {}
+  ): Promise<AuditoriaAcceso[]> => {
+    const params = new URLSearchParams();
+
+    if (filtros.username?.trim()) {
+      params.append('username', filtros.username.trim());
+    }
+
+    if (filtros.evento?.trim()) {
+      params.append('evento', filtros.evento.trim());
+    }
+
+    if (filtros.exitoso === 'true' || filtros.exitoso === 'false') {
+      params.append('exitoso', filtros.exitoso);
+    }
+
+    if (filtros.fechaInicio) {
+      params.append('fechaInicio', filtros.fechaInicio);
+    }
+
+    if (filtros.fechaFin) {
+      params.append('fechaFin', filtros.fechaFin);
+    }
+
+    const queryString = params.toString();
+
+    const url = queryString
+      ? `${BASE_URL}/auditoria/accesos?${queryString}`
+      : `${BASE_URL}/auditoria/accesos`;
+
+    const response = await fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          'Error al consultar auditoría de acceso.'
+        )
+      );
+    }
+
+    const result = await parseJsonResponse<{
+      status: string;
+      data: AuditoriaAcceso[];
+    }>(response);
+
+    return result.data || [];
+  }
+};
 export const operacionApi = {
   listarInspeccionesAsync: async (
     plantaKey: string,

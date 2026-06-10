@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
 import { InicioView } from './InicioView';
+import { AuditoriaView } from './AuditoriaView';
 import { GenericView } from './GenericView';
 import type {
   UserSession,
@@ -27,7 +28,8 @@ const TAB_PERMISOS: Record<string, string[]> = {
   recibos: ['WEB_REPORTE_SUNAT'],
   usuarios: ['EDITAR_MAESTRO'],
   empresas: ['EDITAR_MAESTRO'],
-  descuentos: ['EDITAR_MAESTRO']
+  descuentos: ['EDITAR_MAESTRO'],
+  auditoria: ['EDITAR_MAESTRO']
 };
 
 const tieneAlguno = (
@@ -178,7 +180,8 @@ export function MainLayout({
             description="Configuración de campañas, promociones y tarifas especiales."
           />
         );
-
+      case 'auditoria':
+        return <AuditoriaView />;
       default:
         return (
           <InicioView
@@ -195,11 +198,11 @@ export function MainLayout({
         collapsed={sidebarCollapsed}
         activeMenu={activeTab}
         permisos={permisos}
+        perfilId={user?.perfilId || ''}
         onTabChange={setActiveTab}
         onMouseEnterSidebar={() => setSidebarHover(true)}
         onMouseLeaveSidebar={() => setSidebarHover(false)}
       />
-
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Header
           user={user}
