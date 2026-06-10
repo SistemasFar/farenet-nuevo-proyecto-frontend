@@ -11,6 +11,8 @@ const BASE_URL =
 
 console.log('API URL:', BASE_URL);
 
+const TIMEOUT_MS = 10000;
+
 async function getErrorMessage(
   response: Response,
   defaultMessage: string
@@ -22,12 +24,60 @@ async function getErrorMessage(
   return errorData.message || defaultMessage;
 }
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const controller = new AbortController();
+
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error(
+        'El servidor está tardando demasiado en responder. Intente nuevamente.'
+      );
+    }
+
+    if (!navigator.onLine) {
+      throw new Error(
+        'No hay conexión a internet o red local. Verifique su conexión.'
+      );
+    }
+
+    throw new Error(
+      'No se pudo conectar con el servidor. Verifique que el backend esté encendido o que la red esté disponible.'
+    );
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+async function parseJsonResponse<T>(
+  response: Response
+): Promise<T> {
+  try {
+    return await response.json();
+  } catch {
+    throw new Error(
+      'El servidor respondió con un formato inválido. Contacte con Sistemas.'
+    );
+  }
+}
+
 export const authApi = {
   loginAsync: async (
     username: string,
     password?: string
   ): Promise<LoginResponse> => {
-    const response = await fetch(`${BASE_URL}/auth/login`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -42,28 +92,31 @@ export const authApi = {
       throw new Error(
         await getErrorMessage(
           response,
-          'Error en la autenticación.'
+          'Usuario o contraseña incorrectos.'
         )
       );
     }
 
-    return response.json();
+    return parseJsonResponse<LoginResponse>(response);
   },
 
   confirmarPlantaAsync: async (
     username: string,
     plantaKey: string
   ): Promise<LoginResponse> => {
-    const response = await fetch(`${BASE_URL}/auth/confirmar-planta`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: username.trim(),
-        plantaKey: plantaKey.trim()
-      }),
-    });
+    const response = await fetchWithTimeout(
+      `${BASE_URL}/auth/confirmar-planta`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          plantaKey: plantaKey.trim()
+        }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(
@@ -74,14 +127,14 @@ export const authApi = {
       );
     }
 
-    return response.json();
+    return parseJsonResponse<LoginResponse>(response);
   },
 
   cambiarPlantaAsync: async (
     username: string,
     plantaKey: string
   ): Promise<CambiarPlantaResponse> => {
-    const response = await fetch(`${BASE_URL}/auth/cambiar-planta`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/auth/cambiar-planta`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -101,7 +154,7 @@ export const authApi = {
       );
     }
 
-    return response.json();
+    return parseJsonResponse<CambiarPlantaResponse>(response);
   },
 
   obtenerPermisosAsync: async (
@@ -115,11 +168,12 @@ export const authApi = {
     }
 
     const queryString = params.toString();
+
     const url = queryString
       ? `${BASE_URL}/auth/permisos/${username.trim()}?${queryString}`
       : `${BASE_URL}/auth/permisos/${username.trim()}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -135,7 +189,7 @@ export const authApi = {
       );
     }
 
-    return response.json();
+    return parseJsonResponse<PermisosResponse>(response);
   },
 
   logoutAsync: async (
@@ -144,7 +198,7 @@ export const authApi = {
     status: string;
     message: string;
   }> => {
-    const response = await fetch(`${BASE_URL}/auth/logout`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/auth/logout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -163,7 +217,10 @@ export const authApi = {
       );
     }
 
-    return response.json();
+    return parseJsonResponse<{
+      status: string;
+      message: string;
+    }>(response);
   }
 };
 
