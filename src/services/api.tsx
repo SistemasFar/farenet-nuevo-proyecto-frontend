@@ -99,6 +99,37 @@ export const authApi = {
 
     return parseJsonResponse<LoginResponse>(response);
   },
+    refrescarSesionAsync: async (
+    username: string
+  ): Promise<{
+    status: string;
+    message: string;
+  }> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/auth/refresh-sesion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: username.trim()
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          'La sesión ha expirado. Inicie sesión nuevamente.'
+        )
+      );
+    }
+
+    return parseJsonResponse<{
+      status: string;
+      message: string;
+    }>(response);
+  },
+
   validarSesionAsync: async (
     username: string
   ): Promise<{
