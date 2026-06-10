@@ -84,12 +84,12 @@ export const authApi = {
     const response = await fetchWithTimeout(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         username: username.trim(),
         password: password?.trim()
-      }),
+      })
     });
 
     if (!response.ok) {
@@ -103,6 +103,7 @@ export const authApi = {
 
     return parseJsonResponse<LoginResponse>(response);
   },
+
   validarSesionAsync: async (
     username: string
   ): Promise<{
@@ -112,11 +113,11 @@ export const authApi = {
     const response = await fetchWithTimeout(`${BASE_URL}/auth/validar-sesion`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         username: username.trim()
-      }),
+      })
     });
 
     if (!response.ok) {
@@ -143,12 +144,12 @@ export const authApi = {
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           username: username.trim(),
           plantaKey: plantaKey.trim()
-        }),
+        })
       }
     );
 
@@ -171,12 +172,12 @@ export const authApi = {
     const response = await fetchWithTimeout(`${BASE_URL}/auth/cambiar-planta`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         username: username.trim(),
         plantaKey: plantaKey.trim()
-      }),
+      })
     });
 
     if (!response.ok) {
@@ -197,7 +198,7 @@ export const authApi = {
   ): Promise<PermisosResponse> => {
     const params = new URLSearchParams();
 
-    if (plantaKey) {
+    if (plantaKey?.trim()) {
       params.append('plantaKey', plantaKey.trim());
     }
 
@@ -210,8 +211,8 @@ export const authApi = {
     const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-      },
+        'Content-Type': 'application/json'
+      }
     });
 
     if (!response.ok) {
@@ -235,11 +236,11 @@ export const authApi = {
     const response = await fetchWithTimeout(`${BASE_URL}/auth/logout`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         username: username.trim()
-      }),
+      })
     });
 
     if (!response.ok) {
@@ -271,67 +272,35 @@ export const operacionApi = {
       pageSize?: number;
     }
   ): Promise<InspeccionesResponse> => {
-
     const params = new URLSearchParams();
 
-    params.append(
-      'plantaKey',
-      plantaKey.trim()
-    );
+    params.append('plantaKey', plantaKey.trim());
 
-    if (filtros?.fechaInicio) {
-      params.append(
-        'fechaInicio',
-        filtros.fechaInicio
-      );
+    if (filtros?.fechaInicio?.trim()) {
+      params.append('fechaInicio', filtros.fechaInicio.trim());
     }
 
-    if (filtros?.fechaFin) {
-      params.append(
-        'fechaFin',
-        filtros.fechaFin
-      );
+    if (filtros?.fechaFin?.trim()) {
+      params.append('fechaFin', filtros.fechaFin.trim());
     }
 
-    if (
-      filtros?.placa &&
-      filtros.placa.trim() !== ''
-    ) {
-      params.append(
-        'placa',
-        filtros.placa.trim()
-      );
+    if (filtros?.placa?.trim()) {
+      params.append('placa', filtros.placa.trim());
     }
 
-    if (
-      filtros?.estado &&
-      filtros.estado.trim() !== ''
-    ) {
-      params.append(
-        'estado',
-        filtros.estado.trim()
-      );
+    if (filtros?.estado?.trim()) {
+      params.append('estado', filtros.estado.trim());
     }
 
-    if (
-      filtros?.numeroInspeccion &&
-      filtros.numeroInspeccion.trim() !== ''
-    ) {
+    if (filtros?.numeroInspeccion?.trim()) {
       params.append(
         'numeroInspeccion',
         filtros.numeroInspeccion.trim()
       );
     }
 
-    params.append(
-      'page',
-      String(filtros?.page ?? 1)
-    );
-
-    params.append(
-      'pageSize',
-      String(filtros?.pageSize ?? 5)
-    );
+    params.append('page', String(filtros?.page ?? 1));
+    params.append('pageSize', String(filtros?.pageSize ?? 5));
 
     const response = await fetchWithTimeout(
       `${BASE_URL}/operacion/inspecciones-dia?${params.toString()}`,
@@ -352,9 +321,7 @@ export const operacionApi = {
       );
     }
 
-    return parseJsonResponse<InspeccionesResponse>(
-      response
-    );
+    return parseJsonResponse<InspeccionesResponse>(response);
   }
 };
 
@@ -362,7 +329,10 @@ export const plantaSession = {
   guardar: (planta: PlantaAsignada | string) => {
     const plantaNormalizada: PlantaAsignada =
       typeof planta === 'string'
-        ? { key: planta, nombre: planta }
+        ? {
+            key: planta,
+            nombre: planta
+          }
         : planta;
 
     sessionStorage.setItem(

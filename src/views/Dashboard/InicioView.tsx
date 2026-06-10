@@ -308,9 +308,7 @@ export function InicioView({
             >
               <option value="">Todos</option>
               <option value="NUEVO">Nuevo</option>
-              <option value="EN_PROCESO">En proceso</option>
-              <option value="FINALIZADO">Finalizado</option>
-              <option value="ANULADO">Anulado</option>
+              <option value="PROCESO">Proceso</option>
               <option value="PENDIENTE">Pendiente</option>
             </select>
           </div>
