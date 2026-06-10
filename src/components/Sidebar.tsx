@@ -201,6 +201,27 @@ const menuItems: MenuItem[] = [
       </svg>
     ),
   },
+  {
+  key: 'auditoria',
+  label: 'AUDITORÍA',
+  permisos: ['EDITAR_MAESTRO'],
+  icon: (
+    <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M5 4h14v16H5V4Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M8 8h8M8 12h8M8 16h5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
+},
 ];
 
 export function Sidebar({
