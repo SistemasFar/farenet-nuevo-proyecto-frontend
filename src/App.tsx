@@ -23,7 +23,8 @@ export default function App() {
   const [planta, setPlanta] = useState<PlantaAsignada | null>(null);
   const [plantasDisponibles, setPlantasDisponibles] = useState<PlantaAsignada[]>([]);
 
-  useEffect(() => {
+ useEffect(() => {
+  const restaurarSesion = async () => {
     const token = sessionStorage.getItem('accessToken');
     const userRaw = sessionStorage.getItem('user');
     const plantasRaw = sessionStorage.getItem('plantasDisponibles');
@@ -32,6 +33,8 @@ export default function App() {
     if (token && userRaw && plantaSeleccionada) {
       try {
         const userSession = JSON.parse(userRaw) as UserSession;
+
+        await authApi.validarSesionAsync(userSession.username);
 
         const plantasSession = plantasRaw
           ? JSON.parse(plantasRaw) as PlantaAsignada[]
@@ -46,11 +49,14 @@ export default function App() {
         setPlantasDisponibles(plantasSession);
         setStep('DASHBOARD');
       } catch (error) {
-        console.error('Error restaurando sesión:', error);
+        console.error('Sesión expirada o inválida:', error);
         limpiarSesionFrontend();
       }
     }
-  }, []);
+  };
+
+  restaurarSesion();
+}, []);
 
   const limpiarSesionFrontend = () => {
     sessionStorage.clear();
