@@ -5,6 +5,10 @@ import type {
   PlantaAsignada
 } from '../types/auth';
 
+import type {
+  InspeccionesResponse
+} from '../types/operacion';
+
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
   'http://127.0.0.1:3000/api';
@@ -99,6 +103,7 @@ export const authApi = {
 
     return parseJsonResponse<LoginResponse>(response);
   },
+
   validarSesionAsync: async (
     username: string
   ): Promise<{
@@ -129,6 +134,7 @@ export const authApi = {
       message: string;
     }>(response);
   },
+
   confirmarPlantaAsync: async (
     username: string,
     plantaKey: string
@@ -250,6 +256,106 @@ export const authApi = {
       status: string;
       message: string;
     }>(response);
+  }
+};
+
+export const operacionApi = {
+  listarInspeccionesAsync: async (
+    plantaKey: string,
+    filtros?: {
+      fechaInicio?: string;
+      fechaFin?: string;
+      placa?: string;
+      estado?: string;
+      numeroInspeccion?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ): Promise<InspeccionesResponse> => {
+
+    const params = new URLSearchParams();
+
+    params.append(
+      'plantaKey',
+      plantaKey.trim()
+    );
+
+    if (filtros?.fechaInicio) {
+      params.append(
+        'fechaInicio',
+        filtros.fechaInicio
+      );
+    }
+
+    if (filtros?.fechaFin) {
+      params.append(
+        'fechaFin',
+        filtros.fechaFin
+      );
+    }
+
+    if (
+      filtros?.placa &&
+      filtros.placa.trim() !== ''
+    ) {
+      params.append(
+        'placa',
+        filtros.placa.trim()
+      );
+    }
+
+    if (
+      filtros?.estado &&
+      filtros.estado.trim() !== ''
+    ) {
+      params.append(
+        'estado',
+        filtros.estado.trim()
+      );
+    }
+
+    if (
+      filtros?.numeroInspeccion &&
+      filtros.numeroInspeccion.trim() !== ''
+    ) {
+      params.append(
+        'numeroInspeccion',
+        filtros.numeroInspeccion.trim()
+      );
+    }
+
+    params.append(
+      'page',
+      String(filtros?.page ?? 1)
+    );
+
+    params.append(
+      'pageSize',
+      String(filtros?.pageSize ?? 5)
+    );
+
+    const response = await fetchWithTimeout(
+      `${BASE_URL}/operacion/inspecciones-dia?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          'Error al obtener inspecciones.'
+        )
+      );
+    }
+
+    return parseJsonResponse<InspeccionesResponse>(
+      response
+    );
   }
 };
 
