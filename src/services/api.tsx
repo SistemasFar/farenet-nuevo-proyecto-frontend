@@ -103,7 +103,6 @@ export const authApi = {
 
     return parseJsonResponse<LoginResponse>(response);
   },
-
   validarSesionAsync: async (
     username: string
   ): Promise<{

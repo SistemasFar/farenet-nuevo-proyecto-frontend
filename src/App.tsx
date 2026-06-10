@@ -35,6 +35,7 @@ export default function App() {
         const userSession = JSON.parse(userRaw) as UserSession;
 
         await authApi.validarSesionAsync(userSession.username);
+        await authApi.refrescarSesionAsync(userSession.username);
 
         const plantasSession = plantasRaw
           ? JSON.parse(plantasRaw) as PlantaAsignada[]
