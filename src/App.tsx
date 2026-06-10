@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { LoginView } from './views/LoginView';
 import { SelectPlantaView } from './views/SelectPlantaView';
 import { MainLayout } from './views/Dashboard/MainLayout';
+
 import type {
   UserSession,
   PlantaAsignada
 } from './types/auth';
+
 import {
   authApi,
   plantaSession,
@@ -23,19 +25,34 @@ export default function App() {
   const [planta, setPlanta] = useState<PlantaAsignada | null>(null);
   const [plantasDisponibles, setPlantasDisponibles] = useState<PlantaAsignada[]>([]);
 
- useEffect(() => {
-  const restaurarSesion = async () => {
-    const token = sessionStorage.getItem('accessToken');
-    const userRaw = sessionStorage.getItem('user');
-    const plantasRaw = sessionStorage.getItem('plantasDisponibles');
-    const plantaSeleccionada = plantaSession.obtener();
+  const limpiarSesionFrontend = () => {
+    sessionStorage.clear();
+    plantaSession.limpiar();
+    permisosSession.limpiar();
 
-    if (token && userRaw && plantaSeleccionada) {
+    setUser(null);
+    setPermisos([]);
+    setPlanta(null);
+    setUsernameContext('');
+    setPlantasDisponibles([]);
+    setStep('LOGIN');
+  };
+
+  useEffect(() => {
+    const restaurarSesion = async () => {
+      const token = sessionStorage.getItem('accessToken');
+      const userRaw = sessionStorage.getItem('user');
+      const plantasRaw = sessionStorage.getItem('plantasDisponibles');
+      const plantaSeleccionada = plantaSession.obtener();
+
+      if (!token || !userRaw || !plantaSeleccionada) {
+        return;
+      }
+
       try {
         const userSession = JSON.parse(userRaw) as UserSession;
 
         await authApi.validarSesionAsync(userSession.username);
-        await authApi.refrescarSesionAsync(userSession.username);
 
         const plantasSession = plantasRaw
           ? JSON.parse(plantasRaw) as PlantaAsignada[]
@@ -53,24 +70,10 @@ export default function App() {
         console.error('Sesión expirada o inválida:', error);
         limpiarSesionFrontend();
       }
-    }
-  };
+    };
 
-  restaurarSesion();
-}, []);
-
-  const limpiarSesionFrontend = () => {
-    sessionStorage.clear();
-    plantaSession.limpiar();
-    permisosSession.limpiar();
-
-    setUser(null);
-    setPermisos([]);
-    setPlanta(null);
-    setUsernameContext('');
-    setPlantasDisponibles([]);
-    setStep('LOGIN');
-  };
+    restaurarSesion();
+  }, []);
 
   const guardarSesionFrontend = (
     token: string,
@@ -239,4 +242,3 @@ export default function App() {
     />
   );
 }
-// Inicialización del proceso permanentemente en IPv4 local

@@ -3,6 +3,8 @@ import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
 import { InicioView } from './InicioView';
 import { GenericView } from './GenericView';
+import InspeccionesView from '../Inspecciones/InspeccionesView';
+
 import type {
   UserSession,
   PlantaAsignada
@@ -109,10 +111,7 @@ export function MainLayout({
 
       case 'inspecciones':
         return (
-          <GenericView
-            title="Módulo de Inspecciones"
-            description={`Gestión y registro de inspecciones técnicas vehiculares para la sede ${plantaNombre}.`}
-          />
+          <InspeccionesView />
         );
 
       case 'personas':

@@ -9,6 +9,10 @@ import type {
   InspeccionesResponse
 } from '../types/operacion';
 
+import type {
+  BuscarInspeccionesResponse
+} from '../types/inspecciones';
+
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
   'http://127.0.0.1:3000/api';
@@ -322,6 +326,85 @@ export const operacionApi = {
     }
 
     return parseJsonResponse<InspeccionesResponse>(response);
+  }
+};
+
+export const inspeccionesApi = {
+  buscarInspeccionesAsync: async (
+    plantaKey: string,
+    filtros?: {
+      fechaInicio?: string;
+      fechaFin?: string;
+      numeroInspeccion?: string;
+      placa?: string;
+      comprobante?: string;
+      cliente?: string;
+      estado?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ): Promise<BuscarInspeccionesResponse> => {
+    const params = new URLSearchParams();
+
+    params.append('plantaKey', plantaKey.trim());
+
+    if (filtros?.fechaInicio?.trim()) {
+      params.append('fechaInicio', filtros.fechaInicio.trim());
+    }
+
+    if (filtros?.fechaFin?.trim()) {
+      params.append('fechaFin', filtros.fechaFin.trim());
+    }
+
+    if (filtros?.numeroInspeccion?.trim()) {
+      params.append(
+        'numeroInspeccion',
+        filtros.numeroInspeccion.trim()
+      );
+    }
+
+    if (filtros?.placa?.trim()) {
+      params.append('placa', filtros.placa.trim());
+    }
+
+    if (filtros?.comprobante?.trim()) {
+      params.append('comprobante', filtros.comprobante.trim());
+    }
+
+    if (filtros?.cliente?.trim()) {
+      params.append('cliente', filtros.cliente.trim());
+    }
+
+    if (
+      filtros?.estado?.trim() &&
+      filtros.estado.trim().toUpperCase() !== 'TODOS'
+    ) {
+      params.append('estado', filtros.estado.trim());
+    }
+
+    params.append('page', String(filtros?.page ?? 1));
+    params.append('pageSize', String(filtros?.pageSize ?? 10));
+
+    const response = await fetchWithTimeout(
+      `${BASE_URL}/inspecciones/buscar?${params.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          'Error al buscar inspecciones registradas.'
+        )
+      );
+    }
+
+    return parseJsonResponse<BuscarInspeccionesResponse>(response);
   }
 };
 
