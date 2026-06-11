@@ -3,9 +3,17 @@ export interface InspeccionPanel {
   fechaHora: string;
   placa: string;
   comprobante: string;
+
+  clienteDocumento: string;
+  clienteNombre: string;
+
   conceptoVehicular: string;
   linea: string;
   estado: string;
+
+  posicion: number | null;
+  estadoActual: string;
+
   numeroCertificado: string;
   resultado: string;
   estadoCertificado: string;
@@ -18,6 +26,7 @@ export interface InspeccionesFiltroRequest {
   placa?: string;
   estado?: string;
   numeroInspeccion?: string;
+  cliente?: string;
   page?: number;
   pageSize?: number;
 }
@@ -34,3 +43,4 @@ export interface InspeccionesResponse {
   data: InspeccionPanel[];
   message?: string;
 }
+export type BuscarInspeccionesResponse = InspeccionesResponse;

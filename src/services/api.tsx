@@ -6,7 +6,8 @@ import type {
 } from '../types/auth';
 
 import type {
-  InspeccionesResponse
+  InspeccionesResponse,
+  BuscarInspeccionesResponse
 } from '../types/operacion';
 
 const BASE_URL =
@@ -259,6 +260,17 @@ export const authApi = {
   }
 };
 
+export interface AuditoriaAcceso {
+  id: number;
+  username: string | null;
+  evento: string;
+  exitoso: boolean;
+  mensaje: string | null;
+  planta_key: string | null;
+  ip_direccion: string | null;
+  user_agent: string | null;
+  fecha_evento: string;
+}
 export interface AuditoriaAccesoFiltro {
   username?: string;
   evento?: string;
@@ -266,7 +278,6 @@ export interface AuditoriaAccesoFiltro {
   fechaInicio?: string;
   fechaFin?: string;
 }
-
 export const auditoriaApi = {
   listarAccesosAsync: async (
     filtros: AuditoriaAccesoFiltro = {}
@@ -334,6 +345,7 @@ export const operacionApi = {
       numeroInspeccion?: string;
       page?: number;
       pageSize?: number;
+      cliente?: string;
     }
   ): Promise<InspeccionesResponse> => {
     const params = new URLSearchParams();
@@ -362,6 +374,9 @@ export const operacionApi = {
         filtros.numeroInspeccion.trim()
       );
     }
+    if (filtros?.cliente?.trim()) {
+  params.append('cliente', filtros.cliente.trim());
+}
 
     params.append('page', String(filtros?.page ?? 1));
     params.append('pageSize', String(filtros?.pageSize ?? 5));

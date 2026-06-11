@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { operacionApi } from '../../services/api';
 import type { InspeccionPanel } from '../../types/operacion';
 
@@ -13,6 +13,7 @@ interface FiltrosPanel {
   placa: string;
   estado: string;
   numeroInspeccion: string;
+  cliente: string;
 }
 
 const obtenerFechaActual = (): string => {
@@ -85,27 +86,29 @@ export function InicioView({
     fechaFin: obtenerFechaActual(),
     placa: '',
     estado: '',
-    numeroInspeccion: ''
+    numeroInspeccion: '',
+    cliente: ''
   });
+  const filtrosRef = useRef(filtros);
 
+  useEffect(() => {
+    filtrosRef.current = filtros;
+  }, [filtros]);
   const puedeConsultar = useMemo(() => {
     return plantaSeleccionada && plantaSeleccionada.trim() !== '';
   }, [plantaSeleccionada]);
 
   const cargarInspecciones = async (
-    paginaActual = page,
-    cantidadPorPagina = pageSize
+    paginaConsulta = page,
+    pageSizeConsulta = pageSize
   ) => {
     if (!puedeConsultar) {
-      setInspecciones([]);
-      setTotal(0);
-      setPage(1);
-      setTotalPages(1);
-      setError('Seleccione una sede para visualizar las inspecciones.');
       return;
     }
 
-    if (filtros.fechaInicio > filtros.fechaFin) {
+    const filtrosActuales = filtrosRef.current;
+
+    if (filtrosActuales.fechaInicio > filtrosActuales.fechaFin) {
       setError('La fecha desde no puede ser mayor que la fecha hasta.');
       setInspecciones([]);
       setTotal(0);
@@ -120,31 +123,28 @@ export function InicioView({
       const response = await operacionApi.listarInspeccionesAsync(
         plantaSeleccionada,
         {
-          fechaInicio: filtros.fechaInicio,
-          fechaFin: filtros.fechaFin,
-          placa: filtros.placa,
-          estado: filtros.estado,
-          numeroInspeccion: filtros.numeroInspeccion,
-          page: paginaActual,
-          pageSize: cantidadPorPagina
+          fechaInicio: filtrosActuales.fechaInicio,
+          fechaFin: filtrosActuales.fechaFin,
+          placa: filtrosActuales.placa,
+          estado: filtrosActuales.estado,
+          numeroInspeccion: filtrosActuales.numeroInspeccion,
+          cliente: filtrosActuales.cliente,
+          page: paginaConsulta,
+          pageSize: pageSizeConsulta
         }
       );
 
       setInspecciones(response.data || []);
       setTotal(response.total || 0);
-      setPage(response.page || paginaActual);
-      setPageSize(response.pageSize || cantidadPorPagina);
+      setPage(response.page || paginaConsulta);
+      setPageSize(response.pageSize || pageSizeConsulta);
       setTotalPages(response.totalPages || 1);
     } catch (err) {
-      const message =
+      setError(
         err instanceof Error
           ? err.message
-          : 'Error al cargar inspecciones.';
-
-      setError(message);
-      setInspecciones([]);
-      setTotal(0);
-      setTotalPages(1);
+          : 'Error al cargar inspecciones.'
+      );
     } finally {
       setLoading(false);
     }
@@ -154,6 +154,18 @@ export function InicioView({
     cargarInspecciones(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantaSeleccionada]);
+  useEffect(() => {
+    if (!puedeConsultar) return;
+
+    const intervalId = window.setInterval(() => {
+      cargarInspecciones(page, pageSize);
+    }, 60000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puedeConsultar, page, pageSize]);
 
   const handleFiltroChange = (
     field: keyof FiltrosPanel,
@@ -178,7 +190,8 @@ export function InicioView({
       fechaFin: hoy,
       placa: '',
       estado: '',
-      numeroInspeccion: ''
+      numeroInspeccion: '',
+      cliente: ''
     });
 
     setPage(1);
@@ -299,6 +312,21 @@ export function InicioView({
 
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+              Cliente
+            </label>
+
+            <input
+              type="text"
+              value={filtros.cliente}
+              onChange={(e) =>
+                handleFiltroChange('cliente', e.target.value)
+              }
+              placeholder="DNI / RUC / Nombre"
+              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
               Estado
             </label>
             <select
@@ -417,7 +445,10 @@ export function InicioView({
                   Placa
                 </th>
                 <th className="p-3 border-r border-teal-600">
-                  Comprobante
+                  DNI / RUC
+                </th>
+                <th className="p-3 border-r border-teal-600">
+                  Cliente
                 </th>
                 <th className="p-3 border-r border-teal-600">
                   Concepto vehicular
@@ -426,7 +457,7 @@ export function InicioView({
                   Línea
                 </th>
                 <th className="p-3 border-r border-teal-600">
-                  Estado
+                  Estado actual
                 </th>
                 <th className="p-3 border-r border-teal-600">
                   N° Certificado
@@ -447,7 +478,7 @@ export function InicioView({
               {loading && (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={12}
                     className="p-6 text-center text-slate-500 font-medium"
                   >
                     Cargando inspecciones...
@@ -458,7 +489,7 @@ export function InicioView({
               {!loading && inspecciones.length === 0 && (
                 <tr>
                   <td
-                    colSpan={11}
+                    colSpan={12}
                     className="p-6 text-center text-slate-400"
                   >
                     No hay inspecciones registradas para el rango seleccionado.
@@ -482,7 +513,10 @@ export function InicioView({
                       {normalizarTexto(ins.placa)}
                     </td>
                     <td className="p-3 whitespace-nowrap">
-                      {normalizarTexto(ins.comprobante)}
+                      {normalizarTexto(ins.clienteDocumento)}
+                    </td>
+                    <td className="p-3 min-w-[220px]">
+                      {normalizarTexto(ins.clienteNombre)}
                     </td>
                     <td className="p-3 min-w-[180px]">
                       {normalizarTexto(ins.conceptoVehicular)}
@@ -491,7 +525,7 @@ export function InicioView({
                       {normalizarTexto(ins.linea)}
                     </td>
                     <td className="p-3 whitespace-nowrap">
-                      <BadgeEstado value={ins.estado} />
+                      <BadgeEstado value={ins.estadoActual || ins.estado} />
                     </td>
                     <td className="p-3 whitespace-nowrap">
                       {normalizarTexto(ins.numeroCertificado)}
