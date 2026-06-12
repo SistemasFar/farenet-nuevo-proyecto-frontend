@@ -123,17 +123,11 @@ export function InicioView({
       const response = await operacionApi.listarInspeccionesAsync(
         plantaSeleccionada,
         {
-          fechaInicio: filtrosActuales.fechaInicio,
-          fechaFin: filtrosActuales.fechaFin,
-          placa: filtrosActuales.placa,
-          estado: filtrosActuales.estado,
-          numeroInspeccion: filtrosActuales.numeroInspeccion,
           cliente: filtrosActuales.cliente,
           page: paginaConsulta,
           pageSize: pageSizeConsulta
         }
       );
-
       setInspecciones(response.data || []);
       setTotal(response.total || 0);
       setPage(response.page || paginaConsulta);
@@ -265,54 +259,10 @@ export function InicioView({
             </button>
           </div>
         </div>
-
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Desde
-            </label>
-            <input
-              type="date"
-              value={filtros.fechaInicio}
-              onChange={(e) =>
-                handleFiltroChange('fechaInicio', e.target.value)
-              }
-              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Hasta
-            </label>
-            <input
-              type="date"
-              value={filtros.fechaFin}
-              onChange={(e) =>
-                handleFiltroChange('fechaFin', e.target.value)
-              }
-              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Placa
-            </label>
-            <input
-              type="text"
-              value={filtros.placa}
-              onChange={(e) =>
-                handleFiltroChange('placa', e.target.value.toUpperCase())
-              }
-              placeholder="ABC123"
-              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Cliente
+              Buscar
             </label>
 
             <input
@@ -321,59 +271,28 @@ export function InicioView({
               onChange={(e) =>
                 handleFiltroChange('cliente', e.target.value)
               }
-              placeholder="DNI / RUC / Nombre"
-              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Estado
-            </label>
-            <select
-              value={filtros.estado}
-              onChange={(e) => handleFiltroChange('estado', e.target.value)}
-              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-            >
-              <option value="">Todos</option>
-              <option value="NUEVO">Nuevo</option>
-              <option value="PROCESO">Proceso</option>
-              <option value="PENDIENTE">Pendiente</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              N° Inspección
-            </label>
-            <input
-              type="text"
-              value={filtros.numeroInspeccion}
-              onChange={(e) =>
-                handleFiltroChange(
-                  'numeroInspeccion',
-                  e.target.value.toUpperCase()
-                )
-              }
-              placeholder="INS-098..."
+              placeholder="Buscar por placa, DNI, RUC o nombre del cliente"
               className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
             />
           </div>
 
-          <div className="flex items-end gap-2">
+          <div className="flex items-end">
             <button
               type="button"
               onClick={aplicarFiltros}
               disabled={loading || !puedeConsultar}
-              className="w-full px-3 py-2 bg-[#052a79] text-white rounded text-xs font-semibold hover:bg-blue-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-[34px] min-w-[140px] rounded bg-[#052a79] px-4 text-xs font-semibold text-white transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Buscar
             </button>
+          </div>
 
+          <div className="flex items-end">
             <button
               type="button"
               onClick={limpiarFiltros}
               disabled={loading}
-              className="px-3 py-2 bg-slate-100 text-slate-600 rounded text-xs font-semibold hover:bg-slate-200 transition disabled:opacity-50"
+              className="h-[34px] min-w-[90px] rounded bg-slate-100 px-4 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 disabled:opacity-50"
             >
               Limpiar
             </button>
@@ -492,7 +411,7 @@ export function InicioView({
                     colSpan={12}
                     className="p-6 text-center text-slate-400"
                   >
-                    No hay inspecciones registradas para el rango seleccionado.
+                    No hay inspecciones registradas para el día actual.
                   </td>
                 </tr>
               )}
@@ -597,8 +516,7 @@ export function InicioView({
           <span className="ml-1 font-mono text-slate-600">
             /api/operacion/inspecciones-dia?plantaKey=
             {plantaSeleccionada || 'N/A'}
-            &fechaInicio={filtros.fechaInicio}
-            &fechaFin={filtros.fechaFin}
+            &cliente={filtros.cliente || ''}
             &page={page}
             &pageSize={pageSize}
           </span>
