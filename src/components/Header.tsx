@@ -113,11 +113,11 @@ export function Header({
 
           <div className="leading-tight min-w-0">
             <div className="text-lg font-black tracking-wide text-[#f2cc11] uppercase truncate">
-              {plantaName || 'SIN SEDE'}
+              SEDE ACTIVA: {plantaName || 'SIN SEDE'}
             </div>
 
-            <div className="text-xs font-light text-slate-200 tracking-wider truncate">
-              {pageTitle}
+            <div className="text-xs font-semibold text-[#f2cc11] tracking-wider truncate">
+              Código de sede: {plantaSeleccionada || 'N/A'} · {pageTitle}
             </div>
           </div>
         </div>

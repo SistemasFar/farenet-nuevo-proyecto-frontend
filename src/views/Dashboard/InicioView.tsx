@@ -78,7 +78,7 @@ export function InicioView({
 
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
   const [filtros, setFiltros] = useState<FiltrosPanel>({
@@ -131,7 +131,7 @@ export function InicioView({
       setInspecciones(response.data || []);
       setTotal(response.total || 0);
       setPage(response.page || paginaConsulta);
-      setPageSize(response.pageSize || pageSizeConsulta);
+      setPageSize(pageSizeConsulta);
       setTotalPages(response.totalPages || 1);
     } catch (err) {
       setError(
@@ -224,17 +224,7 @@ export function InicioView({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-        <p className="text-xs font-bold text-blue-900 uppercase tracking-wider">
-          Sede activa
-        </p>
-        <p className="text-sm font-semibold text-blue-700">
-          {plantaNombre || 'Sin sede seleccionada'}
-        </p>
-        <p className="text-[11px] text-blue-500 mt-1">
-          Código de sede: {plantaSeleccionada || 'N/A'}
-        </p>
-      </div>
+
 
       <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-100 gap-4">
@@ -335,7 +325,6 @@ export function InicioView({
               disabled={loading}
               className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400"
             >
-              <option value={5}>5</option>
               <option value={10}>10</option>
               <option value={20}>20</option>
               <option value={25}>25</option>
@@ -367,7 +356,7 @@ export function InicioView({
                   DNI / RUC
                 </th>
                 <th className="p-3 border-r border-teal-600">
-                  Cliente
+                  Nombres / Razón Social
                 </th>
                 <th className="p-3 border-r border-teal-600">
                   Concepto vehicular
@@ -417,54 +406,65 @@ export function InicioView({
               )}
 
               {!loading &&
-                inspecciones.map((ins, idx) => (
-                  <tr
-                    key={`${ins.numeroInspeccion}-${idx}`}
-                    className="hover:bg-slate-50 transition-colors"
-                  >
-                    <td className="p-3 font-semibold text-blue-700 bg-slate-50/50 whitespace-nowrap">
-                      {normalizarTexto(ins.numeroInspeccion)}
-                    </td>
-                    <td className="p-3 text-slate-500 whitespace-nowrap">
-                      {normalizarTexto(ins.fechaHora)}
-                    </td>
-                    <td className="p-3 font-bold text-slate-700 whitespace-nowrap">
-                      {normalizarTexto(ins.placa)}
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      {normalizarTexto(ins.clienteDocumento)}
-                    </td>
-                    <td className="p-3 min-w-[220px]">
-                      {normalizarTexto(ins.clienteNombre)}
-                    </td>
-                    <td className="p-3 min-w-[180px]">
-                      {normalizarTexto(ins.conceptoVehicular)}
-                    </td>
-                    <td className="p-3 font-mono text-center bg-slate-50/30 whitespace-nowrap">
-                      {normalizarTexto(ins.linea)}
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      <BadgeEstado value={ins.estadoActual || ins.estado} />
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      {normalizarTexto(ins.numeroCertificado)}
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      <BadgeEstado value={ins.resultado} />
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      <BadgeEstado value={ins.estadoCertificado} />
-                    </td>
-                    <td className="p-3 whitespace-nowrap">
-                      <button
-                        type="button"
-                        className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-200 transition"
-                      >
-                        Ver
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                inspecciones.map((ins, idx) => {
+                  const posicion = Number(ins.posicion ?? 0);
+
+                  const claseFila =
+                    posicion >= 11
+                      ? 'bg-green-100 hover:bg-green-200'
+                      : posicion >= 6
+                        ? 'bg-yellow-100 hover:bg-yellow-200'
+                        : 'bg-red-50 hover:bg-red-100';
+                  return (
+                    <tr
+                      key={`${ins.numeroInspeccion}-${idx}`}
+                      className={`transition-colors ${claseFila}`}
+                    >
+                      <td className="p-3 font-semibold text-blue-700 whitespace-nowrap">
+                        {normalizarTexto(ins.numeroInspeccion)}
+                      </td>
+                      <td className="p-3 text-slate-500 whitespace-nowrap">
+                        {normalizarTexto(ins.fechaHora)}
+                      </td>
+                      <td className="p-3 font-bold text-slate-700 whitespace-nowrap">
+                        {normalizarTexto(ins.placa)}
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        {normalizarTexto(ins.clienteDocumento)}
+                      </td>
+                      <td className="p-3 min-w-[220px]">
+                        {normalizarTexto(ins.clienteNombre)}
+                      </td>
+                      <td className="p-3 min-w-[180px]">
+                        {normalizarTexto(ins.conceptoVehicular)}
+                      </td>
+                      <td className="p-3 font-mono text-center whitespace-nowrap">
+                        {normalizarTexto(ins.linea)}
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <BadgeEstado value={ins.estadoActual || ins.estado} />
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        {normalizarTexto(ins.numeroCertificado)}
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <BadgeEstado value={ins.resultado} />
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <BadgeEstado value={ins.estadoCertificado} />
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <button
+                          type="button"
+                          className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-200 transition"
+                        >
+                          Ver
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              }
             </tbody>
           </table>
         </div>
@@ -511,16 +511,7 @@ export function InicioView({
           </div>
         </div>
 
-        <div className="mt-3 text-[11px] text-slate-400">
-          Endpoint:
-          <span className="ml-1 font-mono text-slate-600">
-            /api/operacion/inspecciones-dia?plantaKey=
-            {plantaSeleccionada || 'N/A'}
-            &cliente={filtros.cliente || ''}
-            &page={page}
-            &pageSize={pageSize}
-          </span>
-        </div>
+
       </div>
     </div>
   );
