@@ -257,6 +257,33 @@ export const authApi = {
       status: string;
       message: string;
     }>(response);
+  },
+
+  cambiarContrasenaAsync: async (
+    username: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ status: string; message: string }> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/auth/change-password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: username.trim(),
+        currentPassword,
+        newPassword
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          'Error al cambiar contraseña.'
+        )
+      );
+    }
+
+    return parseJsonResponse<{ status: string; message: string }>(response);
   }
 };
 

@@ -159,6 +159,11 @@ export function InicioView({
   };
 
   useEffect(() => {
+    setFiltros(prev => {
+      const nextFiltros = { ...prev, lineaKey: 'TODOS' };
+      filtrosRef.current = nextFiltros;
+      return nextFiltros;
+    });
     cargarInspecciones(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantaSeleccionada]);
