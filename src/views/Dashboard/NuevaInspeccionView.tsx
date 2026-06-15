@@ -105,10 +105,10 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   }
 
   return (
-    <div className="w-full min-h-[calc(100vh-10rem)] bg-[#fcfaf4] rounded-2xl shadow-xl border-t-4 border-t-amber-500 border border-amber-200/50 overflow-hidden flex flex-col">
+    <div className="w-full min-h-[calc(100vh-10rem)] bg-white rounded-2xl shadow-xl border-t-4 border-t-amber-500 border border-slate-200 overflow-hidden flex flex-col">
       
       {/* Header / Stepper */}
-      <div className="bg-white border-b border-amber-100 p-6">
+      <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-6">
         <div className="flex items-center gap-3 mb-6">
           <button 
             type="button" 
@@ -137,7 +137,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
             const isCompleted = index < currentStepIndex;
             
             return (
-              <div key={step.id} className="flex flex-col items-center gap-2 bg-slate-50 px-2">
+              <div key={step.id} className="flex flex-col items-center gap-2 bg-[#f4f9ff] px-2">
                 <div 
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                     isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
