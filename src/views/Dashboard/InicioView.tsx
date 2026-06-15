@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { operacionApi } from '../../services/api';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL 
+const SOCKET_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '')
   : 'http://127.0.0.1:3000';
 import type { InspeccionPanel } from '../../types/operacion';
@@ -10,6 +10,7 @@ import type { InspeccionPanel } from '../../types/operacion';
 interface InicioViewProps {
   plantaSeleccionada: string;
   plantaNombre: string;
+  onNuevaInspeccion?: () => void;
 }
 
 interface FiltrosPanel {
@@ -74,12 +75,10 @@ function BadgeEstado({ value }: { value?: string | null }) {
   );
 }
 
-export function InicioView({
-  plantaSeleccionada,
-  plantaNombre
-}: InicioViewProps) {
+export function InicioView(props: InicioViewProps) {
+  const { plantaSeleccionada, plantaNombre } = props;
   const [inspecciones, setInspecciones] = useState<InspeccionPanel[]>([]);
-  const [lineasDisponibles, setLineasDisponibles] = useState<{key: string; nombre: string}[]>([]);
+  const [lineasDisponibles, setLineasDisponibles] = useState<{ key: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -219,7 +218,8 @@ export function InicioView({
       placa: '',
       estado: '',
       numeroInspeccion: '',
-      cliente: ''
+      cliente: '',
+      lineaKey: ''
     });
 
     setPage(1);
@@ -278,7 +278,11 @@ export function InicioView({
             <button className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition">
               + Nuevo Servicio
             </button>
-            <button className="px-3 py-1.5 bg-[#052a79] text-white rounded text-xs font-semibold hover:bg-blue-900 transition">
+            <button 
+              type="button"
+              onClick={props.onNuevaInspeccion}
+              className="px-3 py-1.5 bg-[#052a79] text-white rounded text-xs font-semibold hover:bg-blue-900 transition"
+            >
               + Nueva Inspección
             </button>
           </div>

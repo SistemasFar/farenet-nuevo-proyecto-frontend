@@ -5,6 +5,7 @@ import { InicioView } from './InicioView';
 import { AuditoriaView } from './AuditoriaView';
 import { GenericView } from './GenericView';
 import InspeccionesView from '../Inspecciones/InspeccionesView';
+import { NuevaInspeccionView } from './NuevaInspeccionView';
 
 import type {
   UserSession,
@@ -22,6 +23,7 @@ interface MainLayoutProps {
 
 const TAB_PERMISOS: Record<string, string[]> = {
   inicio: [],
+  nueva_inspeccion: [], // Idealmente requiere permiso CREAR_INSPECCION, lo dejaremos vacio o como LISTA por ahora para que pueda verlo
   inspecciones: ['LISTA_INSPECCION', 'VER_INSPECCION', 'CREAR_INSPECCION'],
   personas: ['EDITAR_PERSONA'],
   vehiculos: ['EDITAR_VEHICULO'],
@@ -108,8 +110,12 @@ export function MainLayout({
           <InicioView
             plantaSeleccionada={plantaKey}
             plantaNombre={plantaNombre}
+            onNuevaInspeccion={() => setActiveTab('nueva_inspeccion')}
           />
         );
+
+      case 'nueva_inspeccion':
+        return <NuevaInspeccionView onBack={() => setActiveTab('inicio')} />;
 
       case 'inspecciones':
         return (
@@ -186,6 +192,7 @@ export function MainLayout({
           <InicioView
             plantaSeleccionada={plantaKey}
             plantaNombre={plantaNombre}
+            onNuevaInspeccion={() => setActiveTab('nueva_inspeccion')}
           />
         );
     }

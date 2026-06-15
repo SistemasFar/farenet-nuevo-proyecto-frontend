@@ -7,8 +7,8 @@ import {
 } from '../../services/api';
 
 import type {
-  InspeccionRegistrada
-} from '../../types/inspecciones';
+  InspeccionPanel
+} from '../../types/operacion';
 
 const PAGE_SIZES = [5, 10, 20, 25, 50];
 
@@ -16,7 +16,7 @@ export default function InspeccionesView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [inspecciones, setInspecciones] = useState<InspeccionRegistrada[]>([]);
+  const [inspecciones, setInspecciones] = useState<InspeccionPanel[]>([]);
 
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -292,7 +292,7 @@ export default function InspeccionesView() {
                   <td className="px-4 py-3 text-slate-600">{item.fechaHora}</td>
                   <td className="px-4 py-3 font-semibold text-slate-700">{item.placa}</td>
                   <td className="px-4 py-3 text-slate-600">{item.comprobante}</td>
-                  <td className="px-4 py-3 text-slate-600">{item.cliente}</td>
+                  <td className="px-4 py-3 text-slate-600">{item.clienteNombre || item.clienteDocumento}</td>
                   <td className="px-4 py-3 text-slate-600">{item.conceptoVehicular}</td>
                   <td className="px-4 py-3 text-slate-600">{item.linea}</td>
                   <td className="px-4 py-3">

@@ -605,3 +605,21 @@ export const permisosSession = {
     sessionStorage.removeItem('permisos');
   }
 };
+
+import type { MaestrosCajaResponse } from '../types/maestros';
+
+export const maestrosApi = {
+  obtenerMaestrosCajaAsync: async (): Promise<MaestrosCajaResponse> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/caja`, {
+      method: 'GET'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, 'Error al obtener maestros.')
+      );
+    }
+
+    return parseJsonResponse<MaestrosCajaResponse>(response);
+  }
+};
