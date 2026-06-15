@@ -64,7 +64,7 @@ export function Header({
 
   const pageTitle = routeToTitle(activeTab);
 
-  const userName = user?.username ?? 'OPERADOR';
+  const userName = String(user?.nombreCompleto || user?.username || 'OPERADOR').toUpperCase();
 
   const userInitial =
     userName.trim()[0]?.toUpperCase() ?? 'U';
@@ -158,7 +158,7 @@ export function Header({
                     Operador
                   </span>
 
-                  <span className="block text-sm font-bold text-slate-800 truncate">
+                  <span className="block text-sm font-bold text-slate-800 break-words">
                     {userName}
                   </span>
 

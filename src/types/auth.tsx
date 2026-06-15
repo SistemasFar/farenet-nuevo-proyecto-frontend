@@ -1,5 +1,6 @@
 export interface UserSession {
   username: string;
+  nombreCompleto?: string;
   perfilId: string;
   personaDocumento?: string;
   estado?: boolean;
