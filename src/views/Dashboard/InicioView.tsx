@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
 import { operacionApi } from '../../services/api';
+
+const SOCKET_URL = import.meta.env.VITE_API_URL 
+  ? import.meta.env.VITE_API_URL.replace('/api', '')
+  : 'http://127.0.0.1:3000';
 import type { InspeccionPanel } from '../../types/operacion';
 
 interface InicioViewProps {
@@ -14,6 +19,7 @@ interface FiltrosPanel {
   estado: string;
   numeroInspeccion: string;
   cliente: string;
+  lineaKey: string;
 }
 
 const obtenerFechaActual = (): string => {
@@ -73,6 +79,7 @@ export function InicioView({
   plantaNombre
 }: InicioViewProps) {
   const [inspecciones, setInspecciones] = useState<InspeccionPanel[]>([]);
+  const [lineasDisponibles, setLineasDisponibles] = useState<{key: string; nombre: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -85,9 +92,10 @@ export function InicioView({
     fechaInicio: obtenerFechaActual(),
     fechaFin: obtenerFechaActual(),
     placa: '',
-    estado: '',
+    estado: 'PROCESO',
     numeroInspeccion: '',
-    cliente: ''
+    cliente: '',
+    lineaKey: 'TODOS'
   });
   const filtrosRef = useRef(filtros);
 
@@ -123,7 +131,13 @@ export function InicioView({
       const response = await operacionApi.listarInspeccionesAsync(
         plantaSeleccionada,
         {
+          fechaInicio: filtrosActuales.fechaInicio,
+          fechaFin: filtrosActuales.fechaFin,
+          placa: filtrosActuales.placa,
+          estado: filtrosActuales.estado,
+          numeroInspeccion: filtrosActuales.numeroInspeccion,
           cliente: filtrosActuales.cliente,
+          lineaKey: filtrosActuales.lineaKey,
           page: paginaConsulta,
           pageSize: pageSizeConsulta
         }
@@ -149,17 +163,32 @@ export function InicioView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantaSeleccionada]);
   useEffect(() => {
+    if (plantaSeleccionada) {
+      operacionApi.listarLineasAsync(plantaSeleccionada)
+        .then(setLineasDisponibles)
+        .catch(console.error);
+    }
+  }, [plantaSeleccionada]);
+
+  useEffect(() => {
     if (!puedeConsultar) return;
 
-    const intervalId = window.setInterval(() => {
-      cargarInspecciones(page, pageSize);
-    }, 60000);
+    const socket = io(SOCKET_URL, {
+      withCredentials: true
+    });
+
+    socket.on('inspeccionActualizada', (payload: any) => {
+      if (payload && payload.planta_key === plantaSeleccionada) {
+        console.log('🔄 Actualizando inspecciones por WebSocket:', payload);
+        cargarInspecciones(page, pageSize);
+      }
+    });
 
     return () => {
-      window.clearInterval(intervalId);
+      socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [puedeConsultar, page, pageSize]);
+  }, [puedeConsultar, plantaSeleccionada, page, pageSize]);
 
   const handleFiltroChange = (
     field: keyof FiltrosPanel,
@@ -289,7 +318,7 @@ export function InicioView({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <p className="text-[11px] font-bold text-slate-400 uppercase">
               Total registros
@@ -331,6 +360,25 @@ export function InicioView({
               <option value={50}>50</option>
             </select>
           </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[11px] font-bold text-slate-400 uppercase">
+              Línea
+            </p>
+            <select
+              value={filtros.lineaKey}
+              onChange={(e) => handleFiltroChange('lineaKey', e.target.value)}
+              disabled={loading}
+              className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400"
+            >
+              <option value="TODOS">Todas las líneas</option>
+              {lineasDisponibles.map((l) => (
+                <option key={l.key} value={l.key}>
+                  {l.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {error && (
@@ -367,9 +415,7 @@ export function InicioView({
                 <th className="p-3 border-r border-teal-600">
                   Estado actual
                 </th>
-                <th className="p-3 border-r border-teal-600">
-                  N° Certificado
-                </th>
+
                 <th className="p-3 border-r border-teal-600">
                   Resultado
                 </th>
@@ -443,9 +489,6 @@ export function InicioView({
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         <BadgeEstado value={ins.estadoActual || ins.estado} />
-                      </td>
-                      <td className="p-3 whitespace-nowrap">
-                        {normalizarTexto(ins.numeroCertificado)}
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         <BadgeEstado value={ins.resultado} />

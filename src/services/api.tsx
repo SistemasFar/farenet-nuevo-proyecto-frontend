@@ -343,6 +343,7 @@ export const operacionApi = {
       placa?: string;
       estado?: string;
       numeroInspeccion?: string;
+      lineaKey?: string;
       page?: number;
       pageSize?: number;
       cliente?: string;
@@ -378,6 +379,10 @@ export const operacionApi = {
   params.append('cliente', filtros.cliente.trim());
 }
 
+    if (filtros?.lineaKey?.trim()) {
+      params.append('lineaKey', filtros.lineaKey.trim());
+    }
+
     params.append('page', String(filtros?.page ?? 1));
     params.append('pageSize', String(filtros?.pageSize ?? 5));
 
@@ -401,6 +406,30 @@ export const operacionApi = {
     }
 
     return parseJsonResponse<InspeccionesResponse>(response);
+  },
+
+  listarLineasAsync: async (plantaKey: string): Promise<{ key: string; nombre: string }[]> => {
+    const response = await fetchWithTimeout(
+      `${BASE_URL}/operacion/lineas/${plantaKey}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(
+          response,
+          'Error al obtener las líneas de la planta.'
+        )
+      );
+    }
+
+    const result = await parseJsonResponse<{ status: string; data: { key: string; nombre: string }[] }>(response);
+    return result.data || [];
   }
 };
 
