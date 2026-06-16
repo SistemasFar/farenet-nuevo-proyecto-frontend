@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { maestrosApi, plantaSession } from '../../services/api';
-import type { MaestrosCajaResponse } from '../../types/maestros';
+import type { MaestrosCajaResponse, MaestrosPagoResponse } from '../../types/maestros';
 import { Search, XCircle, CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Frown, HelpCircle } from 'lucide-react';
 import Select from 'react-select';
 
@@ -47,7 +47,6 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   const [descuento, setDescuento] = useState<number>(0);
   const [precioTotal, setPrecioTotal] = useState<number>(0);
   
-  const [formaPago, setFormaPago] = useState<string>('');
   const [documentoPago, setDocumentoPago] = useState<string>('');
 
   // Form State (Caja)
@@ -61,9 +60,29 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
     tipoAutorizacion: ''
   });
 
+  // Pago State
+  const [maestrosPago, setMaestrosPago] = useState<MaestrosPagoResponse['data'] | null>(null);
+  const [pagosAgregados, setPagosAgregados] = useState<any[]>([]);
+  const [pagoTab, setPagoTab] = useState<'EFECTIVO' | 'TARJETA' | 'BANCO'>('EFECTIVO');
+  
+  // Form State (Pago)
+  const [formPago, setFormPago] = useState({
+    importe: '',
+    tarjetaKey: '',
+    entidadFinancieraKey: '',
+    cuentaCorrienteKey: '',
+    nroOperacion: '',
+    digitosTarjeta: '',
+    fechaDeposito: new Date().toISOString().split('T')[0]
+  });
+
   useEffect(() => {
-    cargarMaestros();
-  }, []);
+    if (currentStepIndex === 0 && !maestros) {
+      cargarMaestros();
+    } else if (currentStepIndex === 1 && !maestrosPago) {
+      cargarMaestrosPago();
+    }
+  }, [currentStepIndex]);
 
   const cargarMaestros = async () => {
     try {
@@ -71,7 +90,19 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
       const res = await maestrosApi.obtenerMaestrosCajaAsync();
       setMaestros(res.data);
     } catch (err: any) {
-      setError(err.message || 'Error cargando maestros');
+      setError(err.message || 'Error cargando maestros de caja');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cargarMaestrosPago = async () => {
+    try {
+      setLoading(true);
+      const res = await maestrosApi.obtenerMaestrosPagoAsync();
+      setMaestrosPago(res.data);
+    } catch (err: any) {
+      setError(err.message || 'Error cargando maestros de pago');
     } finally {
       setLoading(false);
     }
@@ -130,7 +161,72 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
     }
   };
 
-  if (loading) {
+  const montoPendiente = Math.max(0, precioTotal - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
+
+  const handleAgregarPago = () => {
+    if (!formPago.importe || isNaN(parseFloat(formPago.importe)) || parseFloat(formPago.importe) <= 0) {
+      alert('Ingrese un importe válido mayor a 0.');
+      return;
+    }
+    
+    const importeNumerico = parseFloat(formPago.importe);
+    
+    if (pagoTab === 'BANCO') {
+      if (importeNumerico !== precioTotal) {
+        alert('Los pagos por Banco o Transferencia deben cubrir el monto total de la operación.');
+        return;
+      }
+      if (!formPago.entidadFinancieraKey || !formPago.cuentaCorrienteKey || !formPago.nroOperacion || !formPago.fechaDeposito) {
+        alert('Complete todos los campos del banco.');
+        return;
+      }
+    } else if (pagoTab === 'TARJETA') {
+      const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
+      const isYapePlin = selected && (selected.nombre.toUpperCase().includes('YAPE') || selected.nombre.toUpperCase().includes('PLIN'));
+      
+      if (!formPago.tarjetaKey || !formPago.nroOperacion) {
+        alert('Complete los campos obligatorios de la tarjeta.');
+        return;
+      }
+      if (!isYapePlin && !formPago.digitosTarjeta) {
+        alert('Ingrese los últimos 4 dígitos de la tarjeta.');
+        return;
+      }
+    }
+
+    if (importeNumerico > montoPendiente) {
+      alert(`El importe ingresado (S/ ${importeNumerico.toFixed(2)}) es mayor al monto pendiente (S/ ${montoPendiente.toFixed(2)}).`);
+      return;
+    }
+
+    const nuevoPago = {
+      tipo: pagoTab,
+      importe: importeNumerico.toFixed(2),
+      ...formPago,
+      nroOperacion: formPago.nroOperacion.trim()
+    };
+
+    setPagosAgregados([...pagosAgregados, nuevoPago]);
+    
+    // Reset form
+    setFormPago({
+      importe: '',
+      tarjetaKey: '',
+      entidadFinancieraKey: '',
+      cuentaCorrienteKey: '',
+      nroOperacion: '',
+      digitosTarjeta: '',
+      fechaDeposito: new Date().toISOString().split('T')[0]
+    });
+  };
+
+  const eliminarPago = (index: number) => {
+    const nuevosPagos = [...pagosAgregados];
+    nuevosPagos.splice(index, 1);
+    setPagosAgregados(nuevosPagos);
+  };
+
+  if (loading && currentStepIndex === 0) {
     return <div className="p-8 text-center text-slate-500">Cargando opciones...</div>;
   }
 
@@ -279,10 +375,12 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                 <Select
                   options={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })) || []}
                   value={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })).find(o => o.value === formCaja.tipoAutorizacion) || null}
-                  onChange={(o) => handleSelectChange('tipoAutorizacion', o)}
+                  onChange={(o) => setFormCaja({...formCaja, tipoAutorizacion: o?.value || ''})}
                   placeholder="Seleccione..."
                   isClearable
                   styles={customSelectStyles}
+                  menuPlacement="top"
+                  menuPortalTarget={document.body}
                 />
               </div>
 
@@ -371,21 +469,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                 <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-3">
                   <h3 className="text-sm font-black text-[#052a79] uppercase tracking-wide">Resumen de Pago</h3>
                 </div>
-                <div className="p-5 bg-white grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
-
-                  <div className="flex flex-col gap-1.5 md:col-span-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Forma de Pago</label>
-                    <Select
-                      options={[{ value: 'EFECTIVO', label: 'EFECTIVO' }, { value: 'TARJETA', label: 'TARJETA' }, { value: 'YAPE/PLIN', label: 'YAPE/PLIN' }]}
-                      value={[{ value: 'EFECTIVO', label: 'EFECTIVO' }, { value: 'TARJETA', label: 'TARJETA' }, { value: 'YAPE/PLIN', label: 'YAPE/PLIN' }].find(o => o.value === formaPago) || null}
-                      onChange={(o) => setFormaPago(o?.value || '')}
-                      placeholder="Seleccione..."
-                      styles={customSelectStyles}
-                      isClearable
-                      menuPlacement="top"
-                      menuPortalTarget={document.body}
-                    />
-                  </div>
+                <div className="p-5 bg-white grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
 
                   <div className="flex flex-col gap-1.5 md:col-span-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Documento</label>
@@ -467,7 +551,6 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                         setPrecioSubtotal(0);
                         setDescuento(0);
                         setPrecioTotal(0);
-                        setFormaPago('');
                         setDocumentoPago('');
                         setShowAnularModal(false);
                       }}
@@ -504,8 +587,205 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
           </div>
         )}
 
+        {/* PASO 2: PAGO */}
+        {currentStepIndex === 1 && (
+          <div className="p-6">
+            {/* Cabecera de Totales */}
+            <div className="grid grid-cols-2 gap-6 mb-8">
+              <div className="bg-[#f4f9ff] border-2 border-[#052a79] rounded-2xl p-6 text-center shadow-sm">
+                <h3 className="text-sm font-black text-[#052a79] uppercase tracking-wider mb-2">Monto Total a Pagar</h3>
+                <p className="text-4xl font-black text-[#052a79]">S/ {precioTotal.toFixed(2)}</p>
+              </div>
+              <div className={`border-2 rounded-2xl p-6 text-center shadow-sm transition-colors ${montoPendiente > 0 ? 'bg-red-50 border-red-500' : 'bg-green-50 border-green-500'}`}>
+                <h3 className={`text-sm font-black uppercase tracking-wider mb-2 ${montoPendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>Monto Pendiente</h3>
+                <p className={`text-4xl font-black ${montoPendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>S/ {montoPendiente.toFixed(2)}</p>
+              </div>
+            </div>
+
+            {/* Pestañas de Método de Pago */}
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+              {(['EFECTIVO', 'TARJETA', 'BANCO'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setPagoTab(tab)}
+                  className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${pagoTab === tab ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* Formulario de Pago */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
+              <h3 className="text-sm font-black text-slate-800 uppercase mb-4">Detalles del Pago: {pagoTab}</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                {pagoTab === 'TARJETA' && (
+                  <>
+                    <div className="flex flex-col gap-1.5 md:col-span-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Tipo Tarjeta</label>
+                      <Select
+                        options={maestrosPago?.tarjetas?.map(t => ({ value: t.key, label: t.nombre })) || []}
+                        value={maestrosPago?.tarjetas?.map(t => ({ value: t.key, label: t.nombre })).find(o => o.value === formPago.tarjetaKey) || null}
+                        onChange={(o) => setFormPago({...formPago, tarjetaKey: o?.value || ''})}
+                        placeholder="Seleccione..."
+                        styles={customSelectStyles}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Nro. Operación</label>
+                      <input type="text" value={formPago.nroOperacion} onChange={(e) => setFormPago({...formPago, nroOperacion: e.target.value.replace(/[^0-9]/g, '')})} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500" />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Últimos 4 Dígitos</label>
+                      <input 
+                        type="text" 
+                        maxLength={4} 
+                        value={formPago.digitosTarjeta} 
+                        onChange={(e) => setFormPago({...formPago, digitosTarjeta: e.target.value.replace(/\\D/g, '')})} 
+                        disabled={(() => {
+                          const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
+                          if (!selected) return false;
+                          const name = selected.nombre.toUpperCase();
+                          return name.includes('YAPE') || name.includes('PLIN');
+                        })()}
+                        className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none ${
+                          (() => {
+                            const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
+                            return selected && (selected.nombre.toUpperCase().includes('YAPE') || selected.nombre.toUpperCase().includes('PLIN')) 
+                              ? 'bg-slate-100 cursor-not-allowed opacity-60' 
+                              : 'focus:border-amber-500'
+                          })()
+                        }`}
+                        placeholder={
+                          (() => {
+                            const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
+                            return selected && (selected.nombre.toUpperCase().includes('YAPE') || selected.nombre.toUpperCase().includes('PLIN')) 
+                              ? 'N/A' 
+                              : ''
+                          })()
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                {pagoTab === 'BANCO' && (
+                  <>
+                    <div className="flex flex-col gap-1.5 md:col-span-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Banco (*)</label>
+                      <Select
+                        options={maestrosPago?.entidadesFinancieras?.map(t => ({ value: t.key, label: t.nombre })) || []}
+                        value={maestrosPago?.entidadesFinancieras?.map(t => ({ value: t.key, label: t.nombre })).find(o => o.value === formPago.entidadFinancieraKey) || null}
+                        onChange={(o) => setFormPago({...formPago, entidadFinancieraKey: o?.value || '', cuentaCorrienteKey: ''})}
+                        placeholder="Seleccione..."
+                        styles={customSelectStyles}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Cuenta Corriente (*)</label>
+                      <Select
+                        options={maestrosPago?.cuentasCorrientes?.filter(c => c.entidadfinanciera_key === formPago.entidadFinancieraKey).map(t => ({ value: t.key, label: t.nombre })) || []}
+                        value={maestrosPago?.cuentasCorrientes?.map(t => ({ value: t.key, label: t.nombre })).find(o => o.value === formPago.cuentaCorrienteKey) || null}
+                        onChange={(o) => setFormPago({...formPago, cuentaCorrienteKey: o?.value || ''})}
+                        placeholder={formPago.entidadFinancieraKey ? "Seleccione cuenta..." : "Elija banco primero"}
+                        isDisabled={!formPago.entidadFinancieraKey}
+                        styles={customSelectStyles}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Nro. Operación (*)</label>
+                      <input 
+                        type="text" 
+                        maxLength={20}
+                        value={formPago.nroOperacion} 
+                        onChange={(e) => setFormPago({...formPago, nroOperacion: e.target.value.replace(/[^0-9]/g, '')})} 
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500" 
+                      />
+                      <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Ingrese el N° indicado en el voucher.</p>
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Fecha Depósito (*)</label>
+                      <input 
+                        type="date" 
+                        max={new Date().toISOString().split('T')[0]}
+                        value={formPago.fechaDeposito} 
+                        onChange={(e) => setFormPago({...formPago, fechaDeposito: e.target.value})} 
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500" 
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="flex flex-col gap-1.5 md:col-span-1">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Importe (S/) (*)</label>
+                  <input 
+                    type="text" 
+                    value={pagoTab === 'BANCO' ? montoPendiente.toFixed(2) : formPago.importe} 
+                    onChange={(e) => {
+                      // Solo permitir números y un punto decimal
+                      let val = e.target.value.replace(/[^0-9.]/g, '');
+                      // Evitar múltiples puntos
+                      const parts = val.split('.');
+                      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                      setFormPago({...formPago, importe: val});
+                    }} 
+                    readOnly={pagoTab === 'BANCO'}
+                    className={`w-full rounded-lg border ${pagoTab === 'BANCO' ? 'bg-slate-100 border-slate-200 cursor-not-allowed' : 'border-amber-400 bg-amber-50 focus:ring-2 focus:ring-amber-200'} px-3 py-2 text-lg font-black text-slate-700 outline-none`} 
+                  />
+                  {pagoTab === 'BANCO' && <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Monto total depositado según voucher.</p>}
+                </div>
+
+                <div className="md:col-span-1">
+                  <button
+                    onClick={handleAgregarPago}
+                    disabled={montoPendiente <= 0}
+                    className="w-full px-4 py-2.5 rounded-lg font-black text-white bg-[#052a79] hover:bg-blue-900 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed uppercase text-sm"
+                  >
+                    AGREGAR
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de Pagos Agregados */}
+            {pagosAgregados.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="bg-[#f4f9ff] text-[#052a79] text-xs uppercase font-black">
+                    <tr>
+                      <th className="px-4 py-3">Tipo</th>
+                      <th className="px-4 py-3">Detalle</th>
+                      <th className="px-4 py-3 text-right">Importe</th>
+                      <th className="px-4 py-3 text-center">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagosAgregados.map((pago, idx) => (
+                      <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50">
+                        <td className="px-4 py-3 font-bold">{pago.tipo}</td>
+                        <td className="px-4 py-3 text-xs">
+                          {pago.tipo === 'TARJETA' && `Operación: ${pago.nroOperacion} | Tarjeta: ****${pago.digitosTarjeta}`}
+                          {pago.tipo === 'BANCO' && `Operación: ${pago.nroOperacion} | Fecha: ${pago.fechaDeposito}`}
+                          {pago.tipo === 'EFECTIVO' && '-'}
+                        </td>
+                        <td className="px-4 py-3 font-black text-right">S/ {parseFloat(pago.importe).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => eliminarPago(idx)} className="text-red-500 hover:text-red-700">
+                            <XCircle className="w-5 h-5 mx-auto" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* OTROS PASOS */}
-        {currentStepIndex > 0 && (
+        {currentStepIndex > 1 && (
           <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-4">
             <CheckCircle2 className="w-16 h-16 text-slate-300" />
             <h3 className="text-xl font-bold text-slate-700">Paso en construcción</h3>
@@ -528,7 +808,8 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
           <button
             type="button"
             onClick={irSiguientePaso}
-            className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-bold text-white hover:bg-blue-900 transition"
+            disabled={currentStepIndex === 1 && montoPendiente > 0}
+            className={`rounded-lg bg-[#052a79] px-5 py-2 text-xs font-bold text-white transition ${currentStepIndex === 1 && montoPendiente > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-900'}`}
           >
             {currentStepIndex === STEPS.length - 1 ? 'Finalizar' : 'Siguiente Paso'}
           </button>

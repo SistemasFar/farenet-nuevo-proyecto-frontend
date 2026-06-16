@@ -24,5 +24,20 @@ export interface MaestrosCajaResponse {
     tiposInspeccion: MaestroOption[];
     tiposCertificado: MaestroAbreviaturaOption[];
     tiposAutorizacion: MaestroOption[];
+    tiposDocumento: MaestroOption[];
+  };
+}
+
+export interface CuentaCorrienteOption extends MaestroOption {
+  entidadfinanciera_key: string;
+}
+
+export interface MaestrosPagoResponse {
+  status: string;
+  data: {
+    formasPago: MaestroOption[];
+    tarjetas: MaestroOption[];
+    entidadesFinancieras: MaestroOption[];
+    cuentasCorrientes: CuentaCorrienteOption[];
   };
 }
