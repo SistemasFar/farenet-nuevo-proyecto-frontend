@@ -37,6 +37,9 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [isConsultado, setIsConsultado] = useState(false);
+  const [documentoDescuento, setDocumentoDescuento] = useState('');
+
   // Form State (Caja)
   const [formCaja, setFormCaja] = useState({
     tipoPlaca: '',
@@ -281,8 +284,8 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                 type="button" 
                 onClick={() => {
                    if (validarCaja()) {
-                     alert('Consultando vehículo...');
-                     irSiguientePaso();
+                     setIsConsultado(true);
+                     // irSiguientePaso(); // Comentado por ahora para mostrar la sección de descuentos en el mismo paso
                    } else {
                      alert('Por favor complete todos los campos.');
                    }
@@ -299,6 +302,8 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                   setFormCaja({
                     tipoPlaca: '', placa: '', concepto: '', categoria: '', tipoInspeccion: '', tipoCertificado: '', tipoAutorizacion: ''
                   });
+                  setIsConsultado(false);
+                  setDocumentoDescuento('');
                 }}
                 className="flex items-center gap-2 rounded-lg bg-white border border-red-200 text-red-600 px-6 py-2.5 text-xs font-bold hover:bg-red-50 shadow-sm transition uppercase tracking-wide"
               >
@@ -306,6 +311,32 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                 Anular
               </button>
             </div>
+
+            {/* SECCION DE DESCUENTOS (Solo se muestra después de consultar) */}
+            {isConsultado && (
+              <div className="mt-4 p-4 rounded-lg bg-[#f2cc11] border-2 border-[#e0bc0d] shadow-md">
+                <div className="flex items-center gap-3 mb-3">
+                  <h4 className="text-[#052a79] font-black uppercase text-sm drop-shadow-sm">
+                    Buscar descuentos por: Código / DNI / RUC / Placa
+                  </h4>
+                  <span className="text-red-600 font-black text-xs uppercase animate-pulse drop-shadow-sm bg-white/50 px-2 py-0.5 rounded">
+                    POR HACER
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={documentoDescuento}
+                    onChange={(e) => setDocumentoDescuento(e.target.value)}
+                    placeholder="Número de documento..."
+                    className="flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 outline-none"
+                  />
+                  <button type="button" className="bg-[#052a79] text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-blue-900 transition flex items-center gap-2 uppercase">
+                    <Search className="w-3 h-3" /> Buscar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
