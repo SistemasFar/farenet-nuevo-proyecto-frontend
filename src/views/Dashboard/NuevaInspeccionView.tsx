@@ -46,7 +46,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   const [precioSubtotal, setPrecioSubtotal] = useState<number>(0);
   const [descuento, setDescuento] = useState<number>(0);
   const [precioTotal, setPrecioTotal] = useState<number>(0);
-  
+
   const [documentoPago, setDocumentoPago] = useState<string>('');
 
   // Form State (Caja)
@@ -64,7 +64,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   const [maestrosPago, setMaestrosPago] = useState<MaestrosPagoResponse['data'] | null>(null);
   const [pagosAgregados, setPagosAgregados] = useState<any[]>([]);
   const [pagoTab, setPagoTab] = useState<'EFECTIVO' | 'TARJETA' | 'BANCO'>('EFECTIVO');
-  
+
   // Form State (Pago)
   const [formPago, setFormPago] = useState({
     importe: '',
@@ -168,21 +168,18 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
       alert('Ingrese un importe válido mayor a 0.');
       return;
     }
-    
+
     const importeNumerico = parseFloat(formPago.importe);
-    
+
     if (pagoTab === 'BANCO') {
-      if (importeNumerico !== precioTotal) {
-        alert('Los pagos por Banco o Transferencia deben cubrir el monto total de la operación.');
-        return;
-      }
       if (!formPago.entidadFinancieraKey || !formPago.cuentaCorrienteKey || !formPago.nroOperacion || !formPago.fechaDeposito) {
         alert('Complete todos los campos del banco.');
         return;
       }
     } else if (pagoTab === 'TARJETA') {
       const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
-      const isYapePlin = selected && (selected.nombre.toUpperCase().includes('YAPE') || selected.nombre.toUpperCase().includes('PLIN'));
+      const nameUpper = selected ? selected.nombre.toUpperCase() : '';
+      const isYapePlin = nameUpper.includes('YAPE') || nameUpper.includes('PLIN') || nameUpper.includes('CUPONIDAD');
       
       if (!formPago.tarjetaKey || !formPago.nroOperacion) {
         alert('Complete los campos obligatorios de la tarjeta.');
@@ -207,7 +204,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
     };
 
     setPagosAgregados([...pagosAgregados, nuevoPago]);
-    
+
     // Reset form
     setFormPago({
       importe: '',
@@ -270,8 +267,8 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
               <div key={step.id} className="flex flex-col items-center gap-2 bg-[#f4f9ff] px-2">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
-                      isCompleted ? 'bg-amber-500 text-white shadow-sm' :
-                        'bg-white text-slate-400 border-2 border-slate-200'
+                    isCompleted ? 'bg-amber-500 text-white shadow-sm' :
+                      'bg-white text-slate-400 border-2 border-slate-200'
                     }`}
                 >
                   {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
@@ -375,7 +372,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                 <Select
                   options={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })) || []}
                   value={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })).find(o => o.value === formCaja.tipoAutorizacion) || null}
-                  onChange={(o) => setFormCaja({...formCaja, tipoAutorizacion: o?.value || ''})}
+                  onChange={(o) => setFormCaja({ ...formCaja, tipoAutorizacion: o?.value || '' })}
                   placeholder="Seleccione..."
                   isClearable
                   styles={customSelectStyles}
@@ -523,7 +520,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                 </button>
               </div>
             )}
-            
+
             {/* MODAL PERSONALIZADO PARA ANULAR */}
             {showAnularModal && (
               <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -618,8 +615,8 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
             {/* Formulario de Pago */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
               <h3 className="text-sm font-black text-slate-800 uppercase mb-4">Detalles del Pago: {pagoTab}</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                 {pagoTab === 'TARJETA' && (
                   <>
                     <div className="flex flex-col gap-1.5 md:col-span-1">
@@ -627,41 +624,44 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                       <Select
                         options={maestrosPago?.tarjetas?.map(t => ({ value: t.key, label: t.nombre })) || []}
                         value={maestrosPago?.tarjetas?.map(t => ({ value: t.key, label: t.nombre })).find(o => o.value === formPago.tarjetaKey) || null}
-                        onChange={(o) => setFormPago({...formPago, tarjetaKey: o?.value || ''})}
+                        onChange={(o) => setFormPago({ ...formPago, tarjetaKey: o?.value || '' })}
                         placeholder="Seleccione..."
                         styles={customSelectStyles}
                       />
                     </div>
                     <div className="flex flex-col gap-1.5 md:col-span-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Nro. Operación</label>
-                      <input type="text" value={formPago.nroOperacion} onChange={(e) => setFormPago({...formPago, nroOperacion: e.target.value.replace(/[^0-9]/g, '')})} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500" />
+                      <input type="text" value={formPago.nroOperacion} onChange={(e) => setFormPago({ ...formPago, nroOperacion: e.target.value.replace(/[^0-9]/g, '') })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500" />
                     </div>
                     <div className="flex flex-col gap-1.5 md:col-span-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Últimos 4 Dígitos</label>
-                      <input 
-                        type="text" 
-                        maxLength={4} 
-                        value={formPago.digitosTarjeta} 
-                        onChange={(e) => setFormPago({...formPago, digitosTarjeta: e.target.value.replace(/\\D/g, '')})} 
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={formPago.digitosTarjeta}
+                        onChange={(e) => setFormPago({ ...formPago, digitosTarjeta: e.target.value.replace(/\\D/g, '') })}
                         disabled={(() => {
                           const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
                           if (!selected) return false;
                           const name = selected.nombre.toUpperCase();
-                          return name.includes('YAPE') || name.includes('PLIN');
+                          return name.includes('YAPE') || name.includes('PLIN') || name.includes('CUPONIDAD');
                         })()}
-                        className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none ${
-                          (() => {
+                        className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none ${(() => {
                             const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
-                            return selected && (selected.nombre.toUpperCase().includes('YAPE') || selected.nombre.toUpperCase().includes('PLIN')) 
-                              ? 'bg-slate-100 cursor-not-allowed opacity-60' 
+                            if (!selected) return 'focus:border-amber-500';
+                            const name = selected.nombre.toUpperCase();
+                            return (name.includes('YAPE') || name.includes('PLIN') || name.includes('CUPONIDAD'))
+                              ? 'bg-slate-100 cursor-not-allowed opacity-60'
                               : 'focus:border-amber-500'
                           })()
-                        }`}
+                          }`}
                         placeholder={
                           (() => {
                             const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
-                            return selected && (selected.nombre.toUpperCase().includes('YAPE') || selected.nombre.toUpperCase().includes('PLIN')) 
-                              ? 'N/A' 
+                            if (!selected) return '';
+                            const name = selected.nombre.toUpperCase();
+                            return (name.includes('YAPE') || name.includes('PLIN') || name.includes('CUPONIDAD'))
+                              ? 'N/A'
                               : ''
                           })()
                         }
@@ -677,7 +677,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                       <Select
                         options={maestrosPago?.entidadesFinancieras?.map(t => ({ value: t.key, label: t.nombre })) || []}
                         value={maestrosPago?.entidadesFinancieras?.map(t => ({ value: t.key, label: t.nombre })).find(o => o.value === formPago.entidadFinancieraKey) || null}
-                        onChange={(o) => setFormPago({...formPago, entidadFinancieraKey: o?.value || '', cuentaCorrienteKey: ''})}
+                        onChange={(o) => setFormPago({ ...formPago, entidadFinancieraKey: o?.value || '', cuentaCorrienteKey: '' })}
                         placeholder="Seleccione..."
                         styles={customSelectStyles}
                       />
@@ -687,7 +687,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                       <Select
                         options={maestrosPago?.cuentasCorrientes?.filter(c => c.entidadfinanciera_key === formPago.entidadFinancieraKey).map(t => ({ value: t.key, label: t.nombre })) || []}
                         value={maestrosPago?.cuentasCorrientes?.map(t => ({ value: t.key, label: t.nombre })).find(o => o.value === formPago.cuentaCorrienteKey) || null}
-                        onChange={(o) => setFormPago({...formPago, cuentaCorrienteKey: o?.value || ''})}
+                        onChange={(o) => setFormPago({ ...formPago, cuentaCorrienteKey: o?.value || '' })}
                         placeholder={formPago.entidadFinancieraKey ? "Seleccione cuenta..." : "Elija banco primero"}
                         isDisabled={!formPago.entidadFinancieraKey}
                         styles={customSelectStyles}
@@ -695,23 +695,23 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                     </div>
                     <div className="flex flex-col gap-1.5 md:col-span-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Nro. Operación (*)</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         maxLength={20}
-                        value={formPago.nroOperacion} 
-                        onChange={(e) => setFormPago({...formPago, nroOperacion: e.target.value.replace(/[^0-9]/g, '')})} 
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500" 
+                        value={formPago.nroOperacion}
+                        onChange={(e) => setFormPago({ ...formPago, nroOperacion: e.target.value.replace(/[^0-9]/g, '') })}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500"
                       />
                       <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Ingrese el N° indicado en el voucher.</p>
                     </div>
                     <div className="flex flex-col gap-1.5 md:col-span-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Fecha Depósito (*)</label>
-                      <input 
-                        type="date" 
+                      <input
+                        type="date"
                         max={new Date().toISOString().split('T')[0]}
-                        value={formPago.fechaDeposito} 
-                        onChange={(e) => setFormPago({...formPago, fechaDeposito: e.target.value})} 
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500" 
+                        value={formPago.fechaDeposito}
+                        onChange={(e) => setFormPago({ ...formPago, fechaDeposito: e.target.value })}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500"
                       />
                     </div>
                   </>
@@ -719,28 +719,27 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
                 <div className="flex flex-col gap-1.5 md:col-span-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase">Importe (S/) (*)</label>
-                  <input 
-                    type="text" 
-                    value={pagoTab === 'BANCO' ? montoPendiente.toFixed(2) : formPago.importe} 
+                  <input
+                    type="text"
+                    value={formPago.importe}
                     onChange={(e) => {
                       // Solo permitir números y un punto decimal
                       let val = e.target.value.replace(/[^0-9.]/g, '');
                       // Evitar múltiples puntos
                       const parts = val.split('.');
                       if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-                      setFormPago({...formPago, importe: val});
-                    }} 
-                    readOnly={pagoTab === 'BANCO'}
-                    className={`w-full rounded-lg border ${pagoTab === 'BANCO' ? 'bg-slate-100 border-slate-200 cursor-not-allowed' : 'border-amber-400 bg-amber-50 focus:ring-2 focus:ring-amber-200'} px-3 py-2 text-lg font-black text-slate-700 outline-none`} 
+                      setFormPago({ ...formPago, importe: val });
+                    }}
+                    className="w-full rounded-lg border border-amber-400 bg-amber-50 focus:ring-2 focus:ring-amber-200 px-3 py-2 text-lg font-black text-slate-700 outline-none"
                   />
-                  {pagoTab === 'BANCO' && <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Monto total depositado según voucher.</p>}
+                  {pagoTab === 'BANCO' && <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Monto depositado según voucher.</p>}
                 </div>
 
-                <div className="md:col-span-1">
+                <div className="md:col-span-1 pt-[21px]">
                   <button
                     onClick={handleAgregarPago}
                     disabled={montoPendiente <= 0}
-                    className="w-full px-4 py-2.5 rounded-lg font-black text-white bg-[#052a79] hover:bg-blue-900 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed uppercase text-sm"
+                    className="w-full px-4 py-2.5 rounded-lg font-black text-white bg-[#052a79] hover:bg-blue-900 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed uppercase text-sm h-[42px]"
                   >
                     AGREGAR
                   </button>
