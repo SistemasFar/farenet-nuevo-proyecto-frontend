@@ -2,6 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { maestrosApi } from '../../services/api';
 import type { MaestrosCajaResponse } from '../../types/maestros';
 import { Search, XCircle, CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft } from 'lucide-react';
+import Select from 'react-select';
+
+const customSelectStyles = {
+  control: (base: any, state: any) => ({
+    ...base,
+    borderRadius: '0.5rem',
+    borderColor: state.isFocused ? '#f59e0b' : '#cbd5e1',
+    boxShadow: state.isFocused ? '0 0 0 2px rgba(253, 230, 138, 0.5)' : 'none',
+    '&:hover': { borderColor: state.isFocused ? '#f59e0b' : '#cbd5e1' },
+    minHeight: '38px',
+    fontSize: '0.75rem',
+    fontWeight: '600'
+  }),
+  option: (base: any) => ({ ...base, fontSize: '0.75rem' }),
+  menu: (base: any) => ({ ...base, zIndex: 50 })
+};
 
 interface NuevaInspeccionViewProps {
   onBack?: () => void;
@@ -46,6 +62,11 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSelectChange = (name: string, option: any) => {
+    const value = option ? option.value : '';
+    setFormCaja((prev) => ({ ...prev, [name]: value, ...(name === 'tipoPlaca' ? { placa: '' } : {}) }));
   };
 
   const handleCajaChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
@@ -170,17 +191,14 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
               
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Placa *</label>
-                <select 
-                  name="tipoPlaca" 
-                  value={formCaja.tipoPlaca} 
-                  onChange={handleCajaChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition"
-                >
-                  <option value="">Seleccione...</option>
-                  {maestros?.tiposPlaca.map(tp => (
-                    <option key={tp.id} value={tp.id}>{tp.nombre}</option>
-                  ))}
-                </select>
+                <Select 
+                  options={maestros?.tiposPlaca.map(tp => ({ value: tp.id, label: tp.nombre })) || []}
+                  value={maestros?.tiposPlaca.map(tp => ({ value: tp.id, label: tp.nombre })).find(o => o.value === formCaja.tipoPlaca) || null}
+                  onChange={(o) => handleSelectChange('tipoPlaca', o)}
+                  placeholder="Seleccione..."
+                  isClearable
+                  styles={customSelectStyles}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -198,77 +216,62 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Concepto *</label>
-                <select 
-                  name="concepto" 
-                  value={formCaja.concepto} 
-                  onChange={handleCajaChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition"
-                >
-                  <option value="">Seleccione...</option>
-                  {maestros?.conceptos.map(c => (
-                    <option key={c.key} value={c.key}>{c.nombre}</option>
-                  ))}
-                </select>
+                <Select 
+                  options={maestros?.conceptos.map(c => ({ value: c.key, label: c.abreviatura || c.nombre })) || []}
+                  value={maestros?.conceptos.map(c => ({ value: c.key, label: c.abreviatura || c.nombre })).find(o => o.value === formCaja.concepto) || null}
+                  onChange={(o) => handleSelectChange('concepto', o)}
+                  placeholder="Seleccione..."
+                  isClearable
+                  styles={customSelectStyles}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Categoría *</label>
-                <select 
-                  name="categoria" 
-                  value={formCaja.categoria} 
-                  onChange={handleCajaChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition"
-                >
-                  <option value="">Seleccione...</option>
-                  {maestros?.categorias.map(c => (
-                    <option key={c.key} value={c.key}>{c.nombre}</option>
-                  ))}
-                </select>
+                <Select 
+                  options={maestros?.categorias.map(c => ({ value: c.key, label: c.nombre })) || []}
+                  value={maestros?.categorias.map(c => ({ value: c.key, label: c.nombre })).find(o => o.value === formCaja.categoria) || null}
+                  onChange={(o) => handleSelectChange('categoria', o)}
+                  placeholder="Seleccione..."
+                  isClearable
+                  styles={customSelectStyles}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Inspección *</label>
-                <select 
-                  name="tipoInspeccion" 
-                  value={formCaja.tipoInspeccion} 
-                  onChange={handleCajaChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition"
-                >
-                  <option value="">Seleccione...</option>
-                  {maestros?.tiposInspeccion.map(ti => (
-                    <option key={ti.key} value={ti.key}>{ti.nombre}</option>
-                  ))}
-                </select>
+                <Select 
+                  options={maestros?.tiposInspeccion.map(ti => ({ value: ti.key, label: ti.nombre })) || []}
+                  value={maestros?.tiposInspeccion.map(ti => ({ value: ti.key, label: ti.nombre })).find(o => o.value === formCaja.tipoInspeccion) || null}
+                  onChange={(o) => handleSelectChange('tipoInspeccion', o)}
+                  placeholder="Seleccione..."
+                  isClearable
+                  styles={customSelectStyles}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Tipo Certificado *</label>
-                <select 
-                  name="tipoCertificado" 
-                  value={formCaja.tipoCertificado} 
-                  onChange={handleCajaChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition"
-                >
-                  <option value="">Seleccione...</option>
-                  {maestros?.tiposCertificado.map(tc => (
-                    <option key={tc.key} value={tc.key}>{tc.nombre}</option>
-                  ))}
-                </select>
+                <Select 
+                  options={maestros?.tiposCertificado.map(tc => ({ value: tc.key, label: tc.abreviacion || tc.nombre })) || []}
+                  value={maestros?.tiposCertificado.map(tc => ({ value: tc.key, label: tc.abreviacion || tc.nombre })).find(o => o.value === formCaja.tipoCertificado) || null}
+                  onChange={(o) => handleSelectChange('tipoCertificado', o)}
+                  placeholder="Seleccione..."
+                  isClearable
+                  styles={customSelectStyles}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5 md:col-span-2">
                 <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización *</label>
-                <select 
-                  name="tipoAutorizacion" 
-                  value={formCaja.tipoAutorizacion} 
-                  onChange={handleCajaChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition"
-                >
-                  <option value="">Seleccione...</option>
-                  {maestros?.tiposAutorizacion.map(ta => (
-                    <option key={ta.key} value={ta.key}>{ta.nombre}</option>
-                  ))}
-                </select>
+                <Select 
+                  options={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })) || []}
+                  value={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })).find(o => o.value === formCaja.tipoAutorizacion) || null}
+                  onChange={(o) => handleSelectChange('tipoAutorizacion', o)}
+                  placeholder="Seleccione..."
+                  isClearable
+                  styles={customSelectStyles}
+                />
               </div>
 
             </div>

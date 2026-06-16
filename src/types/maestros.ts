@@ -3,8 +3,11 @@ export interface MaestroOption {
   nombre: string;
 }
 
-export interface MaestroAbreviaturaOption extends MaestroOption {
+export interface MaestroAbreviaturaOption {
+  key: string;
   abreviatura?: string;
+  abreviacion?: string;
+  nombre?: string;
 }
 
 export interface MaestroIdOption {
@@ -19,7 +22,7 @@ export interface MaestrosCajaResponse {
     conceptos: MaestroAbreviaturaOption[];
     categorias: MaestroOption[];
     tiposInspeccion: MaestroOption[];
-    tiposCertificado: MaestroOption[];
+    tiposCertificado: MaestroAbreviaturaOption[];
     tiposAutorizacion: MaestroOption[];
   };
 }
