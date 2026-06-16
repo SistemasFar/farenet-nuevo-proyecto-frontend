@@ -621,5 +621,19 @@ export const maestrosApi = {
     }
 
     return parseJsonResponse<MaestrosCajaResponse>(response);
+  },
+
+  obtenerPrecioConceptoAsync: async (plantaKey: string, conceptoKey: string): Promise<{status: string, data: {precio: number}}> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/precio?planta_key=${plantaKey}&concepto_key=${conceptoKey}`, {
+      method: 'GET'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, 'Error al obtener precio del concepto.')
+      );
+    }
+
+    return parseJsonResponse<{status: string, data: {precio: number}}>(response);
   }
 };

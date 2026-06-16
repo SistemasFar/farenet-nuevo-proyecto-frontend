@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { maestrosApi } from '../../services/api';
+import { maestrosApi, plantaSession } from '../../services/api';
 import type { MaestrosCajaResponse } from '../../types/maestros';
 import { Search, XCircle, CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft } from 'lucide-react';
 import Select from 'react-select';
@@ -40,6 +40,10 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   const [isConsultado, setIsConsultado] = useState(false);
   const [documentoDescuento, setDocumentoDescuento] = useState('');
 
+  const [precioSubtotal, setPrecioSubtotal] = useState<number>(0);
+  const [descuento, setDescuento] = useState<number>(0);
+  const [precioTotal, setPrecioTotal] = useState<number>(0);
+
   // Form State (Caja)
   const [formCaja, setFormCaja] = useState({
     tipoPlaca: '',
@@ -74,7 +78,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
   const handleCajaChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
     const { name, value } = e.target;
-    
+
     // Si cambia el tipo de placa, limpiamos la placa para evitar problemas de formato
     if (name === 'tipoPlaca') {
       setFormCaja((prev) => ({ ...prev, [name]: value, placa: '' }));
@@ -108,7 +112,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
       alert('Por favor completa todos los campos de la caja antes de continuar.');
       return;
     }
-    
+
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     }
@@ -130,12 +134,12 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
   return (
     <div className="w-full min-h-[calc(100vh-10rem)] bg-white rounded-2xl shadow-xl border-t-4 border-t-amber-500 border border-slate-200 overflow-hidden flex flex-col">
-      
+
       {/* Header / Stepper */}
       <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-6">
         <div className="flex items-center gap-3 mb-6">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={onBack}
             className="p-1.5 text-slate-400 hover:text-[#052a79] hover:bg-slate-100 rounded-full transition"
             title="Volver"
@@ -146,28 +150,27 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
             Nueva Inspección
           </h2>
         </div>
-        
+
         <div className="flex items-center justify-between relative">
           <div className="absolute left-0 top-1/2 w-full h-1 bg-slate-200 -z-10 -translate-y-1/2">
-            <div 
-              className="h-full bg-amber-500 transition-all duration-500" 
+            <div
+              className="h-full bg-amber-500 transition-all duration-500"
               style={{ width: `${(currentStepIndex / (STEPS.length - 1)) * 100}%` }}
             ></div>
           </div>
-          
+
           {STEPS.map((step, index) => {
             const StepIcon = step.icon;
             const isActive = index === currentStepIndex;
             const isCompleted = index < currentStepIndex;
-            
+
             return (
               <div key={step.id} className="flex flex-col items-center gap-2 bg-[#f4f9ff] px-2">
-                <div 
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                    isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
-                    isCompleted ? 'bg-amber-500 text-white shadow-sm' : 
-                    'bg-white text-slate-400 border-2 border-slate-200'
-                  }`}
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
+                      isCompleted ? 'bg-amber-500 text-white shadow-sm' :
+                        'bg-white text-slate-400 border-2 border-slate-200'
+                    }`}
                 >
                   {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                 </div>
@@ -182,19 +185,19 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
       {/* Content Area */}
       <div className="p-8">
-        
+
         {/* === PASO 1: CAJA === */}
         {currentStepIndex === 0 && (
           <div className="space-y-6">
             <h3 className="text-lg font-bold text-[#052a79] uppercase border-b border-amber-200/60 pb-2">
               Datos de Caja
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Placa *</label>
-                <Select 
+                <Select
                   options={maestros?.tiposPlaca.map(tp => ({ value: tp.id, label: tp.nombre })) || []}
                   value={maestros?.tiposPlaca.map(tp => ({ value: tp.id, label: tp.nombre })).find(o => o.value === formCaja.tipoPlaca) || null}
                   onChange={(o) => handleSelectChange('tipoPlaca', o)}
@@ -206,10 +209,10 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Placa *</label>
-                <input 
-                  type="text" 
-                  name="placa" 
-                  value={formCaja.placa} 
+                <input
+                  type="text"
+                  name="placa"
+                  value={formCaja.placa}
                   onChange={handleCajaChange}
                   placeholder="Ej: ABC-123"
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
@@ -219,7 +222,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Concepto *</label>
-                <Select 
+                <Select
                   options={maestros?.conceptos.map(c => ({ value: c.key, label: c.abreviatura || c.nombre })) || []}
                   value={maestros?.conceptos.map(c => ({ value: c.key, label: c.abreviatura || c.nombre })).find(o => o.value === formCaja.concepto) || null}
                   onChange={(o) => handleSelectChange('concepto', o)}
@@ -231,7 +234,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Categoría *</label>
-                <Select 
+                <Select
                   options={maestros?.categorias.map(c => ({ value: c.key, label: c.nombre })) || []}
                   value={maestros?.categorias.map(c => ({ value: c.key, label: c.nombre })).find(o => o.value === formCaja.categoria) || null}
                   onChange={(o) => handleSelectChange('categoria', o)}
@@ -243,7 +246,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Inspección *</label>
-                <Select 
+                <Select
                   options={maestros?.tiposInspeccion.map(ti => ({ value: ti.key, label: ti.nombre })) || []}
                   value={maestros?.tiposInspeccion.map(ti => ({ value: ti.key, label: ti.nombre })).find(o => o.value === formCaja.tipoInspeccion) || null}
                   onChange={(o) => handleSelectChange('tipoInspeccion', o)}
@@ -255,7 +258,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-600 uppercase">Tipo Certificado *</label>
-                <Select 
+                <Select
                   options={maestros?.tiposCertificado.map(tc => ({ value: tc.key, label: tc.abreviacion || tc.nombre })) || []}
                   value={maestros?.tiposCertificado.map(tc => ({ value: tc.key, label: tc.abreviacion || tc.nombre })).find(o => o.value === formCaja.tipoCertificado) || null}
                   onChange={(o) => handleSelectChange('tipoCertificado', o)}
@@ -267,7 +270,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
               <div className="flex flex-col gap-1.5 md:col-span-2">
                 <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización *</label>
-                <Select 
+                <Select
                   options={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })) || []}
                   value={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })).find(o => o.value === formCaja.tipoAutorizacion) || null}
                   onChange={(o) => handleSelectChange('tipoAutorizacion', o)}
@@ -280,23 +283,41 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
             </div>
 
             <div className="flex items-center gap-4 pt-4 border-t border-slate-100 mt-6">
-              <button 
-                type="button" 
-                onClick={() => {
-                   if (validarCaja()) {
-                     setIsConsultado(true);
-                     // irSiguientePaso(); // Comentado por ahora para mostrar la sección de descuentos en el mismo paso
-                   } else {
-                     alert('Por favor complete todos los campos.');
-                   }
+              <button
+                type="button"
+                onClick={async () => {
+                  if (validarCaja()) {
+                    try {
+                      const planta = plantaSession.obtener();
+                      if (!planta?.key) {
+                        alert('Por favor seleccione una planta en el inicio.');
+                        return;
+                      }
+                      const res = await maestrosApi.obtenerPrecioConceptoAsync(planta.key, formCaja.concepto);
+                      const precio = res?.data?.precio || 0;
+                      if (precio === 0) {
+                        alert(`El sistema calculó 0.00. Esto sucede porque no hay un precio registrado en la tabla "conceptoinspecciondetalle" para la combinación de la Planta actual (${planta.key}) y el Concepto elegido (${formCaja.concepto}).`);
+                      }
+                      setPrecioSubtotal(precio);
+                      setPrecioTotal(precio - descuento);
+                    } catch (err) {
+                      console.error('Error calculando precio:', err);
+                      setPrecioSubtotal(0);
+                      setPrecioTotal(0);
+                    } finally {
+                      setIsConsultado(true);
+                    }
+                  } else {
+                    alert('Por favor complete todos los campos.');
+                  }
                 }}
                 className="flex items-center gap-2 rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-900 border border-[#052a79] transition uppercase tracking-wide"
               >
                 <Search className="w-4 h-4" />
                 Consultar
               </button>
-              
-              <button 
+
+              <button
                 type="button"
                 onClick={() => {
                   setFormCaja({
@@ -324,8 +345,8 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                   </span>
                 </div>
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={documentoDescuento}
                     onChange={(e) => setDocumentoDescuento(e.target.value)}
                     placeholder="Número de documento..."
@@ -334,6 +355,52 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                   <button type="button" className="bg-[#052a79] text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-blue-900 transition flex items-center gap-2 uppercase">
                     <Search className="w-3 h-3" /> Buscar
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* SECCION DE RESUMEN DE PAGO (También se muestra después de consultar) */}
+            {isConsultado && (
+              <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-3">
+                  <h3 className="text-sm font-black text-[#052a79] uppercase tracking-wide">Resumen de Pago</h3>
+                </div>
+                <div className="p-5 bg-white grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
+
+                  <div className="flex flex-col gap-1.5 md:col-span-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Forma de Pago</label>
+                    <Select
+                      options={[{ value: 'EFECTIVO', label: 'EFECTIVO' }, { value: 'TARJETA', label: 'TARJETA' }, { value: 'YAPE/PLIN', label: 'YAPE/PLIN' }]}
+                      placeholder="Seleccione..."
+                      styles={customSelectStyles}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 md:col-span-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Documento</label>
+                    <Select
+                      options={maestros?.tiposDocumento?.map(td => ({ value: td.key, label: td.nombre })) || []}
+                      placeholder="Seleccione..."
+                      styles={customSelectStyles}
+                      isClearable
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 md:col-span-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Subtotal (S/)</label>
+                    <input type="text" readOnly value={precioSubtotal.toFixed(2)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 text-right outline-none" />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 md:col-span-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Descuento (S/)</label>
+                    <input type="text" readOnly value={descuento.toFixed(2)} className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 text-right outline-none" />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 md:col-span-1">
+                    <label className="text-[10px] font-black text-[#052a79] uppercase">Total (S/)</label>
+                    <input type="text" readOnly value={precioTotal.toFixed(2)} className="w-full rounded-lg border-2 border-[#052a79] bg-[#f4f9ff] px-3 py-2 text-lg font-black text-[#052a79] text-right outline-none shadow-inner" />
+                  </div>
+
                 </div>
               </div>
             )}
@@ -353,16 +420,16 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
       {/* FOOTER ACTIONS */}
       {currentStepIndex > 0 && (
         <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={irPasoAnterior}
             className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
           >
             Atrás
           </button>
-          
-          <button 
-            type="button" 
+
+          <button
+            type="button"
             onClick={irSiguientePaso}
             className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-bold text-white hover:bg-blue-900 transition"
           >
