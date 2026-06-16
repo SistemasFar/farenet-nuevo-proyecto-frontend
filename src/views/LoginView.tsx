@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { authApi } from '../services/api';
+import { NetworkStatus } from '../components/NetworkStatus';
+import { BackendStatus } from '../components/BackendStatus';
+
 import type {
   LoginResponse,
   PlantaAsignada,
@@ -79,8 +82,13 @@ export function LoginView({
       }
 
       setError('No se recibió una sesión válida desde el servidor.');
-    } catch (err: any) {
-      setError(err.message || 'Ocurrió un error inesperado.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Ocurrió un error inesperado.';
+
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -91,7 +99,12 @@ export function LoginView({
       className="flex min-h-screen flex-col items-center justify-center p-4 select-none bg-cover bg-center bg-no-repeat relative"
       style={{ backgroundImage: `url(${bgFarenet})` }}
     >
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"></div>
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" />
+
+      <div className="absolute right-5 top-5 z-20 flex items-center gap-3">
+        <NetworkStatus />
+        <BackendStatus />
+      </div>
 
       <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
         <div className="mb-4 text-center">
@@ -103,6 +116,8 @@ export function LoginView({
             Sistema de Línea
           </p>
         </div>
+
+        
 
         <div className="w-full rounded-xl bg-white/10 backdrop-blur-md border border-white/20 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
           <form onSubmit={handleSubmit} className="space-y-4">
