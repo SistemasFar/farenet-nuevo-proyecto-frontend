@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { maestrosApi, plantaSession } from '../../services/api';
 import type { MaestrosCajaResponse } from '../../types/maestros';
-import { Search, XCircle, CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft } from 'lucide-react';
+import { Search, XCircle, CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Frown, HelpCircle } from 'lucide-react';
 import Select from 'react-select';
 
 const customSelectStyles = {
@@ -16,7 +16,8 @@ const customSelectStyles = {
     fontWeight: '600'
   }),
   option: (base: any) => ({ ...base, fontSize: '0.75rem' }),
-  menu: (base: any) => ({ ...base, zIndex: 50 })
+  menu: (base: any) => ({ ...base, zIndex: 50 }),
+  menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
 interface NuevaInspeccionViewProps {
@@ -38,11 +39,16 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   const [error, setError] = useState('');
 
   const [isConsultado, setIsConsultado] = useState(false);
+  const [showAnularModal, setShowAnularModal] = useState(false);
+  const [showCamposVaciosModal, setShowCamposVaciosModal] = useState(false);
   const [documentoDescuento, setDocumentoDescuento] = useState('');
 
   const [precioSubtotal, setPrecioSubtotal] = useState<number>(0);
   const [descuento, setDescuento] = useState<number>(0);
   const [precioTotal, setPrecioTotal] = useState<number>(0);
+  
+  const [formaPago, setFormaPago] = useState<string>('');
+  const [documentoPago, setDocumentoPago] = useState<string>('');
 
   // Form State (Caja)
   const [formCaja, setFormCaja] = useState({
@@ -308,7 +314,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                       setIsConsultado(true);
                     }
                   } else {
-                    alert('Por favor complete todos los campos.');
+                    setShowCamposVaciosModal(true);
                   }
                 }}
                 className="flex items-center gap-2 rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-900 border border-[#052a79] transition uppercase tracking-wide"
@@ -371,8 +377,13 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Forma de Pago</label>
                     <Select
                       options={[{ value: 'EFECTIVO', label: 'EFECTIVO' }, { value: 'TARJETA', label: 'TARJETA' }, { value: 'YAPE/PLIN', label: 'YAPE/PLIN' }]}
+                      value={[{ value: 'EFECTIVO', label: 'EFECTIVO' }, { value: 'TARJETA', label: 'TARJETA' }, { value: 'YAPE/PLIN', label: 'YAPE/PLIN' }].find(o => o.value === formaPago) || null}
+                      onChange={(o) => setFormaPago(o?.value || '')}
                       placeholder="Seleccione..."
                       styles={customSelectStyles}
+                      isClearable
+                      menuPlacement="top"
+                      menuPortalTarget={document.body}
                     />
                   </div>
 
@@ -380,9 +391,13 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Documento</label>
                     <Select
                       options={maestros?.tiposDocumento?.map(td => ({ value: td.key, label: td.nombre })) || []}
+                      value={maestros?.tiposDocumento?.map(td => ({ value: td.key, label: td.nombre })).find(o => o.value === documentoPago) || null}
+                      onChange={(o) => setDocumentoPago(o?.value || '')}
                       placeholder="Seleccione..."
                       styles={customSelectStyles}
                       isClearable
+                      menuPlacement="top"
+                      menuPortalTarget={document.body}
                     />
                   </div>
 
@@ -404,6 +419,88 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                 </div>
               </div>
             )}
+
+            {/* BOTONES DE ACCIÓN (Solo visibles cuando ya se consultó) */}
+            {isConsultado && (
+              <div className="flex items-center justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowAnularModal(true)}
+                  className="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                  ANULAR
+                </button>
+                <button
+                  type="button"
+                  onClick={irSiguientePaso}
+                  className="px-8 py-2.5 rounded-xl font-black text-[#052a79] bg-[#f2cc11] hover:bg-[#e0b90c] transition-all shadow-md transform hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  SIGUIENTE
+                </button>
+              </div>
+            )}
+            
+            {/* MODAL PERSONALIZADO PARA ANULAR */}
+            {showAnularModal && (
+              <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transform transition-all animate-in zoom-in-95 duration-200">
+                  <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-5 border-4 border-blue-100">
+                    <Frown className="w-10 h-10 text-[#052a79]" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-800 mb-2">¿Estás seguro?</h3>
+                  <p className="text-slate-500 mb-8 text-sm leading-relaxed">
+                    Estás a punto de anular esta inspección y se borrarán todos los datos que ingresaste.
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      onClick={() => setShowAnularModal(false)}
+                      className="flex-1 px-4 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFormCaja({
+                          tipoPlaca: '', placa: '', concepto: '', categoria: '', tipoInspeccion: '', tipoCertificado: '', tipoAutorizacion: ''
+                        });
+                        setIsConsultado(false);
+                        setPrecioSubtotal(0);
+                        setDescuento(0);
+                        setPrecioTotal(0);
+                        setFormaPago('');
+                        setDocumentoPago('');
+                        setShowAnularModal(false);
+                      }}
+                      className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-md shadow-red-200 transition-colors"
+                    >
+                      Sí, anular
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL PERSONALIZADO PARA CAMPOS VACÍOS */}
+            {showCamposVaciosModal && (
+              <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transform transition-all animate-in zoom-in-95 duration-200">
+                  <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-5 border-4 border-amber-100">
+                    <HelpCircle className="w-10 h-10 text-amber-500" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-800 mb-2">¡Un momento!</h3>
+                  <p className="text-slate-500 mb-8 text-sm leading-relaxed">
+                    Te falta llenar todos los campos. Por favor, completa el formulario antes de consultar.
+                  </p>
+                  <button
+                    onClick={() => setShowCamposVaciosModal(false)}
+                    className="w-full px-4 py-3 rounded-xl font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-md shadow-amber-200 transition-colors"
+                  >
+                    Entendido
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 

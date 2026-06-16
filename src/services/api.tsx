@@ -611,7 +611,12 @@ import type { MaestrosCajaResponse } from '../types/maestros';
 export const maestrosApi = {
   obtenerMaestrosCajaAsync: async (): Promise<MaestrosCajaResponse> => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/caja`, {
-      method: 'GET'
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      cache: 'no-store'
     });
 
     if (!response.ok) {
