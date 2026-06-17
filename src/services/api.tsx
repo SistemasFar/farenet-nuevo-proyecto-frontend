@@ -678,5 +678,24 @@ export const maestrosApi = {
     }
 
     return parseJsonResponse<MaestrosVehiculoResponse>(response);
+  },
+
+  buscarModelosAsync: async (query: string): Promise<{status: string, data: {key: string, nombre: string}[]}> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/vehiculo/modelos?q=${encodeURIComponent(query)}`, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, 'Error al buscar modelos de vehículo.')
+      );
+    }
+
+    return parseJsonResponse<{status: string, data: {key: string, nombre: string}[]}>(response);
   }
 };

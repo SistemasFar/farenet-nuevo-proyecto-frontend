@@ -3,6 +3,7 @@ import { maestrosApi, plantaSession } from '../../services/api';
 import type { MaestrosCajaResponse, MaestrosPagoResponse } from '../../types/maestros';
 import { Search, XCircle, CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Frown, HelpCircle } from 'lucide-react';
 import Select from 'react-select';
+import AsyncSelect from 'react-select/async';
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({
@@ -18,6 +19,63 @@ const customSelectStyles = {
   option: (base: any) => ({ ...base, fontSize: '0.75rem' }),
   menu: (base: any) => ({ ...base, zIndex: 50 }),
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
+};
+
+export const FormVehiculoContext = React.createContext<any>(null);
+
+const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false }: any) => {
+  const { formVehiculo, setFormVehiculo } = React.useContext(FormVehiculoContext);
+  return (
+    <div className="flex flex-col gap-1.5 md:col-span-1">
+      <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && '*'}</label>
+      {isAsyncSelect ? (
+        <AsyncSelect
+          cacheOptions
+          defaultOptions={defaultOptions}
+          loadOptions={loadOptions}
+          placeholder="Buscar..."
+          styles={customSelectStyles}
+          value={
+            formVehiculo[name] ? 
+            { value: formVehiculo[name], label: formVehiculo[name + '_label'] || formVehiculo[name] } 
+            : null
+          }
+          onChange={(opt: any) => setFormVehiculo({...formVehiculo, [name]: opt ? opt.value : '', [name + '_label']: opt ? opt.label : ''})}
+          isDisabled={disabled}
+          noOptionsMessage={() => "Escribe para buscar..."}
+          loadingMessage={() => "Buscando..."}
+        />
+      ) : isSelect ? (
+        <Select
+          options={options}
+          placeholder="Seleccione..."
+          styles={customSelectStyles}
+          value={options.find((opt: any) => opt.value === formVehiculo[name]) || null}
+          onChange={(opt: any) => setFormVehiculo({...formVehiculo, [name]: opt ? opt.value : ''})}
+          isDisabled={disabled || options.length === 0}
+        />
+      ) : (
+        <input
+          type={type}
+          value={overrideValue !== undefined ? overrideValue : formVehiculo[name]}
+          onChange={(e) => setFormVehiculo({...formVehiculo, [name]: e.target.value.toUpperCase()})}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79] ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
+        />
+      )}
+    </div>
+  );
+};
+
+const loadModelos = async (inputValue: string) => {
+  if (!inputValue) return [];
+  try {
+    const res = await maestrosApi.buscarModelosAsync(inputValue);
+    return res.data.map((m: any) => ({ value: m.key, label: m.nombre }));
+  } catch (err) {
+    return [];
+  }
 };
 
 interface NuevaInspeccionViewProps {
@@ -102,6 +160,19 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
       cargarMaestrosVehiculo();
     }
   }, [currentStepIndex]);
+
+  // Sincronizar Marca con Marca Carrocería
+  useEffect(() => {
+    if (formVehiculo.marca && maestrosVehiculo?.marcas) {
+      const selectedMarca = maestrosVehiculo.marcas.find((m: any) => m.key === formVehiculo.marca);
+      if (selectedMarca && formVehiculo.marcaCarroceria !== selectedMarca.nombre) {
+        setFormVehiculo((prev: any) => ({
+          ...prev,
+          marcaCarroceria: selectedMarca.nombre
+        }));
+      }
+    }
+  }, [formVehiculo.marca, maestrosVehiculo]);
 
   const cargarMaestrosVehiculo = async () => {
     try {
@@ -854,41 +925,17 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                  const hasSalidasEmergencia = ['M2', 'M3'].includes(catName);
                  const hasMarcaCarroceria = isM || isN || isO;
 
-                 const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [] }: any) => (
-                   <div className="flex flex-col gap-1.5 md:col-span-1">
-                     <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && '*'}</label>
-                     {isSelect ? (
-                       <Select
-                         options={options}
-                         placeholder="Seleccione..."
-                         styles={customSelectStyles}
-                         value={options.find((opt: any) => opt.value === (formVehiculo as any)[name]) || null}
-                         onChange={(opt: any) => setFormVehiculo({...formVehiculo, [name]: opt ? opt.value : ''})}
-                         isDisabled={options.length === 0}
-                       />
-                     ) : (
-                       <input
-                         type={type}
-                         value={(formVehiculo as any)[name]}
-                         onChange={(e) => setFormVehiculo({...formVehiculo, [name]: e.target.value.toUpperCase()})}
-                         placeholder={placeholder}
-                         className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79]"
-                       />
-                     )}
-                   </div>
-                 );
-
                  // Opciones Mapeadas
                  const optsClases = maestrosVehiculo?.clases.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
                  const optsMarcas = maestrosVehiculo?.marcas.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-                 // TODO: Filtrar modelos por marca si es necesario, por ahora listamos todos
-                 const optsModelos = maestrosVehiculo?.modelos.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+                 // Modelos se carga dinámicamente
                  const optsColores = maestrosVehiculo?.colores.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
                  const optsCarrocerias = maestrosVehiculo?.carrocerias.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
                  const optsCombustibles = maestrosVehiculo?.combustibles.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
 
                  return (
-                   <div>
+                   <FormVehiculoContext.Provider value={{formVehiculo, setFormVehiculo}}>
+                    <div>
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-sm font-black text-[#052a79] uppercase">1. Datos del Vehículo</h3>
                         {catName && <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full border border-amber-200">Categoría {catName}</span>}
@@ -904,13 +951,18 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                           <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
                             <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Identificadores y Clasificación</h4>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                              <InputField label="Categoría" name="categoria_display" overrideValue={catName} disabled={true} />
                               <InputField label="Clase" name="clase" isSelect options={optsClases} />
                               <InputField label="Marca" name="marca" isSelect options={optsMarcas} />
-                              <InputField label="Modelo" name="modelo" isSelect options={optsModelos} />
+                              <InputField label="Modelo" name="modelo" isAsyncSelect loadOptions={loadModelos} />
                               <InputField label="Color" name="color" isSelect options={optsColores} />
                               <InputField label="Carrocería" name="carroceria" isSelect options={optsCarrocerias} />
-                              {hasMarcaCarroceria && <InputField label="Marca Carrocería" name="marcaCarroceria" />}
-                              <InputField label="Placa Nueva (Extraordinario)" name="placaNueva" />
+                              <InputField 
+                                label="Marca Carrocería" 
+                                name="marcaCarroceria" 
+                                disabled={true} 
+                              />
+                              <InputField label="Placa Nueva" name="placaNueva" />
                               <InputField label="Nro Serie (VIN)" name="nroSerie" />
                               {hasMotor && <InputField label="Nro Motor" name="nroMotor" />}
                             </div>
@@ -950,13 +1002,14 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                               <InputField label="Nro Ejes" name="nroEjes" type="number" />
                               <InputField label="Nro Ruedas" name="nroRuedas" type="number" />
                             </div>
-                          </div>
-                        </div>
-                      )}
-                   </div>
+                           </div>
+                         </div>
+                       )}
+                    </div>
+                   </FormVehiculoContext.Provider>
                  );
                })()}
-               {vehiculoTab === 'SOAT' && (
+             {vehiculoTab === 'SOAT' && (
                  <div>
                     <h3 className="text-sm font-black text-slate-800 uppercase mb-4">2. SOAT</h3>
                     <p className="text-slate-500 text-sm">Sección en construcción.</p>
