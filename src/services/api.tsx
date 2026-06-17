@@ -697,5 +697,23 @@ export const maestrosApi = {
     }
 
     return parseJsonResponse<{status: string, data: {key: string, nombre: string}[]}>(response);
+  },
+
+  agregarMaestroAsync: async (tabla: string, nombre: string): Promise<{status: string, message: string, data: {key: string, nombre: string}}> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/agregar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ tabla, nombre })
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, `Error al agregar a ${tabla}.`)
+      );
+    }
+
+    return parseJsonResponse<{status: string, message: string, data: {key: string, nombre: string}}>(response);
   }
 };

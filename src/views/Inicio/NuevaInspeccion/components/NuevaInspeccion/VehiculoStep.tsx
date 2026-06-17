@@ -1,9 +1,77 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Plus, XCircle } from 'lucide-react';
 import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
 import { maestrosApi } from '../../../../../services/api';
 
 export const FormVehiculoContext = React.createContext<any>(null);
+
+const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading }: any) => {
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: any) => {
+    e.preventDefault();
+    setError('');
+    const trimValue = value.trim();
+    if (!/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(trimValue)) {
+      setError('Formato inválido. Solo letras, números y guiones intermedios.');
+      return;
+    }
+    onSave(trimValue);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50">
+          <h2 className="text-sm font-bold text-slate-800 uppercase">Agregar Nuevo: {title}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
+            <XCircle size={20} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-4 flex flex-col gap-3">
+          {error && <p className="text-xs text-red-500 font-semibold bg-red-50 p-2 rounded">{error}</p>}
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase">Valor</label>
+            <input
+              type="text"
+              autoFocus
+              value={value}
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase();
+                setValue(val);
+                setError('');
+              }}
+              placeholder="Ej: TOYOTA-YARIS"
+              disabled={loading}
+              className="w-full mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79]"
+            />
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !value.trim()}
+              className="px-4 py-2 text-xs font-bold text-white bg-[#052a79] hover:bg-blue-800 rounded-lg transition disabled:opacity-50"
+            >
+              {loading ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({
@@ -21,11 +89,23 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber }: any) => {
+export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber, onAddNuevo }: any) => {
   const { formVehiculo, setFormVehiculo } = React.useContext(FormVehiculoContext);
   return (
     <div className="flex flex-col gap-1.5 md:col-span-1">
-      <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && '*'}</label>
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && '*'}</label>
+        {onAddNuevo && !disabled && (
+          <button 
+            type="button" 
+            onClick={onAddNuevo}
+            className="text-white bg-blue-600 hover:bg-blue-700 rounded p-0.5 shadow transition"
+            title="Agregar Nuevo"
+          >
+            <Plus size={12} strokeWidth={3} />
+          </button>
+        )}
+      </div>
       {isAsyncSelect ? (
         <AsyncSelect
           cacheOptions
@@ -110,8 +190,53 @@ export function VehiculoStep({
   maestrosVehiculo,
   getCategoriaName
 }: VehiculoStepProps) {
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalTabla, setModalTabla] = useState('');
+  const [modalField, setModalField] = useState('');
+  const [modalLoading, setModalLoading] = useState(false);
+
+  const handleAddNuevo = (title: string, tabla: string, field: string) => {
+    setModalTitle(title);
+    setModalTabla(tabla);
+    setModalField(field);
+    setModalOpen(true);
+  };
+
+  const handleSaveNuevo = async (valor: string) => {
+    try {
+      setModalLoading(true);
+      const res = await maestrosApi.agregarMaestroAsync(modalTabla, valor);
+      
+      setFormVehiculo({ 
+        ...formVehiculo, 
+        [modalField]: res.data.key, 
+        [`${modalField}_label`]: res.data.nombre 
+      });
+      
+      if (modalTabla === 'clase' && maestrosVehiculo?.clases) maestrosVehiculo.clases.push(res.data);
+      if (modalTabla === 'marca' && maestrosVehiculo?.marcas) maestrosVehiculo.marcas.push(res.data);
+      if (modalTabla === 'carroceria' && maestrosVehiculo?.carrocerias) maestrosVehiculo.carrocerias.push(res.data);
+      if (modalTabla === 'color' && maestrosVehiculo?.colores) maestrosVehiculo.colores.push(res.data);
+
+      setModalOpen(false);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <AgregarMaestroModal 
+        isOpen={modalOpen} 
+        onClose={() => setModalOpen(false)} 
+        onSave={handleSaveNuevo} 
+        title={modalTitle} 
+        loading={modalLoading} 
+      />
       {/* Pestañas de Vehículo */}
       <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
         {(['DATOS DEL VEHÍCULO', 'SOAT', 'PROPIETARIO'] as const).map(tab => {
@@ -171,11 +296,11 @@ export function VehiculoStep({
                       <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Identificadores y Clasificación</h4>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <InputField label="Categoría" name="categoria_display" overrideValue={catName} disabled={true} />
-                        <InputField label="Clase" name="clase" isSelect options={optsClases} />
-                        <InputField label="Marca" name="marca" isSelect options={optsMarcas} />
-                        <InputField label="Modelo" name="modelo" isAsyncSelect loadOptions={loadModelos} />
-                        <InputField label="Color" name="color" isSelect options={optsColores} />
-                        <InputField label="Carrocería" name="carroceria" isSelect options={optsCarrocerias} />
+                        <InputField label="Clase" name="clase" isSelect options={optsClases} onAddNuevo={() => handleAddNuevo('Clase', 'clase', 'clase')} />
+                        <InputField label="Marca" name="marca" isSelect options={optsMarcas} onAddNuevo={() => handleAddNuevo('Marca', 'marca', 'marca')} />
+                        <InputField label="Modelo" name="modelo" isAsyncSelect loadOptions={loadModelos} onAddNuevo={() => handleAddNuevo('Modelo', 'modelo', 'modelo')} />
+                        <InputField label="Color" name="color" isSelect options={optsColores} onAddNuevo={() => handleAddNuevo('Color', 'color', 'color')} />
+                        <InputField label="Carrocería" name="carroceria" isSelect options={optsCarrocerias} onAddNuevo={() => handleAddNuevo('Carrocería', 'carroceria', 'carroceria')} />
                         <InputField 
                           label="Marca Carrocería" 
                           name="marcaCarroceria" 
