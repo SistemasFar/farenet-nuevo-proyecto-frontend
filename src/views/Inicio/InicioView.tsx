@@ -76,7 +76,7 @@ function BadgeEstado({ value }: { value?: string | null }) {
 }
 
 export function InicioView(props: InicioViewProps) {
-  const { plantaSeleccionada, plantaNombre } = props;
+  const { plantaSeleccionada } = props;
   const [inspecciones, setInspecciones] = useState<InspeccionPanel[]>([]);
   const [lineasDisponibles, setLineasDisponibles] = useState<{ key: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(false);

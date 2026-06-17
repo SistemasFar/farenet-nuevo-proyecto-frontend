@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
-import { InicioView } from './InicioView';
-import { AuditoriaView } from './AuditoriaView';
+import { InicioView } from '../Inicio/InicioView';
+import { AuditoriaView } from '../Auditoria/AuditoriaView';
 import { GenericView } from './GenericView';
 import InspeccionesView from '../Inspecciones/InspeccionesView';
-import { NuevaInspeccionView } from './NuevaInspeccionView';
+import { NuevaInspeccionView } from '../Inicio/NuevaInspeccion/NuevaInspeccionView';
 
 import type {
   UserSession,
