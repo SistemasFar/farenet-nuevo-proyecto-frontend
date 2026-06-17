@@ -23,7 +23,7 @@ const customSelectStyles = {
 
 export const FormVehiculoContext = React.createContext<any>(null);
 
-const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false }: any) => {
+const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber }: any) => {
   const { formVehiculo, setFormVehiculo } = React.useContext(FormVehiculoContext);
   return (
     <div className="flex flex-col gap-1.5 md:col-span-1">
@@ -56,9 +56,26 @@ const InputField = ({ label, name, type = "text", placeholder = "", required = f
         />
       ) : (
         <input
-          type={type}
+          type={type === 'number' ? 'text' : type} // Cambiar a text para evitar flechas pero validamos por regex
+          inputMode={type === 'number' ? 'numeric' : undefined}
           value={overrideValue !== undefined ? overrideValue : formVehiculo[name]}
-          onChange={(e) => setFormVehiculo({...formVehiculo, [name]: e.target.value.toUpperCase()})}
+          onChange={(e) => {
+            let val = e.target.value.toUpperCase();
+            if (type === 'number') {
+              val = val.replace(/\D/g, ''); // Solo números
+            }
+            if (maxLength && val.length > maxLength) {
+              val = val.slice(0, maxLength);
+            }
+            setFormVehiculo({...formVehiculo, [name]: val});
+          }}
+          onBlur={() => {
+            if (minNumber !== undefined && formVehiculo[name]) {
+              if (parseInt(formVehiculo[name], 10) < minNumber) {
+                setFormVehiculo({...formVehiculo, [name]: ''}); // Resetea si es menor
+              }
+            }
+          }}
           placeholder={placeholder}
           disabled={disabled}
           className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79] ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
@@ -972,7 +989,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
                           <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
                             <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Especificaciones Técnicas</h4>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                              <InputField label="Año Fabricación" name="anioFabricacion" type="number" />
+                              <InputField label="Año Fabricación" name="anioFabricacion" type="number" maxLength={4} minNumber={1800} />
                               {hasMotor && <InputField label="Combustible" name="combustible" isSelect options={optsCombustibles} />}
                               {hasMotor && <InputField label="Nro Cilindros" name="nroCilindros" type="number" />}
                               {hasMotor && <InputField label="Kilometraje" name="kilometraje" type="number" />}
