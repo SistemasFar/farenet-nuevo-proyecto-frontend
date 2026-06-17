@@ -606,7 +606,7 @@ export const permisosSession = {
   }
 };
 
-import type { MaestrosCajaResponse, MaestrosPagoResponse } from '../types/maestros';
+import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '../types/maestros';
 
 export const maestrosApi = {
   obtenerMaestrosCajaAsync: async (): Promise<MaestrosCajaResponse> => {
@@ -659,5 +659,24 @@ export const maestrosApi = {
     }
 
     return parseJsonResponse<MaestrosPagoResponse>(response);
+  },
+
+  obtenerMaestrosVehiculoAsync: async (): Promise<MaestrosVehiculoResponse> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/vehiculo`, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, 'Error al obtener maestros de vehículo.')
+      );
+    }
+
+    return parseJsonResponse<MaestrosVehiculoResponse>(response);
   }
 };

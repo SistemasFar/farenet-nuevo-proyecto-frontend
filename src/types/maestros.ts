@@ -41,3 +41,19 @@ export interface MaestrosPagoResponse {
     cuentasCorrientes: CuentaCorrienteOption[];
   };
 }
+
+export interface ModeloOption extends MaestroOption {
+  marca_key?: string;
+}
+
+export interface MaestrosVehiculoResponse {
+  status: string;
+  data: {
+    clases: MaestroOption[];
+    marcas: MaestroOption[];
+    modelos: ModeloOption[];
+    colores: MaestroOption[];
+    carrocerias: MaestroOption[];
+    combustibles: MaestroOption[];
+  };
+}

@@ -35,6 +35,7 @@ const STEPS = [
 export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
+  const [maestrosVehiculo, setMaestrosVehiculo] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -76,13 +77,43 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
     fechaDeposito: new Date().toISOString().split('T')[0]
   });
 
+  // Form State (Vehículo)
+  const [vehiculoTab, setVehiculoTab] = useState<'DATOS' | 'SOAT' | 'PROPIETARIO'>('DATOS');
+  const [formVehiculo, setFormVehiculo] = useState({
+    clase: '', marca: '', modelo: '', carroceria: '', marcaCarroceria: '', placaNueva: '',
+    anioFabricacion: '', combustible: '', nroSerie: '', nroMotor: '', color: '',
+    nroAsientos: '', nroPasajeros: '', nroPisos: '', longitud: '', ancho: '', altura: '',
+    nroEjes: '', nroRuedas: '', nroCilindros: '', pesoSeco: '', cargaUtil: '', pesoBruto: '',
+    nroPuertas: '', salidasEmergencia: '', kilometraje: ''
+  });
+
+  const getCategoriaName = () => {
+    if (!maestros || !formCaja.categoria) return '';
+    const cat = maestros.categorias.find(c => c.key === formCaja.categoria);
+    return cat ? cat.nombre.toUpperCase() : '';
+  };
+
   useEffect(() => {
     if (currentStepIndex === 0 && !maestros) {
       cargarMaestros();
     } else if (currentStepIndex === 1 && !maestrosPago) {
       cargarMaestrosPago();
+    } else if (currentStepIndex === 2 && !maestrosVehiculo) {
+      cargarMaestrosVehiculo();
     }
   }, [currentStepIndex]);
+
+  const cargarMaestrosVehiculo = async () => {
+    try {
+      setLoading(true);
+      const res = await maestrosApi.obtenerMaestrosVehiculoAsync();
+      setMaestrosVehiculo(res.data);
+    } catch (err: any) {
+      setError(err.message || 'Error cargando maestros de vehículo');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const cargarMaestros = async () => {
     try {
@@ -138,7 +169,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
   const validarCaja = () => {
     // Validar que todos los campos requeridos estén llenos
-    if (!formCaja.tipoPlaca || !formCaja.placa || !formCaja.concepto || !formCaja.categoria || !formCaja.tipoInspeccion || !formCaja.tipoCertificado || !formCaja.tipoAutorizacion) {
+    if (!formCaja.tipoPlaca || !formCaja.placa || !formCaja.concepto || !formCaja.categoria || !formCaja.tipoInspeccion || !formCaja.tipoCertificado) {
       return false;
     }
     return true;
@@ -368,9 +399,12 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
               </div>
 
               <div className="flex flex-col gap-1.5 md:col-span-2">
-                <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización *</label>
+                <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización</label>
                 <Select
-                  options={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })) || []}
+                  options={[
+                    { value: '', label: 'NINGUNO / EN BLANCO' },
+                    ...(maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })) || [])
+                  ]}
                   value={maestros?.tiposAutorizacion.map(ta => ({ value: ta.key, label: ta.nombre })).find(o => o.value === formCaja.tipoAutorizacion) || null}
                   onChange={(o) => setFormCaja({ ...formCaja, tipoAutorizacion: o?.value || '' })}
                   placeholder="Seleccione..."
@@ -783,8 +817,163 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
           </div>
         )}
 
+        {/* PASO 3: VEHÍCULO */}
+        {currentStepIndex === 2 && (
+          <div className="p-6">
+            {/* Pestañas de Vehículo */}
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+              {(['DATOS DEL VEHÍCULO', 'SOAT', 'PROPIETARIO'] as const).map(tab => {
+                const key = tab === 'DATOS DEL VEHÍCULO' ? 'DATOS' : tab as 'SOAT' | 'PROPIETARIO';
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setVehiculoTab(key)}
+                    className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${vehiculoTab === key ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
+               {vehiculoTab === 'DATOS' && (() => {
+                 const catName = getCategoriaName() || ''; // e.g. M1, L1, O2
+                 const isL = catName.startsWith('L');
+                 const isM = catName.startsWith('M');
+                 const isN = catName.startsWith('N');
+                 const isO = catName.startsWith('O');
+
+                 // Reglas dinámicas (sacadas del prompt del usuario)
+                 const hasMotor = isL || isM || isN; // O no tiene motor
+                 const hasAsientos = ['L4', 'L5'].includes(catName) || isM || isN;
+                 const hasPasajeros = ['L4', 'L5'].includes(catName) || isM;
+                 const hasPisos = catName === 'M3';
+                 const hasCargaUtil = catName !== '' && !['L1', 'L3'].includes(catName);
+                 const hasPuertas = isM || isN;
+                 const hasSalidasEmergencia = ['M2', 'M3'].includes(catName);
+                 const hasMarcaCarroceria = isM || isN || isO;
+
+                 const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [] }: any) => (
+                   <div className="flex flex-col gap-1.5 md:col-span-1">
+                     <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && '*'}</label>
+                     {isSelect ? (
+                       <Select
+                         options={options}
+                         placeholder="Seleccione..."
+                         styles={customSelectStyles}
+                         value={options.find((opt: any) => opt.value === (formVehiculo as any)[name]) || null}
+                         onChange={(opt: any) => setFormVehiculo({...formVehiculo, [name]: opt ? opt.value : ''})}
+                         isDisabled={options.length === 0}
+                       />
+                     ) : (
+                       <input
+                         type={type}
+                         value={(formVehiculo as any)[name]}
+                         onChange={(e) => setFormVehiculo({...formVehiculo, [name]: e.target.value.toUpperCase()})}
+                         placeholder={placeholder}
+                         className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79]"
+                       />
+                     )}
+                   </div>
+                 );
+
+                 // Opciones Mapeadas
+                 const optsClases = maestrosVehiculo?.clases.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+                 const optsMarcas = maestrosVehiculo?.marcas.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+                 // TODO: Filtrar modelos por marca si es necesario, por ahora listamos todos
+                 const optsModelos = maestrosVehiculo?.modelos.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+                 const optsColores = maestrosVehiculo?.colores.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+                 const optsCarrocerias = maestrosVehiculo?.carrocerias.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+                 const optsCombustibles = maestrosVehiculo?.combustibles.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+
+                 return (
+                   <div>
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-sm font-black text-[#052a79] uppercase">1. Datos del Vehículo</h3>
+                        {catName && <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full border border-amber-200">Categoría {catName}</span>}
+                      </div>
+                      
+                      {!catName ? (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-700 p-4 rounded-xl text-sm font-semibold text-center">
+                           Selecciona una Categoría en el Paso 1 (Caja) para cargar los campos dinámicos del vehículo.
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {/* BLOQUE 1: IDENTIFICADORES Y CLASIFICACIÓN */}
+                          <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                            <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Identificadores y Clasificación</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                              <InputField label="Clase" name="clase" isSelect options={optsClases} />
+                              <InputField label="Marca" name="marca" isSelect options={optsMarcas} />
+                              <InputField label="Modelo" name="modelo" isSelect options={optsModelos} />
+                              <InputField label="Color" name="color" isSelect options={optsColores} />
+                              <InputField label="Carrocería" name="carroceria" isSelect options={optsCarrocerias} />
+                              {hasMarcaCarroceria && <InputField label="Marca Carrocería" name="marcaCarroceria" />}
+                              <InputField label="Placa Nueva (Extraordinario)" name="placaNueva" />
+                              <InputField label="Nro Serie (VIN)" name="nroSerie" />
+                              {hasMotor && <InputField label="Nro Motor" name="nroMotor" />}
+                            </div>
+                          </div>
+
+                          {/* BLOQUE 2: ESPECIFICACIONES TÉCNICAS */}
+                          <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                            <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Especificaciones Técnicas</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                              <InputField label="Año Fabricación" name="anioFabricacion" type="number" />
+                              {hasMotor && <InputField label="Combustible" name="combustible" isSelect options={optsCombustibles} />}
+                              {hasMotor && <InputField label="Nro Cilindros" name="nroCilindros" type="number" />}
+                              {hasMotor && <InputField label="Kilometraje" name="kilometraje" type="number" />}
+                            </div>
+                          </div>
+
+                          {/* BLOQUE 3: CAPACIDAD Y DIMENSIONES */}
+                          <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                            <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Capacidad y Dimensiones</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                              {/* Asientos / Pasajeros */}
+                              {hasAsientos && <InputField label="Nro Asientos" name="nroAsientos" type="number" />}
+                              {hasPasajeros && <InputField label="Nro Pasajeros" name="nroPasajeros" type="number" />}
+                              {hasPuertas && <InputField label="Nro Puertas" name="nroPuertas" type="number" />}
+                              {hasPisos && <InputField label="Nro Pisos" name="nroPisos" type="number" />}
+                              {hasSalidasEmergencia && <InputField label="Salidas de Emergencia" name="salidasEmergencia" type="number" />}
+                              
+                              {/* Pesos */}
+                              <InputField label="Peso Seco (Kg)" name="pesoSeco" type="number" />
+                              <InputField label="Peso Bruto (Kg)" name="pesoBruto" type="number" />
+                              {hasCargaUtil && <InputField label="Carga Útil (Kg)" name="cargaUtil" type="number" />}
+                              
+                              {/* Dimensiones */}
+                              <InputField label="Longitud (m)" name="longitud" type="number" />
+                              <InputField label="Ancho (m)" name="ancho" type="number" />
+                              <InputField label="Altura (m)" name="altura" type="number" />
+                              <InputField label="Nro Ejes" name="nroEjes" type="number" />
+                              <InputField label="Nro Ruedas" name="nroRuedas" type="number" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                   </div>
+                 );
+               })()}
+               {vehiculoTab === 'SOAT' && (
+                 <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase mb-4">2. SOAT</h3>
+                    <p className="text-slate-500 text-sm">Sección en construcción.</p>
+                 </div>
+               )}
+               {vehiculoTab === 'PROPIETARIO' && (
+                 <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase mb-4">3. Datos del Propietario</h3>
+                    <p className="text-slate-500 text-sm">Sección en construcción.</p>
+                 </div>
+               )}
+            </div>
+          </div>
+        )}
+
         {/* OTROS PASOS */}
-        {currentStepIndex > 1 && (
+        {currentStepIndex > 2 && (
           <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-4">
             <CheckCircle2 className="w-16 h-16 text-slate-300" />
             <h3 className="text-xl font-bold text-slate-700">Paso en construcción</h3>
