@@ -6,9 +6,25 @@ import { maestrosApi } from '../../../../../services/api';
 
 export const FormVehiculoContext = React.createContext<any>(null);
 
-const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existingOptions = [] }: any) => {
+const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existingOptions = [], asyncSearch }: any) => {
   const [value, setValue] = useState('');
+  const [asyncMatches, setAsyncMatches] = useState<any[]>([]);
   
+  const trimValue = value.trim();
+
+  // Búsqueda asíncrona para Color y Modelo
+  React.useEffect(() => {
+    if (asyncSearch && trimValue.length >= 2) {
+      const timer = setTimeout(async () => {
+        const results = await asyncSearch(trimValue);
+        setAsyncMatches(results);
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      setAsyncMatches([]);
+    }
+  }, [trimValue, asyncSearch]);
+
   if (!isOpen) return null;
 
   // Derive error and suggestions based on value
@@ -16,7 +32,7 @@ const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existing
   let isExactMatch = false;
   let suggestions: string[] = [];
 
-  const trimValue = value.trim();
+  const combinedOptions = [...existingOptions, ...asyncMatches];
 
   if (trimValue) {
     if (!/[A-Z]/.test(trimValue)) {
@@ -29,7 +45,7 @@ const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existing
       error = 'No puede empezar ni terminar con guión.';
     }
 
-    const matches = existingOptions.filter((opt: any) => opt.label && opt.label.includes(trimValue));
+    const matches = combinedOptions.filter((opt: any) => opt.label && opt.label.includes(trimValue));
     
     if (matches.some((opt: any) => opt.label === trimValue)) {
       isExactMatch = true;
@@ -91,11 +107,14 @@ const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existing
                   <span key={s} className="bg-amber-200 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full">{s}</span>
                 ))}
               </div>
-              {title === 'Color' && (
-                <p className="text-[10px] font-bold text-amber-800 mt-2 border-t border-amber-200 pt-1">
-                  💡 <strong>Nota:</strong> Si son varios colores, puedes separarlos por guiones.
-                </p>
-              )}
+            </div>
+          )}
+          
+          {title === 'Color' && (
+            <div className="bg-amber-50 border border-amber-200 p-2 rounded-lg">
+              <p className="text-[10px] font-bold text-amber-800">
+                💡 <strong>Nota:</strong> Si son varios colores, puedes separarlos por guiones.
+              </p>
             </div>
           )}
 
@@ -257,11 +276,14 @@ export function VehiculoStep({
   const [modalOptions, setModalOptions] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
 
-  const handleAddNuevo = (title: string, tabla: string, field: string, options: any = []) => {
+  const [modalAsyncSearch, setModalAsyncSearch] = useState<any>(null);
+
+  const handleAddNuevo = (title: string, tabla: string, field: string, options: any = [], asyncSearchFunc?: any) => {
     setModalTitle(title);
     setModalTabla(tabla);
     setModalField(field);
     setModalOptions(options);
+    setModalAsyncSearch(() => asyncSearchFunc);
     setModalOpen(true);
   };
 
@@ -291,27 +313,54 @@ export function VehiculoStep({
 
   const checkDatosValid = () => {
     const catName = getCategoriaName() || '';
+    if (!catName) return false;
+
     const isO2O3O4 = ['O2', 'O3', 'O4'].includes(catName);
     const hasCategoriaExtra = ['M2', 'M3'].includes(catName);
     
-    // Core fields
-    if (!formVehiculo.clase || !formVehiculo.marca || !formVehiculo.modelo || !formVehiculo.color || !formVehiculo.carroceria || !formVehiculo.marcaCarroceria || !formVehiculo.placaNueva || !formVehiculo.anioFabricacion || !formVehiculo.combustible || !formVehiculo.nroChasis || !formVehiculo.longitud || !formVehiculo.ancho || !formVehiculo.altura || !formVehiculo.nroEjes || !formVehiculo.nroRuedas || !formVehiculo.pesoSeco || !formVehiculo.cargaUtil || !formVehiculo.pesoBruto) return false;
+    // Función auxiliar para comprobar que el valor no esté vacío (permite el número 0)
+    const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
+
+    // Campos obligatorios para TODOS los vehículos (nota: nroSerie reemplaza a nroChasis, y marcaCarroceria está deshabilitado)
+    const coreFields = [
+      'clase', 'marca', 'modelo', 'color', 'carroceria', 
+      'nroSerie', 'anioFabricacion', 'combustible',
+      'longitud', 'ancho', 'altura', 'nroEjes', 'nroRuedas',
+      'pesoSeco', 'cargaUtil', 'pesoBruto'
+    ];
+
+    for (const f of coreFields) {
+      if (!isValid((formVehiculo as any)[f])) return false;
+    }
     
-    // Dynamic fields
-    if (hasCategoriaExtra && !formVehiculo.categoriaExtra) return false;
-    if (!isO2O3O4 && !formVehiculo.nroMotor) return false;
-    if (!isO2O3O4 && !formVehiculo.nroAsientos) return false;
-    if (!isO2O3O4 && !formVehiculo.nroPasajeros) return false;
-    if (!isO2O3O4 && !formVehiculo.nroPisos) return false;
-    if (!isO2O3O4 && !formVehiculo.nroCilindros) return false;
-    if (!isO2O3O4 && !formVehiculo.nroPuertas) return false;
-    if (!isO2O3O4 && !formVehiculo.salidasEmergencia) return false;
-    if (!isO2O3O4 && !formVehiculo.kilometraje) return false;
+    // Campos dinámicos según categoría
+    if (hasCategoriaExtra && !isValid(formVehiculo.categoriaExtra)) return false;
+    
+    if (!isO2O3O4) {
+      const dynamicFields = [
+        'nroMotor', 'nroCilindros', 'kilometraje', 'nroAsientos', 
+        'nroPasajeros', 'nroPuertas', 'nroPisos', 'salidasEmergencia'
+      ];
+      for (const f of dynamicFields) {
+        if (!isValid((formVehiculo as any)[f])) return false;
+      }
+    }
 
     return true;
   };
 
   const isDatosValid = checkDatosValid();
+
+  const checkSoatValid = () => {
+    const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
+    const soatFields = ['nroSoat', 'tipoPoliza', 'aseguradora', 'mesesSoat', 'fechaEmisionSoat', 'fechaVencimientoSoat'];
+    for (const f of soatFields) {
+      if (!isValid((formVehiculo as any)[f])) return false;
+    }
+    return true;
+  };
+
+  const isSoatValid = checkSoatValid();
 
   return (
     <div className="space-y-6">
@@ -322,12 +371,24 @@ export function VehiculoStep({
         title={modalTitle} 
         loading={modalLoading} 
         existingOptions={modalOptions}
+        asyncSearch={modalAsyncSearch}
       />
       {/* Pestañas de Vehículo */}
       <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
         {(['DATOS DEL VEHÍCULO', 'SOAT', 'PROPIETARIO'] as const).map(tab => {
           const key = tab === 'DATOS DEL VEHÍCULO' ? 'DATOS' : tab as 'SOAT' | 'PROPIETARIO';
-          const isDisabled = (key === 'SOAT' || key === 'PROPIETARIO') && !isDatosValid;
+          
+          let isDisabled = false;
+          let disabledReason = '';
+          
+          if (key === 'SOAT' && !isDatosValid) {
+            isDisabled = true;
+            disabledReason = 'Debe completar todos los datos del vehículo primero';
+          }
+          if (key === 'PROPIETARIO' && (!isDatosValid || !isSoatValid)) {
+            isDisabled = true;
+            disabledReason = 'Debe completar los datos del vehículo y el SOAT primero';
+          }
           
           return (
             <button
@@ -338,7 +399,7 @@ export function VehiculoStep({
                 ${vehiculoTab === key ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'}
                 ${isDisabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}
               `}
-              title={isDisabled ? 'Debe completar todos los datos del vehículo primero' : ''}
+              title={disabledReason}
             >
               {tab}
             </button>
@@ -391,10 +452,10 @@ export function VehiculoStep({
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <InputField label="Categoría" name="categoria_display" overrideValue={catName} disabled={true} />
                         {hasCategoriaExtra && <InputField label="Categoría Extra" name="categoriaExtra" isSelect options={optsCategoriasExtra} />}
-                        <InputField label="Clase" name="clase" isSelect options={optsClases} onAddNuevo={() => handleAddNuevo('Clase', 'clase', 'clase', optsClases)} />
+                        <InputField label="Clase" name="clase" isSelect options={optsClases} onAddNuevo={() => handleAddNuevo('Clase', 'vehiculoclase', 'clase', optsClases)} />
                         <InputField label="Marca" name="marca" isSelect options={optsMarcas} onAddNuevo={() => handleAddNuevo('Marca', 'marca', 'marca', optsMarcas)} />
-                        <InputField label="Modelo" name="modelo" isAsyncSelect loadOptions={loadModelos} onAddNuevo={() => handleAddNuevo('Modelo', 'modelo', 'modelo')} />
-                        <InputField label="Color" name="color" isAsyncSelect loadOptions={loadColores} onAddNuevo={() => handleAddNuevo('Color', 'color', 'color')} />
+                        <InputField label="Modelo" name="modelo" isAsyncSelect loadOptions={loadModelos} onAddNuevo={() => handleAddNuevo('Modelo', 'modelo', 'modelo', [], loadModelos)} />
+                        <InputField label="Color" name="color" isAsyncSelect loadOptions={loadColores} onAddNuevo={() => handleAddNuevo('Color', 'color', 'color', [], loadColores)} />
                         <InputField label="Carrocería" name="carroceria" isSelect options={optsCarrocerias} onAddNuevo={() => handleAddNuevo('Carrocería', 'carroceria', 'carroceria', optsCarrocerias)} />
                         <InputField 
                           label="Marca Carrocería" 
@@ -470,12 +531,73 @@ export function VehiculoStep({
              </FormVehiculoContext.Provider>
            );
          })()}
-       {vehiculoTab === 'SOAT' && (
-           <div>
-              <h3 className="text-sm font-black text-slate-800 uppercase mb-4">2. SOAT</h3>
-              <p className="text-slate-500 text-sm">Sección en construcción.</p>
-           </div>
-         )}
+         {vehiculoTab === 'SOAT' && (() => {
+           const optsTiposPoliza = maestrosVehiculo?.tiposPoliza?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+           const optsAseguradoras = maestrosVehiculo?.aseguradoras?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+
+           return (
+             <FormVehiculoContext.Provider value={{formVehiculo, setFormVehiculo}}>
+               <div>
+                 <h3 className="text-sm font-black text-[#052a79] uppercase mb-4">2. SOAT</h3>
+                 
+                 <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl">
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                     <InputField 
+                       label="Nro SOAT" 
+                       name="nroSoat" 
+                       maxLength={25}
+                       onKeyDown={(e: any) => {
+                         // Solo permitir números, retroceso y teclas de flecha
+                         if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab') {
+                           e.preventDefault();
+                         }
+                       }}
+                       onChange={(e: any) => {
+                         const val = e.target.value.replace(/[^0-9]/g, '');
+                         setFormVehiculo({...formVehiculo, nroSoat: val});
+                       }}
+                       overrideValue={formVehiculo.nroSoat || ''}
+                     />
+                     <InputField label="Tipo de Póliza" name="tipoPoliza" isSelect options={optsTiposPoliza} />
+                     <InputField label="Aseguradora" name="aseguradora" isSelect options={optsAseguradoras} />
+                     <InputField 
+                       label="Vigencia SOAT (Meses)" 
+                       name="mesesSoat" 
+                       isSelect 
+                       options={[
+                         { value: '6', label: '6 meses' },
+                         { value: '12', label: '12 meses' }
+                       ]} 
+                     />
+                     <InputField label="Fecha de Emisión" name="fechaEmisionSoat" type="date" />
+                     <InputField label="Fecha de Vencimiento" name="fechaVencimientoSoat" type="date" />
+                   </div>
+                 </div>
+
+                 <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center justify-center">
+                    {!isSoatValid && (
+                      <p className="text-xs text-amber-600 font-bold mb-3 bg-amber-50 px-4 py-2 rounded-lg border border-amber-200">
+                        ⚠️ Complete todos los campos del SOAT para continuar
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!isSoatValid}
+                      onClick={() => setVehiculoTab('PROPIETARIO')}
+                      className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-md
+                        ${isSoatValid 
+                          ? 'bg-amber-400 text-[#052a79] hover:bg-amber-300 hover:shadow-lg hover:-translate-y-0.5' 
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                        }
+                      `}
+                    >
+                      Continuar a 3. Propietario
+                    </button>
+                  </div>
+               </div>
+             </FormVehiculoContext.Provider>
+           );
+         })()}
          {vehiculoTab === 'PROPIETARIO' && (
            <div>
               <h3 className="text-sm font-black text-slate-800 uppercase mb-4">3. Datos del Propietario</h3>

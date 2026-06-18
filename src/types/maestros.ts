@@ -56,5 +56,7 @@ export interface MaestrosVehiculoResponse {
     carrocerias: MaestroOption[];
     combustibles: MaestroOption[];
     categoriasExtra: MaestroOption[];
+    tiposPoliza: MaestroOption[];
+    aseguradoras: MaestroOption[];
   };
 }
