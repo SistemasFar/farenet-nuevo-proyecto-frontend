@@ -256,18 +256,19 @@ export function VehiculoStep({
       <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
          {vehiculoTab === 'DATOS' && (() => {
            const catName = getCategoriaName() || ''; // e.g. M1, L1, O2
-           const isL = catName.startsWith('L');
-           const isM = catName.startsWith('M');
-           const isN = catName.startsWith('N');
+           const isO2O3O4 = ['O2', 'O3', 'O4'].includes(catName);
 
-           // Reglas dinámicas (sacadas del prompt del usuario)
-           const hasMotor = isL || isM || isN; // O no tiene motor
-           const hasAsientos = ['L4', 'L5'].includes(catName) || isM || isN;
-           const hasPasajeros = ['L4', 'L5'].includes(catName) || isM;
-           const hasPisos = catName === 'M3';
-           const hasCargaUtil = catName !== '' && !['L1', 'L3'].includes(catName);
-           const hasPuertas = isM || isN;
-           const hasSalidasEmergencia = ['M2', 'M3'].includes(catName);
+           // Reglas dinámicas (basadas en la lista exacta proporcionada)
+           const hasCategoriaExtra = ['M2', 'M3'].includes(catName);
+           const hasMotor = !isO2O3O4;
+           const hasAsientos = !isO2O3O4;
+           const hasPasajeros = !isO2O3O4;
+           const hasPisos = !isO2O3O4;
+           const hasCargaUtil = true; // Todos tienen Peso Seco, Carga Útil, Peso Bruto en este listado
+           const hasPuertas = !isO2O3O4;
+           const hasSalidasEmergencia = !isO2O3O4;
+           const hasCilindros = !isO2O3O4;
+           const hasKilometraje = !isO2O3O4;
 
            // Opciones Mapeadas
            const optsClases = maestrosVehiculo?.clases.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
@@ -276,6 +277,7 @@ export function VehiculoStep({
            const optsColores = maestrosVehiculo?.colores.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
            const optsCarrocerias = maestrosVehiculo?.carrocerias.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
            const optsCombustibles = maestrosVehiculo?.combustibles.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+           const optsCategoriasExtra = maestrosVehiculo?.categoriasExtra?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
 
            return (
              <FormVehiculoContext.Provider value={{formVehiculo, setFormVehiculo}}>
@@ -296,6 +298,7 @@ export function VehiculoStep({
                       <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Identificadores y Clasificación</h4>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <InputField label="Categoría" name="categoria_display" overrideValue={catName} disabled={true} />
+                        {hasCategoriaExtra && <InputField label="Categoría Extra" name="categoriaExtra" isSelect options={optsCategoriasExtra} />}
                         <InputField label="Clase" name="clase" isSelect options={optsClases} onAddNuevo={() => handleAddNuevo('Clase', 'clase', 'clase')} />
                         <InputField label="Marca" name="marca" isSelect options={optsMarcas} onAddNuevo={() => handleAddNuevo('Marca', 'marca', 'marca')} />
                         <InputField label="Modelo" name="modelo" isAsyncSelect loadOptions={loadModelos} onAddNuevo={() => handleAddNuevo('Modelo', 'modelo', 'modelo')} />
@@ -317,9 +320,9 @@ export function VehiculoStep({
                       <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Especificaciones Técnicas</h4>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <InputField label="Año Fabricación" name="anioFabricacion" type="number" maxLength={4} minNumber={1800} />
-                        {hasMotor && <InputField label="Combustible" name="combustible" isSelect options={optsCombustibles} />}
-                        {hasMotor && <InputField label="Nro Cilindros" name="nroCilindros" type="number" />}
-                        {hasMotor && <InputField label="Kilometraje" name="kilometraje" type="number" />}
+                        <InputField label="Combustible" name="combustible" isSelect options={optsCombustibles} />
+                        {hasCilindros && <InputField label="Nro Cilindros" name="nroCilindros" type="number" />}
+                        {hasKilometraje && <InputField label="Kilometraje" name="kilometraje" type="number" />}
                       </div>
                     </div>
 
@@ -336,8 +339,8 @@ export function VehiculoStep({
                         
                         {/* Pesos */}
                         <InputField label="Peso Seco (Kg)" name="pesoSeco" type="number" />
-                        <InputField label="Peso Bruto (Kg)" name="pesoBruto" type="number" />
                         {hasCargaUtil && <InputField label="Carga Útil (Kg)" name="cargaUtil" type="number" />}
+                        <InputField label="Peso Bruto (Kg)" name="pesoBruto" type="number" />
                         
                         {/* Dimensiones */}
                         <InputField label="Longitud (m)" name="longitud" type="number" />

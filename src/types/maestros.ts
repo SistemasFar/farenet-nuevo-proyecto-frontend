@@ -55,5 +55,6 @@ export interface MaestrosVehiculoResponse {
     colores: MaestroOption[];
     carrocerias: MaestroOption[];
     combustibles: MaestroOption[];
+    categoriasExtra: MaestroOption[];
   };
 }
