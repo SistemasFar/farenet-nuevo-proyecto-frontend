@@ -699,6 +699,25 @@ export const maestrosApi = {
     return parseJsonResponse<{status: string, data: {key: string, nombre: string}[]}>(response);
   },
 
+  buscarColoresAsync: async (query: string): Promise<{status: string, data: {key: string, nombre: string}[]}> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/vehiculo/colores?q=${encodeURIComponent(query)}`, {
+      method: 'GET',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, 'Error al buscar colores.')
+      );
+    }
+
+    return parseJsonResponse<{status: string, data: {key: string, nombre: string}[]}>(response);
+  },
+
   agregarMaestroAsync: async (tabla: string, nombre: string): Promise<{status: string, message: string, data: {key: string, nombre: string}}> => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/agregar`, {
       method: 'POST',

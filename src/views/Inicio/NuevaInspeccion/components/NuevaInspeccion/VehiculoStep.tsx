@@ -213,11 +213,21 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
 };
 
 export const loadModelos = async (inputValue: string) => {
-  if (!inputValue) return [];
   try {
-    const res = await maestrosApi.buscarModelosAsync(inputValue);
-    return res.data.map((m: any) => ({ value: m.key, label: m.nombre }));
-  } catch (err) {
+    const response = await maestrosApi.buscarModelosAsync(inputValue);
+    return response.data.map((m: any) => ({ value: m.key, label: m.nombre }));
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+};
+
+const loadColores = async (inputValue: string) => {
+  try {
+    const response = await maestrosApi.buscarColoresAsync(inputValue);
+    return response.data.map((c: any) => ({ value: c.key, label: c.nombre }));
+  } catch (error) {
+    console.error(error);
     return [];
   }
 };
@@ -279,6 +289,30 @@ export function VehiculoStep({
     }
   };
 
+  const checkDatosValid = () => {
+    const catName = getCategoriaName() || '';
+    const isO2O3O4 = ['O2', 'O3', 'O4'].includes(catName);
+    const hasCategoriaExtra = ['M2', 'M3'].includes(catName);
+    
+    // Core fields
+    if (!formVehiculo.clase || !formVehiculo.marca || !formVehiculo.modelo || !formVehiculo.color || !formVehiculo.carroceria || !formVehiculo.marcaCarroceria || !formVehiculo.placaNueva || !formVehiculo.anioFabricacion || !formVehiculo.combustible || !formVehiculo.nroChasis || !formVehiculo.longitud || !formVehiculo.ancho || !formVehiculo.altura || !formVehiculo.nroEjes || !formVehiculo.nroRuedas || !formVehiculo.pesoSeco || !formVehiculo.cargaUtil || !formVehiculo.pesoBruto) return false;
+    
+    // Dynamic fields
+    if (hasCategoriaExtra && !formVehiculo.categoriaExtra) return false;
+    if (!isO2O3O4 && !formVehiculo.nroMotor) return false;
+    if (!isO2O3O4 && !formVehiculo.nroAsientos) return false;
+    if (!isO2O3O4 && !formVehiculo.nroPasajeros) return false;
+    if (!isO2O3O4 && !formVehiculo.nroPisos) return false;
+    if (!isO2O3O4 && !formVehiculo.nroCilindros) return false;
+    if (!isO2O3O4 && !formVehiculo.nroPuertas) return false;
+    if (!isO2O3O4 && !formVehiculo.salidasEmergencia) return false;
+    if (!isO2O3O4 && !formVehiculo.kilometraje) return false;
+
+    return true;
+  };
+
+  const isDatosValid = checkDatosValid();
+
   return (
     <div className="space-y-6">
       <AgregarMaestroModal 
@@ -293,11 +327,18 @@ export function VehiculoStep({
       <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
         {(['DATOS DEL VEHÍCULO', 'SOAT', 'PROPIETARIO'] as const).map(tab => {
           const key = tab === 'DATOS DEL VEHÍCULO' ? 'DATOS' : tab as 'SOAT' | 'PROPIETARIO';
+          const isDisabled = (key === 'SOAT' || key === 'PROPIETARIO') && !isDatosValid;
+          
           return (
             <button
               key={key}
-              onClick={() => setVehiculoTab(key)}
-              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${vehiculoTab === key ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => !isDisabled && setVehiculoTab(key)}
+              disabled={isDisabled}
+              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all 
+                ${vehiculoTab === key ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'}
+                ${isDisabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}
+              `}
+              title={isDisabled ? 'Debe completar todos los datos del vehículo primero' : ''}
             >
               {tab}
             </button>
@@ -325,8 +366,7 @@ export function VehiculoStep({
            // Opciones Mapeadas
            const optsClases = maestrosVehiculo?.clases.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
            const optsMarcas = maestrosVehiculo?.marcas.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-           // Modelos se carga dinámicamente
-           const optsColores = maestrosVehiculo?.colores.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+           // Modelos y Colores se cargan dinámicamente
            const optsCarrocerias = maestrosVehiculo?.carrocerias.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
            const optsCombustibles = maestrosVehiculo?.combustibles.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
            const optsCategoriasExtra = maestrosVehiculo?.categoriasExtra?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
@@ -354,7 +394,7 @@ export function VehiculoStep({
                         <InputField label="Clase" name="clase" isSelect options={optsClases} onAddNuevo={() => handleAddNuevo('Clase', 'clase', 'clase', optsClases)} />
                         <InputField label="Marca" name="marca" isSelect options={optsMarcas} onAddNuevo={() => handleAddNuevo('Marca', 'marca', 'marca', optsMarcas)} />
                         <InputField label="Modelo" name="modelo" isAsyncSelect loadOptions={loadModelos} onAddNuevo={() => handleAddNuevo('Modelo', 'modelo', 'modelo')} />
-                        <InputField label="Color" name="color" isSelect options={optsColores} onAddNuevo={() => handleAddNuevo('Color', 'color', 'color', optsColores)} />
+                        <InputField label="Color" name="color" isAsyncSelect loadOptions={loadColores} onAddNuevo={() => handleAddNuevo('Color', 'color', 'color')} />
                         <InputField label="Carrocería" name="carroceria" isSelect options={optsCarrocerias} onAddNuevo={() => handleAddNuevo('Carrocería', 'carroceria', 'carroceria', optsCarrocerias)} />
                         <InputField 
                           label="Marca Carrocería" 
@@ -405,6 +445,28 @@ export function VehiculoStep({
                    </div>
                  )}
               </div>
+
+              <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center justify-center">
+                {!isDatosValid && (
+                  <p className="text-xs text-amber-600 font-bold mb-3 bg-amber-50 px-4 py-2 rounded-lg border border-amber-200">
+                    ⚠️ Complete todos los campos obligatorios para continuar al SOAT
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={!isDatosValid}
+                  onClick={() => setVehiculoTab('SOAT')}
+                  className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-md
+                    ${isDatosValid 
+                      ? 'bg-amber-400 text-[#052a79] hover:bg-amber-300 hover:shadow-lg hover:-translate-y-0.5' 
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    }
+                  `}
+                >
+                  Continuar a 2. SOAT
+                </button>
+              </div>
+
              </FormVehiculoContext.Provider>
            );
          })()}
