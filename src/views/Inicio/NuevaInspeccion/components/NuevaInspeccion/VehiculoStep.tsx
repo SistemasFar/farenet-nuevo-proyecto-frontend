@@ -9,6 +9,7 @@ export const FormVehiculoContext = React.createContext<any>(null);
 const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existingOptions = [], asyncSearch }: any) => {
   const [value, setValue] = useState('');
   const [asyncMatches, setAsyncMatches] = useState<any[]>([]);
+  const [serverError, setServerError] = useState(false);
   
   const trimValue = value.trim();
 
@@ -54,19 +55,24 @@ const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existing
     }
   }
 
-  const handleSubmit = (e: any) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     if (error || isExactMatch || !trimValue) return;
-    onSave(trimValue);
+    try {
+      await onSave(trimValue);
+    } catch (err: any) {
+      setServerError(true);
+    }
   };
 
   const handleChange = (e: any) => {
     // Solo permitir letras, números y guiones, todo a mayúsculas
     const val = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
     setValue(val);
+    setServerError(false);
   };
 
-  const isSaveDisabled = loading || !trimValue || error !== '' || isExactMatch;
+  const isSaveDisabled = loading || !trimValue || error !== '' || isExactMatch || serverError;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -78,7 +84,7 @@ const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existing
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-4 flex flex-col gap-3">
-          {isExactMatch && (
+          {(isExactMatch || serverError) && (
             <p className="text-xs text-white bg-blue-600 font-semibold p-2 rounded-lg flex items-center gap-2">
               <span className="text-lg">🥶</span> Este elemento ya existe.
             </p>
@@ -305,7 +311,7 @@ export function VehiculoStep({
 
       setModalOpen(false);
     } catch (err: any) {
-      alert(err.message);
+      throw err;
     } finally {
       setModalLoading(false);
     }
@@ -313,15 +319,13 @@ export function VehiculoStep({
 
   const checkDatosValid = () => {
     const catName = getCategoriaName() || '';
-    if (!catName) return false;
+    if (!catName) return ['Categoría'];
 
     const isO2O3O4 = ['O2', 'O3', 'O4'].includes(catName);
     const hasCategoriaExtra = ['M2', 'M3'].includes(catName);
     
-    // Función auxiliar para comprobar que el valor no esté vacío (permite el número 0)
     const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
 
-    // Campos obligatorios para TODOS los vehículos (nota: nroSerie reemplaza a nroChasis, y marcaCarroceria está deshabilitado)
     const coreFields = [
       'clase', 'marca', 'modelo', 'color', 'carroceria', 
       'nroSerie', 'anioFabricacion', 'combustible',
@@ -329,12 +333,13 @@ export function VehiculoStep({
       'pesoSeco', 'cargaUtil', 'pesoBruto'
     ];
 
+    let missing: string[] = [];
+
     for (const f of coreFields) {
-      if (!isValid((formVehiculo as any)[f])) return false;
+      if (!isValid((formVehiculo as any)[f])) missing.push(f);
     }
     
-    // Campos dinámicos según categoría
-    if (hasCategoriaExtra && !isValid(formVehiculo.categoriaExtra)) return false;
+    if (hasCategoriaExtra && !isValid(formVehiculo.categoriaExtra)) missing.push('categoriaExtra');
     
     if (!isO2O3O4) {
       const dynamicFields = [
@@ -342,25 +347,28 @@ export function VehiculoStep({
         'nroPasajeros', 'nroPuertas', 'nroPisos', 'salidasEmergencia'
       ];
       for (const f of dynamicFields) {
-        if (!isValid((formVehiculo as any)[f])) return false;
+        if (!isValid((formVehiculo as any)[f])) missing.push(f);
       }
     }
 
-    return true;
+    return missing;
   };
 
-  const isDatosValid = checkDatosValid();
+  const missingDatos = checkDatosValid();
+  const isDatosValid = missingDatos.length === 0;
 
   const checkSoatValid = () => {
     const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
     const soatFields = ['nroSoat', 'tipoPoliza', 'aseguradora', 'mesesSoat', 'fechaEmisionSoat', 'fechaVencimientoSoat'];
+    let missing: string[] = [];
     for (const f of soatFields) {
-      if (!isValid((formVehiculo as any)[f])) return false;
+      if (!isValid((formVehiculo as any)[f])) missing.push(f);
     }
-    return true;
+    return missing;
   };
 
-  const isSoatValid = checkSoatValid();
+  const missingSoat = checkSoatValid();
+  const isSoatValid = missingSoat.length === 0;
 
   return (
     <div className="space-y-6">
@@ -526,6 +534,11 @@ export function VehiculoStep({
                 >
                   Continuar a 2. SOAT
                 </button>
+                {!isDatosValid && (
+                  <p className="mt-3 text-xs text-red-500 font-semibold max-w-lg text-center">
+                    Falta completar: {missingDatos.join(', ')}
+                  </p>
+                )}
               </div>
 
              </FormVehiculoContext.Provider>
