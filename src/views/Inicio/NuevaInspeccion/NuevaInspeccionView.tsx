@@ -100,6 +100,24 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
   };
 
   useEffect(() => {
+    if (inspeccionIdBorrador) {
+      setLoading(true);
+      inspeccionesApi.obtenerBorrador(inspeccionIdBorrador)
+        .then(res => {
+          if (res?.data) {
+            const data = res.data;
+            if (data.formCaja) setFormCaja(data.formCaja);
+            if (data.formVehiculo) setFormVehiculo(data.formVehiculo);
+            if (data.pagosAgregados) setPagosAgregados(data.pagosAgregados);
+            if (data.currentStepIndex) setCurrentStepIndex(data.currentStepIndex);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [inspeccionIdBorrador]);
+
+  useEffect(() => {
     if (currentStepIndex === 0 && !maestros) {
       cargarMaestros();
     } else if (currentStepIndex === 1 && !maestrosPago) {

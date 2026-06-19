@@ -494,6 +494,14 @@ export const inspeccionesApi = {
       headers: { 'Content-Type': 'application/json' }
     });
     if (!response.ok) throw new Error('Error al obtener borrador');
+    return await parseJsonResponse<{ status: string; data?: any }>(response);
+  },
+  eliminarBorrador: async (id: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/borrador/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Error al eliminar borrador');
     return await parseJsonResponse(response);
   },
   buscarInspeccionesAsync: async (

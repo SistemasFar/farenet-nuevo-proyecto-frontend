@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { operacionApi } from '../../services/api';
+import { operacionApi, inspeccionesApi } from '../../services/api';
+import { Trash2 } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '')
@@ -110,6 +111,19 @@ export function InicioView(props: InicioViewProps) {
   const puedeConsultar = useMemo(() => {
     return plantaSeleccionada && plantaSeleccionada.trim() !== '';
   }, [plantaSeleccionada]);
+
+  const handleEliminarBorrador = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este borrador? Esta acción no se puede deshacer.')) return;
+    try {
+      setLoading(true);
+      await inspeccionesApi.eliminarBorrador(id);
+      cargarInspecciones();
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar el borrador');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const cargarInspecciones = async (
     paginaConsulta = page,
@@ -477,18 +491,19 @@ export function InicioView(props: InicioViewProps) {
                       : posicion >= 6
                         ? 'bg-amber-50 hover:bg-amber-100'
                         : esBorrador
-                          ? 'bg-red-600 hover:bg-red-500' // Rojo intenso para borradores
+                          ? 'bg-slate-100 hover:bg-slate-200' // Plomo muy sutil para borradores
                           : 'bg-red-50 hover:bg-red-100';
 
-                  const textoClase = esBorrador ? 'text-white' : 'text-slate-700';
-                  const labelClase = esBorrador ? 'text-white' : 'text-slate-500';
+                  // Al usar un fondo sutil, el texto ya no debe ser blanco, sino oscuro como el resto
+                  const textoClase = esBorrador ? 'text-slate-700' : 'text-slate-700';
+                  const labelClase = esBorrador ? 'text-slate-500' : 'text-slate-500';
 
                   return (
                     <tr
                       key={`${ins.numeroInspeccion}-${idx}`}
                       className={`transition-colors ${claseFila} ${textoClase}`}
                     >
-                      <td className={`p-3 font-semibold whitespace-nowrap ${esBorrador ? 'text-white' : 'text-blue-700'}`}>
+                      <td className={`p-3 font-semibold whitespace-nowrap ${esBorrador ? 'text-slate-800' : 'text-blue-700'}`}>
                         {normalizarTexto(ins.numeroInspeccion)}
                       </td>
                       <td className={`p-3 whitespace-nowrap ${labelClase}`}>
@@ -519,13 +534,25 @@ export function InicioView(props: InicioViewProps) {
                         <BadgeEstado value={ins.estadoCertificado} />
                       </td>
                       <td className="p-3 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => props.onNuevaInspeccion?.(ins.numeroInspeccion)}
-                          className="rounded bg-white/90 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-white shadow-sm transition"
-                        >
-                          Ver
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => props.onNuevaInspeccion?.(ins.numeroInspeccion)}
+                            className="rounded bg-white/90 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-white shadow-sm transition"
+                          >
+                            Ver
+                          </button>
+                          {esBorrador && (
+                            <button
+                              type="button"
+                              onClick={() => handleEliminarBorrador(ins.numeroInspeccion)}
+                              title="Eliminar borrador"
+                              className="p-1.5 text-slate-500 hover:text-white hover:bg-red-500 rounded transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
