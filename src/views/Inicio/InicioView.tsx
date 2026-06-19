@@ -10,7 +10,7 @@ import type { InspeccionPanel } from '../../types/operacion';
 interface InicioViewProps {
   plantaSeleccionada: string;
   plantaNombre: string;
-  onNuevaInspeccion?: () => void;
+  onNuevaInspeccion?: (id?: string) => void;
 }
 
 interface FiltrosPanel {
@@ -32,7 +32,11 @@ const normalizarTexto = (valor?: string | null): string => {
   return valor.trim();
 };
 
-const obtenerClaseBadge = (valor?: string | null): string => {
+const obtenerClaseBadge = (valor?: string | null, esBorrador?: boolean): string => {
+  if (esBorrador) {
+    return 'bg-white text-red-800 border-red-800 font-black shadow-sm';
+  }
+
   const estado = normalizarTexto(valor).toUpperCase();
 
   if (
@@ -47,7 +51,8 @@ const obtenerClaseBadge = (valor?: string | null): string => {
     estado.includes('ANULADO') ||
     estado.includes('DESAPROBADO') ||
     estado.includes('VENCIDO') ||
-    estado.includes('INACTIVO')
+    estado.includes('INACTIVO') ||
+    estado.includes('BORRADOR')
   ) {
     return 'bg-red-50 text-red-700 border-red-200';
   }
@@ -63,14 +68,15 @@ const obtenerClaseBadge = (valor?: string | null): string => {
   return 'bg-slate-50 text-slate-700 border-slate-200';
 };
 
-function BadgeEstado({ value }: { value?: string | null }) {
+function BadgeEstado({ value, esBorrador }: { value?: string | null, esBorrador?: boolean }) {
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${obtenerClaseBadge(
-        value
+        value,
+        esBorrador
       )}`}
     >
-      {normalizarTexto(value)}
+      {esBorrador ? 'BORRADOR' : normalizarTexto(value)}
     </span>
   );
 }
@@ -280,7 +286,7 @@ export function InicioView(props: InicioViewProps) {
             </button>
             <button 
               type="button"
-              onClick={props.onNuevaInspeccion}
+              onClick={() => props.onNuevaInspeccion?.()}
               className="px-3 py-1.5 bg-[#052a79] text-white rounded text-xs font-semibold hover:bg-blue-900 transition"
             >
               + Nueva Inspección
@@ -463,25 +469,32 @@ export function InicioView(props: InicioViewProps) {
               {!loading &&
                 inspecciones.map((ins, idx) => {
                   const posicion = Number(ins.posicion ?? 0);
+                  const esBorrador = posicion < 3;
 
                   const claseFila =
                     posicion >= 11
-                      ? 'bg-green-100 hover:bg-green-200'
+                      ? 'bg-emerald-50 hover:bg-emerald-100'
                       : posicion >= 6
-                        ? 'bg-yellow-100 hover:bg-yellow-200'
-                        : 'bg-red-50 hover:bg-red-100';
+                        ? 'bg-amber-50 hover:bg-amber-100'
+                        : esBorrador
+                          ? 'bg-red-600 hover:bg-red-500' // Rojo intenso para borradores
+                          : 'bg-red-50 hover:bg-red-100';
+
+                  const textoClase = esBorrador ? 'text-white' : 'text-slate-700';
+                  const labelClase = esBorrador ? 'text-white' : 'text-slate-500';
+
                   return (
                     <tr
                       key={`${ins.numeroInspeccion}-${idx}`}
-                      className={`transition-colors ${claseFila}`}
+                      className={`transition-colors ${claseFila} ${textoClase}`}
                     >
-                      <td className="p-3 font-semibold text-blue-700 whitespace-nowrap">
+                      <td className={`p-3 font-semibold whitespace-nowrap ${esBorrador ? 'text-white' : 'text-blue-700'}`}>
                         {normalizarTexto(ins.numeroInspeccion)}
                       </td>
-                      <td className="p-3 text-slate-500 whitespace-nowrap">
+                      <td className={`p-3 whitespace-nowrap ${labelClase}`}>
                         {normalizarTexto(ins.fechaHora)}
                       </td>
-                      <td className="p-3 font-bold text-slate-700 whitespace-nowrap">
+                      <td className="p-3 font-bold whitespace-nowrap">
                         {normalizarTexto(ins.placa)}
                       </td>
                       <td className="p-3 whitespace-nowrap">
@@ -497,7 +510,7 @@ export function InicioView(props: InicioViewProps) {
                         {normalizarTexto(ins.linea)}
                       </td>
                       <td className="p-3 whitespace-nowrap">
-                        <BadgeEstado value={ins.estadoActual || ins.estado} />
+                        <BadgeEstado value={ins.estadoActual || ins.estado} esBorrador={esBorrador} />
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         <BadgeEstado value={ins.resultado} />
@@ -508,7 +521,8 @@ export function InicioView(props: InicioViewProps) {
                       <td className="p-3 whitespace-nowrap">
                         <button
                           type="button"
-                          className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-200 transition"
+                          onClick={() => props.onNuevaInspeccion?.(ins.numeroInspeccion)}
+                          className="rounded bg-white/90 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-white shadow-sm transition"
                         >
                           Ver
                         </button>

@@ -461,6 +461,41 @@ export const operacionApi = {
 };
 
 export const inspeccionesApi = {
+  buscar: async (params: any) => {
+    const query = new URLSearchParams(params).toString();
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/buscar?${query}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Error al buscar inspecciones');
+    return await parseJsonResponse(response);
+  },
+  guardar: async (data: any) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/guardar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error al guardar inspeccion');
+    return await parseJsonResponse(response);
+  },
+  guardarBorrador: async (data: any) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/borrador`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error al guardar borrador');
+    return await parseJsonResponse<{ status: string; data?: { idBorrador?: string } }>(response);
+  },
+  obtenerBorrador: async (id: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/borrador/${id}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Error al obtener borrador');
+    return await parseJsonResponse(response);
+  },
   buscarInspeccionesAsync: async (
     plantaKey: string,
     filtros?: {

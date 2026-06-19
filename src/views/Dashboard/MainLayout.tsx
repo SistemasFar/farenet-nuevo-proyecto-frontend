@@ -56,6 +56,7 @@ export function MainLayout({
   onLogout
 }: MainLayoutProps) {
   const [activeTab, setActiveTab] = useState('inicio');
+  const [inspeccionIdBorrador, setInspeccionIdBorrador] = useState<string | undefined>(undefined);
 
   const [sidebarPinned, setSidebarPinned] = useState(() => {
     return localStorage.getItem('sidebarPinned') === 'true';
@@ -110,12 +111,24 @@ export function MainLayout({
           <InicioView
             plantaSeleccionada={plantaKey}
             plantaNombre={plantaNombre}
-            onNuevaInspeccion={() => setActiveTab('nueva_inspeccion')}
+            onNuevaInspeccion={(id) => {
+              setInspeccionIdBorrador(id);
+              setActiveTab('nueva_inspeccion');
+            }}
           />
         );
 
       case 'nueva_inspeccion':
-        return <NuevaInspeccionView onBack={() => setActiveTab('inicio')} />;
+        return (
+          <NuevaInspeccionView 
+            onBack={() => {
+              setInspeccionIdBorrador(undefined);
+              setActiveTab('inicio');
+            }} 
+            plantaSeleccionada={plantaKey} 
+            inspeccionIdBorrador={inspeccionIdBorrador}
+          />
+        );
 
       case 'inspecciones':
         return (
@@ -192,7 +205,10 @@ export function MainLayout({
           <InicioView
             plantaSeleccionada={plantaKey}
             plantaNombre={plantaNombre}
-            onNuevaInspeccion={() => setActiveTab('nueva_inspeccion')}
+            onNuevaInspeccion={(id) => {
+              setInspeccionIdBorrador(id);
+              setActiveTab('nueva_inspeccion');
+            }}
           />
         );
     }

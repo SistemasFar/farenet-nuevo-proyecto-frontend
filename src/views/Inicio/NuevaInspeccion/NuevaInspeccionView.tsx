@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { maestrosApi } from '../../../services/api';
+import { maestrosApi, inspeccionesApi } from '../../../services/api';
 import type { MaestrosCajaResponse, MaestrosPagoResponse } from '../../../types/maestros';
 import { CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Search } from 'lucide-react';
 import { CajaStep } from './components/NuevaInspeccion/CajaStep';
@@ -22,10 +22,10 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-
-
 interface NuevaInspeccionViewProps {
   onBack?: () => void;
+  plantaSeleccionada?: string;
+  inspeccionIdBorrador?: string;
 }
 
 const STEPS = [
@@ -36,8 +36,9 @@ const STEPS = [
   { id: 'verificacion', label: 'Verificación', icon: FileText }
 ];
 
-export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
+export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBorrador }: NuevaInspeccionViewProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentBorradorId, setCurrentBorradorId] = useState<string | undefined>(inspeccionIdBorrador);
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
   const [maestrosVehiculo, setMaestrosVehiculo] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,18 +193,36 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
     return true;
   };
 
-  const irSiguientePaso = () => {
+  const irSiguientePaso = async () => {
     if (currentStepIndex === 0 && !validarCaja()) {
       alert('Por favor completa todos los campos de la caja antes de continuar.');
       return;
     }
 
     if (currentStepIndex === 2 && !isVehiculoValid) {
+      alert('Por favor completa todos los campos obligatorios del vehículo, SOAT y Propietario antes de continuar.');
       return;
     }
 
+    try {
+      // Auto-guardar borrador
+      const res = await inspeccionesApi.guardarBorrador({
+        idBorrador: currentBorradorId,
+        currentStepIndex: currentStepIndex + 1,
+        plantaKey: plantaSeleccionada,
+        formCaja,
+        pagosAgregados,
+        formVehiculo
+      });
+      if (res?.data?.idBorrador) {
+        setCurrentBorradorId(res.data.idBorrador);
+      }
+    } catch (err) {
+      console.warn('No se pudo guardar el borrador silenciosamente', err);
+    }
+
     if (currentStepIndex < STEPS.length - 1) {
-      setCurrentStepIndex(currentStepIndex + 1);
+      setCurrentStepIndex((prev) => prev + 1);
     }
   };
 
