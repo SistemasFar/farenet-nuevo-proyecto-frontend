@@ -32,7 +32,7 @@ const STEPS = [
   { id: 'caja', label: 'Caja', icon: Box },
   { id: 'pago', label: 'Pago', icon: CreditCard },
   { id: 'vehiculo', label: 'Vehículo', icon: Search },
-  { id: 'cliente', label: 'Cliente', icon: User },
+  { id: 'cliente', label: 'Facturación', icon: User },
   { id: 'verificacion', label: 'Verificación', icon: FileText }
 ];
 
@@ -82,6 +82,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   });
 
   // Form State (Vehículo)
+  const [isVehiculoValid, setIsVehiculoValid] = useState(false);
   const [vehiculoTab, setVehiculoTab] = useState<'DATOS' | 'SOAT' | 'PROPIETARIO'>('DATOS');
   const [formVehiculo, setFormVehiculo] = useState({
     clase: '', marca: '', modelo: '', carroceria: '', marcaCarroceria: '', placaNueva: '',
@@ -194,6 +195,10 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
   const irSiguientePaso = () => {
     if (currentStepIndex === 0 && !validarCaja()) {
       alert('Por favor completa todos los campos de la caja antes de continuar.');
+      return;
+    }
+
+    if (currentStepIndex === 2 && !isVehiculoValid) {
       return;
     }
 
@@ -391,6 +396,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
               setFormVehiculo={setFormVehiculo}
               maestrosVehiculo={maestrosVehiculo}
               getCategoriaName={getCategoriaName}
+              onValidationChange={setIsVehiculoValid}
             />
           </div>
         )}
@@ -407,7 +413,7 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
 
       {/* FOOTER ACTIONS */}
       {currentStepIndex > 0 && (
-        <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between">
+        <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
           <button
             type="button"
             onClick={irPasoAnterior}
@@ -416,14 +422,25 @@ export function NuevaInspeccionView({ onBack }: NuevaInspeccionViewProps) {
             Atrás
           </button>
 
-          <button
-            type="button"
-            onClick={irSiguientePaso}
-            disabled={currentStepIndex === 1 && montoPendiente > 0}
-            className={`rounded-lg bg-[#052a79] px-5 py-2 text-xs font-bold text-white transition ${currentStepIndex === 1 && montoPendiente > 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-900'}`}
-          >
-            {currentStepIndex === STEPS.length - 1 ? 'Finalizar' : 'Siguiente Paso'}
-          </button>
+          <div className="flex flex-col items-end gap-1.5">
+            {currentStepIndex === 2 && !isVehiculoValid && (
+              <p className="text-[10px] text-red-500 font-bold uppercase">
+                Falta completar campos en Datos, SOAT o Propietario
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={irSiguientePaso}
+              disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid)}
+              className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
+                ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid)
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  : 'bg-amber-400 text-[#052a79] hover:bg-amber-300 hover:shadow-lg hover:-translate-y-0.5'
+                }`}
+            >
+              {currentStepIndex === STEPS.length - 1 ? 'Finalizar' : 'Siguiente Paso'}
+            </button>
+          </div>
         </div>
       )}
 

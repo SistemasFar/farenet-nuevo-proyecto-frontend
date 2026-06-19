@@ -269,6 +269,7 @@ interface VehiculoStepProps {
   setFormVehiculo: (data: any) => void;
   maestrosVehiculo: any;
   getCategoriaName: () => string;
+  onValidationChange?: (isValid: boolean) => void;
 }
 
 export function VehiculoStep({
@@ -277,7 +278,8 @@ export function VehiculoStep({
   formVehiculo,
   setFormVehiculo,
   maestrosVehiculo,
-  getCategoriaName
+  getCategoriaName,
+  onValidationChange
 }: VehiculoStepProps) {
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -400,6 +402,30 @@ export function VehiculoStep({
 
   const missingSoat = checkSoatValid();
   const isSoatValid = missingSoat.length === 0;
+
+  const checkPropietarioValid = () => {
+    const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
+    const req = ['nombresProp', 'apellidosProp', 'paisProp', 'departamentoProp', 'provinciaProp', 'distritoProp', 'direccionProp', 'emailProp', 'telefonoProp'];
+    if (!formVehiculo.sinDni) {
+      req.push('tipoDocProp', 'nroDocProp');
+    }
+    let missing: string[] = [];
+    for (const f of req) {
+      if (!isValid((formVehiculo as any)[f])) missing.push(f);
+    }
+    return missing;
+  };
+
+  const missingPropietario = checkPropietarioValid();
+  const isPropietarioValid = missingPropietario.length === 0;
+
+  const isAllValid = isDatosValid && isSoatValid && isPropietarioValid;
+
+  React.useEffect(() => {
+    if (onValidationChange) {
+      onValidationChange(isAllValid);
+    }
+  }, [isAllValid, onValidationChange]);
 
   return (
     <div className="space-y-6">
@@ -683,6 +709,12 @@ export function VehiculoStep({
                       <InputField label="Teléfono" name="telefonoProp" filter="telefono" />
                     </div>
                   </div>
+
+                  {!isPropietarioValid && (
+                    <p className="mt-4 text-xs text-red-500 font-semibold text-center">
+                      Falta completar: {missingPropietario.join(', ')}
+                    </p>
+                  )}
                 </div>
               </FormVehiculoContext.Provider>
             );
