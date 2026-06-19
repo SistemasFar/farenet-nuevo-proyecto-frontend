@@ -163,7 +163,7 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber, onAddNuevo }: any) => {
+export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber, onAddNuevo, filter }: any) => {
   const { formVehiculo, setFormVehiculo } = React.useContext(FormVehiculoContext);
   return (
     <div className="flex flex-col gap-1.5 md:col-span-1">
@@ -212,9 +212,14 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
           inputMode={type === 'number' ? 'numeric' : undefined}
           value={overrideValue !== undefined ? overrideValue : formVehiculo[name]}
           onChange={(e) => {
-            let val = e.target.value.toUpperCase();
+            let val = type === 'email' ? e.target.value : e.target.value.toUpperCase();
             if (type === 'number') {
               val = val.replace(/\D/g, '');
+            }
+            if (filter === 'letras') {
+              val = val.replace(/[^A-Z\sÑÁÉÍÓÚ]/g, '');
+            } else if (filter === 'telefono') {
+              val = val.replace(/[^0-9+]/g, '');
             }
             if (maxLength && val.length > maxLength) {
               val = val.slice(0, maxLength);
@@ -283,6 +288,32 @@ export function VehiculoStep({
   const [modalLoading, setModalLoading] = useState(false);
 
   const [modalAsyncSearch, setModalAsyncSearch] = useState<any>(null);
+
+  const [maestrosPropietario, setMaestrosPropietario] = useState<any>(null);
+  const [provincias, setProvincias] = useState<any[]>([]);
+  const [distritos, setDistritos] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (vehiculoTab === 'PROPIETARIO' && !maestrosPropietario) {
+      maestrosApi.obtenerMaestrosPropietario().then((res: any) => setMaestrosPropietario(res.data)).catch(console.error);
+    }
+  }, [vehiculoTab, maestrosPropietario]);
+
+  React.useEffect(() => {
+    if (formVehiculo.departamentoProp) {
+      maestrosApi.obtenerProvincias(formVehiculo.departamentoProp).then((res: any) => setProvincias(res.data)).catch(console.error);
+    } else {
+      setProvincias([]);
+    }
+  }, [formVehiculo.departamentoProp]);
+
+  React.useEffect(() => {
+    if (formVehiculo.provinciaProp) {
+      maestrosApi.obtenerDistritos(formVehiculo.provinciaProp).then((res: any) => setDistritos(res.data)).catch(console.error);
+    } else {
+      setDistritos([]);
+    }
+  }, [formVehiculo.provinciaProp]);
 
   const handleAddNuevo = (title: string, tabla: string, field: string, options: any = [], asyncSearchFunc?: any) => {
     setModalTitle(title);
@@ -611,12 +642,51 @@ export function VehiculoStep({
              </FormVehiculoContext.Provider>
            );
          })()}
-         {vehiculoTab === 'PROPIETARIO' && (
-           <div>
-              <h3 className="text-sm font-black text-slate-800 uppercase mb-4">3. Datos del Propietario</h3>
-              <p className="text-slate-500 text-sm">Sección en construcción.</p>
-           </div>
-         )}
+         {vehiculoTab === 'PROPIETARIO' && (() => {
+            const optsDocs = maestrosPropietario?.tiposDocumento?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+            const optsPaises = maestrosPropietario?.paises?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+            const optsDept = maestrosPropietario?.departamentos?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
+            const optsProv = provincias.map((x: any) => ({ value: x.key, label: x.nombre }));
+            const optsDist = distritos.map((x: any) => ({ value: x.key, label: x.nombre }));
+
+            return (
+              <FormVehiculoContext.Provider value={{formVehiculo, setFormVehiculo}}>
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-black text-[#052a79] uppercase">3. Datos del Propietario</h3>
+                    <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 transition">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded text-[#052a79] focus:ring-[#052a79] cursor-pointer"
+                        checked={formVehiculo.sinDni || false}
+                        onChange={(e) => setFormVehiculo({...formVehiculo, sinDni: e.target.checked, tipoDocProp: '', nroDocProp: ''})}
+                      />
+                      <span className="text-xs font-bold text-slate-700">SIN DNI</span>
+                    </label>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {!formVehiculo.sinDni && (
+                        <>
+                          <InputField label="Tipo de Documento" name="tipoDocProp" isSelect options={optsDocs} />
+                          <InputField label="Número de Identidad" name="nroDocProp" />
+                        </>
+                      )}
+                      <InputField label="Nombres" name="nombresProp" filter="letras" />
+                      <InputField label="Apellidos" name="apellidosProp" filter="letras" />
+                      <InputField label="País" name="paisProp" isSelect options={optsPaises} />
+                      <InputField label="Departamento" name="departamentoProp" isSelect options={optsDept} />
+                      <InputField label="Provincia" name="provinciaProp" isSelect options={optsProv} disabled={!formVehiculo.departamentoProp} />
+                      <InputField label="Distrito" name="distritoProp" isSelect options={optsDist} disabled={!formVehiculo.provinciaProp} />
+                      <InputField label="Dirección" name="direccionProp" />
+                      <InputField label="Email" name="emailProp" type="email" />
+                      <InputField label="Teléfono" name="telefonoProp" filter="telefono" />
+                    </div>
+                  </div>
+                </div>
+              </FormVehiculoContext.Provider>
+            );
+         })()}
       </div>
     </div>
   );
