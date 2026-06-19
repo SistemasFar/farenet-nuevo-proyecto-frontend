@@ -110,6 +110,14 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
             if (data.formVehiculo) setFormVehiculo(data.formVehiculo);
             if (data.pagosAgregados) setPagosAgregados(data.pagosAgregados);
             if (data.currentStepIndex) setCurrentStepIndex(data.currentStepIndex);
+            
+            // Restaurar estado del Resumen de Pago
+            if (data.isConsultado) setIsConsultado(data.isConsultado);
+            if (data.documentoPago) setDocumentoPago(data.documentoPago);
+            if (data.precioSubtotal) setPrecioSubtotal(data.precioSubtotal);
+            if (data.descuento) setDescuento(data.descuento);
+            if (data.precioTotal) setPrecioTotal(data.precioTotal);
+            if (data.documentoDescuento) setDocumentoDescuento(data.documentoDescuento);
           }
         })
         .catch(console.error)
@@ -230,7 +238,13 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
         plantaKey: plantaSeleccionada,
         formCaja,
         pagosAgregados,
-        formVehiculo
+        formVehiculo,
+        isConsultado,
+        documentoPago,
+        precioSubtotal,
+        descuento,
+        precioTotal,
+        documentoDescuento
       });
       if (res?.data?.idBorrador) {
         setCurrentBorradorId(res.data.idBorrador);
