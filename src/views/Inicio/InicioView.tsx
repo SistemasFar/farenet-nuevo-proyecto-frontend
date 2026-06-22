@@ -113,13 +113,13 @@ export function InicioView(props: InicioViewProps) {
   }, [plantaSeleccionada]);
 
   const handleEliminarBorrador = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este borrador? Esta acción no se puede deshacer.')) return;
+    if (!window.confirm('¿Estás seguro de que deseas anular este borrador? El registro quedará guardado como anulado.')) return;
     try {
       setLoading(true);
       await inspeccionesApi.eliminarBorrador(id);
       cargarInspecciones();
     } catch (err: any) {
-      setError(err.message || 'Error al eliminar el borrador');
+      setError(err.message || 'Error al anular el borrador');
     } finally {
       setLoading(false);
     }
@@ -483,7 +483,8 @@ export function InicioView(props: InicioViewProps) {
               {!loading &&
                 inspecciones.map((ins, idx) => {
                   const posicion = Number(ins.posicion ?? 0);
-                  const esBorrador = posicion < 3;
+                  const estadoActual = ins.estadoActual || ins.estado;
+                  const esBorrador = posicion < 3 && estadoActual !== 'ANULADO';
 
                   const claseFila =
                     posicion >= 11
@@ -546,7 +547,7 @@ export function InicioView(props: InicioViewProps) {
                             <button
                               type="button"
                               onClick={() => handleEliminarBorrador(ins.numeroInspeccion)}
-                              title="Eliminar borrador"
+                              title="Anular borrador"
                               className="p-1.5 text-slate-500 hover:text-white hover:bg-red-500 rounded transition-colors"
                             >
                               <Trash2 size={16} />
