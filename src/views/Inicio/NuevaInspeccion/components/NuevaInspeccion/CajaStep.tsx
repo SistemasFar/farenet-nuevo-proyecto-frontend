@@ -68,7 +68,7 @@ export function CajaStep({
           <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Placa *</label>
           <Select
             options={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })) || []}
-            value={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })).find((o: any) => o.value === formCaja.tipoPlaca) || null}
+            value={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoPlaca?.toString()) || null}
             onChange={(o) => handleSelectChange('tipoPlaca', o)}
             placeholder="Seleccione..."
             isClearable
@@ -93,7 +93,7 @@ export function CajaStep({
           <label className="text-xs font-bold text-slate-600 uppercase">Concepto *</label>
           <Select
             options={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })) || []}
-            value={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })).find((o: any) => o.value === formCaja.concepto) || null}
+            value={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })).find((o: any) => o.value?.toString() === formCaja.concepto?.toString()) || null}
             onChange={(o) => handleSelectChange('concepto', o)}
             placeholder="Seleccione..."
             isClearable
@@ -105,7 +105,7 @@ export function CajaStep({
           <label className="text-xs font-bold text-slate-600 uppercase">Categoría *</label>
           <Select
             options={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })) || []}
-            value={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })).find((o: any) => o.value === formCaja.categoria) || null}
+            value={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })).find((o: any) => o.value?.toString() === formCaja.categoria?.toString()) || null}
             onChange={(o) => handleSelectChange('categoria', o)}
             placeholder="Seleccione..."
             isClearable
@@ -117,7 +117,7 @@ export function CajaStep({
           <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Inspección *</label>
           <Select
             options={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })) || []}
-            value={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })).find((o: any) => o.value === formCaja.tipoInspeccion) || null}
+            value={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoInspeccion?.toString()) || null}
             onChange={(o) => handleSelectChange('tipoInspeccion', o)}
             placeholder="Seleccione..."
             isClearable
@@ -129,7 +129,7 @@ export function CajaStep({
           <label className="text-xs font-bold text-slate-600 uppercase">Tipo Certificado *</label>
           <Select
             options={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })) || []}
-            value={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })).find((o: any) => o.value === formCaja.tipoCertificado) || null}
+            value={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoCertificado?.toString()) || null}
             onChange={(o) => handleSelectChange('tipoCertificado', o)}
             placeholder="Seleccione..."
             isClearable
@@ -144,7 +144,7 @@ export function CajaStep({
               { value: '', label: 'NINGUNO / EN BLANCO' },
               ...(maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })) || [])
             ]}
-            value={maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })).find((o: any) => o.value === formCaja.tipoAutorizacion) || null}
+            value={maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoAutorizacion?.toString()) || null}
             onChange={(o) => setFormCaja({ ...formCaja, tipoAutorizacion: o?.value || '' })}
             placeholder="Seleccione..."
             isClearable
