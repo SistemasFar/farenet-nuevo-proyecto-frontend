@@ -1,6 +1,6 @@
 
 import Select from 'react-select';
-import { XCircle } from 'lucide-react';
+import { XCircle, Edit2 } from 'lucide-react';
 
 interface PagoStepProps {
   precioTotal: number;
@@ -14,6 +14,8 @@ interface PagoStepProps {
   handleAgregarPago: () => void;
   pagosAgregados: any[];
   eliminarPago: (index: number) => void;
+  editingPagoIndex?: number | null;
+  setEditingPagoIndex?: (index: number | null) => void;
 }
 
 export function PagoStep({
@@ -27,8 +29,39 @@ export function PagoStep({
   customSelectStyles,
   handleAgregarPago,
   pagosAgregados,
-  eliminarPago
+  eliminarPago,
+  editingPagoIndex = null,
+  setEditingPagoIndex
 }: PagoStepProps) {
+
+  const editarPago = (idx: number) => {
+    const pago = pagosAgregados[idx];
+    setPagoTab(pago.tipo as 'EFECTIVO' | 'TARJETA' | 'BANCO');
+    setFormPago({
+      importe: pago.importe,
+      tarjetaKey: pago.tarjetaKey || '',
+      entidadFinancieraKey: pago.entidadFinancieraKey || '',
+      cuentaCorrienteKey: pago.cuentaCorrienteKey || '',
+      nroOperacion: pago.nroOperacion || '',
+      digitosTarjeta: pago.digitosTarjeta || '',
+      fechaDeposito: pago.fechaDeposito || new Date().toISOString().split('T')[0]
+    });
+    if (setEditingPagoIndex) setEditingPagoIndex(idx);
+  };
+
+  const handleCancelarEdicion = () => {
+    setFormPago({
+      importe: '',
+      tarjetaKey: '',
+      entidadFinancieraKey: '',
+      cuentaCorrienteKey: '',
+      nroOperacion: '',
+      digitosTarjeta: '',
+      fechaDeposito: new Date().toISOString().split('T')[0]
+    });
+    if (setEditingPagoIndex) setEditingPagoIndex(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* Cabecera de Totales */}
@@ -48,7 +81,21 @@ export function PagoStep({
         {(['EFECTIVO', 'TARJETA', 'BANCO'] as const).map(tab => (
           <button
             key={tab}
-            onClick={() => setPagoTab(tab)}
+            onClick={() => {
+              if (pagoTab !== tab) {
+                setPagoTab(tab);
+                setFormPago({
+                  importe: '',
+                  tarjetaKey: '',
+                  entidadFinancieraKey: '',
+                  cuentaCorrienteKey: '',
+                  nroOperacion: '',
+                  digitosTarjeta: '',
+                  fechaDeposito: new Date().toISOString().split('T')[0]
+                });
+                if (setEditingPagoIndex) setEditingPagoIndex(null);
+              }
+            }}
             className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${pagoTab === tab ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             {tab}
@@ -177,14 +224,22 @@ export function PagoStep({
             {pagoTab === 'BANCO' && <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Monto depositado según voucher.</p>}
           </div>
 
-          <div className="md:col-span-1 pt-[21px]">
+          <div className="md:col-span-1 pt-[21px] flex flex-col gap-2">
             <button
               onClick={handleAgregarPago}
-              disabled={montoPendiente <= 0}
+              disabled={montoPendiente <= 0 && editingPagoIndex === null}
               className="w-full px-4 py-2.5 rounded-lg font-black text-white bg-[#052a79] hover:bg-blue-900 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed uppercase text-sm h-[42px]"
             >
-              AGREGAR
+              {editingPagoIndex !== null ? 'ACTUALIZAR' : 'AGREGAR'}
             </button>
+            {editingPagoIndex !== null && (
+              <button
+                onClick={handleCancelarEdicion}
+                className="w-full px-4 py-2 rounded-lg font-bold text-slate-500 hover:bg-slate-100 transition-colors text-xs"
+              >
+                CANCELAR
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -203,8 +258,8 @@ export function PagoStep({
             </thead>
             <tbody>
               {pagosAgregados.map((pago, idx) => (
-                <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3 font-bold">{pago.tipo}</td>
+                <tr key={idx} className={`border-t border-slate-100 hover:bg-slate-50 transition-colors group ${editingPagoIndex === idx ? 'bg-sky-200 border-sky-400' : ''}`}>
+                  <td className="px-4 py-3 font-bold text-slate-800">{pago.tipo}</td>
                   <td className="px-4 py-3 text-xs">
                     {pago.tipo === 'TARJETA' && `Operación: ${pago.nroOperacion} | Tarjeta: ****${pago.digitosTarjeta}`}
                     {pago.tipo === 'BANCO' && `Operación: ${pago.nroOperacion} | Fecha: ${pago.fechaDeposito}`}
@@ -212,9 +267,14 @@ export function PagoStep({
                   </td>
                   <td className="px-4 py-3 font-black text-right">S/ {parseFloat(pago.importe).toFixed(2)}</td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => eliminarPago(idx)} className="text-red-500 hover:text-red-700">
-                      <XCircle className="w-5 h-5 mx-auto" />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => editarPago(idx)} className="text-blue-500 hover:text-blue-700 transition-opacity" title="Editar Pago">
+                        <Edit2 className="w-4 h-4 mx-auto" />
+                      </button>
+                      <button onClick={() => eliminarPago(idx)} className="text-red-500 hover:text-red-700" title="Eliminar Pago">
+                        <XCircle className="w-5 h-5 mx-auto" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

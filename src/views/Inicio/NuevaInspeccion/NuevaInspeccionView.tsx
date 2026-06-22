@@ -82,6 +82,8 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
     fechaDeposito: new Date().toISOString().split('T')[0]
   });
 
+  const [editingPagoIndex, setEditingPagoIndex] = useState<number | null>(null);
+
   // Form State (Vehículo)
   const [isVehiculoValid, setIsVehiculoValid] = useState(false);
   const [vehiculoTab, setVehiculoTab] = useState<'DATOS' | 'SOAT' | 'PROPIETARIO'>('DATOS');
@@ -294,8 +296,13 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       }
     }
 
-    if (importeNumerico > montoPendiente) {
-      alert(`El importe ingresado (S/ ${importeNumerico.toFixed(2)}) es mayor al monto pendiente (S/ ${montoPendiente.toFixed(2)}).`);
+    let montoPendienteReal = montoPendiente;
+    if (editingPagoIndex !== null) {
+      montoPendienteReal += parseFloat(pagosAgregados[editingPagoIndex].importe || '0');
+    }
+
+    if (importeNumerico > montoPendienteReal) {
+      alert(`El importe ingresado (S/ ${importeNumerico.toFixed(2)}) es mayor al monto pendiente (S/ ${montoPendienteReal.toFixed(2)}).`);
       return;
     }
 
@@ -306,7 +313,14 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       nroOperacion: formPago.nroOperacion.trim()
     };
 
-    setPagosAgregados([...pagosAgregados, nuevoPago]);
+    if (editingPagoIndex !== null) {
+      const nuevosPagos = [...pagosAgregados];
+      nuevosPagos[editingPagoIndex] = nuevoPago;
+      setPagosAgregados(nuevosPagos);
+      setEditingPagoIndex(null);
+    } else {
+      setPagosAgregados([...pagosAgregados, nuevoPago]);
+    }
 
     // Reset form
     setFormPago({
@@ -433,6 +447,8 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
               handleAgregarPago={handleAgregarPago}
               pagosAgregados={pagosAgregados}
               eliminarPago={eliminarPago}
+              editingPagoIndex={editingPagoIndex}
+              setEditingPagoIndex={setEditingPagoIndex}
             />
           </div>
         )}
