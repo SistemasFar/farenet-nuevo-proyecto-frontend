@@ -29,6 +29,7 @@ export function VerificacionStep({
 }: VerificacionStepProps) {
 
   const [maestrosVerif, setMaestrosVerif] = useState<any>(null);
+  const [maestrosVehiculo, setMaestrosVehiculo] = useState<any>(null);
   const [lineas, setLineas] = useState<any[]>([]);
 
   useEffect(() => {
@@ -38,6 +39,15 @@ export function VerificacionStep({
         setMaestrosVerif(res.data);
       } catch (err) {
         console.error('Error al obtener maestros verificacion', err);
+      }
+    };
+
+    const fetchMaestrosVehiculo = async () => {
+      try {
+        const res = await maestrosApi.obtenerMaestrosVehiculoAsync();
+        setMaestrosVehiculo(res.data);
+      } catch (err) {
+        console.error('Error al obtener maestros vehiculo', err);
       }
     };
 
@@ -54,6 +64,7 @@ export function VerificacionStep({
     };
 
     fetchMaestros();
+    fetchMaestrosVehiculo();
     fetchLineas();
   }, []);
 
@@ -81,9 +92,9 @@ export function VerificacionStep({
   };
 
   const conceptoNombre = getNameFromList(maestros?.conceptos || [], formCaja?.concepto, 'key', 'abreviatura');
-  const marcaNombre = getNameFromList(maestros?.marcas || [], formVehiculo?.marca);
-  const carroceriaNombre = getNameFromList(maestros?.carrocerias || [], formVehiculo?.carroceria);
-  const combustibleNombre = getNameFromList(maestros?.combustibles || [], formVehiculo?.combustible);
+  const marcaNombre = getNameFromList(maestrosVehiculo?.marcas || [], formVehiculo?.marca);
+  const carroceriaNombre = getNameFromList(maestrosVehiculo?.carrocerias || [], formVehiculo?.carroceria);
+  const combustibleNombre = getNameFromList(maestrosVehiculo?.combustibles || [], formVehiculo?.combustible);
 
   return (
     <div className="space-y-6">
@@ -100,7 +111,7 @@ export function VerificacionStep({
         </div>
         <div>
           <span className="block text-[10px] font-bold text-slate-500 uppercase">Modelo</span>
-          <span className="block text-xl font-black text-[#052a79] uppercase">{formVehiculo.modelo || '-'}</span>
+          <span className="block text-xl font-black text-[#052a79] uppercase">{formVehiculo.modelo_label || formVehiculo.modelo || '-'}</span>
         </div>
         <div>
           <span className="block text-[10px] font-bold text-slate-500 uppercase">Marca</span>
@@ -156,9 +167,9 @@ export function VerificacionStep({
                   <div><span className="block font-bold text-slate-400 uppercase">Nro. Serie</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroSerie}</span></div>
                   <div><span className="block font-bold text-slate-400 uppercase">Largo/Ancho/Alto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.longitud} / {formVehiculo.ancho} / {formVehiculo.altura}</span></div>
 
-                  <div><span className="block font-bold text-slate-400 uppercase">Modelo</span><span className="font-bold uppercase text-slate-800">{formVehiculo.modelo}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Nro. Motor</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroMotor}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Color</span><span className="font-bold uppercase text-slate-800">{formVehiculo.color}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Modelo</span><span className="font-bold uppercase text-slate-800">{formVehiculo.modelo_label || formVehiculo.modelo || '-'}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Nro. Motor</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroMotor || '-'}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Color</span><span className="font-bold uppercase text-slate-800">{formVehiculo.color_label || formVehiculo.color || '-'}</span></div>
 
                   <div><span className="block font-bold text-slate-400 uppercase">Año Fab.</span><span className="font-bold uppercase text-slate-800">{formVehiculo.anioFabricacion}</span></div>
                   <div><span className="block font-bold text-slate-400 uppercase">Carrocería</span><span className="font-bold uppercase text-slate-800">{carroceriaNombre}</span></div>
