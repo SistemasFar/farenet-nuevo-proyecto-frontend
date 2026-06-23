@@ -57,6 +57,19 @@ export function VerificacionStep({
     fetchLineas();
   }, []);
 
+  // Autocompletar desde Caja
+  useEffect(() => {
+    if (!formVerificacion.tipoInspeccion && formCaja.tipoInspeccion) {
+      setFormVerificacion((prev: any) => ({ ...prev, tipoInspeccion: formCaja.tipoInspeccion }));
+    }
+    if (!formVerificacion.tipoCertificado && formCaja.tipoCertificado) {
+      setFormVerificacion((prev: any) => ({ ...prev, tipoCertificado: formCaja.tipoCertificado }));
+    }
+    if (!formVerificacion.tipoAutorizacion && formCaja.tipoAutorizacion) {
+      setFormVerificacion((prev: any) => ({ ...prev, tipoAutorizacion: formCaja.tipoAutorizacion }));
+    }
+  }, [formCaja, formVerificacion, setFormVerificacion]);
+
   const handleSelectChange = (name: string, option: any) => {
     setFormVerificacion({ ...formVerificacion, [name]: option ? option.value : '' });
   };
@@ -111,10 +124,10 @@ export function VerificacionStep({
             </div>
             <div className="p-4 flex-1 flex justify-between">
                <div className="text-xs text-slate-700 space-y-1">
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Documento: </span><span className="font-bold">{formFacturacion.nroDocumento}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Nombre/Razón Social: </span><span className="font-bold">{formFacturacion.nombreRazonSocial || (formPropietario.nombres + ' ' + formPropietario.apellidos)}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Dirección: </span><span>{formFacturacion.direccion || formPropietario.direccion}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Teléfono / Email: </span><span>{formFacturacion.telefono} / {formFacturacion.email}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Documento: </span><span className="font-bold">{formFacturacion.nroDocFac}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Nombre/Razón Social: </span><span className="font-bold">{formFacturacion.razonSocialFac || (formFacturacion.nombresFac + ' ' + formFacturacion.apellidosFac)}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Dirección: </span><span>{formFacturacion.direccionFac}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Teléfono / Email: </span><span>{formFacturacion.telefonoFac} / {formFacturacion.emailFac}</span></div>
                </div>
                <div className="bg-[#052a79] text-white p-4 rounded-lg text-center flex flex-col justify-center min-w-[120px]">
                  <span className="text-[10px] font-bold uppercase">{formCaja.comprobanteSeleccionado === 'RUC' ? 'FACTURA' : 'BOLETA'}</span>
@@ -132,27 +145,27 @@ export function VerificacionStep({
             <div className="p-4 flex-1">
                <div className="text-xs text-slate-700 mb-2">
                  <span className="font-bold text-[10px] text-slate-400 uppercase">Propietario: </span>
-                 <span className="font-bold">{formPropietario.nombres} {formPropietario.apellidos}</span>
+                 <span className="font-bold">{formFacturacion.nombresFac} {formFacturacion.apellidosFac}</span>
                </div>
                <div className="grid grid-cols-3 gap-x-2 gap-y-3 text-[10px] text-slate-600">
                   <div><span className="block font-bold text-slate-400 uppercase">Categoría</span><span className="font-bold uppercase text-slate-800">{formCaja.categoria}</span></div>
                   <div><span className="block font-bold text-slate-400 uppercase">Combustible</span><span className="font-bold uppercase text-slate-800">{combustibleNombre}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Asientos / Pasajeros</span><span className="font-bold uppercase text-slate-800">{formVehiculo.asientos} / {formVehiculo.pasajeros}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Asientos / Pasajeros</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroAsientos} / {formVehiculo.nroPasajeros}</span></div>
                   
                   <div><span className="block font-bold text-slate-400 uppercase">Marca</span><span className="font-bold uppercase text-slate-800">{marcaNombre}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Nro. Serie</span><span className="font-bold uppercase text-slate-800">{formVehiculo.serie}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Largo/Ancho/Alto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.largo} / {formVehiculo.ancho} / {formVehiculo.alto}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Nro. Serie</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroSerie}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Largo/Ancho/Alto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.longitud} / {formVehiculo.ancho} / {formVehiculo.altura}</span></div>
 
                   <div><span className="block font-bold text-slate-400 uppercase">Modelo</span><span className="font-bold uppercase text-slate-800">{formVehiculo.modelo}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Nro. Motor</span><span className="font-bold uppercase text-slate-800">{formVehiculo.motor}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Nro. Motor</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroMotor}</span></div>
                   <div><span className="block font-bold text-slate-400 uppercase">Color</span><span className="font-bold uppercase text-slate-800">{formVehiculo.color}</span></div>
 
                   <div><span className="block font-bold text-slate-400 uppercase">Año Fab.</span><span className="font-bold uppercase text-slate-800">{formVehiculo.anioFabricacion}</span></div>
                   <div><span className="block font-bold text-slate-400 uppercase">Carrocería</span><span className="font-bold uppercase text-slate-800">{carroceriaNombre}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Peso Neto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.pesoNeto}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Peso Neto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.pesoSeco}</span></div>
 
                   <div><span className="block font-bold text-slate-400 uppercase">Kilometraje</span><span className="font-bold uppercase text-slate-800">{formVehiculo.kilometraje}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Ejes / Ruedas</span><span className="font-bold uppercase text-slate-800">{formVehiculo.ejes} / {formVehiculo.ruedas}</span></div>
+                  <div><span className="block font-bold text-slate-400 uppercase">Ejes / Ruedas</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroEjes} / {formVehiculo.nroRuedas}</span></div>
                   <div><span className="block font-bold text-slate-400 uppercase">Peso Bruto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.pesoBruto}</span></div>
                </div>
             </div>
@@ -165,8 +178,8 @@ export function VerificacionStep({
             </div>
             <div className="p-4 flex-1">
                <div className="text-xs text-slate-700 space-y-1">
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">SOAT: </span><span className="font-bold">{formVehiculo.aseguradora} - {formVehiculo.nroPoliza}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Vigencia: </span><span className="font-bold">{formVehiculo.fechaInicioPoliza} - {formVehiculo.fechaFinPoliza}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">SOAT: </span><span className="font-bold">{formVehiculo.aseguradora_label || formVehiculo.aseguradora} - {formVehiculo.nroSoat}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Vigencia: </span><span className="font-bold">{formVehiculo.fechaEmisionSoat} - {formVehiculo.fechaVencimientoSoat}</span></div>
                </div>
             </div>
           </div>
@@ -198,16 +211,7 @@ export function VerificacionStep({
                 styles={customSelectStyles}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Ámbito *</label>
-              <Select
-                options={maestrosVerif?.tiposAutorizacion?.map((t: any) => ({ value: t.key, label: t.nombre })) || []}
-                value={maestrosVerif?.tiposAutorizacion?.map((t: any) => ({ value: t.key, label: t.nombre })).find((o: any) => o.value?.toString() === formVerificacion.tipoAmbito?.toString()) || null}
-                onChange={(o) => handleSelectChange('tipoAmbito', o)}
-                placeholder="Seleccione..."
-                styles={customSelectStyles}
-              />
-            </div>
+
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización *</label>
               <Select

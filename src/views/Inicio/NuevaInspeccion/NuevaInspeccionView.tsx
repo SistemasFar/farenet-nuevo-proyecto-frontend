@@ -111,7 +111,6 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
   const [formVerificacion, setFormVerificacion] = useState({
     tipoInspeccion: '',
     tipoCertificado: '',
-    tipoAmbito: '',
     tipoAutorizacion: '',
     linea: ''
   });
@@ -119,7 +118,6 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
   const validarVerificacion = () => {
     return formVerificacion.tipoInspeccion !== '' &&
       formVerificacion.tipoCertificado !== '' &&
-      formVerificacion.tipoAmbito !== '' &&
       formVerificacion.tipoAutorizacion !== '' &&
       formVerificacion.linea !== '';
   };
