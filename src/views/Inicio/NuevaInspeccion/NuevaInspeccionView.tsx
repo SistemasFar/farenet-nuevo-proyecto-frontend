@@ -118,10 +118,10 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
 
   const validarVerificacion = () => {
     return formVerificacion.tipoInspeccion !== '' &&
-           formVerificacion.tipoCertificado !== '' &&
-           formVerificacion.tipoAmbito !== '' &&
-           formVerificacion.tipoAutorizacion !== '' &&
-           formVerificacion.linea !== '';
+      formVerificacion.tipoCertificado !== '' &&
+      formVerificacion.tipoAmbito !== '' &&
+      formVerificacion.tipoAutorizacion !== '' &&
+      formVerificacion.linea !== '';
   };
 
   const getCategoriaName = () => {
@@ -143,7 +143,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
             if (data.formVerificacion) setFormVerificacion(data.formVerificacion);
             if (data.pagosAgregados) setPagosAgregados(data.pagosAgregados);
             if (data.currentStepIndex) setCurrentStepIndex(data.currentStepIndex);
-            
+
             // Restaurar estado del Resumen de Pago
             if (data.isConsultado) setIsConsultado(data.isConsultado);
             if (data.documentoPago) setDocumentoPago(data.documentoPago);
@@ -293,7 +293,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
         isConsultado,
         documentoDescuento
       };
-      
+
       const res = await inspeccionesApi.guardarBorrador(payload);
       if (res?.data?.idBorrador) {
         setCurrentBorradorId(res.data.idBorrador);
@@ -302,12 +302,12 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       console.warn('No se pudo guardar el borrador silenciosamente', err);
     }
 
-      if (currentStepIndex === STEPS.length - 1) {
-        alert('¡Inspección guardada y finalizada correctamente!');
-        if (onBack) onBack();
-      } else {
-        setCurrentStepIndex((prev) => prev + 1);
-      }
+    if (currentStepIndex === STEPS.length - 1) {
+      alert('¡Inspección guardada y finalizada correctamente!');
+      if (onBack) onBack();
+    } else {
+      setCurrentStepIndex((prev) => prev + 1);
+    }
   };
 
   const irPasoAnterior = () => {
@@ -335,7 +335,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
       const nameUpper = selected ? selected.nombre.toUpperCase() : '';
       const isYapePlin = nameUpper.includes('YAPE') || nameUpper.includes('PLIN') || nameUpper.includes('CUPONIDAD');
-      
+
       if (!formPago.tarjetaKey || !formPago.nroOperacion) {
         alert('Complete los campos obligatorios de la tarjeta.');
         return;
@@ -399,7 +399,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
   }
 
   return (
-    <div className="w-full min-h-[calc(100vh-10rem)] bg-white rounded-2xl shadow-xl border-t-4 border-t-amber-500 border border-slate-200 overflow-hidden flex flex-col">
+    <div className="w-full min-h-[calc(100vh-10rem)] bg-white rounded-2xl shadow-xl border-t-[4px] border-solid border-t-[#f59e0b] overflow-hidden flex flex-col" style={{ borderImage: "linear-gradient(to right, #fde047 0%, #f59e0b 50%, #b45309 100%) 1" }}>
 
       {/* Header / Stepper */}
       <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-6">
@@ -420,7 +420,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
         <div className="flex items-center justify-between relative">
           <div className="absolute left-0 top-1/2 w-full h-1 bg-slate-200 -z-10 -translate-y-1/2">
             <div
-              className="h-full bg-amber-500 transition-all duration-500"
+              className="h-full bg-gold-3d transition-all duration-500"
               style={{ width: `${(currentStepIndex / (STEPS.length - 1)) * 100}%` }}
             ></div>
           </div>
@@ -434,13 +434,13 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
               <div key={step.id} className="flex flex-col items-center gap-2 bg-[#f4f9ff] px-2">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
-                    isCompleted ? 'bg-amber-500 text-white shadow-sm' :
+                    isCompleted ? 'bg-gold-3d shadow-sm border-none' :
                       'bg-white text-slate-400 border-2 border-slate-200'
                     }`}
                 >
                   {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                 </div>
-                <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : isCompleted ? 'text-amber-600' : 'text-slate-400'}`}>
+                <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
                   {step.label}
                 </span>
               </div>
@@ -576,7 +576,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
               className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
                 ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || (currentStepIndex === 4 && !validarVerificacion())
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  : 'bg-amber-400 text-[#052a79] hover:bg-amber-300 hover:shadow-lg hover:-translate-y-0.5'
+                  : 'bg-gold-3d hover:-translate-y-0.5'
                 }`}
             >
               {currentStepIndex === STEPS.length - 1 ? 'Guardar y Finalizar' : 'Siguiente Paso'}

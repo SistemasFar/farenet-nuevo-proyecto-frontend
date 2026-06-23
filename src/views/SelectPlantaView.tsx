@@ -46,7 +46,7 @@ export function SelectPlantaView({
 
       <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
         <div className="mb-4 text-center">
-          <h1 className="text-5xl font-black tracking-tight text-[#f2cc11] font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
+          <h1 className="text-5xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
             FARENET
           </h1>
 
@@ -108,7 +108,7 @@ export function SelectPlantaView({
               <button
                 type="submit"
                 disabled={loading || plantas.length === 0}
-                className="w-full rounded-lg bg-[#f2cc11] py-3 text-sm font-black text-[#052a79] shadow-lg transition transform hover:bg-[#e0bc0d] active:scale-[0.98] disabled:opacity-50"
+                className="w-full rounded-xl bg-gold-3d py-3 text-sm font-black uppercase tracking-wider shadow-lg transition disabled:opacity-50"
               >
                 {loading ? 'Confirmando...' : 'Confirmar Sede'}
               </button>

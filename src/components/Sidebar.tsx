@@ -268,11 +268,11 @@ export function Sidebar({
           onClick={() => onTabChange('inicio')}
         >
           {collapsed ? (
-            <div className="h-10 w-10 bg-[#f2cc11] rounded-full flex items-center justify-center font-black text-[#052a79] text-xl shadow-md select-none">
+            <div className="h-10 w-10 bg-gold-3d rounded-full flex items-center justify-center font-black text-white text-xl shadow-md select-none">
               F
             </div>
           ) : (
-            <h1 className="text-3xl font-black tracking-tight text-[#f2cc11] font-serif select-none drop-shadow-md">
+            <h1 className="text-3xl font-black tracking-tight text-gold-3d font-serif select-none drop-shadow-md">
               FARENET
             </h1>
           )}
@@ -291,11 +291,11 @@ export function Sidebar({
                     onClick={() => onTabChange(item.key)}
                     className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
                       isActive
-                        ? 'bg-[#f2cc11] text-[#052a79] shadow-lg scale-[1.01]'
+                        ? 'bg-gold-3d text-white shadow-lg scale-[1.01]'
                         : 'text-slate-100 hover:bg-blue-800/60'
                     }`}
                   >
-                    <span className={isActive ? 'text-[#052a79]' : 'text-slate-300'}>
+                    <span className={isActive ? 'text-white' : 'text-slate-300'}>
                       {item.icon}
                     </span>
 

@@ -619,7 +619,7 @@ export function VehiculoStep({
                   onClick={() => setVehiculoTab('SOAT')}
                   className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-md
                     ${isDatosValid 
-                      ? 'bg-amber-400 text-[#052a79] hover:bg-amber-300 hover:shadow-lg hover:-translate-y-0.5' 
+                          ? 'bg-gold-3d hover:-translate-y-0.5' 
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                     }
                   `}
@@ -691,7 +691,7 @@ export function VehiculoStep({
                       onClick={() => setVehiculoTab('PROPIETARIO')}
                       className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-md
                         ${isSoatValid 
-                          ? 'bg-amber-400 text-[#052a79] hover:bg-amber-300 hover:shadow-lg hover:-translate-y-0.5' 
+                              ? 'bg-gold-3d hover:-translate-y-0.5' 
                           : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                         }
                       `}

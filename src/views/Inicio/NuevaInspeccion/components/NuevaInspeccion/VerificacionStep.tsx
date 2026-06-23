@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Select from 'react-select';
+import { FileSignature, Car, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { plantaSession, maestrosApi } from '../../../../../services/api';
 
@@ -73,6 +74,7 @@ export function VerificacionStep({
 
   return (
     <div className="space-y-6">
+
       <h3 className="text-lg font-bold text-[#052a79] uppercase border-b border-amber-200/60 pb-2">
         Verificación
       </h3>
@@ -104,8 +106,8 @@ export function VerificacionStep({
           
           {/* Tarjeta Facturación */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden flex shadow-sm">
-            <div className="bg-[#052a79] w-16 flex items-center justify-center shrink-0">
-               <span className="text-white font-bold text-2xl">💰</span>
+            <div className="bg-[#052a79] w-16 flex items-center justify-center shrink-0 border-r-2 border-[#031d5c] shadow-[inset_-2px_0_10px_rgba(0,0,0,0.2)]">
+               <FileSignature className="w-10 h-10 drop-shadow-[0_2px_3px_rgba(0,0,0,0.4)]" style={{ stroke: "url(#gold-gradient)", strokeWidth: 1.8 }} />
             </div>
             <div className="p-4 flex-1 flex justify-between">
                <div className="text-xs text-slate-700 space-y-1">
@@ -124,8 +126,8 @@ export function VerificacionStep({
 
           {/* Tarjeta Vehículo */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden flex shadow-sm">
-            <div className="bg-[#052a79] w-16 flex items-center justify-center shrink-0">
-               <span className="text-white font-bold text-3xl">🚗</span>
+            <div className="bg-[#052a79] w-16 flex items-center justify-center shrink-0 border-r-2 border-[#031d5c] shadow-[inset_-2px_0_10px_rgba(0,0,0,0.2)]">
+               <Car className="w-10 h-10 drop-shadow-[0_2px_3px_rgba(0,0,0,0.4)]" style={{ stroke: "url(#gold-gradient)", strokeWidth: 1.8 }} />
             </div>
             <div className="p-4 flex-1">
                <div className="text-xs text-slate-700 mb-2">
@@ -158,8 +160,8 @@ export function VerificacionStep({
 
           {/* Tarjeta SOAT */}
           <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden flex shadow-sm">
-            <div className="bg-[#052a79] w-16 flex items-center justify-center shrink-0">
-               <span className="text-white font-bold text-2xl">📋</span>
+            <div className="bg-[#052a79] w-16 flex items-center justify-center shrink-0 border-r-2 border-[#031d5c] shadow-[inset_-2px_0_10px_rgba(0,0,0,0.2)]">
+               <ShieldCheck className="w-10 h-10 drop-shadow-[0_2px_3px_rgba(0,0,0,0.4)]" style={{ stroke: "url(#gold-gradient)", strokeWidth: 1.8 }} />
             </div>
             <div className="p-4 flex-1">
                <div className="text-xs text-slate-700 space-y-1">

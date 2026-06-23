@@ -114,11 +114,11 @@ export function Header({
           </button>
 
           <div className="leading-tight min-w-0">
-            <div className="text-lg font-black tracking-wide text-[#f2cc11] uppercase truncate">
+            <div className="text-lg font-black tracking-wide text-gold-3d uppercase truncate">
               SEDE ACTIVA: {plantaName || 'SIN SEDE'}
             </div>
 
-            <div className="text-xs font-semibold text-[#f2cc11] tracking-wider truncate">
+            <div className="text-xs font-semibold text-gold-3d tracking-wider truncate">
               Código de sede: {plantaSeleccionada || 'N/A'} · {pageTitle}
             </div>
           </div>
@@ -141,9 +141,8 @@ export function Header({
             >
               <span
                 className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white/10 text-sm font-extrabold border border-white/20"
-                style={{ color: '#f2cc11' }}
               >
-                {userInitial}
+                <span className="text-gold-3d">{userInitial}</span>
               </span>
 
               <span className="text-sm font-bold tracking-wide hidden md:inline">

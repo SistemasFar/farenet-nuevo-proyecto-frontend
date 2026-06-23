@@ -328,7 +328,7 @@ export function CajaStep({
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transform transition-all animate-in zoom-in-95 duration-200">
             <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-5 border-4 border-amber-100">
-              <HelpCircle className="w-10 h-10 text-amber-500" />
+              <HelpCircle className="w-10 h-10 drop-shadow-[0_2px_3px_rgba(0,0,0,0.4)]" style={{ stroke: "url(#gold-gradient)", strokeWidth: 1.8 }} />
             </div>
             <h3 className="text-xl font-black text-slate-800 mb-2">¡Un momento!</h3>
             <p className="text-slate-500 mb-8 text-sm leading-relaxed">
@@ -336,7 +336,7 @@ export function CajaStep({
             </p>
             <button
               onClick={() => setShowCamposVaciosModal(false)}
-              className="w-full px-4 py-3 rounded-xl font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-md shadow-amber-200 transition-colors"
+              className="w-full px-4 py-3 rounded-xl font-bold text-white bg-gold-3d transition-colors"
             >
               Entendido
             </button>
