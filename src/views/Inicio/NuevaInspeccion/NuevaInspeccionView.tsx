@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from 'react';
-import { maestrosApi, inspeccionesApi } from '../../../services/api';
+import { plantaSession, maestrosApi, inspeccionesApi } from '../../../services/api';
+import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse } from '../../../types/maestros';
 import { CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Search } from 'lucide-react';
 import { CajaStep } from './components/NuevaInspeccion/CajaStep';
@@ -301,8 +302,33 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
     }
 
     if (currentStepIndex === STEPS.length - 1) {
-      alert('¡Inspección guardada y finalizada correctamente!');
-      if (onBack) onBack();
+      try {
+        setLoading(true);
+        const savePayload = {
+          formCaja,
+          pagosAgregados,
+          formVehiculo,
+          formFacturacion,
+          formVerificacion,
+        };
+        const res = await inspeccionesApi.guardar(savePayload);
+        Swal.fire({
+          icon: 'success',
+          title: '¡Guardado!',
+          text: 'La inspección se guardó correctamente en la base de datos.',
+          confirmButtonColor: '#052a79'
+        });
+        if (onBack) onBack();
+      } catch (error: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: error.message || 'No se pudo guardar la inspección.',
+          confirmButtonColor: '#d33'
+        });
+      } finally {
+        setLoading(false);
+      }
     } else {
       setCurrentStepIndex((prev) => prev + 1);
     }

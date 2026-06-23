@@ -95,6 +95,8 @@ export function VerificacionStep({
   const marcaNombre = getNameFromList(maestrosVehiculo?.marcas || [], formVehiculo?.marca);
   const carroceriaNombre = getNameFromList(maestrosVehiculo?.carrocerias || [], formVehiculo?.carroceria);
   const combustibleNombre = getNameFromList(maestrosVehiculo?.combustibles || [], formVehiculo?.combustible);
+  const aseguradoraNombre = getNameFromList(maestrosVehiculo?.aseguradoras || [], formVehiculo?.aseguradora);
+  const tipoPolizaNombre = getNameFromList(maestrosVehiculo?.tiposPoliza || [], formVehiculo?.tipoPoliza);
 
   return (
     <div className="space-y-6">
@@ -187,12 +189,14 @@ export function VerificacionStep({
             <div className="bg-[#052a79] w-16 flex items-center justify-center shrink-0 border-r-2 border-[#031d5c] shadow-[inset_-2px_0_10px_rgba(0,0,0,0.2)]">
                <ShieldCheck className="w-10 h-10 drop-shadow-[0_2px_3px_rgba(0,0,0,0.4)]" style={{ stroke: "url(#gold-gradient)", strokeWidth: 1.8 }} />
             </div>
-            <div className="p-4 flex-1">
-               <div className="text-xs text-slate-700 space-y-1">
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">SOAT: </span><span className="font-bold">{formVehiculo.aseguradora_label || formVehiculo.aseguradora} - {formVehiculo.nroSoat}</span></div>
+              <div className="p-4 flex-1">
+                 <div className="text-xs text-slate-700 space-y-1">
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Aseguradora: </span><span className="font-bold">{aseguradoraNombre || '-'}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Tipo Póliza: </span><span className="font-bold">{tipoPolizaNombre || '-'}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Nro SOAT: </span><span className="font-bold">{formVehiculo.nroSoat || '-'}</span></div>
                  <div><span className="font-bold text-[10px] text-slate-400 uppercase">Vigencia: </span><span className="font-bold">{formVehiculo.fechaEmisionSoat} - {formVehiculo.fechaVencimientoSoat}</span></div>
-               </div>
-            </div>
+                 </div>
+              </div>
           </div>
 
         </div>
