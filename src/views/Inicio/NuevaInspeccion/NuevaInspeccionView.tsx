@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from 'react';
 import { maestrosApi, inspeccionesApi } from '../../../services/api';
 import type { MaestrosCajaResponse, MaestrosPagoResponse } from '../../../types/maestros';
@@ -6,6 +8,7 @@ import { CajaStep } from './components/NuevaInspeccion/CajaStep';
 import { PagoStep } from './components/NuevaInspeccion/PagoStep';
 import { VehiculoStep } from './components/NuevaInspeccion/VehiculoStep';
 import { FacturacionStep } from './components/NuevaInspeccion/FacturacionStep';
+import { VerificacionStep } from './components/NuevaInspeccion/VerificacionStep';
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({
@@ -104,6 +107,23 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
     emailFac: '', telefonoFac: ''
   });
 
+  // Form State (Verificación)
+  const [formVerificacion, setFormVerificacion] = useState({
+    tipoInspeccion: '',
+    tipoCertificado: '',
+    tipoAmbito: '',
+    tipoAutorizacion: '',
+    linea: ''
+  });
+
+  const validarVerificacion = () => {
+    return formVerificacion.tipoInspeccion !== '' &&
+           formVerificacion.tipoCertificado !== '' &&
+           formVerificacion.tipoAmbito !== '' &&
+           formVerificacion.tipoAutorizacion !== '' &&
+           formVerificacion.linea !== '';
+  };
+
   const getCategoriaName = () => {
     if (!maestros || !formCaja.categoria) return '';
     const cat = maestros.categorias.find(c => c.key === formCaja.categoria);
@@ -120,6 +140,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
             if (data.formCaja) setFormCaja(data.formCaja);
             if (data.formVehiculo) setFormVehiculo(data.formVehiculo);
             if (data.formFacturacion) setFormFacturacion(data.formFacturacion);
+            if (data.formVerificacion) setFormVerificacion(data.formVerificacion);
             if (data.pagosAgregados) setPagosAgregados(data.pagosAgregados);
             if (data.currentStepIndex) setCurrentStepIndex(data.currentStepIndex);
             
@@ -136,41 +157,6 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
         .finally(() => setLoading(false));
     }
   }, [inspeccionIdBorrador]);
-
-  useEffect(() => {
-    if (currentStepIndex === 0 && !maestros) {
-      cargarMaestros();
-    } else if (currentStepIndex === 1 && !maestrosPago) {
-      cargarMaestrosPago();
-    } else if (currentStepIndex === 2 && !maestrosVehiculo) {
-      cargarMaestrosVehiculo();
-    }
-  }, [currentStepIndex]);
-
-  // Sincronizar Marca con Marca Carrocería
-  useEffect(() => {
-    if (formVehiculo.marca && maestrosVehiculo?.marcas) {
-      const selectedMarca = maestrosVehiculo.marcas.find((m: any) => m.key === formVehiculo.marca);
-      if (selectedMarca && formVehiculo.marcaCarroceria !== selectedMarca.nombre) {
-        setFormVehiculo((prev: any) => ({
-          ...prev,
-          marcaCarroceria: selectedMarca.nombre
-        }));
-      }
-    }
-  }, [formVehiculo.marca, maestrosVehiculo]);
-
-  const cargarMaestrosVehiculo = async () => {
-    try {
-      setLoading(true);
-      const res = await maestrosApi.obtenerMaestrosVehiculoAsync();
-      setMaestrosVehiculo(res.data);
-    } catch (err: any) {
-      setError(err.message || 'Error cargando maestros de vehículo');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const cargarMaestros = async () => {
     try {
@@ -195,6 +181,43 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       setLoading(false);
     }
   };
+
+  const cargarMaestrosVehiculo = async () => {
+    try {
+      setLoading(true);
+      const res = await maestrosApi.obtenerMaestrosVehiculoAsync();
+      setMaestrosVehiculo(res.data);
+    } catch (err: any) {
+      setError(err.message || 'Error cargando maestros de vehículo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentStepIndex === 0 && !maestros) {
+      cargarMaestros();
+    } else if (currentStepIndex === 1 && !maestrosPago) {
+      cargarMaestrosPago();
+    } else if (currentStepIndex === 2 && !maestrosVehiculo) {
+      cargarMaestrosVehiculo();
+    }
+  }, [currentStepIndex, maestros, maestrosPago, maestrosVehiculo]);
+
+  // Sincronizar Marca con Marca Carrocería
+  useEffect(() => {
+    if (formVehiculo.marca && maestrosVehiculo?.marcas) {
+      const selectedMarca = maestrosVehiculo.marcas.find((m: any) => m.key === formVehiculo.marca);
+      if (selectedMarca && formVehiculo.marcaCarroceria !== selectedMarca.nombre) {
+        setFormVehiculo((prev: any) => ({
+          ...prev,
+          marcaCarroceria: selectedMarca.nombre
+        }));
+      }
+    }
+  }, [formVehiculo.marca, maestrosVehiculo]);
+
+  // Sincronizar Marca con Marca Carrocería
 
   const handleSelectChange = (name: string, option: any) => {
     const value = option ? option.value : '';
@@ -247,9 +270,14 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       return;
     }
 
+    if (currentStepIndex === 4 && !validarVerificacion()) {
+      alert('Por favor completa todos los campos obligatorios de Operación (Tipos y Línea) antes de finalizar.');
+      return;
+    }
+
     try {
       // Auto-guardar borrador
-      const res = await inspeccionesApi.guardarBorrador({
+      const payload = {
         idBorrador: currentBorradorId,
         currentStepIndex: currentStepIndex + 1,
         plantaKey: plantaSeleccionada,
@@ -257,13 +285,16 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
         pagosAgregados,
         formVehiculo,
         formFacturacion,
-        isConsultado,
-        documentoPago,
+        formVerificacion,
         precioSubtotal,
         descuento,
         precioTotal,
+        documentoPago,
+        isConsultado,
         documentoDescuento
-      });
+      };
+      
+      const res = await inspeccionesApi.guardarBorrador(payload);
       if (res?.data?.idBorrador) {
         setCurrentBorradorId(res.data.idBorrador);
       }
@@ -271,9 +302,12 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       console.warn('No se pudo guardar el borrador silenciosamente', err);
     }
 
-    if (currentStepIndex < STEPS.length - 1) {
-      setCurrentStepIndex((prev) => prev + 1);
-    }
+      if (currentStepIndex === STEPS.length - 1) {
+        alert('¡Inspección guardada y finalizada correctamente!');
+        if (onBack) onBack();
+      } else {
+        setCurrentStepIndex((prev) => prev + 1);
+      }
   };
 
   const irPasoAnterior = () => {
@@ -497,13 +531,19 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
           </div>
         )}
 
-        {/* OTROS PASOS */}
-        {currentStepIndex > 3 && (
-          <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-4">
-            <CheckCircle2 className="w-16 h-16 text-slate-300" />
-            <h3 className="text-xl font-bold text-slate-700">Paso en construcción</h3>
-            <p>Este paso ({STEPS[currentStepIndex].label}) se implementará próximamente.</p>
-          </div>
+        {/* === PASO 5: VERIFICACION === */}
+        {currentStepIndex === 4 && (
+          <VerificacionStep
+            maestros={maestros}
+            formCaja={formCaja}
+            formVehiculo={formVehiculo}
+            formPropietario={formVehiculo} // Usando el formVehiculo temporalmente ya que ahí están los datos de propietario
+            formFacturacion={formFacturacion}
+            formVerificacion={formVerificacion}
+            setFormVerificacion={setFormVerificacion}
+            precioTotal={precioTotal}
+            customSelectStyles={customSelectStyles}
+          />
         )}
       </div>
 
@@ -532,14 +572,14 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
             <button
               type="button"
               onClick={irSiguientePaso}
-              disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid)}
+              disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || (currentStepIndex === 4 && !validarVerificacion())}
               className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid)
+                ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || (currentStepIndex === 4 && !validarVerificacion())
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-amber-400 text-[#052a79] hover:bg-amber-300 hover:shadow-lg hover:-translate-y-0.5'
                 }`}
             >
-              {currentStepIndex === STEPS.length - 1 ? 'Finalizar' : 'Siguiente Paso'}
+              {currentStepIndex === STEPS.length - 1 ? 'Guardar y Finalizar' : 'Siguiente Paso'}
             </button>
           </div>
         </div>

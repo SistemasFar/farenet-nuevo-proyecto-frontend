@@ -792,5 +792,15 @@ export const maestrosApi = {
   obtenerDistritos: async (provincia_key: string) => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/distritos/${provincia_key}`);
     return parseJsonResponse(response);
+  },
+
+  obtenerMaestrosVerificacionAsync: async () => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/verificacion`);
+    return parseJsonResponse<any>(response);
+  },
+
+  obtenerLineasPorPlantaAsync: async (plantaKey: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/lineas/${plantaKey}`);
+    return parseJsonResponse<any>(response);
   }
 };
