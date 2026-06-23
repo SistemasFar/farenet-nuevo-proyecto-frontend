@@ -427,10 +427,23 @@ export function VehiculoStep({
 
   const checkPropietarioValid = () => {
     const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
-    const req = ['nombresProp', 'apellidosProp', 'paisProp', 'departamentoProp', 'provinciaProp', 'distritoProp', 'direccionProp', 'emailProp', 'telefonoProp'];
+    const req = ['paisProp', 'departamentoProp', 'provinciaProp', 'distritoProp', 'direccionProp', 'emailProp', 'telefonoProp'];
+    
     if (!formVehiculo.sinDni) {
       req.push('tipoDocProp', 'nroDocProp');
+      
+      const selectedDoc = maestrosPropietario?.tiposDocumento?.find((x: any) => x.key === formVehiculo.tipoDocProp);
+      const isRuc = selectedDoc?.nombre?.toUpperCase() === 'RUC';
+      
+      if (isRuc) {
+        req.push('razonSocialProp');
+      } else {
+        req.push('nombresProp', 'apellidosProp');
+      }
+    } else {
+      req.push('nombresProp', 'apellidosProp');
     }
+    
     let missing: string[] = [];
     for (const f of req) {
       if (!isValid((formVehiculo as any)[f])) missing.push(f);
@@ -717,11 +730,24 @@ export function VehiculoStep({
                       {!formVehiculo.sinDni && (
                         <>
                           <InputField label="Tipo de Documento" name="tipoDocProp" isSelect options={optsDocs} />
-                          <InputField label="Número de Identidad" name="nroDocProp" />
+                          <InputField label="NRO. DOCUMENTO DE IDENTIDAD" name="nroDocProp" />
                         </>
                       )}
-                      <InputField label="Nombres" name="nombresProp" filter="letras" />
-                      <InputField label="Apellidos" name="apellidosProp" filter="letras" />
+                      {(() => {
+                        const selectedDoc = maestrosPropietario?.tiposDocumento?.find((x: any) => x.key === formVehiculo.tipoDocProp);
+                        const isRuc = !formVehiculo.sinDni && selectedDoc?.nombre?.toUpperCase() === 'RUC';
+                        
+                        if (isRuc) {
+                          return <InputField label="Nombre de la Empresa (Razón Social)" name="razonSocialProp" />;
+                        }
+                        
+                        return (
+                          <>
+                            <InputField label="Nombres" name="nombresProp" filter="letras" />
+                            <InputField label="Apellidos" name="apellidosProp" filter="letras" />
+                          </>
+                        );
+                      })()}
                       <InputField label="País" name="paisProp" isSelect options={optsPaises} />
                       <InputField label="Departamento" name="departamentoProp" isSelect options={optsDept} />
                       <InputField label="Provincia" name="provinciaProp" isSelect options={optsProv} disabled={!formVehiculo.departamentoProp} />

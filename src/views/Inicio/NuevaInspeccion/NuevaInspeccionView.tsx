@@ -5,6 +5,7 @@ import { CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Search } from
 import { CajaStep } from './components/NuevaInspeccion/CajaStep';
 import { PagoStep } from './components/NuevaInspeccion/PagoStep';
 import { VehiculoStep } from './components/NuevaInspeccion/VehiculoStep';
+import { FacturacionStep } from './components/NuevaInspeccion/FacturacionStep';
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({
@@ -95,6 +96,14 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
     nroPuertas: '', salidasEmergencia: '', kilometraje: ''
   });
 
+  // Form State (Facturación)
+  const [isFacturacionValid, setIsFacturacionValid] = useState(false);
+  const [formFacturacion, setFormFacturacion] = useState({
+    tipoDocFac: '', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
+    paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
+    emailFac: '', telefonoFac: ''
+  });
+
   const getCategoriaName = () => {
     if (!maestros || !formCaja.categoria) return '';
     const cat = maestros.categorias.find(c => c.key === formCaja.categoria);
@@ -110,6 +119,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
             const data = res.data;
             if (data.formCaja) setFormCaja(data.formCaja);
             if (data.formVehiculo) setFormVehiculo(data.formVehiculo);
+            if (data.formFacturacion) setFormFacturacion(data.formFacturacion);
             if (data.pagosAgregados) setPagosAgregados(data.pagosAgregados);
             if (data.currentStepIndex) setCurrentStepIndex(data.currentStepIndex);
             
@@ -232,6 +242,11 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       return;
     }
 
+    if (currentStepIndex === 3 && !isFacturacionValid) {
+      alert('Por favor completa todos los campos obligatorios de Facturación antes de continuar.');
+      return;
+    }
+
     try {
       // Auto-guardar borrador
       const res = await inspeccionesApi.guardarBorrador({
@@ -241,6 +256,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
         formCaja,
         pagosAgregados,
         formVehiculo,
+        formFacturacion,
         isConsultado,
         documentoPago,
         precioSubtotal,
@@ -468,8 +484,21 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
           </div>
         )}
 
+        {/* PASO 4: FACTURACIÓN */}
+        {currentStepIndex === 3 && (
+          <div className="p-6">
+            <FacturacionStep
+              formFacturacion={formFacturacion}
+              setFormFacturacion={setFormFacturacion}
+              formVehiculo={formVehiculo}
+              documentoPago={documentoPago}
+              onValidationChange={setIsFacturacionValid}
+            />
+          </div>
+        )}
+
         {/* OTROS PASOS */}
-        {currentStepIndex > 2 && (
+        {currentStepIndex > 3 && (
           <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-4">
             <CheckCircle2 className="w-16 h-16 text-slate-300" />
             <h3 className="text-xl font-bold text-slate-700">Paso en construcción</h3>
@@ -495,12 +524,17 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
                 Falta completar campos en Datos, SOAT o Propietario
               </p>
             )}
+            {currentStepIndex === 3 && !isFacturacionValid && (
+              <p className="text-[10px] text-red-500 font-bold uppercase">
+                Falta completar campos de facturación
+              </p>
+            )}
             <button
               type="button"
               onClick={irSiguientePaso}
-              disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid)}
+              disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid)}
               className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid)
+                ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid)
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-amber-400 text-[#052a79] hover:bg-amber-300 hover:shadow-lg hover:-translate-y-0.5'
                 }`}
