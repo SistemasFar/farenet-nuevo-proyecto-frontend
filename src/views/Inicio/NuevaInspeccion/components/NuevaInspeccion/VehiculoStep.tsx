@@ -163,7 +163,7 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber, onAddNuevo, filter }: any) => {
+export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber, maxNumber, enforceStartWith, onAddNuevo, filter }: any) => {
   const { formVehiculo, setFormVehiculo } = React.useContext(FormVehiculoContext);
   return (
     <div className="flex flex-col gap-1.5 md:col-span-1">
@@ -219,7 +219,10 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
             if (filter === 'letras') {
               val = val.replace(/[^A-Z\sÑÁÉÍÓÚ]/g, '');
             } else if (filter === 'telefono') {
-              val = val.replace(/[^0-9+]/g, '');
+              val = val.replace(/[^0-9]/g, '');
+              if (enforceStartWith && val.length > 0 && !val.startsWith(enforceStartWith)) {
+                val = '';
+              }
             }
             if (maxLength && val.length > maxLength) {
               val = val.slice(0, maxLength);
@@ -230,6 +233,11 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
             if (minNumber !== undefined && formVehiculo[name]) {
               if (parseInt(formVehiculo[name], 10) < minNumber) {
                 setFormVehiculo({...formVehiculo, [name]: ''});
+              }
+            }
+            if (maxNumber !== undefined && formVehiculo[name]) {
+              if (parseInt(formVehiculo[name], 10) > maxNumber) {
+                setFormVehiculo({...formVehiculo, [name]: maxNumber.toString()});
               }
             }
           }}
@@ -294,6 +302,20 @@ export function VehiculoStep({
   const [maestrosPropietario, setMaestrosPropietario] = useState<any>(null);
   const [provincias, setProvincias] = useState<any[]>([]);
   const [distritos, setDistritos] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (formVehiculo.fechaEmisionSoat && formVehiculo.mesesSoat) {
+      const emision = new Date(formVehiculo.fechaEmisionSoat);
+      if (!isNaN(emision.getTime())) {
+        // Al sumar meses a la fecha, se maneja automáticamente el año
+        emision.setMonth(emision.getMonth() + parseInt(formVehiculo.mesesSoat, 10));
+        const vencimiento = emision.toISOString().split('T')[0];
+        if (formVehiculo.fechaVencimientoSoat !== vencimiento) {
+          setFormVehiculo((prev: any) => ({ ...prev, fechaVencimientoSoat: vencimiento }));
+        }
+      }
+    }
+  }, [formVehiculo.fechaEmisionSoat, formVehiculo.mesesSoat]);
 
   React.useEffect(() => {
     if (vehiculoTab === 'PROPIETARIO' && !maestrosPropietario) {
@@ -537,7 +559,7 @@ export function VehiculoStep({
                     <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
                       <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Especificaciones Técnicas</h4>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <InputField label="Año Fabricación" name="anioFabricacion" type="number" maxLength={4} minNumber={1800} />
+                        <InputField label="Año Fabricación" name="anioFabricacion" type="number" maxLength={4} minNumber={1800} maxNumber={new Date().getFullYear() + 2} />
                         <InputField label="Combustible" name="combustible" isSelect options={optsCombustibles} />
                         {hasCilindros && <InputField label="Nro Cilindros" name="nroCilindros" type="number" />}
                         {hasKilometraje && <InputField label="Kilometraje" name="kilometraje" type="number" />}
@@ -706,7 +728,7 @@ export function VehiculoStep({
                       <InputField label="Distrito" name="distritoProp" isSelect options={optsDist} disabled={!formVehiculo.provinciaProp} />
                       <InputField label="Dirección" name="direccionProp" />
                       <InputField label="Email" name="emailProp" type="email" />
-                      <InputField label="Teléfono" name="telefonoProp" filter="telefono" />
+                      <InputField label="Teléfono" name="telefonoProp" filter="telefono" maxLength={9} enforceStartWith="9" />
                     </div>
                   </div>
 

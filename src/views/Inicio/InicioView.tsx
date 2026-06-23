@@ -127,7 +127,8 @@ export function InicioView(props: InicioViewProps) {
 
   const cargarInspecciones = async (
     paginaConsulta = page,
-    pageSizeConsulta = pageSize
+    pageSizeConsulta = pageSize,
+    autoAdjust = true
   ) => {
     if (!puedeConsultar) {
       return;
@@ -161,8 +162,24 @@ export function InicioView(props: InicioViewProps) {
           pageSize: pageSizeConsulta
         }
       );
+      
+      const realTotal = response.total || 0;
+
+      if (autoAdjust && paginaConsulta === 1) {
+        let autoPageSize = pageSizeConsulta;
+        if (realTotal > 25 && autoPageSize < 50) autoPageSize = 50;
+        else if (realTotal > 20 && autoPageSize < 25) autoPageSize = 25;
+        else if (realTotal > 10 && autoPageSize < 20) autoPageSize = 20;
+
+        if (autoPageSize !== pageSizeConsulta) {
+          setPageSize(autoPageSize);
+          cargarInspecciones(1, autoPageSize, false);
+          return;
+        }
+      }
+
       setInspecciones(response.data || []);
-      setTotal(response.total || 0);
+      setTotal(realTotal);
       setPage(response.page || paginaConsulta);
       setPageSize(pageSizeConsulta);
       setTotalPages(response.totalPages || 1);
@@ -252,7 +269,7 @@ export function InicioView(props: InicioViewProps) {
   const cambiarPageSize = (nuevoPageSize: number) => {
     setPageSize(nuevoPageSize);
     setPage(1);
-    cargarInspecciones(1, nuevoPageSize);
+    cargarInspecciones(1, nuevoPageSize, false);
   };
 
   const irPaginaAnterior = () => {
