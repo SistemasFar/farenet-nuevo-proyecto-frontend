@@ -403,8 +403,8 @@ export const operacionApi = {
       );
     }
     if (filtros?.cliente?.trim()) {
-  params.append('cliente', filtros.cliente.trim());
-}
+      params.append('cliente', filtros.cliente.trim());
+    }
 
     if (filtros?.lineaKey?.trim()) {
       params.append('lineaKey', filtros.lineaKey.trim());
@@ -468,7 +468,7 @@ export const inspeccionesApi = {
       headers: { 'Content-Type': 'application/json' }
     });
     if (!response.ok) throw new Error('Error al buscar inspecciones');
-    return await parseJsonResponse(response);
+    return await parseJsonResponse<any>(response);
   },
   guardar: async (data: any) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/guardar`, {
@@ -477,7 +477,7 @@ export const inspeccionesApi = {
       body: JSON.stringify(data)
     });
     if (!response.ok) throw new Error('Error al guardar inspeccion');
-    return await parseJsonResponse(response);
+    return await parseJsonResponse<any>(response);
   },
   guardarBorrador: async (data: any) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/borrador`, {
@@ -502,7 +502,7 @@ export const inspeccionesApi = {
       headers: { 'Content-Type': 'application/json' }
     });
     if (!response.ok) throw new Error('Error al eliminar borrador');
-    return await parseJsonResponse(response);
+    return await parseJsonResponse<any>(response);
   },
   buscarInspeccionesAsync: async (
     plantaKey: string,
@@ -582,14 +582,47 @@ export const inspeccionesApi = {
   }
 };
 
+export const externosApi = {
+  consultarDni: async (numero: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/externos/dni/${numero}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Error al consultar DNI.'));
+    return parseJsonResponse<any>(response);
+  },
+  consultarRuc: async (numero: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/externos/ruc/${numero}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Error al consultar RUC.'));
+    return parseJsonResponse<any>(response);
+  }
+};
+
+export const vehiculoApi = {
+  buscarPorPlaca: async (placa: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/vehiculo/buscar/${placa}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(await getErrorMessage(response, 'Error al buscar vehículo.'));
+    }
+    return parseJsonResponse<any>(response);
+  }
+};
+
 export const plantaSession = {
   guardar: (planta: PlantaAsignada | string) => {
     const plantaNormalizada: PlantaAsignada =
       typeof planta === 'string'
         ? {
-            key: planta,
-            nombre: planta
-          }
+          key: planta,
+          nombre: planta
+        }
         : planta;
 
     sessionStorage.setItem(
@@ -671,7 +704,7 @@ export const maestrosApi = {
     return parseJsonResponse<MaestrosCajaResponse>(response);
   },
 
-  obtenerPrecioConceptoAsync: async (plantaKey: string, conceptoKey: string): Promise<{status: string, data: {precio: number}}> => {
+  obtenerPrecioConceptoAsync: async (plantaKey: string, conceptoKey: string): Promise<{ status: string, data: { precio: number } }> => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/precio?planta_key=${plantaKey}&concepto_key=${conceptoKey}`, {
       method: 'GET'
     });
@@ -682,7 +715,7 @@ export const maestrosApi = {
       );
     }
 
-    return parseJsonResponse<{status: string, data: {precio: number}}>(response);
+    return parseJsonResponse<{ status: string, data: { precio: number } }>(response);
   },
 
   obtenerMaestrosPagoAsync: async (): Promise<MaestrosPagoResponse> => {
@@ -723,7 +756,7 @@ export const maestrosApi = {
     return parseJsonResponse<MaestrosVehiculoResponse>(response);
   },
 
-  buscarModelosAsync: async (query: string): Promise<{status: string, data: {key: string, nombre: string}[]}> => {
+  buscarModelosAsync: async (query: string): Promise<{ status: string, data: { key: string, nombre: string }[] }> => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/vehiculo/modelos?q=${encodeURIComponent(query)}`, {
       method: 'GET',
       headers: {
@@ -739,10 +772,10 @@ export const maestrosApi = {
       );
     }
 
-    return parseJsonResponse<{status: string, data: {key: string, nombre: string}[]}>(response);
+    return parseJsonResponse<{ status: string, data: { key: string, nombre: string }[] }>(response);
   },
 
-  buscarColoresAsync: async (query: string): Promise<{status: string, data: {key: string, nombre: string}[]}> => {
+  buscarColoresAsync: async (query: string): Promise<{ status: string, data: { key: string, nombre: string }[] }> => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/vehiculo/colores?q=${encodeURIComponent(query)}`, {
       method: 'GET',
       headers: {
@@ -758,10 +791,10 @@ export const maestrosApi = {
       );
     }
 
-    return parseJsonResponse<{status: string, data: {key: string, nombre: string}[]}>(response);
+    return parseJsonResponse<{ status: string, data: { key: string, nombre: string }[] }>(response);
   },
 
-  agregarMaestroAsync: async (tabla: string, nombre: string): Promise<{status: string, message: string, data: {key: string, nombre: string}}> => {
+  agregarMaestroAsync: async (tabla: string, nombre: string): Promise<{ status: string, message: string, data: { key: string, nombre: string } }> => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/agregar`, {
       method: 'POST',
       headers: {
@@ -776,7 +809,7 @@ export const maestrosApi = {
       );
     }
 
-    return parseJsonResponse<{status: string, message: string, data: {key: string, nombre: string}}>(response);
+    return parseJsonResponse<{ status: string, message: string, data: { key: string, nombre: string } }>(response);
   },
 
   obtenerMaestrosPropietario: async () => {

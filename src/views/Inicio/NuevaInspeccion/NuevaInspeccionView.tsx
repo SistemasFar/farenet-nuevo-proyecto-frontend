@@ -545,6 +545,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
               maestrosVehiculo={maestrosVehiculo}
               getCategoriaName={getCategoriaName}
               onValidationChange={setIsVehiculoValid}
+              placaCaja={formCaja.placa}
             />
           </div>
         )}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { InputField, FormVehiculoContext } from './VehiculoStep';
-import { maestrosApi } from '../../../../../services/api';
+import { maestrosApi, externosApi } from '../../../../../services/api';
 
 interface FacturacionStepProps {
   formFacturacion: any;
@@ -21,6 +21,8 @@ export function FacturacionStep({
   const [maestrosFacturacion, setMaestrosFacturacion] = useState<any>(null);
   const [provincias, setProvincias] = useState<any[]>([]);
   const [distritos, setDistritos] = useState<any[]>([]);
+  
+  const [searchingFacturacion, setSearchingFacturacion] = useState(false);
 
   React.useEffect(() => {
     if (!maestrosFacturacion) {
@@ -86,6 +88,42 @@ export function FacturacionStep({
     }
   }, [isFacturacionValid, onValidationChange]);
 
+  const handleSearchFacturacion = async () => {
+    const nro = formFacturacion.nroDocFac;
+    const tipo = formFacturacion.tipoDocFac;
+    if (!nro) return;
+
+    setSearchingFacturacion(true);
+    try {
+      const selectedDoc = maestrosFacturacion?.tiposDocumento?.find((x: any) => x.key === tipo);
+      const isRuc = selectedDoc?.nombre?.toUpperCase() === 'RUC';
+      
+      if (isRuc && nro.length === 11) {
+        const res = await externosApi.consultarRuc(nro);
+        if (res?.data) {
+          setFormFacturacion((prev: any) => ({
+            ...prev,
+            razonSocialFac: res.data.razonSocial || '',
+            direccionFac: res.data.direccion || prev.direccionFac
+          }));
+        }
+      } else if (!isRuc && nro.length === 8) {
+        const res = await externosApi.consultarDni(nro);
+        if (res?.data) {
+          setFormFacturacion((prev: any) => ({
+            ...prev,
+            nombresFac: res.data.nombres || '',
+            apellidosFac: res.data.apellidos || ''
+          }));
+        }
+      }
+    } catch (e) {
+      console.error('Error autocompletando facturación', e);
+    } finally {
+      setSearchingFacturacion(false);
+    }
+  };
+
   const handleCopiarPropietario = () => {
     setFormFacturacion({
       ...formFacturacion,
@@ -147,7 +185,12 @@ export function FacturacionStep({
               options={optsDocs} 
               disabled={documentoPago === '5'} // Si es Factura, forzamos RUC y lo bloqueamos
             />
-            <InputField label="NRO. DOCUMENTO DE IDENTIDAD" name="nroDocFac" />
+            <InputField 
+              label="NRO. DOCUMENTO DE IDENTIDAD" 
+              name="nroDocFac" 
+              onSearch={handleSearchFacturacion}
+              searching={searchingFacturacion}
+            />
             
             {(() => {
               const selectedDoc = maestrosFacturacion?.tiposDocumento?.find((x: any) => x.key === formFacturacion.tipoDocFac);

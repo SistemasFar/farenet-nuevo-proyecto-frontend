@@ -162,7 +162,7 @@ export function InicioView(props: InicioViewProps) {
           pageSize: pageSizeConsulta
         }
       );
-      
+
       const realTotal = response.total || 0;
 
       if (autoAdjust && paginaConsulta === 1) {
@@ -315,7 +315,7 @@ export function InicioView(props: InicioViewProps) {
             <button className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition">
               + Nuevo Servicio
             </button>
-            <button 
+            <button
               type="button"
               onClick={() => props.onNuevaInspeccion?.()}
               className="px-3 py-1.5 bg-[#052a79] text-white rounded text-xs font-semibold hover:bg-blue-900 transition"

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Plus, XCircle } from 'lucide-react';
 import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
-import { maestrosApi } from '../../../../../services/api';
+import { maestrosApi, externosApi, vehiculoApi } from '../../../../../services/api';
 
 export const FormVehiculoContext = React.createContext<any>(null);
 
@@ -163,7 +163,7 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber, maxNumber, enforceStartWith, onAddNuevo, filter }: any) => {
+export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber, maxNumber, enforceStartWith, onAddNuevo, filter, onSearch, searching }: any) => {
   const { formVehiculo, setFormVehiculo } = React.useContext(FormVehiculoContext);
   return (
     <div className="flex flex-col gap-1.5 md:col-span-1">
@@ -207,44 +207,57 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
           isDisabled={disabled || options.length === 0}
         />
       ) : (
-        <input
-          type={type === 'number' ? 'text' : type}
-          inputMode={type === 'number' ? 'numeric' : undefined}
-          value={overrideValue !== undefined ? overrideValue : formVehiculo[name]}
-          onChange={(e) => {
-            let val = type === 'email' ? e.target.value : e.target.value.toUpperCase();
-            if (type === 'number') {
-              val = val.replace(/\D/g, '');
-            }
-            if (filter === 'letras') {
-              val = val.replace(/[^A-Z\sÑÁÉÍÓÚ]/g, '');
-            } else if (filter === 'telefono') {
-              val = val.replace(/[^0-9]/g, '');
-              if (enforceStartWith && val.length > 0 && !val.startsWith(enforceStartWith)) {
-                val = '';
+        <div className="relative flex items-center">
+          <input
+            type={type === 'number' ? 'text' : type}
+            inputMode={type === 'number' ? 'numeric' : undefined}
+            value={overrideValue !== undefined ? overrideValue : formVehiculo[name]}
+            onChange={(e) => {
+              let val = type === 'email' ? e.target.value : e.target.value.toUpperCase();
+              if (type === 'number') {
+                val = val.replace(/\D/g, '');
               }
-            }
-            if (maxLength && val.length > maxLength) {
-              val = val.slice(0, maxLength);
-            }
-            setFormVehiculo({...formVehiculo, [name]: val});
-          }}
-          onBlur={() => {
-            if (minNumber !== undefined && formVehiculo[name]) {
-              if (parseInt(formVehiculo[name], 10) < minNumber) {
-                setFormVehiculo({...formVehiculo, [name]: ''});
+              if (filter === 'letras') {
+                val = val.replace(/[^A-Z\sÑÁÉÍÓÚ]/g, '');
+              } else if (filter === 'telefono') {
+                val = val.replace(/[^0-9]/g, '');
+                if (enforceStartWith && val.length > 0 && !val.startsWith(enforceStartWith)) {
+                  val = '';
+                }
               }
-            }
-            if (maxNumber !== undefined && formVehiculo[name]) {
-              if (parseInt(formVehiculo[name], 10) > maxNumber) {
-                setFormVehiculo({...formVehiculo, [name]: maxNumber.toString()});
+              if (maxLength && val.length > maxLength) {
+                val = val.slice(0, maxLength);
               }
-            }
-          }}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79] ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
-        />
+              setFormVehiculo({...formVehiculo, [name]: val});
+            }}
+            onBlur={() => {
+              if (minNumber !== undefined && formVehiculo[name]) {
+                if (parseInt(formVehiculo[name], 10) < minNumber) {
+                  setFormVehiculo({...formVehiculo, [name]: ''});
+                }
+              }
+              if (maxNumber !== undefined && formVehiculo[name]) {
+                if (parseInt(formVehiculo[name], 10) > maxNumber) {
+                  setFormVehiculo({...formVehiculo, [name]: maxNumber.toString()});
+                }
+              }
+            }}
+            placeholder={placeholder}
+            disabled={disabled}
+            className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79] ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''} ${onSearch ? 'pr-10' : ''}`}
+          />
+          {onSearch && (
+            <button
+              type="button"
+              onClick={onSearch}
+              disabled={disabled || searching || !formVehiculo[name]}
+              className={`absolute right-1 top-1 bottom-1 px-2 flex items-center justify-center rounded-md transition ${searching ? 'bg-slate-100 text-slate-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+              title="Autocompletar"
+            >
+              {searching ? '⏳' : '🔍'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -278,6 +291,7 @@ interface VehiculoStepProps {
   maestrosVehiculo: any;
   getCategoriaName: () => string;
   onValidationChange?: (isValid: boolean) => void;
+  placaCaja?: string;
 }
 
 export function VehiculoStep({
@@ -287,7 +301,8 @@ export function VehiculoStep({
   setFormVehiculo,
   maestrosVehiculo,
   getCategoriaName,
-  onValidationChange
+  onValidationChange,
+  placaCaja
 }: VehiculoStepProps) {
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -302,6 +317,9 @@ export function VehiculoStep({
   const [maestrosPropietario, setMaestrosPropietario] = useState<any>(null);
   const [provincias, setProvincias] = useState<any[]>([]);
   const [distritos, setDistritos] = useState<any[]>([]);
+  
+  const [searchingPropietario, setSearchingPropietario] = useState(false);
+  const [searchingVehiculo, setSearchingVehiculo] = useState(false);
 
   React.useEffect(() => {
     if (formVehiculo.fechaEmisionSoat && formVehiculo.mesesSoat) {
@@ -338,6 +356,83 @@ export function VehiculoStep({
       setDistritos([]);
     }
   }, [formVehiculo.provinciaProp]);
+
+  const handleSearchPropietario = async () => {
+    const nro = formVehiculo.nroDocProp;
+    const tipo = formVehiculo.tipoDocProp;
+    if (!nro) return;
+
+    setSearchingPropietario(true);
+    try {
+      const selectedDoc = maestrosPropietario?.tiposDocumento?.find((x: any) => x.key === tipo);
+      const isRuc = selectedDoc?.nombre?.toUpperCase() === 'RUC';
+      
+      if (isRuc && nro.length === 11) {
+        const res = await externosApi.consultarRuc(nro);
+        if (res?.data) {
+          setFormVehiculo((prev: any) => ({
+            ...prev,
+            razonSocialProp: res.data.razonSocial || '',
+            direccionProp: res.data.direccion || prev.direccionProp
+          }));
+        }
+      } else if (!isRuc && nro.length === 8) {
+        const res = await externosApi.consultarDni(nro);
+        if (res?.data) {
+          setFormVehiculo((prev: any) => ({
+            ...prev,
+            nombresProp: res.data.nombres || '',
+            apellidosProp: res.data.apellidos || ''
+          }));
+        }
+      }
+    } catch (e) {
+      console.error('Error autocompletando propietario', e);
+    } finally {
+      setSearchingPropietario(false);
+    }
+  };
+
+  const handleSearchVehiculo = async () => {
+    const p = formVehiculo.placaNueva || placaCaja;
+    if (!p) return;
+    setSearchingVehiculo(true);
+    try {
+      const res = await vehiculoApi.buscarPorPlaca(p);
+      if (res?.data) {
+        setFormVehiculo((prev: any) => ({
+          ...prev,
+          placaNueva: res.data.placamotor || p,
+          nroSerie: res.data.nrovin || res.data.nroserie || '',
+          nroMotor: res.data.nromotor || '',
+          anioFabricacion: res.data.aniofabricacion || '',
+          anioModelo: res.data.aniomodelo || '',
+          asientos: res.data.nroasientos || '',
+          pasajeros: res.data.nropasajeros || '',
+          ruedas: res.data.nroruedas || '',
+          ejes: res.data.nroejes || '',
+          cilindros: res.data.nrocilindros || '',
+          pesoSeco: res.data.pesoseco || '',
+          pesoBruto: res.data.pesobruto || '',
+          cargaUtil: res.data.cargautil || '',
+          longitud: res.data.longitud || '',
+          altura: res.data.altura || '',
+          ancho: res.data.ancho || '',
+        }));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSearchingVehiculo(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (placaCaja && !formVehiculo.placaNueva && !formVehiculo.marca) {
+      handleSearchVehiculo();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placaCaja]);
 
   const handleAddNuevo = (title: string, tabla: string, field: string, options: any = [], asyncSearchFunc?: any) => {
     setModalTitle(title);
@@ -562,7 +657,12 @@ export function VehiculoStep({
                           name="marcaCarroceria" 
                           disabled={true} 
                         />
-                        <InputField label="Placa Nueva" name="placaNueva" />
+                        <InputField 
+                          label="Placa Nueva" 
+                          name="placaNueva" 
+                          onSearch={handleSearchVehiculo}
+                          searching={searchingVehiculo}
+                        />
                         <InputField label="Nro Serie (VIN)" name="nroSerie" />
                         {hasMotor && <InputField label="Nro Motor" name="nroMotor" />}
                       </div>
@@ -727,12 +827,17 @@ export function VehiculoStep({
                   </div>
                   <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {!formVehiculo.sinDni && (
-                        <>
-                          <InputField label="Tipo de Documento" name="tipoDocProp" isSelect options={optsDocs} />
-                          <InputField label="NRO. DOCUMENTO DE IDENTIDAD" name="nroDocProp" />
-                        </>
-                      )}
+                        {!formVehiculo.sinDni && (
+                          <>
+                            <InputField label="Tipo de Documento" name="tipoDocProp" isSelect options={optsDocs} />
+                            <InputField 
+                              label="NRO. DOCUMENTO DE IDENTIDAD" 
+                              name="nroDocProp" 
+                              onSearch={handleSearchPropietario}
+                              searching={searchingPropietario}
+                            />
+                          </>
+                        )}
                       {(() => {
                         const selectedDoc = maestrosPropietario?.tiposDocumento?.find((x: any) => x.key === formVehiculo.tipoDocProp);
                         const isRuc = !formVehiculo.sinDni && selectedDoc?.nombre?.toUpperCase() === 'RUC';
