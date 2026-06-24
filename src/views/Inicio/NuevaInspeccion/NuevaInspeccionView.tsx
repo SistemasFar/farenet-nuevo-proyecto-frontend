@@ -310,12 +310,19 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
           formVehiculo,
           formFacturacion,
           formVerificacion,
+          idBorrador: currentBorradorId,
+          documentoPago,
+          isConsultado,
+          precioSubtotal,
+          descuento,
+          precioTotal
         };
         const res = await inspeccionesApi.guardar(savePayload);
+        const finalId = res?.data?.data?.nroInspeccion || res?.data?.nroInspeccion || 'Generado con éxito';
         Swal.fire({
           icon: 'success',
           title: '¡Guardado!',
-          text: 'La inspección se guardó correctamente en la base de datos.',
+          text: `La inspección se guardó correctamente en la base de datos. Código Oficial: ${finalId}`,
           confirmButtonColor: '#052a79'
         });
         if (onBack) onBack();
