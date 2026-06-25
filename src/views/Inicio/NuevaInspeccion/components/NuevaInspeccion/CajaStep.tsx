@@ -62,7 +62,22 @@ export function CajaStep({
         Datos de Caja
       </h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Funciones de validacion dinamica */}
+      {(() => {
+        const getPlacaMaxLength = () => {
+          if (!maestros?.tiposPlaca || !formCaja.tipoPlaca) return 17;
+          const selectedTipo = maestros.tiposPlaca.find((tp: any) => tp.id?.toString() === formCaja.tipoPlaca?.toString());
+          if (!selectedTipo) return 17;
+          const nombre = selectedTipo.nombre?.toUpperCase() || '';
+          if (nombre.includes('DIPLOMATIC') || nombre.includes('DIPLOMÁTIC')) return 6;
+          if (nombre.includes('INCORPORACI')) return 17;
+          if (nombre.includes('RUTINARI')) return 6;
+          if (nombre.includes('EXTRANJER')) return 7;
+          return 17; // default max
+        };
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Placa *</label>
@@ -85,7 +100,7 @@ export function CajaStep({
             onChange={handleCajaChange}
             placeholder="Ej: ABC-123"
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
-            maxLength={formCaja.tipoPlaca === 'BIN_ID_HERE' ? 16 : 16}
+            maxLength={getPlacaMaxLength()}
           />
         </div>
 
@@ -155,6 +170,8 @@ export function CajaStep({
         </div>
 
       </div>
+        );
+      })()}
 
       <div className="flex items-center gap-4 pt-4 border-t border-slate-100 mt-6">
         <button

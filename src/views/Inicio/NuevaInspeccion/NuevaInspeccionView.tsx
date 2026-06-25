@@ -216,6 +216,44 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
     }
   }, [formVehiculo.marca, maestrosVehiculo]);
 
+  // NAVEGACIÓN CON FLECHAS DEL TECLADO
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si el usuario está escribiendo en un input, textarea o select
+      const tagName = (e.target as HTMLElement).tagName;
+      if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
+        return;
+      }
+      
+      if (e.key === 'ArrowRight') {
+        if (currentStepIndex === 2) {
+          if (vehiculoTab === 'DATOS') {
+            setVehiculoTab('SOAT');
+            return;
+          } else if (vehiculoTab === 'SOAT') {
+            setVehiculoTab('PROPIETARIO');
+            return;
+          }
+        }
+        irSiguientePaso();
+      } else if (e.key === 'ArrowLeft') {
+        if (currentStepIndex === 2) {
+          if (vehiculoTab === 'PROPIETARIO') {
+            setVehiculoTab('SOAT');
+            return;
+          } else if (vehiculoTab === 'SOAT') {
+            setVehiculoTab('DATOS');
+            return;
+          }
+        }
+        irPasoAnterior();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentStepIndex, vehiculoTab, formCaja, formVehiculo, formFacturacion, isVehiculoValid, isFacturacionValid, pagosAgregados]);
+
   // Sincronizar Marca con Marca Carrocería
 
   const handleSelectChange = (name: string, option: any) => {
@@ -232,13 +270,24 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       return;
     }
 
-    // Validación de placa: Limitar a 6 o 16 caracteres dependiendo del tipo
     if (name === 'placa') {
-      // En este caso el usuario dijo "hay dos tipos usualmente son de 6... o 16". 
-      // Por defecto no limitamos estrictamente la longitud máxima en el onChange para dejarles escribir,
-      // pero podríamos limitarlo si conocemos el ID del tipo de placa BIN (ej. id 2).
-      // Por ahora, aplicamos mayúsculas siempre:
-      setFormCaja((prev) => ({ ...prev, [name]: value.toUpperCase() }));
+      let val = value.toUpperCase();
+      let maxLen = 17;
+
+      const tp = maestros?.tiposPlaca?.find((x: any) => x.id?.toString() === formCaja.tipoPlaca?.toString());
+      if (tp) {
+        const n = tp.nombre?.toUpperCase() || '';
+        if (n.includes('DIPLOMATIC') || n.includes('DIPLOMÁTIC')) maxLen = 6;
+        else if (n.includes('INCORPORACI')) maxLen = 17;
+        else if (n.includes('RUTINARI')) maxLen = 6;
+        else if (n.includes('EXTRANJER')) maxLen = 7;
+      }
+
+      if (val.length > maxLen) {
+        val = val.slice(0, maxLen);
+      }
+
+      setFormCaja((prev) => ({ ...prev, [name]: val }));
       return;
     }
 
