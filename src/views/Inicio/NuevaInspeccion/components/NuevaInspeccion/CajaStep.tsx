@@ -1,7 +1,7 @@
-
+import React, { useState } from 'react';
 import Select from 'react-select';
 import { Search, XCircle, Frown, HelpCircle } from 'lucide-react';
-import { plantaSession, maestrosApi } from '../../../../../services/api';
+import { plantaSession, maestrosApi, inspeccionesApi } from '../../../../../services/api';
 
 interface CajaStepProps {
   maestros: any;
@@ -56,13 +56,89 @@ export function CajaStep({
   setDocumentoPago,
   customSelectStyles
 }: CajaStepProps) {
+  const [listaDescuentos, setListaDescuentos] = useState<any[]>([]);
+  const [showDescuentosModal, setShowDescuentosModal] = useState(false);
+
+  const handleConsultar = async () => {
+    if (validarCaja()) {
+      try {
+        const planta = plantaSession.obtener();
+        if (!planta?.key) {
+          alert('Por favor seleccione una planta en el inicio.');
+          return;
+        }
+        const res = await inspeccionesApi.consultarVehiculoYCaja({
+          placa: formCaja.placa,
+          concepto: formCaja.concepto,
+          categoria: formCaja.categoria,
+          tipoInspeccion: formCaja.tipoInspeccion,
+          tipoCertificado: formCaja.tipoCertificado,
+          tipoAutorizacion: formCaja.tipoAutorizacion,
+          plantaKey: planta.key,
+          documentoDescuento
+        });
+
+        if (res.status === 'success') {
+          const data = res.data;
+          if (data.mensaje) {
+            console.log(data.mensaje);
+          }
+          
+          const precios = data.precios;
+          setPrecioSubtotal(precios.precioBase);
+          setDescuento(precios.descuento);
+          setPrecioTotal(precios.total);
+          // Reiniciar posibles descuentos manuales aplicados
+          setDocumentoDescuento('');
+        }
+      } catch (err: any) {
+        console.error('Error calculando precio:', err);
+        alert(err.message || 'Error en la consulta');
+        setPrecioSubtotal(0);
+        setDescuento(0);
+        setPrecioTotal(0);
+      } finally {
+        setIsConsultado(true);
+      }
+    } else {
+      setShowCamposVaciosModal(true);
+    }
+  };
+
+  const handleBuscarDescuentos = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!documentoDescuento || !formCaja.concepto) {
+      alert("Ingrese documento y seleccione concepto");
+      return;
+    }
+    try {
+      const res = await inspeccionesApi.buscarDescuentos(documentoDescuento, formCaja.concepto);
+      if (res.status === 'success') {
+        const descuentos = res.data;
+        if (descuentos.length > 0) {
+          setListaDescuentos(descuentos);
+          setShowDescuentosModal(true);
+        } else {
+          alert('No se encontraron promociones para este RUC/DNI');
+        }
+      }
+    } catch (err: any) {
+      alert(err.message || "Error al buscar descuentos");
+    }
+  };
+
+  const aplicarDescuento = (desc: any) => {
+    setDescuento(desc.monto);
+    setPrecioTotal(precioSubtotal - desc.monto);
+    setShowDescuentosModal(false);
+  };
+
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-bold text-[#052a79] uppercase border-b border-amber-200/60 pb-2">
         Datos de Caja
       </h3>
 
-      {/* Funciones de validacion dinamica */}
       {(() => {
         const getPlacaMaxLength = () => {
           if (!maestros?.tiposPlaca || !formCaja.tipoPlaca) return 17;
@@ -176,32 +252,7 @@ export function CajaStep({
       <div className="flex items-center gap-4 pt-4 border-t border-slate-100 mt-6">
         <button
           type="button"
-          onClick={async () => {
-            if (validarCaja()) {
-              try {
-                const planta = plantaSession.obtener();
-                if (!planta?.key) {
-                  alert('Por favor seleccione una planta en el inicio.');
-                  return;
-                }
-                const res = await maestrosApi.obtenerPrecioConceptoAsync(planta.key, formCaja.concepto);
-                const precio = res?.data?.precio || 0;
-                if (precio === 0) {
-                  alert(`El sistema calculó 0.00. Esto sucede porque no hay un precio registrado en la tabla "conceptoinspecciondetalle" para la combinación de la Planta actual (${planta.key}) y el Concepto elegido (${formCaja.concepto}).`);
-                }
-                setPrecioSubtotal(precio);
-                setPrecioTotal(precio - descuento);
-              } catch (err) {
-                console.error('Error calculando precio:', err);
-                setPrecioSubtotal(0);
-                setPrecioTotal(0);
-              } finally {
-                setIsConsultado(true);
-              }
-            } else {
-              setShowCamposVaciosModal(true);
-            }
-          }}
+          onClick={handleConsultar}
           className="flex items-center gap-2 rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-900 border border-[#052a79] transition uppercase tracking-wide"
         >
           <Search className="w-4 h-4" />
@@ -239,12 +290,52 @@ export function CajaStep({
               type="text"
               value={documentoDescuento}
               onChange={(e) => setDocumentoDescuento(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleBuscarDescuentos(e);
+                }
+              }}
               placeholder="Número de documento..."
               className="flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 outline-none"
             />
-            <button type="button" className="bg-[#052a79] text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-blue-900 transition flex items-center gap-2 uppercase">
+            <button type="button" onClick={(e) => handleBuscarDescuentos(e)} className="bg-[#052a79] text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-blue-900 transition flex items-center gap-2 uppercase">
               <Search className="w-3 h-3" /> Buscar
             </button>
+          </div>
+        </div>
+      )}
+
+      {showDescuentosModal && (
+        <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200 shadow-inner">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+            <h3 className="text-[#052a79] font-bold text-sm uppercase flex items-center gap-2">
+              <Search className="w-4 h-4" /> Promociones Disponibles
+            </h3>
+            <button onClick={() => setShowDescuentosModal(false)} className="text-slate-400 hover:text-red-500 transition-colors" title="Cerrar">
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-600 mb-3 font-medium">
+            Seleccione el descuento a aplicar para el documento <span className="font-bold text-slate-900 bg-amber-100 px-1.5 py-0.5 rounded">{documentoDescuento}</span>:
+          </p>
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+            {listaDescuentos.map((desc: any) => (
+              <div key={desc.id} className="flex items-center justify-between p-3 rounded border border-slate-200 bg-white hover:border-amber-400 hover:shadow-sm transition-all group">
+                <div className="flex-1 pr-4">
+                  <p className="font-bold text-[#052a79] text-xs uppercase leading-tight group-hover:text-amber-600 transition-colors">{desc.campana}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0 border-l border-slate-100 pl-4">
+                  <span className="font-black text-red-600 text-sm">- S/ {desc.monto.toFixed(2)}</span>
+                  <button 
+                    onClick={() => aplicarDescuento(desc)}
+                    className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

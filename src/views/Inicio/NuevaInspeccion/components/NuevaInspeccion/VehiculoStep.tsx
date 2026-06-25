@@ -782,7 +782,7 @@ export function VehiculoStep({
                       ]}
                     />
                     <InputField label="Fecha de Emisión" name="fechaEmisionSoat" type="date" />
-                    <InputField label="Fecha de Vencimiento" name="fechaVencimientoSoat" type="date" />
+                    <InputField label="Fecha de Vencimiento" name="fechaVencimientoSoat" type="date" disabled={!!formVehiculo.fechaEmisionSoat} />
                   </div>
                 </div>
 

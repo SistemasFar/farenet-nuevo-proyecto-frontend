@@ -470,6 +470,29 @@ export const inspeccionesApi = {
     if (!response.ok) throw new Error('Error al buscar inspecciones');
     return await parseJsonResponse<any>(response);
   },
+  consultarVehiculoYCaja: async (data: any) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/consultar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      const errMsg = await getErrorMessage(response, 'Error al consultar datos');
+      throw new Error(errMsg);
+    }
+    return await parseJsonResponse<any>(response);
+  },
+  buscarDescuentos: async (documento: string, concepto: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/descuentos?documento=${documento}&concepto=${concepto}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) {
+      const errMsg = await getErrorMessage(response, 'Error al buscar descuentos');
+      throw new Error(errMsg);
+    }
+    return await parseJsonResponse<any>(response);
+  },
   guardar: async (data: any) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/guardar`, {
       method: 'POST',
