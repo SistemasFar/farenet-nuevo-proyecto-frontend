@@ -10,6 +10,7 @@ interface CajaStepProps {
   setFormCaja: (data: any) => void;
   handleCajaChange: (e: any) => void;
   handleSelectChange: (name: string, option: any) => void;
+  setFormVehiculo?: (data: any) => void;
   validarCaja: () => boolean;
   irSiguientePaso: () => void;
   isConsultado: boolean;
@@ -35,6 +36,7 @@ export function CajaStep({
   maestros,
   formCaja,
   setFormCaja,
+  setFormVehiculo,
   handleCajaChange,
   handleSelectChange,
   validarCaja,
@@ -62,9 +64,33 @@ export function CajaStep({
   const [reinspeccionMensaje, setReinspeccionMensaje] = useState<string | null>(null);
   const [isReinspeccionAplica, setIsReinspeccionAplica] = useState<boolean>(false);
   const [isReinspeccionGratuita, setIsReinspeccionGratuita] = useState(false);
+  const [vehiculoRapidoEncontrado, setVehiculoRapidoEncontrado] = useState(false);
+
+  const handlePlacaBlur = async () => {
+    if (formCaja.placa && formCaja.placa.length >= 6) {
+      try {
+        const res = await inspeccionesApi.consultarVehiculoRapido(formCaja.placa);
+        if (res?.data) {
+          const veh = res.data;
+          setFormCaja((prev: any) => ({
+            ...prev,
+            categoria: veh.categoria_key || prev.categoria,
+            tipoPlaca: veh.tipoplaca_key || prev.tipoPlaca
+          }));
+          setVehiculoRapidoEncontrado(true);
+        } else {
+          setVehiculoRapidoEncontrado(false);
+        }
+      } catch (err) {
+        setVehiculoRapidoEncontrado(false);
+      }
+    } else {
+      setVehiculoRapidoEncontrado(false);
+    }
+  };
 
   const handleConsultar = async () => {
-    if (validarCaja()) {
+    if (formCaja.placa && formCaja.concepto) {
       try {
         const planta = plantaSession.obtener();
         if (!planta?.key) {
@@ -84,8 +110,19 @@ export function CajaStep({
 
         if (res.status === 'success') {
           const data = res.data;
-          if (data.mensaje) {
-            console.log(data.mensaje);
+          if (data.vehiculo && data.mensaje && data.mensaje.includes('encontrado')) {
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'success',
+              title: 'PLACA ENCONTRADA',
+              text: 'REVISITA DE CLIENTE REGISTRADO',
+              showConfirmButton: false,
+              timer: 3000,
+              customClass: {
+                popup: 'bg-green-50'
+              }
+            });
           }
           
           const precios = data.precios;
@@ -95,6 +132,58 @@ export function CajaStep({
           
           if (data.vehiculo?.tipoDocumentoSugerido) {
             setDocumentoPago(data.vehiculo.tipoDocumentoSugerido);
+          }
+
+          if (data.vehiculo && setFormVehiculo) {
+            setFormVehiculo((prev: any) => ({
+              ...prev,
+              nroMotor: data.vehiculo.nromotor || '',
+              nroSerie: data.vehiculo.nroserie || '',
+              categoria: data.vehiculo.categoria_key || '',
+              categoriaExtra: data.vehiculo.categoriaextra || '',
+              clase: data.vehiculo.vehiculoclase_key || '',
+              marca: data.vehiculo.marca_key || '',
+              modelo: data.vehiculo.modelo_key || '',
+              color: data.vehiculo.color_key || '',
+              carroceria: data.vehiculo.carroceria_key || '',
+              anioFabricacion: data.vehiculo.aniofabricacion || '',
+              combustible: data.vehiculo.combustible_key || '',
+              nroCilindros: data.vehiculo.nrocilindros || '',
+              kilometraje: data.vehiculo.kilometraje || '',
+              nroAsientos: data.vehiculo.nroasientos || '',
+              nroPasajeros: data.vehiculo.nropasajeros || '',
+              nroPuertas: data.vehiculo.nropuertas || '',
+              nroPisos: data.vehiculo.nropisos || '',
+              salidasEmergencia: data.vehiculo.nrosalidaemergencia || '',
+              pesoSeco: data.vehiculo.pesoseco || '',
+              cargaUtil: data.vehiculo.cargautil || '',
+              pesoBruto: data.vehiculo.pesobruto || '',
+              longitud: data.vehiculo.longitud || '',
+              ancho: data.vehiculo.ancho || '',
+              altura: data.vehiculo.alto || '',
+              nroEjes: data.vehiculo.nroejes || '',
+              nroRuedas: data.vehiculo.nroruedas || '',
+              marcaCarroceria: data.vehiculo.marcacarroceria || '',
+              nroSoat: data.vehiculo.nrosoat || '',
+              tipoPoliza: data.vehiculo.tipopoliza_key || '',
+              aseguradora: data.vehiculo.aseguradora_key || '',
+              inicioSoat: data.vehiculo.fechiniciotarjetapropiedad ? data.vehiculo.fechiniciotarjetapropiedad.split('T')[0] : '',
+              finSoat: data.vehiculo.fechfintarjetapropiedad ? data.vehiculo.fechfintarjetapropiedad.split('T')[0] : '',
+              
+              // Propietario
+              nroDocProp: data.vehiculo.prop_nrodoc || '',
+              tipoDocProp: data.vehiculo.prop_tipodoc || '',
+              razonSocialProp: data.vehiculo.prop_razon || '',
+              nombresProp: data.vehiculo.prop_nombres || '',
+              apellidosProp: data.vehiculo.prop_apellidos || '',
+              paisProp: data.vehiculo.prop_pais || '114', // Default Peru
+              departamentoProp: data.vehiculo.prop_dep || '',
+              provinciaProp: data.vehiculo.prop_prov || '',
+              distritoProp: data.vehiculo.prop_dist || '',
+              direccionProp: data.vehiculo.prop_dir || '',
+              emailProp: data.vehiculo.prop_email || '',
+              telefonoProp: data.vehiculo.prop_tel || '',
+            }));
           }
 
           // Reiniciar posibles descuentos manuales aplicados
@@ -164,7 +253,11 @@ export function CajaStep({
         setIsConsultado(true);
       }
     } else {
-      setShowCamposVaciosModal(true);
+      if (!formCaja.placa || !formCaja.concepto) {
+        alert('Para consultar, ingrese la Placa y seleccione un Concepto.');
+      } else {
+        setShowCamposVaciosModal(true);
+      }
     }
   };
 
@@ -244,6 +337,7 @@ export function CajaStep({
             placeholder="Seleccione..."
             isClearable
             styles={customSelectStyles}
+            isDisabled={isConsultado}
           />
         </div>
 
@@ -254,9 +348,17 @@ export function CajaStep({
             name="placa"
             value={formCaja.placa}
             onChange={handleCajaChange}
+            onBlur={handlePlacaBlur}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handlePlacaBlur();
+              }
+            }}
             placeholder="Ej: ABC-123"
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
             maxLength={getPlacaMaxLength()}
+            disabled={isConsultado}
           />
         </div>
 
@@ -281,6 +383,7 @@ export function CajaStep({
             placeholder="Seleccione..."
             isClearable
             styles={customSelectStyles}
+            isDisabled={isConsultado}
           />
         </div>
 

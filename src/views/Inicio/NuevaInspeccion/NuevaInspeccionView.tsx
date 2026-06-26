@@ -547,6 +547,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
             maestros={maestros}
             formCaja={formCaja}
             setFormCaja={setFormCaja}
+            setFormVehiculo={setFormVehiculo}
             handleCajaChange={handleCajaChange}
             handleSelectChange={handleSelectChange}
             validarCaja={validarCaja}

@@ -470,6 +470,14 @@ export const inspeccionesApi = {
     if (!response.ok) throw new Error('Error al buscar inspecciones');
     return await parseJsonResponse<any>(response);
   },
+  consultarVehiculoRapido: async (placa: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/vehiculo-rapido/${placa}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Error al consultar vehículo rápido');
+    return await parseJsonResponse<any>(response);
+  },
   consultarVehiculoYCaja: async (data: any) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/consultar`, {
       method: 'POST',

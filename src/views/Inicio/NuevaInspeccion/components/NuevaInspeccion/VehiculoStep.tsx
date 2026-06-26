@@ -202,7 +202,7 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
           options={options}
           placeholder="Seleccione..."
           styles={customSelectStyles}
-          value={options.find((opt: any) => opt.value === formVehiculo[name]) || null}
+          value={options.find((opt: any) => opt.value?.toString() === formVehiculo[name]?.toString()) || null}
           onChange={(opt: any) => setFormVehiculo({ ...formVehiculo, [name]: opt ? opt.value : '' })}
           isDisabled={disabled || options.length === 0}
         />
