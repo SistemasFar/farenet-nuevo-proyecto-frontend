@@ -224,7 +224,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
         return;
       }
-      
+
       if (e.key === 'ArrowRight') {
         if (currentStepIndex === 2) {
           if (vehiculoTab === 'DATOS') {
@@ -368,7 +368,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
         };
         const res = await inspeccionesApi.guardar(savePayload);
         const finalId = res?.data?.data?.nroInspeccion || res?.data?.nroInspeccion || 'Generado con éxito';
-        
+
         if (formCaja.descuentoObj && formCaja.descuentoObj.source_table && formCaja.descuentoObj.source_id) {
           try {
             await inspeccionesApi.consumirDescuento(formCaja.descuentoObj.source_table, formCaja.descuentoObj.source_id);
@@ -396,6 +396,46 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       }
     } else {
       setCurrentStepIndex((prev) => prev + 1);
+    }
+  };
+  const handleGuardarSoloBorrador = async () => {
+    try {
+      setLoading(true);
+      const payload = {
+        idBorrador: currentBorradorId,
+        currentStepIndex: currentStepIndex,
+        plantaKey: plantaSeleccionada,
+        formCaja,
+        pagosAgregados,
+        formVehiculo,
+        formFacturacion,
+        formVerificacion,
+        precioSubtotal,
+        descuento,
+        precioTotal,
+        documentoPago,
+        isConsultado,
+        documentoDescuento
+      };
+      const res = await inspeccionesApi.guardarBorrador(payload);
+      if (res?.data?.idBorrador) {
+        setCurrentBorradorId(res.data.idBorrador);
+      }
+      Swal.fire({
+        icon: 'success',
+        title: 'Borrador Guardado',
+        text: 'Los datos han sido guardados temporalmente. Puedes salir y continuar más tarde.',
+        timer: 3000,
+        showConfirmButton: false
+      });
+    } catch (err: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err.message || 'No se pudo guardar el borrador.',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -660,18 +700,42 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
                 Falta completar campos de facturación
               </p>
             )}
-            <button
-              type="button"
-              onClick={irSiguientePaso}
-              disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || (currentStepIndex === 4 && !validarVerificacion())}
-              className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || (currentStepIndex === 4 && !validarVerificacion())
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  : 'bg-gold-3d hover:-translate-y-0.5'
-                }`}
-            >
-              {currentStepIndex === STEPS.length - 1 ? 'Guardar y Finalizar' : 'Siguiente Paso'}
-            </button>
+            {currentStepIndex === STEPS.length - 1 ? (
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleGuardarSoloBorrador}
+                  className="rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm bg-slate-200 text-slate-700 hover:bg-slate-300 hover:-translate-y-0.5"
+                >
+                  GUARDAR (BORRADOR)
+                </button>
+                <button
+                  type="button"
+                  onClick={irSiguientePaso}
+                  disabled={!validarVerificacion()}
+                  className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
+                    ${!validarVerificacion()
+                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                      : 'bg-gold-3d hover:-translate-y-0.5'
+                    }`}
+                >
+                  FINALIZAR
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={irSiguientePaso}
+                disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid)}
+                className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
+                  ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid)
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    : 'bg-gold-3d hover:-translate-y-0.5'
+                  }`}
+              >
+                Siguiente Paso
+              </button>
+            )}
           </div>
         </div>
       )}

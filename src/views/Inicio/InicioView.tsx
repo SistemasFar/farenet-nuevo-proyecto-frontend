@@ -501,7 +501,8 @@ export function InicioView(props: InicioViewProps) {
                 inspecciones.map((ins, idx) => {
                   const posicion = Number(ins.posicion ?? 0);
                   const estadoActual = ins.estadoActual || ins.estado;
-                  const esBorrador = posicion < 3 && estadoActual !== 'ANULADO';
+                  const estadosBorrador = ['CAJA', 'PAGO', 'VEHICULO', 'FACTURACION', 'CLIENTE', 'VERIFICACION', 'BORRADOR'];
+                  const esBorrador = (posicion < 3 || estadosBorrador.includes(estadoActual?.toUpperCase())) && estadoActual !== 'ANULADO';
 
                   const claseFila =
                     posicion >= 11
