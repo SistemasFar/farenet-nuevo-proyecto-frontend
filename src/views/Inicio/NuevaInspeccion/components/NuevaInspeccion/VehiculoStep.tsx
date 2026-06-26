@@ -656,8 +656,8 @@ export function VehiculoStep({
                         {hasCategoriaExtra && <InputField label="Categoría Extra" name="categoriaExtra" isSelect options={optsCategoriasExtra} />}
                         <InputField label="Clase" name="clase" isSelect options={optsClases} onAddNuevo={() => handleAddNuevo('Clase', 'vehiculoclase', 'clase', optsClases)} />
                         <InputField label="Marca" name="marca" isSelect options={optsMarcas} onAddNuevo={() => handleAddNuevo('Marca', 'marca', 'marca', optsMarcas)} />
-                        <InputField label="Modelo" name="modelo" isAsyncSelect loadOptions={loadModelos} onAddNuevo={() => handleAddNuevo('Modelo', 'modelo', 'modelo', [], loadModelos)} />
-                        <InputField label="Color" name="color" isAsyncSelect loadOptions={loadColores} onAddNuevo={() => handleAddNuevo('Color', 'color', 'color', [], loadColores)} />
+                        <InputField label="Modelo" name="modelo" isAsyncSelect defaultOptions={true} loadOptions={loadModelos} onAddNuevo={() => handleAddNuevo('Modelo', 'modelo', 'modelo', [], loadModelos)} />
+                        <InputField label="Color" name="color" isAsyncSelect defaultOptions={true} loadOptions={loadColores} onAddNuevo={() => handleAddNuevo('Color', 'color', 'color', [], loadColores)} />
                         <InputField label="Carrocería" name="carroceria" isSelect options={optsCarrocerias} onAddNuevo={() => handleAddNuevo('Carrocería', 'carroceria', 'carroceria', optsCarrocerias)} />
                         <InputField
                           label="Marca Carrocería"

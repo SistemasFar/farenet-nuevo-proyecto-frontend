@@ -505,6 +505,16 @@ export const inspeccionesApi = {
     }
     return await parseJsonResponse<any>(response);
   },
+  consultarReinspeccion: async (placa: string, concepto: string, planta: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/reinspeccion/${placa}/${concepto}/${planta}`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      const errMsg = await getErrorMessage(response, 'Error al consultar reinspección');
+      throw new Error(errMsg);
+    }
+    return await parseJsonResponse<any>(response);
+  },
   guardar: async (data: any) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/guardar`, {
       method: 'POST',

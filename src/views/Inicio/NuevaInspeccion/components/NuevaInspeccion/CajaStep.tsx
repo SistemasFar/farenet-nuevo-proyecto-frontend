@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Select from 'react-select';
 import { Search, XCircle, Frown, HelpCircle } from 'lucide-react';
 import { plantaSession, maestrosApi, inspeccionesApi } from '../../../../../services/api';
+import Swal from 'sweetalert2';
 
 interface CajaStepProps {
   maestros: any;
@@ -58,6 +59,9 @@ export function CajaStep({
 }: CajaStepProps) {
   const [listaDescuentos, setListaDescuentos] = useState<any[]>([]);
   const [showDescuentosModal, setShowDescuentosModal] = useState(false);
+  const [reinspeccionMensaje, setReinspeccionMensaje] = useState<string | null>(null);
+  const [isReinspeccionAplica, setIsReinspeccionAplica] = useState<boolean>(false);
+  const [isReinspeccionGratuita, setIsReinspeccionGratuita] = useState(false);
 
   const handleConsultar = async () => {
     if (validarCaja()) {
@@ -95,10 +99,64 @@ export function CajaStep({
 
           // Reiniciar posibles descuentos manuales aplicados
           setDocumentoDescuento('');
+
+          // ---------------------------------------------
+          // LÓGICA DE REINSPECCIÓN
+          // ---------------------------------------------
+          try {
+            const resReins = await inspeccionesApi.consultarReinspeccion(formCaja.placa, formCaja.concepto, planta.key);
+            if (resReins?.data?.aplica) {
+              const rData = resReins.data;
+              setIsReinspeccionAplica(true);
+              setReinspeccionMensaje(rData.mensaje || `¡Aplica a Reinspección! Documento anterior: ${rData.nrodocumentoreinspeccion} (${rData.porcentajedescuento}% dscto)`);
+              setFormCaja((prev: any) => ({ 
+                ...prev, 
+                nrodocumentoreinspeccion: rData.nrodocumentoreinspeccion,
+                concepto: rData.conceptoinspeccion_key || prev.concepto,
+                tipoAutorizacion: rData.tipoautorizacion_key || prev.tipoAutorizacion,
+                tipoCertificado: rData.tipocertificado_key || prev.tipoCertificado,
+                tipoInspeccion: rData.tipoinspeccion_key || prev.tipoInspeccion
+              }));
+              
+              if (rData.porcentajedescuento === 100) {
+                setDescuento(precios.precioBase);
+                setPrecioTotal(0);
+                setIsReinspeccionGratuita(true);
+                setDocumentoPago(''); // No se necesita boleta/factura si es gratis
+              } else {
+                const descCalc = precios.precioBase * (rData.porcentajedescuento / 100);
+                setDescuento(descCalc);
+                setPrecioTotal(precios.precioBase - descCalc);
+                setIsReinspeccionGratuita(false);
+              }
+            } else if (resReins?.data?.mensaje) {
+              setIsReinspeccionAplica(false);
+              setReinspeccionMensaje(resReins.data.mensaje);
+              setIsReinspeccionGratuita(false);
+              setFormCaja((prev: any) => ({ ...prev, nrodocumentoreinspeccion: null }));
+            } else {
+              setIsReinspeccionAplica(false);
+              setReinspeccionMensaje(null);
+              setIsReinspeccionGratuita(false);
+              setFormCaja((prev: any) => ({ ...prev, nrodocumentoreinspeccion: null }));
+            }
+          } catch (e) {
+            console.error("Error al consultar reinspeccion", e);
+            setIsReinspeccionAplica(false);
+            setReinspeccionMensaje(null);
+            setIsReinspeccionGratuita(false);
+            setFormCaja((prev: any) => ({ ...prev, nrodocumentoreinspeccion: null }));
+          }
+          // ---------------------------------------------
+
         }
       } catch (err: any) {
         console.error('Error calculando precio:', err);
-        alert(err.message === "PLACA DUPLICADA EN SISTEMA" ? "Esta placa ya pasó inspección hoy con el mismo concepto en esta planta. PLACA DUPLICADA EN SISTEMA." : err.message || 'Error en la consulta');
+        Swal.fire({
+          icon: 'warning',
+          title: 'Aviso',
+          text: err.message === "PLACA DUPLICADA EN SISTEMA" ? "Esta placa ya pasó inspección hoy con el mismo concepto en esta planta. PLACA DUPLICADA EN SISTEMA." : (err.message || 'Error en la consulta')
+        });
         setPrecioSubtotal(0);
         setDescuento(0);
         setPrecioTotal(0);
@@ -113,7 +171,11 @@ export function CajaStep({
   const handleBuscarDescuentos = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!documentoDescuento || !formCaja.concepto) {
-      alert("Ingrese documento y seleccione concepto");
+      Swal.fire({
+        icon: 'warning',
+        title: 'Atención',
+        text: 'Ingrese documento y seleccione concepto'
+      });
       return;
     }
     try {
@@ -124,11 +186,23 @@ export function CajaStep({
           setListaDescuentos(descuentos);
           setShowDescuentosModal(true);
         } else {
-          alert('No se encontraron promociones para este RUC/DNI');
+          Swal.fire({
+            icon: 'info',
+            iconHtml: '😢',
+            title: '¡Ups!',
+            text: 'No se encontraron promociones para este RUC/DNI',
+            customClass: {
+              icon: 'border-none text-4xl text-blue-500'
+            }
+          });
         }
       }
     } catch (err: any) {
-      alert(err.message || "Error al buscar descuentos");
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err.message || "Error al buscar descuentos"
+      });
     }
   };
 
@@ -269,10 +343,12 @@ export function CajaStep({
           type="button"
           onClick={() => {
             setFormCaja({
-              tipoPlaca: '', placa: '', concepto: '', categoria: '', tipoInspeccion: '', tipoCertificado: '', tipoAutorizacion: ''
+              tipoPlaca: '', placa: '', concepto: '', categoria: '', tipoInspeccion: '', tipoCertificado: '', tipoAutorizacion: '', nrodocumentoreinspeccion: null
             });
             setIsConsultado(false);
             setDocumentoDescuento('');
+            setReinspeccionMensaje(null);
+            setIsReinspeccionGratuita(false);
           }}
           className="flex items-center gap-2 rounded-lg bg-white border border-red-200 text-red-600 px-6 py-2.5 text-xs font-bold hover:bg-red-50 shadow-sm transition uppercase tracking-wide"
         >
@@ -281,15 +357,28 @@ export function CajaStep({
         </button>
       </div>
 
-      {isConsultado && (
+      {reinspeccionMensaje && (
+        <div className={`mt-4 p-4 rounded-lg border-2 shadow-md flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${isReinspeccionAplica ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-400'}`}>
+          <div className={`p-2 rounded-full ${isReinspeccionAplica ? 'bg-green-100' : 'bg-red-100'}`}>
+            <Search className={`w-5 h-5 ${isReinspeccionAplica ? 'text-green-700' : 'text-red-600'}`} />
+          </div>
+          <div>
+            <h4 className={`font-black uppercase text-sm ${isReinspeccionAplica ? 'text-green-800' : 'text-red-800'}`}>
+              {isReinspeccionAplica ? 'Inspección Vinculada' : 'Aviso de Reinspección'}
+            </h4>
+            <p className={`font-bold text-xs ${isReinspeccionAplica ? 'text-green-700' : 'text-red-700'}`}>
+              {reinspeccionMensaje}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isConsultado && !isReinspeccionGratuita && (
         <div className="mt-4 p-4 rounded-lg bg-[#f2cc11] border-2 border-[#e0bc0d] shadow-md">
           <div className="flex items-center gap-3 mb-3">
             <h4 className="text-[#052a79] font-black uppercase text-sm drop-shadow-sm">
               Buscar descuentos por: Código / DNI / RUC / Placa
             </h4>
-            <span className="text-red-600 font-black text-xs uppercase animate-pulse drop-shadow-sm bg-white/50 px-2 py-0.5 rounded">
-              POR HACER
-            </span>
           </div>
           <div className="flex gap-2">
             <input
@@ -346,7 +435,7 @@ export function CajaStep({
         </div>
       )}
 
-      {isConsultado && (
+      {isConsultado && !isReinspeccionGratuita && (
         <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-3">
             <h3 className="text-sm font-black text-[#052a79] uppercase tracking-wide">Resumen de Pago</h3>
@@ -377,6 +466,15 @@ export function CajaStep({
               <label className="text-[10px] font-black text-[#052a79] uppercase">Total (S/)</label>
               <input type="text" readOnly value={precioTotal.toFixed(2)} className="w-full rounded-lg border-2 border-[#052a79] bg-[#f4f9ff] px-3 py-2 text-lg font-black text-[#052a79] text-right outline-none shadow-inner" />
             </div>
+          </div>
+        </div>
+      )}
+
+      {isConsultado && isReinspeccionGratuita && (
+        <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-green-50 p-5 text-center">
+            <h3 className="text-lg font-black text-green-700 uppercase">Reinspección 100% Gratuita</h3>
+            <p className="text-green-600 text-sm font-bold mt-1">El monto a pagar es S/ 0.00. Puede continuar al siguiente paso sin requerir pago ni comprobante.</p>
           </div>
         </div>
       )}
@@ -420,7 +518,7 @@ export function CajaStep({
               <button
                 onClick={() => {
                   setFormCaja({
-                    tipoPlaca: '', placa: '', concepto: '', categoria: '', tipoInspeccion: '', tipoCertificado: '', tipoAutorizacion: ''
+                    tipoPlaca: '', placa: '', concepto: '', categoria: '', tipoInspeccion: '', tipoCertificado: '', tipoAutorizacion: '', nrodocumentoreinspeccion: null
                   });
                   setIsConsultado(false);
                   setPrecioSubtotal(0);
@@ -428,6 +526,8 @@ export function CajaStep({
                   setPrecioTotal(0);
                   setDocumentoPago('');
                   setShowAnularModal(false);
+                  setReinspeccionMensaje(null);
+                  setIsReinspeccionGratuita(false);
                 }}
                 className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-md shadow-red-200 transition-colors"
               >
