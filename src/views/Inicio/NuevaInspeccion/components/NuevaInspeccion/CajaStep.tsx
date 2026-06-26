@@ -88,12 +88,17 @@ export function CajaStep({
           setPrecioSubtotal(precios.precioBase);
           setDescuento(precios.descuento);
           setPrecioTotal(precios.total);
+          
+          if (data.vehiculo?.tipoDocumentoSugerido) {
+            setDocumentoPago(data.vehiculo.tipoDocumentoSugerido);
+          }
+
           // Reiniciar posibles descuentos manuales aplicados
           setDocumentoDescuento('');
         }
       } catch (err: any) {
         console.error('Error calculando precio:', err);
-        alert(err.message || 'Error en la consulta');
+        alert(err.message === "PLACA DUPLICADA EN SISTEMA" ? "Esta placa ya pasó inspección hoy con el mismo concepto en esta planta. PLACA DUPLICADA EN SISTEMA." : err.message || 'Error en la consulta');
         setPrecioSubtotal(0);
         setDescuento(0);
         setPrecioTotal(0);
@@ -130,6 +135,7 @@ export function CajaStep({
   const aplicarDescuento = (desc: any) => {
     setDescuento(desc.monto);
     setPrecioTotal(precioSubtotal - desc.monto);
+    setFormCaja({ ...formCaja, descuentoObj: desc });
     setShowDescuentosModal(false);
   };
 

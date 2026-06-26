@@ -11,7 +11,7 @@ const config: Config = {
         farenet: {
           azul: '#0033a0',   // Azul marino corporativo
           rojo: '#e4002b',   // Rojo de acento
-          gris: '#dbc14b'    // Fondo general limpio
+          gris: '#fbf30dff'    // Fondo general limpio
         }
       }
     },

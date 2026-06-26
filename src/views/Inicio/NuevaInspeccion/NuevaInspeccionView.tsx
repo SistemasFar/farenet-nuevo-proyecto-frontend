@@ -61,7 +61,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
   const [documentoPago, setDocumentoPago] = useState<string>('');
 
   // Form State (Caja)
-  const [formCaja, setFormCaja] = useState({
+  const [formCaja, setFormCaja] = useState<any>({
     tipoPlaca: '',
     placa: '',
     concepto: '',
@@ -368,6 +368,15 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
         };
         const res = await inspeccionesApi.guardar(savePayload);
         const finalId = res?.data?.data?.nroInspeccion || res?.data?.nroInspeccion || 'Generado con éxito';
+        
+        if (formCaja.descuentoObj && formCaja.descuentoObj.source_table && formCaja.descuentoObj.source_id) {
+          try {
+            await inspeccionesApi.consumirDescuento(formCaja.descuentoObj.source_table, formCaja.descuentoObj.source_id);
+          } catch (e) {
+            console.error("No se pudo consumir el descuento", e);
+          }
+        }
+
         Swal.fire({
           icon: 'success',
           title: '¡Guardado!',
