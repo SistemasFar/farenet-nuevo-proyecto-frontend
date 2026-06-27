@@ -3,7 +3,7 @@ import Select from 'react-select';
 import { Search, XCircle, Frown, HelpCircle } from 'lucide-react';
 import { plantaSession, maestrosApi, inspeccionesApi } from '../../../../../services/api';
 import Swal from 'sweetalert2';
-
+//hola
 interface CajaStepProps {
   maestros: any;
   formCaja: any;
@@ -124,12 +124,12 @@ export function CajaStep({
               }
             });
           }
-          
+
           const precios = data.precios;
           setPrecioSubtotal(precios.precioBase);
           setDescuento(precios.descuento);
           setPrecioTotal(precios.total);
-          
+
           if (data.vehiculo?.tipoDocumentoSugerido) {
             setDocumentoPago(data.vehiculo.tipoDocumentoSugerido);
           }
@@ -169,7 +169,7 @@ export function CajaStep({
               aseguradora: data.vehiculo.aseguradora_key || '',
               inicioSoat: data.vehiculo.fechiniciotarjetapropiedad ? data.vehiculo.fechiniciotarjetapropiedad.split('T')[0] : '',
               finSoat: data.vehiculo.fechfintarjetapropiedad ? data.vehiculo.fechfintarjetapropiedad.split('T')[0] : '',
-              
+
               // Propietario
               nroDocProp: data.vehiculo.prop_nrodoc || '',
               tipoDocProp: data.vehiculo.prop_tipodoc || '',
@@ -198,15 +198,15 @@ export function CajaStep({
               const rData = resReins.data;
               setIsReinspeccionAplica(true);
               setReinspeccionMensaje(rData.mensaje || `¡Aplica a Reinspección! Documento anterior: ${rData.nrodocumentoreinspeccion} (${rData.porcentajedescuento}% dscto)`);
-              setFormCaja((prev: any) => ({ 
-                ...prev, 
+              setFormCaja((prev: any) => ({
+                ...prev,
                 nrodocumentoreinspeccion: rData.nrodocumentoreinspeccion,
                 concepto: rData.conceptoinspeccion_key || prev.concepto,
                 tipoAutorizacion: rData.tipoautorizacion_key || prev.tipoAutorizacion,
                 tipoCertificado: rData.tipocertificado_key || prev.tipoCertificado,
                 tipoInspeccion: rData.tipoinspeccion_key || prev.tipoInspeccion
               }));
-              
+
               if (rData.porcentajedescuento === 100) {
                 setDescuento(precios.precioBase);
                 setPrecioTotal(0);
@@ -328,107 +328,107 @@ export function CajaStep({
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Placa *</label>
-          <Select
-            options={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })) || []}
-            value={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoPlaca?.toString()) || null}
-            onChange={(o) => handleSelectChange('tipoPlaca', o)}
-            placeholder="Seleccione..."
-            isClearable
-            styles={customSelectStyles}
-            isDisabled={isConsultado}
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Placa *</label>
+              <Select
+                options={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })) || []}
+                value={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoPlaca?.toString()) || null}
+                onChange={(o) => handleSelectChange('tipoPlaca', o)}
+                placeholder="Seleccione..."
+                isClearable
+                styles={customSelectStyles}
+                isDisabled={isConsultado}
+              />
+            </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-600 uppercase">Placa *</label>
-          <input
-            type="text"
-            name="placa"
-            value={formCaja.placa}
-            onChange={handleCajaChange}
-            onBlur={handlePlacaBlur}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handlePlacaBlur();
-              }
-            }}
-            placeholder="Ej: ABC-123"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
-            maxLength={getPlacaMaxLength()}
-            disabled={isConsultado}
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">Placa *</label>
+              <input
+                type="text"
+                name="placa"
+                value={formCaja.placa}
+                onChange={handleCajaChange}
+                onBlur={handlePlacaBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handlePlacaBlur();
+                  }
+                }}
+                placeholder="Ej: ABC-123"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
+                maxLength={getPlacaMaxLength()}
+                disabled={isConsultado}
+              />
+            </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-600 uppercase">Concepto *</label>
-          <Select
-            options={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })) || []}
-            value={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })).find((o: any) => o.value?.toString() === formCaja.concepto?.toString()) || null}
-            onChange={(o) => handleSelectChange('concepto', o)}
-            placeholder="Seleccione..."
-            isClearable
-            styles={customSelectStyles}
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">Concepto *</label>
+              <Select
+                options={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })) || []}
+                value={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })).find((o: any) => o.value?.toString() === formCaja.concepto?.toString()) || null}
+                onChange={(o) => handleSelectChange('concepto', o)}
+                placeholder="Seleccione..."
+                isClearable
+                styles={customSelectStyles}
+              />
+            </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-600 uppercase">Categoría *</label>
-          <Select
-            options={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })) || []}
-            value={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })).find((o: any) => o.value?.toString() === formCaja.categoria?.toString()) || null}
-            onChange={(o) => handleSelectChange('categoria', o)}
-            placeholder="Seleccione..."
-            isClearable
-            styles={customSelectStyles}
-            isDisabled={isConsultado}
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">Categoría *</label>
+              <Select
+                options={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })) || []}
+                value={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })).find((o: any) => o.value?.toString() === formCaja.categoria?.toString()) || null}
+                onChange={(o) => handleSelectChange('categoria', o)}
+                placeholder="Seleccione..."
+                isClearable
+                styles={customSelectStyles}
+                isDisabled={isConsultado}
+              />
+            </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Inspección *</label>
-          <Select
-            options={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })) || []}
-            value={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoInspeccion?.toString()) || null}
-            onChange={(o) => handleSelectChange('tipoInspeccion', o)}
-            placeholder="Seleccione..."
-            isClearable
-            styles={customSelectStyles}
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Inspección *</label>
+              <Select
+                options={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })) || []}
+                value={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoInspeccion?.toString()) || null}
+                onChange={(o) => handleSelectChange('tipoInspeccion', o)}
+                placeholder="Seleccione..."
+                isClearable
+                styles={customSelectStyles}
+              />
+            </div>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-600 uppercase">Tipo Certificado *</label>
-          <Select
-            options={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })) || []}
-            value={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoCertificado?.toString()) || null}
-            onChange={(o) => handleSelectChange('tipoCertificado', o)}
-            placeholder="Seleccione..."
-            isClearable
-            styles={customSelectStyles}
-          />
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Certificado *</label>
+              <Select
+                options={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })) || []}
+                value={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoCertificado?.toString()) || null}
+                onChange={(o) => handleSelectChange('tipoCertificado', o)}
+                placeholder="Seleccione..."
+                isClearable
+                styles={customSelectStyles}
+              />
+            </div>
 
-        <div className="flex flex-col gap-1.5 md:col-span-2">
-          <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización</label>
-          <Select
-            options={[
-              { value: '', label: 'NINGUNO / EN BLANCO' },
-              ...(maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })) || [])
-            ]}
-            value={maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoAutorizacion?.toString()) || null}
-            onChange={(o) => setFormCaja({ ...formCaja, tipoAutorizacion: o?.value || '' })}
-            placeholder="Seleccione..."
-            isClearable
-            styles={customSelectStyles}
-            menuPlacement="top"
-            menuPortalTarget={document.body}
-          />
-        </div>
+            <div className="flex flex-col gap-1.5 md:col-span-2">
+              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización</label>
+              <Select
+                options={[
+                  { value: '', label: 'NINGUNO / EN BLANCO' },
+                  ...(maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })) || [])
+                ]}
+                value={maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoAutorizacion?.toString()) || null}
+                onChange={(o) => setFormCaja({ ...formCaja, tipoAutorizacion: o?.value || '' })}
+                placeholder="Seleccione..."
+                isClearable
+                styles={customSelectStyles}
+                menuPlacement="top"
+                menuPortalTarget={document.body}
+              />
+            </div>
 
-      </div>
+          </div>
         );
       })()}
 
@@ -525,7 +525,7 @@ export function CajaStep({
                 </div>
                 <div className="flex items-center gap-3 shrink-0 border-l border-slate-100 pl-4">
                   <span className="font-black text-red-600 text-sm">- S/ {desc.monto.toFixed(2)}</span>
-                  <button 
+                  <button
                     onClick={() => aplicarDescuento(desc)}
                     className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm"
                   >
