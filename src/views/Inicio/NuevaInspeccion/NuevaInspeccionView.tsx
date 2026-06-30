@@ -75,6 +75,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
   const [maestrosPago, setMaestrosPago] = useState<MaestrosPagoResponse['data'] | null>(null);
   const [pagosAgregados, setPagosAgregados] = useState<any[]>([]);
   const [pagoTab, setPagoTab] = useState<'EFECTIVO' | 'TARJETA' | 'BANCO'>('EFECTIVO');
+  const [disablePagoTabs, setDisablePagoTabs] = useState(false);
 
   // Form State (Pago)
   const [formPago, setFormPago] = useState({
@@ -447,7 +448,67 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
 
   const montoPendiente = Math.max(0, precioTotal - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
 
-  const handleAgregarPago = () => {
+  useEffect(() => {
+    if (currentStepIndex === 1) {
+      const nombreCampana = formCaja.descuentoObj?.campana || formCaja.descuentoObj?.nombre;
+      if (formCaja.descuentoObj && nombreCampana) {
+        const descName = nombreCampana.toUpperCase();
+        if (descName.includes('CUPONIDAD')) {
+          setPagoTab('TARJETA');
+          setDisablePagoTabs(true);
+          const cuponidadTarjeta = maestrosPago?.tarjetas?.find((t: any) => t.nombre.toUpperCase().includes('CUPONIDAD'));
+          if (cuponidadTarjeta) {
+            const exactCode = formCaja.descuentoObj.uuid || formCaja.descuentoObj.documentoBusqueda || '';
+            const newFormPago = {
+              ...formPago,
+              tarjetaKey: cuponidadTarjeta.key,
+              importe: precioTotal.toFixed(2),
+              nroOperacion: exactCode
+            };
+            setFormPago(newFormPago);
+
+            // Auto-agregar el pago si no existe
+            const isAlreadyAdded = pagosAgregados.some((p: any) => p.nroOperacion === exactCode);
+            if (!isAlreadyAdded) {
+              const autoAdd = async () => {
+                const code = exactCode.trim();
+                try {
+                  if (code) {
+                    await inspeccionesApi.validarCuponidad(code);
+                  }
+                  
+                  setPagosAgregados((prev: any[]) => {
+                    const exists = prev.some(p => p.nroOperacion === code);
+                    if (exists) return prev;
+                    return [...prev, {
+                      tipo: 'TARJETA',
+                      ...newFormPago,
+                      importe: parseFloat(newFormPago.importe).toFixed(2),
+                      nroOperacion: code
+                    }];
+                  });
+                } catch (err: any) {
+                  alert('Error automático: ' + (err.message || 'Código de Cuponidad inválido.'));
+                }
+              };
+              autoAdd();
+            }
+          }
+          return; 
+        }
+      }
+      
+      // Si no es Cuponidad, pero el monto pendiente es 0 (ej. Cortesía)
+      if (montoPendiente === 0) {
+        setDisablePagoTabs(true);
+        setFormPago((prev: any) => ({ ...prev, importe: '0' }));
+      } else {
+        setDisablePagoTabs(false);
+      }
+    }
+  }, [currentStepIndex, formCaja.descuentoObj, maestrosPago, precioTotal]);
+
+  const handleAgregarPago = async () => {
     if (!formPago.importe || isNaN(parseFloat(formPago.importe)) || parseFloat(formPago.importe) <= 0) {
       alert('Ingrese un importe válido mayor a 0.');
       return;
@@ -463,15 +524,39 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
     } else if (pagoTab === 'TARJETA') {
       const selected = maestrosPago?.tarjetas?.find(t => t.key === formPago.tarjetaKey);
       const nameUpper = selected ? selected.nombre.toUpperCase() : '';
-      const isYapePlin = nameUpper.includes('YAPE') || nameUpper.includes('PLIN') || nameUpper.includes('CUPONIDAD');
+      const isCuponidad = nameUpper.includes('CUPONIDAD');
+      const isYapePlin = nameUpper.includes('YAPE') || nameUpper.includes('PLIN');
+      const isPagoWeb = nameUpper.includes('PAGO WEB');
+      const isEspecial = isCuponidad || isYapePlin || isPagoWeb;
 
       if (!formPago.tarjetaKey || !formPago.nroOperacion) {
         alert('Complete los campos obligatorios de la tarjeta.');
         return;
       }
-      if (!isYapePlin && !formPago.digitosTarjeta) {
+      if (!isEspecial && !formPago.digitosTarjeta) {
         alert('Ingrese los últimos 4 dígitos de la tarjeta.');
         return;
+      }
+
+      if (isCuponidad) {
+        if (formPago.nroOperacion.trim().length !== 10) {
+          alert('El Nro de Cuponidad ingresado no es correcto. Debe tener exactamente 10 caracteres.');
+          return;
+        }
+        try {
+          await inspeccionesApi.validarCuponidad(formPago.nroOperacion.trim());
+        } catch (err: any) {
+          alert(err.message || 'El código de Cuponidad ya fue usado o es inválido.');
+          return;
+        }
+      }
+
+      if (isYapePlin) {
+        const len = formPago.nroOperacion.trim().length;
+        if (len < 4 || len > 10) {
+          alert('El Nro de Operación de Yape/Plin debe tener entre 4 y 10 dígitos.');
+          return;
+        }
       }
     }
 
@@ -629,6 +714,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
               eliminarPago={eliminarPago}
               editingPagoIndex={editingPagoIndex}
               setEditingPagoIndex={setEditingPagoIndex}
+              disablePagoTabs={disablePagoTabs}
             />
           </div>
         )}

@@ -478,6 +478,17 @@ export const inspeccionesApi = {
     if (!response.ok) throw new Error('Error al consultar vehículo rápido');
     return await parseJsonResponse<any>(response);
   },
+  validarCuponidad: async (codigo: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/cuponidad/validar/${codigo}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'Error al validar código de Cuponidad');
+    }
+    return await parseJsonResponse<any>(response);
+  },
   consultarVehiculoYCaja: async (data: any) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/consultar`, {
       method: 'POST',
@@ -490,8 +501,12 @@ export const inspeccionesApi = {
     }
     return await parseJsonResponse<any>(response);
   },
-  buscarDescuentos: async (documento: string, concepto: string) => {
-    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/descuentos?documento=${documento}&concepto=${concepto}`, {
+  buscarDescuentos: async (documento: string, concepto: string, placaContexto?: string, soloDniCodigo?: boolean) => {
+    let url = `${BASE_URL}/inspecciones/descuentos?documento=${documento}&concepto=${concepto}`;
+    if (placaContexto) url += `&placaContexto=${placaContexto}`;
+    if (soloDniCodigo !== undefined) url += `&soloDniCodigo=${soloDniCodigo}`;
+
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
     });

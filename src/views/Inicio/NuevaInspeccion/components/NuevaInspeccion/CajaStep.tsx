@@ -118,20 +118,9 @@ export function CajaStep({
 
         if (res.status === 'success') {
           const data = res.data;
+          let vehiculoEncontrado = false;
           if (data.vehiculo && data.mensaje && data.mensaje.includes('encontrado')) {
-            const isMtc = data.mensaje.includes('MTC');
-            Swal.fire({
-              toast: true,
-              position: 'top-end',
-              icon: 'success',
-              title: isMtc ? 'ENCONTRADA EN MTC' : 'PLACA ENCONTRADA',
-              text: isMtc ? 'DATOS EXTRAÍDOS DEL MTC' : 'REVISITA DE CLIENTE REGISTRADO',
-              showConfirmButton: false,
-              timer: 3000,
-              customClass: {
-                popup: 'bg-green-50'
-              }
-            });
+            vehiculoEncontrado = true;
           }
 
           const precios = data.precios;
@@ -139,6 +128,7 @@ export function CajaStep({
           setDescuento(precios.descuento);
           setPrecioTotal(precios.total);
 
+          // REINSPECCIÓN MODAL (Se mantiene como modal central)
           if (data.mensaje && data.mensaje.includes('[Reinspección]')) {
             Swal.fire({
               icon: 'info',
@@ -146,16 +136,6 @@ export function CajaStep({
               text: data.mensaje,
               confirmButtonText: 'Entendido',
               confirmButtonColor: '#3085d6'
-            });
-          } else if (data.mensaje && data.mensaje.includes('Descuento automático')) {
-            Swal.fire({
-              toast: true,
-              position: 'top-end',
-              icon: 'success',
-              title: 'DESCUENTO APLICADO',
-              text: 'Se encontró un descuento automático para esta placa',
-              showConfirmButton: false,
-              timer: 4000
             });
           }
 
@@ -267,6 +247,44 @@ export function CajaStep({
           }
           // ---------------------------------------------
 
+          // ---------------------------------------------
+          // AUTO-MOSTRAR DESCUENTOS SI HAY DISPONIBLES
+          // ---------------------------------------------
+          let hasDescuentos = false;
+          if (data.descuentosDisponibles && data.descuentosDisponibles.length > 0) {
+            setListaDescuentos(data.descuentosDisponibles);
+            setShowDescuentosModal(true);
+            hasDescuentos = true;
+          }
+          // ---------------------------------------------
+
+          // ---------------------------------------------
+          // MOSTRAR TOAST COMBINADO PERMANENTE
+          // ---------------------------------------------
+          let toastHtml = '';
+          if (vehiculoEncontrado) {
+            const isMtc = data.mensaje.includes('MTC');
+            const titulo = isMtc ? 'ENCONTRADA EN MTC' : 'PLACA ENCONTRADA';
+            const texto = isMtc ? 'DATOS EXTRAÍDOS DEL MTC' : 'REVISITA DE CLIENTE REGISTRADO';
+            toastHtml += `<div style="margin-bottom: 8px; text-align: left;"><strong>✅ ${titulo}</strong><br/>${texto}</div>`;
+          }
+          if (hasDescuentos) {
+            toastHtml += `<div style="text-align: left;"><strong>🎁 PROMOCIONES ENCONTRADAS</strong><br/>Se encontraron descuentos disponibles.</div>`;
+          }
+
+          if (toastHtml) {
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'info',
+              html: toastHtml,
+              showConfirmButton: false,
+              showCloseButton: true,
+              timer: undefined // Permanente
+            });
+          }
+          // ---------------------------------------------
+
         }
       } catch (err: any) {
         console.error('Error calculando precio:', err);
@@ -323,13 +341,45 @@ export function CajaStep({
       return;
     }
 
+    // Prevenir búsqueda de placas en esta barra manual
+    const esFormatoPlaca = /^[a-zA-Z0-9]{2,3}-[a-zA-Z0-9]{3,4}$/.test(documentoDescuento.trim());
+    if (esFormatoPlaca) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Búsqueda no permitida',
+        text: 'Los descuentos vehiculares ya se buscan automáticamente con el botón azul "Consultar". Usa esta barra únicamente para buscar por DNI, RUC o Códigos Promocionales.',
+        confirmButtonColor: '#3085d6'
+      });
+      return;
+    }
+
     try {
-      const res = await inspeccionesApi.buscarDescuentos(documentoDescuento, formCaja.concepto);
+      const res = await inspeccionesApi.buscarDescuentos(documentoDescuento, formCaja.concepto, formCaja.placa, true);
       if (res.status === 'success') {
-        const descuentos = res.data;
-        if (descuentos.length > 0) {
-          setListaDescuentos(descuentos);
+        const descuentosNuevos = res.data;
+        
+        if (descuentosNuevos.length > 0) {
+          // Filtrar para no agregar duplicados (basado en source_id)
+          setListaDescuentos(prevLista => {
+            const listaCombinada = [...prevLista];
+            descuentosNuevos.forEach((nuevo: any) => {
+              if (!listaCombinada.some(item => item.source_id === nuevo.source_id)) {
+                listaCombinada.push(nuevo);
+              }
+            });
+            return listaCombinada;
+          });
+          
           setShowDescuentosModal(true);
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Nuevos descuentos añadidos',
+            text: 'Se han sumado a la lista disponible.',
+            showConfirmButton: false,
+            timer: 3000
+          });
         } else {
           Swal.fire({
             icon: 'info',
@@ -353,8 +403,8 @@ export function CajaStep({
 
   const aplicarDescuento = (desc: any) => {
     setDescuento(desc.monto);
-    setPrecioTotal(precioSubtotal - desc.monto);
-    setFormCaja({ ...formCaja, descuentoObj: desc });
+    setPrecioTotal(Math.max(0, precioSubtotal - desc.monto));
+    setFormCaja({ ...formCaja, descuentoObj: { ...desc, monto: desc.monto, documentoBusqueda: documentoDescuento } });
     // Removido setShowDescuentosModal(false) para que la lista siga visible
   };
 

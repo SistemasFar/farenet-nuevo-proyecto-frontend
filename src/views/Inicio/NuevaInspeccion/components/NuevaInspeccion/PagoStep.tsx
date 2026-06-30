@@ -16,6 +16,7 @@ interface PagoStepProps {
   eliminarPago: (index: number) => void;
   editingPagoIndex?: number | null;
   setEditingPagoIndex?: (index: number | null) => void;
+  disablePagoTabs?: boolean;
 }
 
 export function PagoStep({
@@ -31,7 +32,8 @@ export function PagoStep({
   pagosAgregados,
   eliminarPago,
   editingPagoIndex = null,
-  setEditingPagoIndex
+  setEditingPagoIndex,
+  disablePagoTabs = false
 }: PagoStepProps) {
 
   const editarPago = (idx: number) => {
@@ -96,7 +98,8 @@ export function PagoStep({
                 if (setEditingPagoIndex) setEditingPagoIndex(null);
               }
             }}
-            className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${pagoTab === tab ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            disabled={disablePagoTabs}
+            className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${pagoTab === tab ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'} ${disablePagoTabs ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {tab}
           </button>
@@ -118,6 +121,7 @@ export function PagoStep({
                   onChange={(o) => setFormPago({ ...formPago, tarjetaKey: o?.value || '' })}
                   placeholder="Seleccione..."
                   styles={customSelectStyles}
+                  isDisabled={disablePagoTabs}
                 />
               </div>
               <div className="flex flex-col gap-1.5 md:col-span-1">
