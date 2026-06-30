@@ -61,6 +61,7 @@ export function CajaStep({
 }: CajaStepProps) {
   const [listaDescuentos, setListaDescuentos] = useState<any[]>([]);
   const [showDescuentosModal, setShowDescuentosModal] = useState(false);
+  const [hasAutoFetchedDescuentos, setHasAutoFetchedDescuentos] = useState(false);
   const [reinspeccionMensaje, setReinspeccionMensaje] = useState<string | null>(null);
   const [isReinspeccionAplica, setIsReinspeccionAplica] = useState<boolean>(false);
   const [isReinspeccionGratuita, setIsReinspeccionGratuita] = useState(false);
@@ -90,7 +91,14 @@ export function CajaStep({
   };
 
   const handleConsultar = async () => {
-    if (formCaja.placa && formCaja.concepto) {
+    if (
+      formCaja.placa && 
+      formCaja.concepto && 
+      formCaja.tipoPlaca && 
+      formCaja.categoria && 
+      formCaja.tipoInspeccion && 
+      formCaja.tipoCertificado
+    ) {
       try {
         const planta = plantaSession.obtener();
         if (!planta?.key) {
@@ -111,12 +119,13 @@ export function CajaStep({
         if (res.status === 'success') {
           const data = res.data;
           if (data.vehiculo && data.mensaje && data.mensaje.includes('encontrado')) {
+            const isMtc = data.mensaje.includes('MTC');
             Swal.fire({
               toast: true,
               position: 'top-end',
               icon: 'success',
-              title: 'PLACA ENCONTRADA',
-              text: 'REVISITA DE CLIENTE REGISTRADO',
+              title: isMtc ? 'ENCONTRADA EN MTC' : 'PLACA ENCONTRADA',
+              text: isMtc ? 'DATOS EXTRAÍDOS DEL MTC' : 'REVISITA DE CLIENTE REGISTRADO',
               showConfirmButton: false,
               timer: 3000,
               customClass: {
@@ -129,6 +138,26 @@ export function CajaStep({
           setPrecioSubtotal(precios.precioBase);
           setDescuento(precios.descuento);
           setPrecioTotal(precios.total);
+
+          if (data.mensaje && data.mensaje.includes('[Reinspección]')) {
+            Swal.fire({
+              icon: 'info',
+              title: 'REINSPECCIÓN GRATUITA',
+              text: data.mensaje,
+              confirmButtonText: 'Entendido',
+              confirmButtonColor: '#3085d6'
+            });
+          } else if (data.mensaje && data.mensaje.includes('Descuento automático')) {
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'success',
+              title: 'DESCUENTO APLICADO',
+              text: 'Se encontró un descuento automático para esta placa',
+              showConfirmButton: false,
+              timer: 4000
+            });
+          }
 
           if (data.vehiculo?.tipoDocumentoSugerido) {
             setDocumentoPago(data.vehiculo.tipoDocumentoSugerido);
@@ -253,24 +282,47 @@ export function CajaStep({
         setIsConsultado(true);
       }
     } else {
-      if (!formCaja.placa || !formCaja.concepto) {
-        alert('Para consultar, ingrese la Placa y seleccione un Concepto.');
-      } else {
-        setShowCamposVaciosModal(true);
-      }
+      setShowCamposVaciosModal(true);
     }
   };
+
+  React.useEffect(() => {
+    if (formCaja.descuentoObj && !hasAutoFetchedDescuentos && formCaja.placa && formCaja.concepto) {
+      setHasAutoFetchedDescuentos(true);
+      
+      const fetchList = async () => {
+        try {
+          // If a draft is loaded with a discount, fetch its list to display in the modal
+          // Determine the search query (documentoDescuento or placa)
+          let query = documentoDescuento;
+          if (!query) {
+             query = formCaja.descuentoObj.documento || formCaja.placa;
+             setDocumentoDescuento(query);
+          }
+          const res = await inspeccionesApi.buscarDescuentos(query, formCaja.concepto);
+          if (res.status === 'success' && res.data.length > 0) {
+            setListaDescuentos(res.data);
+            setShowDescuentosModal(true);
+          }
+        } catch (err) {
+          console.error("Error auto-fetching descuentos para borrador:", err);
+        }
+      };
+      fetchList();
+    }
+  }, [formCaja.descuentoObj, formCaja.placa, formCaja.concepto, hasAutoFetchedDescuentos, documentoDescuento, setDocumentoDescuento]);
 
   const handleBuscarDescuentos = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!documentoDescuento || !formCaja.concepto) {
       Swal.fire({
         icon: 'warning',
-        title: 'Atención',
-        text: 'Ingrese documento y seleccione concepto'
+        title: 'Faltan datos',
+        text: 'Debe seleccionar un concepto e ingresar el documento a buscar'
       });
       return;
     }
+
     try {
       const res = await inspeccionesApi.buscarDescuentos(documentoDescuento, formCaja.concepto);
       if (res.status === 'success') {
@@ -303,7 +355,7 @@ export function CajaStep({
     setDescuento(desc.monto);
     setPrecioTotal(precioSubtotal - desc.monto);
     setFormCaja({ ...formCaja, descuentoObj: desc });
-    setShowDescuentosModal(false);
+    // Removido setShowDescuentosModal(false) para que la lista siga visible
   };
 
   return (
@@ -324,6 +376,10 @@ export function CajaStep({
           if (nombre.includes('EXTRANJER')) return 7;
           return 17; // default max
         };
+
+        const calcTotal = precioSubtotal - descuento;
+        const calcBaseImponible = calcTotal / 1.18;
+        const calcIgv = calcTotal - calcBaseImponible;
 
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -518,22 +574,29 @@ export function CajaStep({
             Seleccione el descuento a aplicar para el documento <span className="font-bold text-slate-900 bg-amber-100 px-1.5 py-0.5 rounded">{documentoDescuento}</span>:
           </p>
           <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
-            {listaDescuentos.map((desc: any) => (
-              <div key={desc.id} className="flex items-center justify-between p-3 rounded border border-slate-200 bg-white hover:border-amber-400 hover:shadow-sm transition-all group">
-                <div className="flex-1 pr-4">
-                  <p className="font-bold text-[#052a79] text-xs uppercase leading-tight group-hover:text-amber-600 transition-colors">{desc.campana}</p>
+            {listaDescuentos.map((desc: any) => {
+              const isApplied = formCaja.descuentoObj?.source_id === desc.source_id && formCaja.descuentoObj?.source_table === desc.source_table;
+              return (
+                <div key={desc.id || `${desc.source_table}-${desc.source_id}`} className={`flex items-center justify-between p-3 rounded border transition-all group ${isApplied ? 'border-green-500 bg-green-50 shadow-md ring-1 ring-green-400' : 'border-slate-200 bg-white hover:border-amber-400 hover:shadow-sm'}`}>
+                  <div className="flex-1 pr-4">
+                    <p className={`font-bold text-xs uppercase leading-tight transition-colors ${isApplied ? 'text-green-800' : 'text-[#052a79] group-hover:text-amber-600'}`}>
+                      {desc.campana}
+                      {isApplied && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-200 text-green-800">ACTIVO</span>}
+                    </p>
+                  </div>
+                  <div className={`flex items-center gap-3 shrink-0 border-l pl-4 ${isApplied ? 'border-green-200' : 'border-slate-100'}`}>
+                    <span className="font-black text-red-600 text-sm">- S/ {desc.monto.toFixed(2)}</span>
+                    <button
+                      onClick={() => aplicarDescuento(desc)}
+                      disabled={isApplied}
+                      className={`font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm ${isApplied ? 'bg-green-600 text-white cursor-not-allowed opacity-80' : 'bg-amber-400 hover:bg-amber-500 text-amber-950'}`}
+                    >
+                      {isApplied ? 'Aplicado' : 'Aplicar'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 shrink-0 border-l border-slate-100 pl-4">
-                  <span className="font-black text-red-600 text-sm">- S/ {desc.monto.toFixed(2)}</span>
-                  <button
-                    onClick={() => aplicarDescuento(desc)}
-                    className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm"
-                  >
-                    Aplicar
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -543,7 +606,7 @@ export function CajaStep({
           <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-3">
             <h3 className="text-sm font-black text-[#052a79] uppercase tracking-wide">Resumen de Pago</h3>
           </div>
-          <div className="p-5 bg-white grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+          <div className="p-5 bg-white grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
             <div className="flex flex-col gap-1.5 md:col-span-1">
               <label className="text-[10px] font-bold text-slate-500 uppercase">Documento</label>
               <Select
@@ -558,11 +621,15 @@ export function CajaStep({
               />
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">Subtotal (S/)</label>
-              <input type="text" readOnly value={precioSubtotal.toFixed(2)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 text-right outline-none" />
+              <label className="text-[10px] font-bold text-slate-500 uppercase">Base Imponible (S/)</label>
+              <input type="text" readOnly value={(precioSubtotal > 0 ? (precioSubtotal - descuento) / 1.18 : 0).toFixed(2)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 text-right outline-none" />
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">Descuento (S/)</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase">IGV 18% (S/)</label>
+              <input type="text" readOnly value={(precioSubtotal > 0 ? (precioSubtotal - descuento) - ((precioSubtotal - descuento) / 1.18) : 0).toFixed(2)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 text-right outline-none" />
+            </div>
+            <div className="flex flex-col gap-1.5 md:col-span-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase">Dscto. (S/)</label>
               <input type="text" readOnly value={descuento.toFixed(2)} className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 text-right outline-none" />
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-1">
