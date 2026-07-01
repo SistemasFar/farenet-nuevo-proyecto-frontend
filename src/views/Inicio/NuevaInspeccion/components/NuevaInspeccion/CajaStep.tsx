@@ -342,7 +342,7 @@ export function CajaStep({
     }
 
     // Prevenir búsqueda de placas en esta barra manual
-    const esFormatoPlaca = /^[a-zA-Z0-9]{2,3}-[a-zA-Z0-9]{3,4}$/.test(documentoDescuento.trim());
+    const esFormatoPlaca = /^([A-Za-z]{2,3}-?\d{3,4}|\d{3,4}-?[A-Za-z]{2,3}|[A-Za-z0-9]{3}-?\d{3})$/.test(documentoDescuento.trim().toUpperCase());
     if (esFormatoPlaca) {
       Swal.fire({
         icon: 'warning',
