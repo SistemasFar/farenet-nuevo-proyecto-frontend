@@ -502,6 +502,10 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       if (montoPendiente === 0) {
         setDisablePagoTabs(true);
         setFormPago((prev: any) => ({ ...prev, importe: '0' }));
+        // Si el precio total es 0 (Cortesía total), asegurarnos de no tener pagos "basura"
+        if (precioTotal === 0 && pagosAgregados.length > 0) {
+          setPagosAgregados([]);
+        }
       } else {
         setDisablePagoTabs(false);
       }

@@ -402,9 +402,25 @@ export function CajaStep({
   };
 
   const aplicarDescuento = (desc: any) => {
-    setDescuento(desc.monto);
-    setPrecioTotal(Math.max(0, precioSubtotal - desc.monto));
-    setFormCaja({ ...formCaja, descuentoObj: { ...desc, monto: desc.monto, documentoBusqueda: documentoDescuento } });
+    let finalPrecioTotal = Math.max(0, precioSubtotal - desc.monto);
+    let finalDescuento = desc.monto;
+    
+    const nombreCampana = (desc.campana || desc.nombre || '').toUpperCase();
+    
+    // Si es Cuponidad, el monto del descuento (ej: 84.90) es el PRECIO FINAL a facturar
+    if (nombreCampana.includes('CUPONIDAD')) {
+      finalPrecioTotal = desc.monto; // La boleta sale por S/ 84.90
+      finalDescuento = Math.max(0, precioSubtotal - desc.monto); // El descuento real aplicado es la diferencia
+    }
+    // Si es Cortesía, el descuento es del 100%, total a pagar = 0
+    else if (nombreCampana.includes('CORTESIA') || nombreCampana.includes('CORTESÍA')) {
+      finalPrecioTotal = 0;
+      finalDescuento = precioSubtotal;
+    }
+
+    setDescuento(finalDescuento);
+    setPrecioTotal(finalPrecioTotal);
+    setFormCaja({ ...formCaja, descuentoObj: { ...desc, monto: finalDescuento, documentoBusqueda: documentoDescuento } });
     // Removido setShowDescuentosModal(false) para que la lista siga visible
   };
 
