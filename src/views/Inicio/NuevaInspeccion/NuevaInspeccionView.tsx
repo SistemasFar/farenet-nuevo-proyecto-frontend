@@ -131,6 +131,13 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
   };
 
   useEffect(() => {
+    // Cleanup de notificaciones flotantes (SweetAlert2 toasts) al desmontar la vista
+    return () => {
+      Swal.close();
+    };
+  }, []);
+
+  useEffect(() => {
     if (inspeccionIdBorrador) {
       setLoading(true);
       inspeccionesApi.obtenerBorrador(inspeccionIdBorrador)
@@ -677,8 +684,9 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
               eliminarPago={eliminarPago}
               editingPagoIndex={editingPagoIndex}
               setEditingPagoIndex={setEditingPagoIndex}
-              disablePagoTabs={disablePagoTabs}
+              disablePagoTabs={disablePagoTabs || (formCaja.nrodocumentoreinspeccion && montoPendiente === 0)}
               descuentoObj={formCaja.descuentoObj}
+              isReinspeccionGratuita={!!(formCaja.nrodocumentoreinspeccion && montoPendiente === 0)}
             />
           </div>
         )}

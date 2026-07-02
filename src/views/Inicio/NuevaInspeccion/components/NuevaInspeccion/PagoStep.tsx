@@ -18,6 +18,7 @@ interface PagoStepProps {
   setEditingPagoIndex?: (index: number | null) => void;
   disablePagoTabs?: boolean;
   descuentoObj?: any;
+  isReinspeccionGratuita?: boolean;
 }
 
 export function PagoStep({
@@ -35,7 +36,8 @@ export function PagoStep({
   editingPagoIndex = null,
   setEditingPagoIndex,
   disablePagoTabs = false,
-  descuentoObj
+  descuentoObj,
+  isReinspeccionGratuita = false
 }: PagoStepProps) {
 
   const editarPago = (idx: number) => {
@@ -106,39 +108,51 @@ export function PagoStep({
         </div>
       </div>
 
-      {/* Pestañas de Método de Pago */}
-      <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
-        {(['EFECTIVO', 'TARJETA', 'BANCO'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => {
-              if (pagoTab !== tab) {
-                setPagoTab(tab);
-                setFormPago({
-                  importe: '',
-                  tarjetaKey: '',
-                  entidadFinancieraKey: '',
-                  cuentaCorrienteKey: '',
-                  nroOperacion: '',
-                  digitosTarjeta: '',
-                  fechaDeposito: new Date().toISOString().split('T')[0]
-                });
-                if (setEditingPagoIndex) setEditingPagoIndex(null);
-              }
-            }}
-            disabled={disablePagoTabs}
-            className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${pagoTab === tab ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'} ${disablePagoTabs ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      {/* Formulario de Pago */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
-        <h3 className="text-sm font-black text-slate-800 uppercase mb-4">Detalles del Pago: {pagoTab}</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+      {/* Pestañas de Método de Pago y Formulario */}
+      {isReinspeccionGratuita ? (
+        <div className="bg-green-100 border-2 border-green-500 rounded-xl p-8 mb-8 text-center shadow-sm">
+          <h2 className="text-2xl font-black text-green-700 uppercase tracking-wide">REINSPECCIÓN APLICADA</h2>
+          <p className="text-lg font-bold text-green-600 mt-2 uppercase">NO TIENE MONTO QUE PAGAR</p>
+        </div>
+      ) : descuentoObj?.tipodescuento_key === 'corte' ? (
+        <div className="bg-green-100 border-2 border-green-500 rounded-xl p-8 mb-8 text-center shadow-sm">
+          <h2 className="text-2xl font-black text-green-700 uppercase tracking-wide">CORTESÍA APLICADA</h2>
+          <p className="text-lg font-bold text-green-600 mt-2 uppercase">NO TIENE MONTO QUE PAGAR</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+            {(['EFECTIVO', 'TARJETA', 'BANCO'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => {
+                  if (pagoTab !== tab) {
+                    setPagoTab(tab);
+                    setFormPago({
+                      importe: '',
+                      tarjetaKey: '',
+                      entidadFinancieraKey: '',
+                      cuentaCorrienteKey: '',
+                      nroOperacion: '',
+                      digitosTarjeta: '',
+                      fechaDeposito: new Date().toISOString().split('T')[0]
+                    });
+                    if (setEditingPagoIndex) setEditingPagoIndex(null);
+                  }
+                }}
+                disabled={disablePagoTabs}
+                className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${pagoTab === tab ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'} ${disablePagoTabs ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+    
+          {/* Formulario de Pago */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
+            <h3 className="text-sm font-black text-slate-800 uppercase mb-4">Detalles del Pago: {pagoTab}</h3>
+    
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
           {pagoTab === 'TARJETA' && (
             <>
               <div className="flex flex-col gap-1.5 md:col-span-1">
@@ -275,6 +289,8 @@ export function PagoStep({
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Lista de Pagos Agregados */}
       {pagosAgregados.length > 0 && (

@@ -67,6 +67,7 @@ export function CajaStep({
   const [isReinspeccionGratuita, setIsReinspeccionGratuita] = useState(false);
   const [vehiculoRapidoEncontrado, setVehiculoRapidoEncontrado] = useState(false);
   const [activasReinspecciones, setActivasReinspecciones] = useState<any[]>([]);
+  const [isLockedForReinspeccion, setIsLockedForReinspeccion] = useState(false);
 
   const handlePlacaBlur = async () => {
     if (formCaja.placa && formCaja.placa.length >= 6) {
@@ -104,6 +105,68 @@ export function CajaStep({
       setActivasReinspecciones([]);
     }
   };
+
+  // EFECTO AUTOMÁTICO DE REINSPECCIÓN: Si se llena placa y concepto, verificar si aplica
+  React.useEffect(() => {
+    const checkAutoReinspeccion = async () => {
+      if (formCaja.placa && formCaja.placa.length >= 6 && formCaja.concepto) {
+        const planta = plantaSession.obtener();
+        if (!planta?.key) return;
+        
+        try {
+          const resReins = await inspeccionesApi.consultarReinspeccion(formCaja.placa, formCaja.concepto, planta.key);
+          if (resReins?.data?.aplica) {
+            const rData = resReins.data;
+            setIsReinspeccionAplica(true);
+            setReinspeccionMensaje(rData.mensaje || `¡Aplica a Reinspección! Documento anterior: ${rData.nrodocumentoreinspeccion} (${rData.porcentajedescuento}% dscto)`);
+            
+            // Extraer tipoPlaca de ui_metadata si existe
+            let oldTipoPlaca = formCaja.tipoPlaca;
+            if (rData.ui_metadata && rData.ui_metadata.formCaja && rData.ui_metadata.formCaja.tipoPlaca) {
+              oldTipoPlaca = rData.ui_metadata.formCaja.tipoPlaca;
+            }
+
+            // AUTO-FILL de todos los campos según la reinspección anterior
+            setFormCaja((prev: any) => ({
+              ...prev,
+              nrodocumentoreinspeccion: rData.nrodocumentoreinspeccion,
+              tipoAutorizacion: rData.tipoautorizacion_key || prev.tipoAutorizacion,
+              tipoCertificado: rData.tipocertificado_key || prev.tipoCertificado,
+              tipoInspeccion: rData.tipoinspeccion_key || prev.tipoInspeccion,
+              categoria: rData.categoria_key || prev.categoria,
+              tipoPlaca: oldTipoPlaca
+            }));
+
+            // Bloquear los campos
+            setIsLockedForReinspeccion(true);
+
+            // Simular cálculo de precios si es 100% gratuita
+            if (rData.porcentajedescuento === 100) {
+              setDescuento(0); // El descuento se calcula en base al precio original, pero para reinspección lo podemos dejar en 0 o el total.
+              setPrecioTotal(0);
+              setIsReinspeccionGratuita(true);
+              setDocumentoPago(''); 
+              setIsConsultado(true); // Pasar directamente a consultado!
+            }
+            
+          } else {
+            // Si no aplica reinspección, desbloquear
+            setIsLockedForReinspeccion(false);
+            setIsReinspeccionAplica(false);
+            setReinspeccionMensaje(null);
+            setIsReinspeccionGratuita(false);
+            setFormCaja((prev: any) => ({ ...prev, nrodocumentoreinspeccion: null }));
+          }
+        } catch (e) {
+          setIsLockedForReinspeccion(false);
+        }
+      } else {
+        setIsLockedForReinspeccion(false);
+      }
+    };
+    
+    checkAutoReinspeccion();
+  }, [formCaja.placa, formCaja.concepto]);
 
   const handleConsultar = async () => {
     if (
@@ -524,7 +587,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
-                isDisabled={isConsultado}
+                isDisabled={isConsultado || isLockedForReinspeccion}
               />
             </div>
 
@@ -545,7 +608,7 @@ export function CajaStep({
                 placeholder="Ej: ABC-123"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
                 maxLength={getPlacaMaxLength()}
-                disabled={isConsultado}
+                disabled={isConsultado || isLockedForReinspeccion}
               />
             </div>
 
@@ -558,6 +621,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
+                isDisabled={isLockedForReinspeccion}
               />
             </div>
 
@@ -570,7 +634,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
-                isDisabled={isConsultado}
+                isDisabled={isConsultado || isLockedForReinspeccion}
               />
             </div>
 
@@ -583,6 +647,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
+                isDisabled={isLockedForReinspeccion}
               />
             </div>
 
@@ -595,6 +660,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
+                isDisabled={isLockedForReinspeccion}
               />
             </div>
 
@@ -610,6 +676,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
+                isDisabled={isConsultado || isLockedForReinspeccion}
                 menuPlacement="top"
                 menuPortalTarget={document.body}
               />
@@ -639,6 +706,7 @@ export function CajaStep({
             setDocumentoDescuento('');
             setReinspeccionMensaje(null);
             setIsReinspeccionGratuita(false);
+            setIsLockedForReinspeccion(false);
           }}
           className="flex items-center gap-2 rounded-lg bg-white border border-red-200 text-red-600 px-6 py-2.5 text-xs font-bold hover:bg-red-50 shadow-sm transition uppercase tracking-wide"
         >
@@ -675,11 +743,11 @@ export function CajaStep({
               type="text"
               value={documentoDescuento}
               onChange={(e) => setDocumentoDescuento(e.target.value)}
-              disabled={formCaja.descuentoObj?.isCuponidad}
+              disabled={formCaja.descuentoObj?.isCuponidad || isLockedForReinspeccion}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  if (!formCaja.descuentoObj?.isCuponidad) {
+                  if (!formCaja.descuentoObj?.isCuponidad && !isLockedForReinspeccion) {
                     handleBuscarDescuentos(e);
                   }
                 }
@@ -690,8 +758,8 @@ export function CajaStep({
             <button 
               type="button" 
               onClick={(e) => handleBuscarDescuentos(e)} 
-              disabled={formCaja.descuentoObj?.isCuponidad}
-              className={`text-white px-6 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 uppercase ${formCaja.descuentoObj?.isCuponidad ? 'bg-slate-400 cursor-not-allowed opacity-80' : 'bg-[#052a79] hover:bg-blue-900'}`}
+              disabled={formCaja.descuentoObj?.isCuponidad || isLockedForReinspeccion}
+              className={`text-white px-6 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 uppercase ${(formCaja.descuentoObj?.isCuponidad || isLockedForReinspeccion) ? 'bg-slate-400 cursor-not-allowed opacity-80' : 'bg-[#052a79] hover:bg-blue-900'}`}
             >
               <Search className="w-3 h-3" /> Buscar
             </button>
@@ -724,7 +792,9 @@ export function CajaStep({
                     </p>
                   </div>
                   <div className={`flex items-center gap-3 shrink-0 border-l pl-4 ${isApplied ? 'border-green-200' : 'border-slate-100'}`}>
-                    <span className="font-black text-red-600 text-sm">- S/ {desc.monto.toFixed(2)}</span>
+                    {desc.tipodescuento_key !== 'corte' && (
+                      <span className="font-black text-red-600 text-sm">- S/ {desc.monto.toFixed(2)}</span>
+                    )}
                     <button
                       onClick={() => aplicarDescuento(desc)}
                       disabled={isApplied}
@@ -856,6 +926,7 @@ export function CajaStep({
                   setShowAnularModal(false);
                   setReinspeccionMensaje(null);
                   setIsReinspeccionGratuita(false);
+                  setIsLockedForReinspeccion(false);
                 }}
                 className="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-md shadow-red-200 transition-colors"
               >
