@@ -478,6 +478,14 @@ export const inspeccionesApi = {
     if (!response.ok) throw new Error('Error al consultar vehículo rápido');
     return await parseJsonResponse<any>(response);
   },
+  consultarReinspeccionesActivas: async (placa: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/reinspecciones-activas/${placa}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    });
+    if (!response.ok) throw new Error('Error al consultar reinspecciones activas');
+    return await parseJsonResponse<any>(response);
+  },
   validarCuponidad: async (codigo: string) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/cuponidad/validar/${codigo}`, {
       method: 'GET',

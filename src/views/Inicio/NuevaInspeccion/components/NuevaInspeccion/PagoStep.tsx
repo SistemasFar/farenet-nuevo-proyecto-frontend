@@ -17,6 +17,7 @@ interface PagoStepProps {
   editingPagoIndex?: number | null;
   setEditingPagoIndex?: (index: number | null) => void;
   disablePagoTabs?: boolean;
+  descuentoObj?: any;
 }
 
 export function PagoStep({
@@ -33,7 +34,8 @@ export function PagoStep({
   eliminarPago,
   editingPagoIndex = null,
   setEditingPagoIndex,
-  disablePagoTabs = false
+  disablePagoTabs = false,
+  descuentoObj
 }: PagoStepProps) {
 
   const editarPago = (idx: number) => {
@@ -66,6 +68,32 @@ export function PagoStep({
 
   return (
     <div className="space-y-6">
+      <h3 className="text-lg font-bold text-[#052a79] uppercase border-b border-amber-200/60 pb-2">
+        Registro de Pago
+      </h3>
+
+      {descuentoObj?.isCuponidad && (
+        <div className="bg-amber-500 rounded-xl p-4 shadow-md text-white flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-white text-amber-600 font-black px-3 py-1.5 rounded uppercase tracking-wider text-sm shadow-sm">
+              CUPONIDAD
+            </div>
+            <div>
+              <p className="font-bold text-amber-50 leading-tight text-xs uppercase">Código validado</p>
+              <p className="font-black text-xl tracking-wide">{descuentoObj.documentoBusqueda || descuentoObj.uuid}</p>
+            </div>
+          </div>
+          <div className="text-right bg-amber-600/30 px-4 py-2 rounded-lg border border-amber-400/50">
+            <p className="text-[10px] font-bold text-amber-100 uppercase">Aplicando Tipo de Promoción:</p>
+            <p className="text-sm font-black uppercase">
+              {(!descuentoObj.tipopagodescuento_key || descuentoObj.tipopagodescuento_key === 'MON') && `MONTO (S/ -${(descuentoObj.montoBaseOperacion || 0).toFixed(2)})`}
+              {descuentoObj.tipopagodescuento_key === 'FLA' && `TARIFA PLANA (PAGA S/ ${(descuentoObj.montoBaseOperacion || 0).toFixed(2)})`}
+              {descuentoObj.tipopagodescuento_key === 'POR' && `PORCENTAJE (-${descuentoObj.montoBaseOperacion || 0}%)`}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Cabecera de Totales */}
       <div className="grid grid-cols-2 gap-6 mb-8">
         <div className="bg-[#f4f9ff] border-2 border-[#052a79] rounded-2xl p-6 text-center shadow-sm">

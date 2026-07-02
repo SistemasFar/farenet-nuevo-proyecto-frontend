@@ -292,6 +292,7 @@ interface VehiculoStepProps {
   getCategoriaName: () => string;
   onValidationChange?: (isValid: boolean) => void;
   placaCaja?: string;
+  isReinspeccion?: boolean;
 }
 
 export function VehiculoStep({
@@ -302,7 +303,8 @@ export function VehiculoStep({
   maestrosVehiculo,
   getCategoriaName,
   onValidationChange,
-  placaCaja
+  placaCaja,
+  isReinspeccion
 }: VehiculoStepProps) {
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -502,8 +504,15 @@ export function VehiculoStep({
 
       // Regla 4: Kilometraje >= 5000 (No aplica para O)
       if (isValid((formVehiculo as any)['kilometraje'])) {
-        if (parseFloat((formVehiculo as any)['kilometraje']) < 5000) {
+        const kmActual = parseFloat((formVehiculo as any)['kilometraje']);
+        if (kmActual < 5000) {
           missing.push('Kilometraje (debe ser >= 5000)');
+        }
+        
+        // Si el vehiculo ya existe en BD, el nuevo kilometraje debe ser mayor al original
+        const kmOriginal = parseFloat((formVehiculo as any)['kilometrajeOriginal'] || 0);
+        if (kmOriginal > 0 && kmActual <= kmOriginal) {
+          missing.push(`Kilometraje (debe ser mayor a ${kmOriginal} que fue el último registrado)`);
         }
       }
     }
@@ -669,6 +678,7 @@ export function VehiculoStep({
                           name="placaNueva"
                           onSearch={handleSearchVehiculo}
                           searching={searchingVehiculo}
+                          disabled={!(isReinspeccion || parseFloat((formVehiculo as any)['kilometrajeOriginal'] || 0) > 0)}
                         />
                         <InputField label="Nro Serie (VIN)" name="nroSerie" maxLength={22} />
                         {hasMotor && <InputField label="Nro Motor" name="nroMotor" maxLength={20} />}

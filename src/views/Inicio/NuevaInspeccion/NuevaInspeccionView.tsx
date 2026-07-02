@@ -448,69 +448,28 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
 
   const montoPendiente = Math.max(0, precioTotal - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
 
+  // Efecto para auto-llenar pagos de Cortesía u otros que dejan el total en 0
   useEffect(() => {
-    if (currentStepIndex === 1) {
-      const nombreCampana = formCaja.descuentoObj?.campana || formCaja.descuentoObj?.nombre;
-      if (formCaja.descuentoObj && nombreCampana) {
-        const descName = nombreCampana.toUpperCase();
-        if (descName.includes('CUPONIDAD')) {
-          setPagoTab('TARJETA');
-          setDisablePagoTabs(true);
-          const cuponidadTarjeta = maestrosPago?.tarjetas?.find((t: any) => t.nombre.toUpperCase().includes('CUPONIDAD'));
-          if (cuponidadTarjeta) {
-            const exactCode = formCaja.descuentoObj.uuid || formCaja.descuentoObj.documentoBusqueda || '';
-            const newFormPago = {
-              ...formPago,
-              tarjetaKey: cuponidadTarjeta.key,
-              importe: precioTotal.toFixed(2),
-              nroOperacion: exactCode
-            };
-            setFormPago(newFormPago);
-
-            // Auto-agregar el pago si no existe
-            const isAlreadyAdded = pagosAgregados.some((p: any) => p.nroOperacion === exactCode);
-            if (!isAlreadyAdded) {
-              const autoAdd = async () => {
-                const code = exactCode.trim();
-                try {
-                  if (code) {
-                    await inspeccionesApi.validarCuponidad(code);
-                  }
-                  
-                  setPagosAgregados((prev: any[]) => {
-                    const exists = prev.some(p => p.nroOperacion === code);
-                    if (exists) return prev;
-                    return [...prev, {
-                      tipo: 'TARJETA',
-                      ...newFormPago,
-                      importe: parseFloat(newFormPago.importe).toFixed(2),
-                      nroOperacion: code
-                    }];
-                  });
-                } catch (err: any) {
-                  alert('Error automático: ' + (err.message || 'Código de Cuponidad inválido.'));
-                }
-              };
-              autoAdd();
-            }
-          }
-          return; 
-        }
-      }
+    if (currentStepIndex === 1 && maestrosPago && formCaja.descuentoObj) {
       
-      // Si no es Cuponidad, pero el monto pendiente es 0 (ej. Cortesía)
+      // Si el monto pendiente es 0 (ej. Cortesía, 100% descuento)
       if (montoPendiente === 0) {
         setDisablePagoTabs(true);
         setFormPago((prev: any) => ({ ...prev, importe: '0' }));
-        // Si el precio total es 0 (Cortesía total), asegurarnos de no tener pagos "basura"
+        // Si el precio total es 0, asegurarnos de no tener pagos "basura"
         if (precioTotal === 0 && pagosAgregados.length > 0) {
           setPagosAgregados([]);
         }
       } else {
         setDisablePagoTabs(false);
       }
+    } else if (currentStepIndex === 1) {
+      // En caso de que se haya quitado el descuento
+      if (montoPendiente > 0) {
+        setDisablePagoTabs(false);
+      }
     }
-  }, [currentStepIndex, formCaja.descuentoObj, maestrosPago, precioTotal]);
+  }, [currentStepIndex, formCaja.descuentoObj, maestrosPago, precioTotal, montoPendiente]);
 
   const handleAgregarPago = async () => {
     if (!formPago.importe || isNaN(parseFloat(formPago.importe)) || parseFloat(formPago.importe) <= 0) {
@@ -719,6 +678,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
               editingPagoIndex={editingPagoIndex}
               setEditingPagoIndex={setEditingPagoIndex}
               disablePagoTabs={disablePagoTabs}
+              descuentoObj={formCaja.descuentoObj}
             />
           </div>
         )}
@@ -735,6 +695,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
               getCategoriaName={getCategoriaName}
               onValidationChange={setIsVehiculoValid}
               placaCaja={formCaja.placa}
+              isReinspeccion={!!formCaja.nrodocumentoreinspeccion}
             />
           </div>
         )}

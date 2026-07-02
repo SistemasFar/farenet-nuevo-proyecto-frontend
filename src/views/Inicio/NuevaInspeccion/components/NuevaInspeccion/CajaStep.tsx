@@ -66,6 +66,7 @@ export function CajaStep({
   const [isReinspeccionAplica, setIsReinspeccionAplica] = useState<boolean>(false);
   const [isReinspeccionGratuita, setIsReinspeccionGratuita] = useState(false);
   const [vehiculoRapidoEncontrado, setVehiculoRapidoEncontrado] = useState(false);
+  const [activasReinspecciones, setActivasReinspecciones] = useState<any[]>([]);
 
   const handlePlacaBlur = async () => {
     if (formCaja.placa && formCaja.placa.length >= 6) {
@@ -82,11 +83,25 @@ export function CajaStep({
         } else {
           setVehiculoRapidoEncontrado(false);
         }
+
+        // Consultar reinspecciones activas para mostrar notificación
+        try {
+          const resActivas = await inspeccionesApi.consultarReinspeccionesActivas(formCaja.placa);
+          if (resActivas?.data && resActivas.data.length > 0) {
+            setActivasReinspecciones(resActivas.data);
+          } else {
+            setActivasReinspecciones([]);
+          }
+        } catch(e) {
+          setActivasReinspecciones([]);
+        }
       } catch (err) {
         setVehiculoRapidoEncontrado(false);
+        setActivasReinspecciones([]);
       }
     } else {
       setVehiculoRapidoEncontrado(false);
+      setActivasReinspecciones([]);
     }
   };
 
@@ -159,6 +174,7 @@ export function CajaStep({
               combustible: data.vehiculo.combustible_key || '',
               nroCilindros: data.vehiculo.nrocilindros || '',
               kilometraje: data.vehiculo.kilometraje || '',
+              kilometrajeOriginal: data.vehiculo.kilometraje || 0,
               nroAsientos: data.vehiculo.nroasientos || '',
               nroPasajeros: data.vehiculo.nropasajeros || '',
               nroPuertas: data.vehiculo.nropuertas || '',
@@ -261,6 +277,16 @@ export function CajaStep({
           // ---------------------------------------------
           // MOSTRAR TOAST COMBINADO PERMANENTE
           // ---------------------------------------------
+          let currentActivas = activasReinspecciones;
+          try {
+            // Asegurarnos de tener la info más reciente (evita race condition si consultó muy rápido)
+            const resActivas = await inspeccionesApi.consultarReinspeccionesActivas(formCaja.placa);
+            if (resActivas?.data) {
+              currentActivas = resActivas.data;
+              setActivasReinspecciones(resActivas.data);
+            }
+          } catch(e) {}
+
           let toastHtml = '';
           if (vehiculoEncontrado) {
             const isMtc = data.mensaje.includes('MTC');
@@ -269,8 +295,22 @@ export function CajaStep({
             toastHtml += `<div style="margin-bottom: 8px; text-align: left;"><strong>✅ ${titulo}</strong><br/>${texto}</div>`;
           }
           if (hasDescuentos) {
-            toastHtml += `<div style="text-align: left;"><strong>🎁 PROMOCIONES ENCONTRADAS</strong><br/>Se encontraron descuentos disponibles.</div>`;
+            toastHtml += `<div style="margin-bottom: 8px; text-align: left;"><strong>🎁 PROMOCIONES ENCONTRADAS</strong><br/>Se encontraron descuentos disponibles.</div>`;
           }
+          
+          if (currentActivas && currentActivas.length > 0) {
+            let reinsHtml = '<ul style="margin: 8px 0 0 20px; padding: 0; list-style-type: disc; color: #1f2937; line-height: 1.6;">';
+            currentActivas.forEach((act: any) => {
+              reinsHtml += `<li style="margin-bottom: 6px;"><strong>${act.concepto_nombre}</strong><br/><span style="font-size: 0.9em; color: #4b5563;">(Quedan ${act.dias_restantes} días, ${act.intentos_restantes} intentos)</span></li>`;
+            });
+            reinsHtml += '</ul>';
+            toastHtml += `<div style="text-align: left; margin-top: 8px; border-top: 1px solid #e5e7eb; padding-top: 8px;">
+              <strong style="color: #b91c1c; font-size: 1.05em;">⚠️ REINSPECCIONES ACTIVAS EN ESTA PLACA:</strong>
+              ${reinsHtml}
+            </div>`;
+          }
+
+          console.log("toastHtml generated:", toastHtml);
 
           if (toastHtml) {
             Swal.fire({
@@ -402,26 +442,51 @@ export function CajaStep({
   };
 
   const aplicarDescuento = (desc: any) => {
-    let finalPrecioTotal = Math.max(0, precioSubtotal - desc.monto);
-    let finalDescuento = desc.monto;
-    
-    const nombreCampana = (desc.campana || desc.nombre || '').toUpperCase();
-    
-    // Si es Cuponidad, el monto del descuento (ej: 84.90) es el PRECIO FINAL a facturar
-    if (nombreCampana.includes('CUPONIDAD')) {
-      finalPrecioTotal = desc.monto; // La boleta sale por S/ 84.90
-      finalDescuento = Math.max(0, precioSubtotal - desc.monto); // El descuento real aplicado es la diferencia
-    }
-    // Si es Cortesía, el descuento es del 100%, total a pagar = 0
-    else if (nombreCampana.includes('CORTESIA') || nombreCampana.includes('CORTESÍA')) {
+    const isCuponidad = desc.tipodescuento_key === 'aliestrategica' || (desc.campana || desc.nombre || '').toUpperCase().includes('CUPONIDAD');
+    const isCortesia = desc.tipodescuento_key === 'corte' || (desc.campana || desc.nombre || '').toUpperCase().includes('CORTESIA') || (desc.campana || desc.nombre || '').toUpperCase().includes('CORTESÍA');
+
+    let finalPrecioTotal = precioSubtotal;
+    let finalDescuento = 0;
+
+    const tipoCobro = desc.tipopagodescuento_key || 'MON'; // Valor por defecto
+
+    if (isCortesia) {
       finalPrecioTotal = 0;
       finalDescuento = precioSubtotal;
+    } else {
+      if (tipoCobro === 'FLA') {
+        // Flat (Monto fijo a pagar)
+        finalPrecioTotal = desc.monto;
+        finalDescuento = Math.max(0, precioSubtotal - desc.monto);
+      } else if (tipoCobro === 'POR') {
+        // Porcentaje a descontar
+        finalDescuento = precioSubtotal * (desc.monto / 100);
+        finalPrecioTotal = Math.max(0, precioSubtotal - finalDescuento);
+      } else {
+        // Monto fijo a descontar (MON)
+        finalDescuento = desc.monto;
+        finalPrecioTotal = Math.max(0, precioSubtotal - finalDescuento);
+      }
+    }
+
+    // Seguro contra descuentos mayores al precio
+    if (finalDescuento > precioSubtotal) {
+      finalDescuento = precioSubtotal;
+      finalPrecioTotal = 0;
     }
 
     setDescuento(finalDescuento);
     setPrecioTotal(finalPrecioTotal);
-    setFormCaja({ ...formCaja, descuentoObj: { ...desc, monto: finalDescuento, documentoBusqueda: documentoDescuento } });
-    // Removido setShowDescuentosModal(false) para que la lista siga visible
+    setFormCaja({ 
+      ...formCaja, 
+      descuentoObj: { 
+        ...desc, 
+        monto: finalDescuento, 
+        montoBaseOperacion: desc.monto,
+        isCuponidad: isCuponidad,
+        documentoBusqueda: documentoDescuento 
+      } 
+    });
   };
 
   return (
@@ -610,16 +675,24 @@ export function CajaStep({
               type="text"
               value={documentoDescuento}
               onChange={(e) => setDocumentoDescuento(e.target.value)}
+              disabled={formCaja.descuentoObj?.isCuponidad}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  handleBuscarDescuentos(e);
+                  if (!formCaja.descuentoObj?.isCuponidad) {
+                    handleBuscarDescuentos(e);
+                  }
                 }
               }}
-              placeholder="Número de documento..."
-              className="flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-amber-500 outline-none"
+              placeholder={formCaja.descuentoObj?.isCuponidad ? "Cupón ya aplicado" : "Número de documento..."}
+              className={`flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none ${formCaja.descuentoObj?.isCuponidad ? 'opacity-60 cursor-not-allowed bg-slate-100' : 'focus:border-amber-500'}`}
             />
-            <button type="button" onClick={(e) => handleBuscarDescuentos(e)} className="bg-[#052a79] text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-blue-900 transition flex items-center gap-2 uppercase">
+            <button 
+              type="button" 
+              onClick={(e) => handleBuscarDescuentos(e)} 
+              disabled={formCaja.descuentoObj?.isCuponidad}
+              className={`text-white px-6 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 uppercase ${formCaja.descuentoObj?.isCuponidad ? 'bg-slate-400 cursor-not-allowed opacity-80' : 'bg-[#052a79] hover:bg-blue-900'}`}
+            >
               <Search className="w-3 h-3" /> Buscar
             </button>
           </div>
@@ -703,6 +776,25 @@ export function CajaStep({
               <input type="text" readOnly value={precioTotal.toFixed(2)} className="w-full rounded-lg border-2 border-[#052a79] bg-[#f4f9ff] px-3 py-2 text-lg font-black text-[#052a79] text-right outline-none shadow-inner" />
             </div>
           </div>
+
+          {formCaja.descuentoObj?.isCuponidad && (
+            <div className="bg-amber-50 px-5 py-3 border-t border-amber-200 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-amber-500 text-white font-black text-[10px] px-2 py-1 rounded-sm uppercase tracking-wider">CUPONIDAD</div>
+                <span className="text-amber-900 font-bold text-sm">
+                  Código Aplicado: <span className="font-black bg-white px-2 py-0.5 rounded border border-amber-300 ml-1">{formCaja.descuentoObj.documentoBusqueda || formCaja.descuentoObj.uuid}</span>
+                </span>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-bold text-amber-800 uppercase">Tipo de Descuento:</p>
+                <p className="text-sm font-black text-amber-900">
+                  {(!formCaja.descuentoObj.tipopagodescuento_key || formCaja.descuentoObj.tipopagodescuento_key === 'MON') && `MONTO (S/ -${(formCaja.descuentoObj.montoBaseOperacion || 0).toFixed(2)})`}
+                  {formCaja.descuentoObj.tipopagodescuento_key === 'FLA' && `TARIFA PLANA (PAGA S/ ${(formCaja.descuentoObj.montoBaseOperacion || 0).toFixed(2)})`}
+                  {formCaja.descuentoObj.tipopagodescuento_key === 'POR' && `PORCENTAJE (-${formCaja.descuentoObj.montoBaseOperacion || 0}%)`}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
