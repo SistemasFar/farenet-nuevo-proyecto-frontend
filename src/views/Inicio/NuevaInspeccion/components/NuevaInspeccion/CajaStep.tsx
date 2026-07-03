@@ -387,24 +387,22 @@ export function CajaStep({
             });
           }
           // ---------------------------------------------
-
+          setIsConsultado(true);
         }
       } catch (err: any) {
-        console.error('Error calculando precio:', err);
         Swal.fire({
           icon: 'warning',
           title: 'Aviso',
-          text: err.message === "PLACA DUPLICADA EN SISTEMA" ? "Esta placa ya pasó inspección hoy con el mismo concepto en esta planta. PLACA DUPLICADA EN SISTEMA." : (err.message || 'Error en la consulta')
+          text: err.message || 'Error en la consulta',
         });
         setPrecioSubtotal(0);
         setDescuento(0);
         setPrecioTotal(0);
-      } finally {
-        setIsConsultado(true);
+        setIsConsultado(false);
       }
-    } else {
-      setShowCamposVaciosModal(true);
-    }
+      } else {
+        setShowCamposVaciosModal(true);
+      }
   };
 
   React.useEffect(() => {

@@ -311,8 +311,8 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
   };
 
   const irSiguientePaso = async () => {
-    if (currentStepIndex === 0 && !validarCaja()) {
-      alert('Por favor completa todos los campos de la caja antes de continuar.');
+    if (currentStepIndex === 0 && (!validarCaja() || !isConsultado)) {
+      alert('Por favor completa todos los campos de la caja y consulta exitosamente antes de continuar.');
       return;
     }
 
@@ -362,6 +362,7 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
       try {
         setLoading(true);
         const savePayload = {
+          plantaKey: plantaSeleccionada,
           formCaja,
           pagosAgregados,
           formVehiculo,
