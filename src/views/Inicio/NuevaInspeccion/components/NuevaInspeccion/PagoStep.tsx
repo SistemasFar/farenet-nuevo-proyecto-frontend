@@ -75,7 +75,7 @@ export function PagoStep({
       </h3>
 
       {/* Cabecera de Totales */}
-      {!descuentoObj?.isCuponidad && (
+      {!descuentoObj?.isCuponidad && !isReinspeccionGratuita && descuentoObj?.tipodescuento_key !== 'corte' && (
         <div className="grid grid-cols-2 gap-6 mb-8">
           <div className="bg-[#f4f9ff] border-2 border-[#052a79] rounded-2xl p-6 text-center shadow-sm">
             <h3 className="text-sm font-black text-[#052a79] uppercase tracking-wider mb-2">Monto Total a Pagar</h3>
@@ -111,8 +111,18 @@ export function PagoStep({
         </div>
       ) : descuentoObj?.tipodescuento_key === 'corte' ? (
         <div className="bg-green-100 border-2 border-green-500 rounded-xl p-8 mb-8 text-center shadow-sm">
-          <h2 className="text-2xl font-black text-green-700 uppercase tracking-wide">CORTESÍA APLICADA</h2>
-          <p className="text-lg font-bold text-green-600 mt-2 uppercase">NO TIENE MONTO QUE PAGAR</p>
+          <h2 className="text-3xl font-black text-green-700 uppercase tracking-wide flex items-center justify-center gap-3">
+            ✅ CORTESÍA APLICADA
+          </h2>
+          <div className="mt-4 bg-white/60 inline-block px-6 py-2 rounded-lg border border-green-300">
+            <p className="text-sm font-bold text-green-800 uppercase mb-1">PROMOCIÓN / MOTIVO:</p>
+            <p className="text-2xl font-black text-green-900 tracking-wider">
+              {descuentoObj.campana || descuentoObj.nombre || 'Cortesía General'}
+            </p>
+          </div>
+          <p className="text-sm font-bold text-green-600 mt-4 uppercase">
+            NO TIENE MONTO QUE PAGAR. Haga clic en el botón Siguiente Paso.
+          </p>
         </div>
       ) : (
         <>
@@ -288,7 +298,7 @@ export function PagoStep({
       )}
 
       {/* Lista de Pagos Agregados */}
-      {!descuentoObj?.isCuponidad && pagosAgregados.length > 0 && (
+      {!descuentoObj?.isCuponidad && !isReinspeccionGratuita && descuentoObj?.tipodescuento_key !== 'corte' && pagosAgregados.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-[#f4f9ff] text-[#052a79] text-xs uppercase font-black">
