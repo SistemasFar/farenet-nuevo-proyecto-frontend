@@ -513,7 +513,7 @@ export function CajaStep({
 
     const tipoCobro = desc.tipopagodescuento_key || 'MON'; // Valor por defecto
 
-    if (isCortesia) {
+    if (isCortesia || isCuponidad) {
       finalPrecioTotal = 0;
       finalDescuento = precioSubtotal;
     } else {
@@ -855,13 +855,31 @@ export function CajaStep({
                   Código Aplicado: <span className="font-black bg-white px-2 py-0.5 rounded border border-amber-300 ml-1">{formCaja.descuentoObj.documentoBusqueda || formCaja.descuentoObj.uuid}</span>
                 </span>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-bold text-amber-800 uppercase">Tipo de Descuento:</p>
-                <p className="text-sm font-black text-amber-900">
-                  {(!formCaja.descuentoObj.tipopagodescuento_key || formCaja.descuentoObj.tipopagodescuento_key === 'MON') && `MONTO (S/ -${(formCaja.descuentoObj.montoBaseOperacion || 0).toFixed(2)})`}
-                  {formCaja.descuentoObj.tipopagodescuento_key === 'FLA' && `TARIFA PLANA (PAGA S/ ${(formCaja.descuentoObj.montoBaseOperacion || 0).toFixed(2)})`}
-                  {formCaja.descuentoObj.tipopagodescuento_key === 'POR' && `PORCENTAJE (-${formCaja.descuentoObj.montoBaseOperacion || 0}%)`}
-                </p>
+              <div className="text-right flex flex-col items-end">
+                <p className="text-xs font-bold text-amber-800 uppercase mb-1">Tipo de Descuento:</p>
+                
+                {(!formCaja.descuentoObj.tipopagodescuento_key || formCaja.descuentoObj.tipopagodescuento_key === 'MON') && (
+                  <p className="text-sm font-black text-amber-900">
+                    MONTO (S/ -{(formCaja.descuentoObj.montoBaseOperacion || 0).toFixed(2)})
+                  </p>
+                )}
+
+                {formCaja.descuentoObj.tipopagodescuento_key === 'POR' && (
+                  <p className="text-sm font-black text-amber-900">
+                    PORCENTAJE (-{formCaja.descuentoObj.montoBaseOperacion || 0}%)
+                  </p>
+                )}
+
+                {formCaja.descuentoObj.tipopagodescuento_key === 'FLA' && (
+                  <div className="flex flex-col items-end gap-1 mt-0.5">
+                    <span className="text-sm font-black text-amber-900 bg-white/60 px-2 py-0.5 rounded border border-amber-300">
+                      TARIFA PLANA: S/ {(formCaja.descuentoObj.montoBaseOperacion || 0).toFixed(2)}
+                    </span>
+                    <span className="text-[11px] font-black text-green-700 bg-green-100 px-2 py-1 rounded shadow-sm border border-green-300">
+                      ✅ TARIFA YA FUE PAGADA (PAGA: S/ 0.00)
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}

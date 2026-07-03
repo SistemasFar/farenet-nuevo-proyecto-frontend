@@ -455,6 +455,31 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
 
   const montoPendiente = Math.max(0, precioTotal - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
 
+  // Efecto para inyectar automticamente el pago de Cuponidad
+  useEffect(() => {
+    if (formCaja.descuentoObj?.isCuponidad) {
+      const uuid = formCaja.descuentoObj.documentoBusqueda || formCaja.descuentoObj.uuid;
+      const cuponidadTarjeta = maestrosPago?.tarjetas?.find((t: any) => t.nombre.toUpperCase().includes('CUPONIDAD'));
+      
+      if (cuponidadTarjeta) {
+        const pagoExiste = pagosAgregados.some((p: any) => p.nroOperacion === uuid);
+        if (!pagoExiste) {
+          const nuevoPago = {
+            tipo: 'TARJETA',
+            tarjetaKey: cuponidadTarjeta.key,
+            nroOperacion: uuid,
+            importe: precioTotal.toFixed(2),
+            entidadFinancieraKey: '',
+            cuentaCorrienteKey: '',
+            fechaDeposito: '',
+            digitosTarjeta: ''
+          };
+          setPagosAgregados([nuevoPago]);
+        }
+      }
+    }
+  }, [formCaja.descuentoObj, precioTotal, maestrosPago, pagosAgregados]);
+
   // Efecto para auto-llenar pagos de Cortesía u otros que dejan el total en 0
   useEffect(() => {
     if (currentStepIndex === 1 && maestrosPago && formCaja.descuentoObj) {
