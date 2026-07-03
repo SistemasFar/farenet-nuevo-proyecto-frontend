@@ -127,15 +127,21 @@ export function CajaStep({
             }
 
             // AUTO-FILL de todos los campos según la reinspección anterior
-            setFormCaja((prev: any) => ({
-              ...prev,
-              nrodocumentoreinspeccion: rData.nrodocumentoreinspeccion,
-              tipoAutorizacion: rData.tipoautorizacion_key || prev.tipoAutorizacion,
-              tipoCertificado: rData.tipocertificado_key || prev.tipoCertificado,
-              tipoInspeccion: rData.tipoinspeccion_key || prev.tipoInspeccion,
-              categoria: rData.categoria_key || prev.categoria,
-              tipoPlaca: oldTipoPlaca
-            }));
+                          // AUTO-FILL de todos los campos segun la reinspeccion anterior
+              setFormCaja((prev: any) => ({
+                ...prev,
+                nrodocumentoreinspeccion: rData.nrodocumentoreinspeccion,
+                tipoAutorizacion: rData.tipoautorizacion_key || prev.tipoAutorizacion,
+                tipoCertificado: rData.tipocertificado_key || prev.tipoCertificado,
+                tipoInspeccion: rData.tipoinspeccion_key || prev.tipoInspeccion,
+                categoria: rData.categoria_key || prev.categoria,
+                tipoPlaca: oldTipoPlaca
+              }));
+
+              // Y RESTAURAMOS TODOS LOS DATOS DEL VEHICULO Y SOAT (Si existen)
+              if (rData.ui_metadata && rData.ui_metadata.formVehiculo && setFormVehiculo) {
+                setFormVehiculo(rData.ui_metadata.formVehiculo);
+              }
 
             // Bloquear los campos
             setIsLockedForReinspeccion(true);
@@ -286,14 +292,27 @@ export function CajaStep({
               const rData = resReins.data;
               setIsReinspeccionAplica(true);
               setReinspeccionMensaje(rData.mensaje || `¡Aplica a Reinspección! Documento anterior: ${rData.nrodocumentoreinspeccion} (${rData.porcentajedescuento}% dscto)`);
+              // Extraer tipoPlaca de ui_metadata si existe
+              let oldTipoPlaca = formCaja.tipoPlaca;
+              if (rData.ui_metadata && rData.ui_metadata.formCaja && rData.ui_metadata.formCaja.tipoPlaca) {
+                oldTipoPlaca = rData.ui_metadata.formCaja.tipoPlaca;
+              }
+
+              // AUTO-FILL de todos los campos segun la reinspeccion anterior
               setFormCaja((prev: any) => ({
                 ...prev,
                 nrodocumentoreinspeccion: rData.nrodocumentoreinspeccion,
-                concepto: rData.conceptoinspeccion_key || prev.concepto,
                 tipoAutorizacion: rData.tipoautorizacion_key || prev.tipoAutorizacion,
                 tipoCertificado: rData.tipocertificado_key || prev.tipoCertificado,
-                tipoInspeccion: rData.tipoinspeccion_key || prev.tipoInspeccion
+                tipoInspeccion: rData.tipoinspeccion_key || prev.tipoInspeccion,
+                categoria: rData.categoria_key || prev.categoria,
+                tipoPlaca: oldTipoPlaca
               }));
+
+              // Y RESTAURAMOS TODOS LOS DATOS DEL VEHICULO Y SOAT (Si existen)
+              if (rData.ui_metadata && rData.ui_metadata.formVehiculo && setFormVehiculo) {
+                setFormVehiculo(rData.ui_metadata.formVehiculo);
+              }
 
               if (rData.porcentajedescuento === 100) {
                 setDescuento(precios.precioBase);
