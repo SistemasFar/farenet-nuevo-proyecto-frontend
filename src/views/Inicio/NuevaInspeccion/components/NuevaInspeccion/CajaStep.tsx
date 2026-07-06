@@ -161,7 +161,7 @@ export function CajaStep({
 
               // Y RESTAURAMOS TODOS LOS DATOS DEL VEHICULO Y SOAT (Si existen)
               if (setFormVehiculo) {
-                let vehData = {};
+                let vehData: any = {};
                 // 1. Cargamos el snapshot anterior si existe
                 if (rData.ui_metadata && rData.ui_metadata.formVehiculo) {
                   vehData = { ...rData.ui_metadata.formVehiculo };
@@ -208,8 +208,8 @@ export function CajaStep({
                     nroSoat: v.nrosoat || vehData.nroSoat || '',
                     tipoPoliza: v.tipopoliza_key || vehData.tipoPoliza || '',
                     aseguradora: v.aseguradora_key || vehData.aseguradora || '',
-                    fechaEmisionSoat: v.fechiniciotarjetapropiedad ? v.fechiniciotarjetapropiedad.split('T')[0] : (vehData.fechaEmisionSoat || ''),
-                    fechaVencimientoSoat: v.fechfintarjetapropiedad ? v.fechfintarjetapropiedad.split('T')[0] : (vehData.fechaVencimientoSoat || ''),
+                    fechaEmisionSoat: v.fechiniciotarjetapropiedad ? String(v.fechiniciotarjetapropiedad).split('T')[0] : (vehData.fechaEmisionSoat || ''),
+                    fechaVencimientoSoat: v.fechfintarjetapropiedad ? String(v.fechfintarjetapropiedad).split('T')[0] : (vehData.fechaVencimientoSoat || ''),
                     mesesSoat: (v.fechiniciotarjetapropiedad && v.fechfintarjetapropiedad) 
                                ? (((new Date(v.fechfintarjetapropiedad).getFullYear() - new Date(v.fechiniciotarjetapropiedad).getFullYear()) * 12) + (new Date(v.fechfintarjetapropiedad).getMonth() - new Date(v.fechiniciotarjetapropiedad).getMonth()) <= 6 ? '6' : '12')
                                : (vehData.mesesSoat || '12'),
@@ -356,10 +356,10 @@ export function CajaStep({
               nroSoat: data.vehiculo.nrosoat || '',
               tipoPoliza: data.vehiculo.tipopoliza_key || '',
               aseguradora: data.vehiculo.aseguradora_key || '',
-              fechaEmisionSoat: data.vehiculo.fechiniciotarjetapropiedad ? data.vehiculo.fechiniciotarjetapropiedad.split('T')[0] : '',
-              fechaVencimientoSoat: data.vehiculo.fechfintarjetapropiedad ? data.vehiculo.fechfintarjetapropiedad.split('T')[0] : '',
+              fechaEmisionSoat: data.vehiculo.fechiniciotarjetapropiedad ? String(data.vehiculo.fechiniciotarjetapropiedad).split('T')[0] : '',
+              fechaVencimientoSoat: data.vehiculo.fechfintarjetapropiedad ? String(data.vehiculo.fechfintarjetapropiedad).split('T')[0] : '',
               mesesSoat: data.vehiculo.fechiniciotarjetapropiedad && data.vehiculo.fechfintarjetapropiedad ? 
-                (new Date(data.vehiculo.fechfintarjetapropiedad).getFullYear() - new Date(data.vehiculo.fechiniciotarjetapropiedad).getFullYear()) * 12 === 6 ? '6' : '12' : '12',
+                (((new Date(data.vehiculo.fechfintarjetapropiedad).getFullYear() - new Date(data.vehiculo.fechiniciotarjetapropiedad).getFullYear()) * 12) + (new Date(data.vehiculo.fechfintarjetapropiedad).getMonth() - new Date(data.vehiculo.fechiniciotarjetapropiedad).getMonth()) <= 6 ? '6' : '12') : '12',
 
               // Propietario
               nroDocProp: data.vehiculo.prop_nrodoc || '',
@@ -602,6 +602,15 @@ export function CajaStep({
         text: err.message || "Error al buscar descuentos"
       });
     }
+  };
+
+  const quitarDescuento = () => {
+    setDescuento(0);
+    setPrecioTotal(precioSubtotal);
+    setFormCaja({ 
+      ...formCaja, 
+      descuentoObj: null 
+    });
   };
 
   const aplicarDescuento = (desc: any) => {
@@ -895,13 +904,21 @@ export function CajaStep({
                     {desc.tipodescuento_key !== 'corte' && (
                       <span className="font-black text-red-600 text-sm">- S/ {desc.monto.toFixed(2)}</span>
                     )}
-                    <button
-                      onClick={() => aplicarDescuento(desc)}
-                      disabled={isApplied}
-                      className={`font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm ${isApplied ? 'bg-green-600 text-white cursor-not-allowed opacity-80' : 'bg-amber-400 hover:bg-amber-500 text-amber-950'}`}
-                    >
-                      {isApplied ? 'Aplicado' : 'Aplicar'}
-                    </button>
+                    {isApplied ? (
+                      <button
+                        onClick={() => quitarDescuento()}
+                        className="font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm bg-red-500 hover:bg-red-600 text-white"
+                      >
+                        Quitar
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => aplicarDescuento(desc)}
+                        className="font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm bg-amber-400 hover:bg-amber-500 text-amber-950"
+                      >
+                        Aplicar
+                      </button>
+                    )}
                   </div>
                 </div>
               );
