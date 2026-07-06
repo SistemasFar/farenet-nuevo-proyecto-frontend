@@ -92,8 +92,8 @@ export function VerificacionStep({
   };
 
   const conceptoNombre = getNameFromList(maestros?.conceptos || [], formCaja?.concepto, 'key', 'abreviatura');
-  const marcaNombre = getNameFromList(maestrosVehiculo?.marcas || [], formVehiculo?.marca);
-  const carroceriaNombre = getNameFromList(maestrosVehiculo?.carrocerias || [], formVehiculo?.carroceria);
+  const marcaNombre = formVehiculo?.marca_label || getNameFromList(maestrosVehiculo?.marcas || [], formVehiculo?.marca);
+  const carroceriaNombre = formVehiculo?.carroceria_label || getNameFromList(maestrosVehiculo?.carrocerias || [], formVehiculo?.carroceria);
   const combustibleNombre = getNameFromList(maestrosVehiculo?.combustibles || [], formVehiculo?.combustible);
   const aseguradoraNombre = getNameFromList(maestrosVehiculo?.aseguradoras || [], formVehiculo?.aseguradora);
   const tipoPolizaNombre = getNameFromList(maestrosVehiculo?.tiposPoliza || [], formVehiculo?.tipoPoliza);

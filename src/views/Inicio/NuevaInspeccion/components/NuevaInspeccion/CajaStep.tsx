@@ -90,6 +90,27 @@ export function CajaStep({
           const resActivas = await inspeccionesApi.consultarReinspeccionesActivas(formCaja.placa);
           if (resActivas?.data && resActivas.data.length > 0) {
             setActivasReinspecciones(resActivas.data);
+            
+            // Mostrar Toast "Ojito" inmediatamente al detectar la placa
+            let reinsHtml = '<ul style="margin: 8px 0 0 20px; padding: 0; list-style-type: disc; color: #1f2937; line-height: 1.6;">';
+            resActivas.data.forEach((act: any) => {
+              reinsHtml += `<li style="margin-bottom: 6px;"><strong>${act.concepto_nombre}</strong><br/><span style="font-size: 0.9em; color: #4b5563;">(Quedan ${act.dias_restantes} días, ${act.intentos_restantes} intentos)</span></li>`;
+            });
+            reinsHtml += '</ul>';
+            
+            Swal.fire({
+              toast: true,
+              position: 'top-end',
+              icon: 'info',
+              html: `<div style="text-align: left; margin-top: 8px; padding-top: 8px;">
+                <strong style="color: #b91c1c; font-size: 1.05em;">⚠️ REINSPECCIONES ACTIVAS EN ESTA PLACA:</strong>
+                ${reinsHtml}
+              </div>`,
+              showConfirmButton: false,
+              showCloseButton: true,
+              timer: 15000,
+              timerProgressBar: true
+            });
           } else {
             setActivasReinspecciones([]);
           }
@@ -139,8 +160,77 @@ export function CajaStep({
               }));
 
               // Y RESTAURAMOS TODOS LOS DATOS DEL VEHICULO Y SOAT (Si existen)
-              if (rData.ui_metadata && rData.ui_metadata.formVehiculo && setFormVehiculo) {
-                setFormVehiculo(rData.ui_metadata.formVehiculo);
+              if (setFormVehiculo) {
+                let vehData = {};
+                // 1. Cargamos el snapshot anterior si existe
+                if (rData.ui_metadata && rData.ui_metadata.formVehiculo) {
+                  vehData = { ...rData.ui_metadata.formVehiculo };
+                }
+                
+                // 2. Sobreescribimos con los datos ACTUALES de la BD (si existen) para permitir
+                //    que cualquier corrección manual hecha en la BD se refleje en la reinspección
+                if (rData.vehiculo_actual) {
+                  const v = rData.vehiculo_actual;
+                  vehData = {
+                    ...vehData,
+                    nroMotor: v.nromotor || vehData.nroMotor || '',
+                    nroSerie: v.nroserie || vehData.nroSerie || '',
+                    categoria: v.categoria_key || vehData.categoria || '',
+                    clase: v.vehiculoclase_key || vehData.clase || '',
+                    clase_label: v.clase_nombre || vehData.clase_label || '',
+                    marca: v.marca_key || vehData.marca || '',
+                    marca_label: v.marca_nombre || vehData.marca_label || '',
+                    modelo: v.modelo_key || vehData.modelo || '',
+                    modelo_label: v.modelo_nombre || vehData.modelo_label || '',
+                    color: v.color_key || vehData.color || '',
+                    color_label: v.color_nombre || vehData.color_label || '',
+                    carroceria: v.carroceria_key || vehData.carroceria || '',
+                    carroceria_label: v.carroceria_nombre || vehData.carroceria_label || '',
+                    anioFabricacion: v.aniofabricacion || vehData.anioFabricacion || '',
+                    combustible: v.combustible_key || vehData.combustible || '',
+                    nroCilindros: v.nrocilindros || vehData.nroCilindros || '',
+                    kilometraje: v.kilometraje || vehData.kilometraje || '',
+                    kilometrajeOriginal: v.kilometraje || vehData.kilometrajeOriginal || 0,
+                    nroAsientos: v.nroasientos || vehData.nroAsientos || '',
+                    nroPasajeros: v.nropasajeros || vehData.nroPasajeros || '',
+                    nroPuertas: v.nropuertas || vehData.nroPuertas || '',
+                    nroPisos: v.nropisos || vehData.nroPisos || '',
+                    salidasEmergencia: v.nrosalidaemergencia || vehData.salidasEmergencia || '',
+                    pesoSeco: v.pesoseco || vehData.pesoSeco || '',
+                    cargaUtil: v.cargautil || vehData.cargaUtil || '',
+                    pesoBruto: v.pesobruto || vehData.pesoBruto || '',
+                    longitud: v.longitud || vehData.longitud || '',
+                    ancho: v.ancho || vehData.ancho || '',
+                    altura: v.alto || vehData.altura || '',
+                    nroEjes: v.nroejes || vehData.nroEjes || '',
+                    nroRuedas: v.nroruedas || vehData.nroRuedas || '',
+                    marcaCarroceria: v.marcacarroceria || vehData.marcaCarroceria || '',
+                    nroSoat: v.nrosoat || vehData.nroSoat || '',
+                    tipoPoliza: v.tipopoliza_key || vehData.tipoPoliza || '',
+                    aseguradora: v.aseguradora_key || vehData.aseguradora || '',
+                    fechaEmisionSoat: v.fechiniciotarjetapropiedad ? v.fechiniciotarjetapropiedad.split('T')[0] : (vehData.fechaEmisionSoat || ''),
+                    fechaVencimientoSoat: v.fechfintarjetapropiedad ? v.fechfintarjetapropiedad.split('T')[0] : (vehData.fechaVencimientoSoat || ''),
+                    mesesSoat: (v.fechiniciotarjetapropiedad && v.fechfintarjetapropiedad) 
+                               ? (((new Date(v.fechfintarjetapropiedad).getFullYear() - new Date(v.fechiniciotarjetapropiedad).getFullYear()) * 12) + (new Date(v.fechfintarjetapropiedad).getMonth() - new Date(v.fechiniciotarjetapropiedad).getMonth()) <= 6 ? '6' : '12')
+                               : (vehData.mesesSoat || '12'),
+                    tipoDocProp: v.prop_tipodoc || vehData.tipoDocProp || '',
+                    nroDocProp: v.prop_nrodoc || vehData.nroDocProp || '',
+                    razonSocialProp: v.prop_razon || vehData.razonSocialProp || '',
+                    nombresProp: v.prop_nombres || vehData.nombresProp || '',
+                    apellidosProp: v.prop_apellidos || vehData.apellidosProp || '',
+                    paisProp: v.prop_pais || vehData.paisProp || '',
+                    departamentoProp: v.prop_dep || vehData.departamentoProp || '',
+                    provinciaProp: v.prop_prov || vehData.provinciaProp || '',
+                    distritoProp: v.prop_dist || vehData.distritoProp || '',
+                    direccionProp: v.prop_dir || vehData.direccionProp || '',
+                    emailProp: v.prop_email || vehData.emailProp || '',
+                    telefonoProp: v.prop_tel || vehData.telefonoProp || '',
+                  };
+                }
+                
+                if (Object.keys(vehData).length > 0) {
+                  setFormVehiculo(vehData);
+                }
               }
 
             // Bloquear los campos
@@ -211,6 +301,7 @@ export function CajaStep({
           setPrecioSubtotal(precios.precioBase);
           setDescuento(precios.descuento);
           setPrecioTotal(precios.total);
+          setIsReinspeccionGratuita(precios.esReinspeccion || false);
 
           // REINSPECCIÓN MODAL (Se mantiene como modal central)
           if (data.mensaje && data.mensaje.includes('[Reinspección]')) {
@@ -236,9 +327,13 @@ export function CajaStep({
               categoriaExtra: data.vehiculo.categoriaextra || '',
               clase: data.vehiculo.vehiculoclase_key || '',
               marca: data.vehiculo.marca_key || '',
+              marca_label: data.vehiculo.marca_nombre || '',
               modelo: data.vehiculo.modelo_key || '',
+              modelo_label: data.vehiculo.modelo_nombre || '',
               color: data.vehiculo.color_key || '',
+              color_label: data.vehiculo.color_nombre || '',
               carroceria: data.vehiculo.carroceria_key || '',
+              carroceria_label: data.vehiculo.carroceria_nombre || '',
               anioFabricacion: data.vehiculo.aniofabricacion || '',
               combustible: data.vehiculo.combustible_key || '',
               nroCilindros: data.vehiculo.nrocilindros || '',
@@ -261,8 +356,10 @@ export function CajaStep({
               nroSoat: data.vehiculo.nrosoat || '',
               tipoPoliza: data.vehiculo.tipopoliza_key || '',
               aseguradora: data.vehiculo.aseguradora_key || '',
-              inicioSoat: data.vehiculo.fechiniciotarjetapropiedad ? data.vehiculo.fechiniciotarjetapropiedad.split('T')[0] : '',
-              finSoat: data.vehiculo.fechfintarjetapropiedad ? data.vehiculo.fechfintarjetapropiedad.split('T')[0] : '',
+              fechaEmisionSoat: data.vehiculo.fechiniciotarjetapropiedad ? data.vehiculo.fechiniciotarjetapropiedad.split('T')[0] : '',
+              fechaVencimientoSoat: data.vehiculo.fechfintarjetapropiedad ? data.vehiculo.fechfintarjetapropiedad.split('T')[0] : '',
+              mesesSoat: data.vehiculo.fechiniciotarjetapropiedad && data.vehiculo.fechfintarjetapropiedad ? 
+                (new Date(data.vehiculo.fechfintarjetapropiedad).getFullYear() - new Date(data.vehiculo.fechiniciotarjetapropiedad).getFullYear()) * 12 === 6 ? '6' : '12' : '12',
 
               // Propietario
               nroDocProp: data.vehiculo.prop_nrodoc || '',
@@ -380,20 +477,6 @@ export function CajaStep({
             toastHtml += `<div style="margin-bottom: 8px; text-align: left;"><strong>🎁 PROMOCIONES ENCONTRADAS</strong><br/>Se encontraron descuentos disponibles.</div>`;
           }
           
-          if (currentActivas && currentActivas.length > 0) {
-            let reinsHtml = '<ul style="margin: 8px 0 0 20px; padding: 0; list-style-type: disc; color: #1f2937; line-height: 1.6;">';
-            currentActivas.forEach((act: any) => {
-              reinsHtml += `<li style="margin-bottom: 6px;"><strong>${act.concepto_nombre}</strong><br/><span style="font-size: 0.9em; color: #4b5563;">(Quedan ${act.dias_restantes} días, ${act.intentos_restantes} intentos)</span></li>`;
-            });
-            reinsHtml += '</ul>';
-            toastHtml += `<div style="text-align: left; margin-top: 8px; border-top: 1px solid #e5e7eb; padding-top: 8px;">
-              <strong style="color: #b91c1c; font-size: 1.05em;">⚠️ REINSPECCIONES ACTIVAS EN ESTA PLACA:</strong>
-              ${reinsHtml}
-            </div>`;
-          }
-
-          console.log("toastHtml generated:", toastHtml);
-
           if (toastHtml) {
             Swal.fire({
               toast: true,

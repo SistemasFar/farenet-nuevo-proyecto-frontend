@@ -185,27 +185,32 @@ export function FacturacionStep({
               options={optsDocs} 
               disabled={documentoPago === '5'} // Si es Factura, forzamos RUC y lo bloqueamos
             />
-            <InputField 
-              label="NRO. DOCUMENTO DE IDENTIDAD" 
-              name="nroDocFac" 
-              onSearch={handleSearchFacturacion}
-              searching={searchingFacturacion}
-            />
-            
             {(() => {
               const selectedDoc = maestrosFacturacion?.tiposDocumento?.find((x: any) => x.key === formFacturacion.tipoDocFac);
               const isRuc = selectedDoc?.nombre?.toUpperCase() === 'RUC';
-              
-              if (isRuc) {
-                return <InputField label="NOMBRE DE LA EMPRESA (RAZÓN SOCIAL)" name="razonSocialFac" />;
-              }
-              
+              const isDni = selectedDoc?.nombre?.toUpperCase() === 'DNI';
+              const maxLen = isDni ? 8 : (isRuc ? 11 : 15);
+
               return (
                 <>
-                  <InputField label="NOMBRES" name="nombresFac" filter="letras" />
-                  <InputField label="APELLIDOS" name="apellidosFac" filter="letras" />
-                </>
-              );
+                  <InputField 
+                    label="NRO. DOCUMENTO DE IDENTIDAD" 
+                    name="nroDocFac" 
+                    type="number"
+                    maxLength={maxLen}
+                    onSearch={handleSearchFacturacion}
+                    searching={searchingFacturacion}
+                  />
+                  {isRuc ? (
+                    <InputField label="NOMBRE DE LA EMPRESA (RAZÓN SOCIAL)" name="razonSocialFac" />
+                  ) : (
+                            <>
+                              <InputField label="NOMBRES" name="nombresFac" filter="letras" />
+                              <InputField label="APELLIDOS" name="apellidosFac" filter="letras" />
+                            </>
+                          )}
+                        </>
+                      );
             })()}
             
             <InputField label="PAÍS" name="paisFac" isSelect options={optsPaises} />

@@ -202,8 +202,11 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
           options={options}
           placeholder="Seleccione..."
           styles={customSelectStyles}
-          value={options.find((opt: any) => opt.value?.toString() === formVehiculo[name]?.toString()) || null}
-          onChange={(opt: any) => setFormVehiculo({ ...formVehiculo, [name]: opt ? opt.value : '' })}
+          value={
+            options.find((opt: any) => opt.value?.toString() === formVehiculo[name]?.toString()) ||
+            (formVehiculo[name] && formVehiculo[name + '_label'] ? { value: formVehiculo[name], label: formVehiculo[name + '_label'] } : null)
+          }
+          onChange={(opt: any) => setFormVehiculo({ ...formVehiculo, [name]: opt ? opt.value : '', [name + '_label']: opt ? opt.label : '' })}
           isDisabled={disabled || options.length === 0}
         />
       ) : (
@@ -436,8 +439,10 @@ export function VehiculoStep({
             nroSoat: res.data.nrosoat || '',
             tipoPoliza: res.data.tipopoliza_key || '',
             aseguradora: res.data.aseguradora_key || '',
-                        inicioSoat: res.data.fechiniciotarjetapropiedad ? res.data.fechiniciotarjetapropiedad.split('T')[0] : '',
-            finSoat: res.data.fechfintarjetapropiedad ? res.data.fechfintarjetapropiedad.split('T')[0] : '',
+                        fechaEmisionSoat: res.data.fechiniciotarjetapropiedad ? res.data.fechiniciotarjetapropiedad.split('T')[0] : '',
+            fechaVencimientoSoat: res.data.fechfintarjetapropiedad ? res.data.fechfintarjetapropiedad.split('T')[0] : '',
+            mesesSoat: res.data.fechiniciotarjetapropiedad && res.data.fechfintarjetapropiedad ? 
+              (new Date(res.data.fechfintarjetapropiedad).getFullYear() - new Date(res.data.fechiniciotarjetapropiedad).getFullYear()) * 12 === 6 ? '6' : '12' : '12',
 
             // Propietario
             nroDocProp: res.data.prop_nrodoc || '',
@@ -541,7 +546,7 @@ export function VehiculoStep({
           missing.push('Kilometraje (debe ser >= 5000)');
         }
         
-        // Si el vehiculo ya existe en BD, el nuevo kilometraje debe ser mayor al original
+        // Si el vehiculo ya existe en BD, el nuevo kilometraje debe ser obligatoriamente mayor al original
         const kmOriginal = parseFloat((formVehiculo as any)['kilometrajeOriginal'] || 0);
         if (kmOriginal > 0 && kmActual <= kmOriginal) {
           missing.push(`Kilometraje (debe ser mayor a ${kmOriginal} que fue el último registrado)`);
@@ -876,29 +881,35 @@ export function VehiculoStep({
                 </div>
                 <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {!formVehiculo.sinDni && (
-                      <>
-                        <InputField label="Tipo de Documento" name="tipoDocProp" isSelect options={optsDocs} />
-                        <InputField
-                          label="NRO. DOCUMENTO DE IDENTIDAD"
-                          name="nroDocProp"
-                          onSearch={handleSearchPropietario}
-                          searching={searchingPropietario}
-                        />
-                      </>
-                    )}
                     {(() => {
                       const selectedDoc = maestrosPropietario?.tiposDocumento?.find((x: any) => x.key === formVehiculo.tipoDocProp);
                       const isRuc = !formVehiculo.sinDni && selectedDoc?.nombre?.toUpperCase() === 'RUC';
-
-                      if (isRuc) {
-                        return <InputField label="Nombre de la Empresa (Razón Social)" name="razonSocialProp" />;
-                      }
+                      const isDni = selectedDoc?.nombre?.toUpperCase() === 'DNI';
+                      const maxLen = isDni ? 8 : (isRuc ? 11 : 15);
 
                       return (
                         <>
-                          <InputField label="Nombres" name="nombresProp" filter="letras" />
-                          <InputField label="Apellidos" name="apellidosProp" filter="letras" />
+                          {!formVehiculo.sinDni && (
+                            <>
+                              <InputField label="Tipo de Documento" name="tipoDocProp" isSelect options={optsDocs} />
+                              <InputField
+                                label="NRO. DOCUMENTO DE IDENTIDAD"
+                                name="nroDocProp"
+                                type="number"
+                                maxLength={maxLen}
+                                onSearch={handleSearchPropietario}
+                                searching={searchingPropietario}
+                              />
+                            </>
+                          )}
+                          {isRuc ? (
+                            <InputField label="Nombre de la Empresa (Razón Social)" name="razonSocialProp" />
+                          ) : (
+                            <>
+                              <InputField label="Nombres" name="nombresProp" filter="letras" />
+                              <InputField label="Apellidos" name="apellidosProp" filter="letras" />
+                            </>
+                          )}
                         </>
                       );
                     })()}
