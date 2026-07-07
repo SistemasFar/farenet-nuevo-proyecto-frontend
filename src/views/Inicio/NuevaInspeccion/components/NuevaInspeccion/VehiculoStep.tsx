@@ -539,14 +539,10 @@ export function VehiculoStep({
         if (!isValid((formVehiculo as any)[f])) missing.push(f);
       }
 
-      // Regla 4: Kilometraje >= 5000 (No aplica para O)
+      // Regla: Si el vehiculo ya existe en BD, el nuevo kilometraje debe ser obligatoriamente mayor al original
       if (isValid((formVehiculo as any)['kilometraje'])) {
         const kmActual = parseFloat((formVehiculo as any)['kilometraje']);
-        if (kmActual < 5000) {
-          missing.push('Kilometraje (debe ser >= 5000)');
-        }
         
-        // Si el vehiculo ya existe en BD, el nuevo kilometraje debe ser obligatoriamente mayor al original
         const kmOriginal = parseFloat((formVehiculo as any)['kilometrajeOriginal'] || 0);
         if (kmOriginal > 0 && kmActual <= kmOriginal) {
           missing.push(`Kilometraje (debe ser mayor a ${kmOriginal} que fue el último registrado)`);

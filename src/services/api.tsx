@@ -525,7 +525,7 @@ export const inspeccionesApi = {
     return await parseJsonResponse<any>(response);
   },
   consumirDescuento: async (source_table: string, source_id: string) => {
-    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/descuentos/consumir`, {
+    const response = await fetchWithTimeout(`${BASE_URL}/descuentos/consumir`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source_table, source_id })
@@ -542,6 +542,18 @@ export const inspeccionesApi = {
     });
     if (!response.ok) {
       const errMsg = await getErrorMessage(response, 'Error al consultar reinspección');
+      throw new Error(errMsg);
+    }
+    return await parseJsonResponse<any>(response);
+  },
+  validarDescuentosYReinspeccion: async (placa: string, plantaKey: string, concepto: string, ruc?: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/descuentos/validar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ placa, plantaKey, concepto, ruc })
+    });
+    if (!response.ok) {
+      const errMsg = await getErrorMessage(response, 'Error al validar descuentos y reinspección');
       throw new Error(errMsg);
     }
     return await parseJsonResponse<any>(response);
@@ -778,6 +790,20 @@ export const maestrosApi = {
     }
 
     return parseJsonResponse<MaestrosCajaResponse>(response);
+  },
+
+  obtenerIngenierosAsync: async (plantaKey: string): Promise<{ status: string, data: any[] }> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/maestros/ingenieros/${plantaKey}`, {
+      method: 'GET'
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await getErrorMessage(response, 'Error al obtener ingenieros.')
+      );
+    }
+
+    return parseJsonResponse<{ status: string, data: any[] }>(response);
   },
 
   obtenerPrecioConceptoAsync: async (plantaKey: string, conceptoKey: string): Promise<{ status: string, data: { precio: number } }> => {

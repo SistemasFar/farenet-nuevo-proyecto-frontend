@@ -381,75 +381,59 @@ export function CajaStep({
           setDocumentoDescuento('');
 
           // ---------------------------------------------
-          // LÓGICA DE REINSPECCIÓN
+          // LÓGICA DE REINSPECCIÓN Y DESCUENTOS AUTOMÁTICOS
           // ---------------------------------------------
+          let hasDescuentos = false;
           try {
-            const resReins = await inspeccionesApi.consultarReinspeccion(formCaja.placa, formCaja.concepto, planta.key);
-            if (resReins?.data?.aplica) {
-              const rData = resReins.data;
-              setIsReinspeccionAplica(true);
-              setReinspeccionMensaje(rData.mensaje || `¡Aplica a Reinspección! Documento anterior: ${rData.nrodocumentoreinspeccion} (${rData.porcentajedescuento}% dscto)`);
-              // Extraer tipoPlaca de ui_metadata si existe
-              let oldTipoPlaca = formCaja.tipoPlaca;
-              if (rData.ui_metadata && rData.ui_metadata.formCaja && rData.ui_metadata.formCaja.tipoPlaca) {
-                oldTipoPlaca = rData.ui_metadata.formCaja.tipoPlaca;
-              }
+            const resDescuentos = await inspeccionesApi.validarDescuentosYReinspeccion(
+              formCaja.placa, 
+              planta.key, 
+              formCaja.concepto
+            );
+            
+            if (resDescuentos?.data) {
+              const rData = resDescuentos.data;
+              
+              if (rData.tipo === 'REINSPECCION') {
+                setIsReinspeccionAplica(true);
+                setReinspeccionMensaje(rData.mensaje);
+                // Aquí deberíamos setear el monto de reinspección (0 en la mayoría de casos)
+                const porcentaje = rData.porcentajedescuento || 100;
+                
+                if (porcentaje === 100) {
+                  setDescuento(precios.precioBase);
+                  setPrecioTotal(0);
+                  setIsReinspeccionGratuita(true);
+                  setDocumentoPago(''); 
+                } else {
+                  const descCalc = precios.precioBase * (porcentaje / 100);
+                  setDescuento(descCalc);
+                  setPrecioTotal(precios.precioBase - descCalc);
+                  setIsReinspeccionGratuita(false);
+                }
 
-              // AUTO-FILL de todos los campos segun la reinspeccion anterior
-              setFormCaja((prev: any) => ({
-                ...prev,
-                nrodocumentoreinspeccion: rData.nrodocumentoreinspeccion,
-                tipoAutorizacion: rData.tipoautorizacion_key || prev.tipoAutorizacion,
-                tipoCertificado: rData.tipocertificado_key || prev.tipoCertificado,
-                tipoInspeccion: rData.tipoinspeccion_key || prev.tipoInspeccion,
-                categoria: rData.categoria_key || prev.categoria,
-                tipoPlaca: oldTipoPlaca
-              }));
-
-              // Y RESTAURAMOS TODOS LOS DATOS DEL VEHICULO Y SOAT (Si existen)
-              if (rData.ui_metadata && rData.ui_metadata.formVehiculo && setFormVehiculo) {
-                setFormVehiculo(rData.ui_metadata.formVehiculo);
-              }
-
-              if (rData.porcentajedescuento === 100) {
-                setDescuento(precios.precioBase);
-                setPrecioTotal(0);
-                setIsReinspeccionGratuita(true);
-                setDocumentoPago(''); // No se necesita boleta/factura si es gratis
+                setFormCaja((prev: any) => ({
+                  ...prev,
+                  nrodocumentoreinspeccion: rData.nrodocumentoreinspeccion || null
+                })); 
+              } else if (rData.tipo === 'CAMPANAS' && rData.descuentos && rData.descuentos.length > 0) {
+                setListaDescuentos(rData.descuentos);
+                setShowDescuentosModal(true);
+                hasDescuentos = true;
+                setIsReinspeccionAplica(false);
+                setReinspeccionMensaje(null);
+                setIsReinspeccionGratuita(false);
               } else {
-                const descCalc = precios.precioBase * (rData.porcentajedescuento / 100);
-                setDescuento(descCalc);
-                setPrecioTotal(precios.precioBase - descCalc);
+                setIsReinspeccionAplica(false);
+                setReinspeccionMensaje(null);
                 setIsReinspeccionGratuita(false);
               }
-            } else if (resReins?.data?.mensaje) {
-              setIsReinspeccionAplica(false);
-              setReinspeccionMensaje(resReins.data.mensaje);
-              setIsReinspeccionGratuita(false);
-              setFormCaja((prev: any) => ({ ...prev, nrodocumentoreinspeccion: null }));
-            } else {
-              setIsReinspeccionAplica(false);
-              setReinspeccionMensaje(null);
-              setIsReinspeccionGratuita(false);
-              setFormCaja((prev: any) => ({ ...prev, nrodocumentoreinspeccion: null }));
             }
           } catch (e) {
-            console.error("Error al consultar reinspeccion", e);
+            console.error("Error al validar descuentos y reinspección", e);
             setIsReinspeccionAplica(false);
             setReinspeccionMensaje(null);
             setIsReinspeccionGratuita(false);
-            setFormCaja((prev: any) => ({ ...prev, nrodocumentoreinspeccion: null }));
-          }
-          // ---------------------------------------------
-
-          // ---------------------------------------------
-          // AUTO-MOSTRAR DESCUENTOS SI HAY DISPONIBLES
-          // ---------------------------------------------
-          let hasDescuentos = false;
-          if (data.descuentosDisponibles && data.descuentosDisponibles.length > 0) {
-            setListaDescuentos(data.descuentosDisponibles);
-            setShowDescuentosModal(true);
-            hasDescuentos = true;
           }
           // ---------------------------------------------
 
@@ -557,22 +541,23 @@ export function CajaStep({
     }
 
     try {
-      const res = await inspeccionesApi.buscarDescuentos(documentoDescuento, formCaja.concepto, formCaja.placa, true);
+      const planta = plantaSession.obtener();
+      if (!planta?.key) {
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No hay planta seleccionada.' });
+        return;
+      }
+
+      const res = await inspeccionesApi.validarDescuentosYReinspeccion(
+        formCaja.placa, 
+        planta.key, 
+        formCaja.concepto,
+        documentoDescuento.trim().toUpperCase()
+      );
       if (res.status === 'success') {
-        const descuentosNuevos = res.data;
+        const descuentosNuevos = res.data.descuentos || [];
         
         if (descuentosNuevos.length > 0) {
-          // Filtrar para no agregar duplicados (basado en source_id)
-          setListaDescuentos(prevLista => {
-            const listaCombinada = [...prevLista];
-            descuentosNuevos.forEach((nuevo: any) => {
-              if (!listaCombinada.some(item => item.source_id === nuevo.source_id)) {
-                listaCombinada.push(nuevo);
-              }
-            });
-            return listaCombinada;
-          });
-          
+          setListaDescuentos(descuentosNuevos);
           setShowDescuentosModal(true);
           Swal.fire({
             toast: true,
@@ -607,22 +592,21 @@ export function CajaStep({
   const quitarDescuento = () => {
     setDescuento(0);
     setPrecioTotal(precioSubtotal);
-    setFormCaja({ 
-      ...formCaja, 
+    setFormCaja((prev: any) => ({ 
+      ...prev, 
       descuentoObj: null 
-    });
+    }));
   };
 
   const aplicarDescuento = (desc: any) => {
-    const isCuponidad = desc.tipodescuento_key === 'aliestrategica' || (desc.campana || desc.nombre || '').toUpperCase().includes('CUPONIDAD');
-    const isCortesia = desc.tipodescuento_key === 'corte' || (desc.campana || desc.nombre || '').toUpperCase().includes('CORTESIA') || (desc.campana || desc.nombre || '').toUpperCase().includes('CORTESÍA');
-
+    // La lógica de cortesia y cuponidad ahora viene de la base de datos real
     let finalPrecioTotal = precioSubtotal;
     let finalDescuento = 0;
 
     const tipoCobro = desc.tipopagodescuento_key || 'MON'; // Valor por defecto
+    const isDescuentoTotal = desc.monto === 0 && tipoCobro === 'FLA'; 
 
-    if (isCortesia || isCuponidad) {
+    if (isDescuentoTotal) {
       finalPrecioTotal = 0;
       finalDescuento = precioSubtotal;
     } else {
@@ -649,16 +633,18 @@ export function CajaStep({
 
     setDescuento(finalDescuento);
     setPrecioTotal(finalPrecioTotal);
-    setFormCaja({ 
-      ...formCaja, 
+    setFormCaja((prev: any) => ({ 
+      ...prev, 
+      descuento: finalDescuento,
       descuentoObj: { 
         ...desc, 
+        uuid: desc.verificaciondescuento_codigo || null, 
         monto: finalDescuento, 
         montoBaseOperacion: desc.monto,
-        isCuponidad: isCuponidad,
+        isCuponidad: desc.tipodescuento_key === 'cuponidad' || desc.nombre?.toLowerCase().includes('cuponidad'),
         documentoBusqueda: documentoDescuento 
       } 
-    });
+    }));
   };
 
   return (

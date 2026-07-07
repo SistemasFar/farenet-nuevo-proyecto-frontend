@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { maestrosApi, plantaSession } from '../../../../services/api';
 
 interface ConsolidacionInicialStepProps {
   nroInspeccion?: string;
@@ -10,6 +11,25 @@ interface ConsolidacionInicialStepProps {
 export function ConsolidacionInicialStep({ nroInspeccion, inspeccionData, onSiguiente, onAnular }: ConsolidacionInicialStepProps) {
   const placa = inspeccionData?.form_data?.vehiculo?.placa || 'N/A';
   const nombreCliente = inspeccionData?.form_data?.facturacion?.razonSocial || 'N/A';
+  
+  const [ingenieros, setIngenieros] = useState<any[]>([]);
+  
+  useEffect(() => {
+    const fetchIngenieros = async () => {
+      try {
+        const planta = plantaSession.obtener();
+        if (planta?.key) {
+          const res = await maestrosApi.obtenerIngenierosAsync(planta.key);
+          if (res.status === 'success' && res.data) {
+            setIngenieros(res.data);
+          }
+        }
+      } catch (error) {
+        console.error("Error cargando ingenieros", error);
+      }
+    };
+    fetchIngenieros();
+  }, []);
   return (
     <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -38,8 +58,9 @@ export function ConsolidacionInicialStep({ nroInspeccion, inspeccionData, onSigu
               <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Ingeniero Certificador</label>
               <select className="w-full bg-white border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-amber-500 focus:border-amber-500 block p-2.5">
                 <option value="">Seleccione ingeniero...</option>
-                <option value="ing1">Ing. Carlos Rodríguez (CIP 123456)</option>
-                <option value="ing2">Ing. María Fernández (CIP 654321)</option>
+                {ingenieros.map(ing => (
+                  <option key={ing.id} value={ing.id}>{ing.nombre}</option>
+                ))}
               </select>
             </div>
           </div>
