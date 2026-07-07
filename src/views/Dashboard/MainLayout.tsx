@@ -6,6 +6,7 @@ import { AuditoriaView } from '../Auditoria/AuditoriaView';
 import { GenericView } from './GenericView';
 import InspeccionesView from '../Inspecciones/InspeccionesView';
 import { NuevaInspeccionView } from '../Inicio/NuevaInspeccion/NuevaInspeccionView';
+import { LineaView } from '../Inicio/Linea';
 
 import type {
   UserSession,
@@ -24,6 +25,7 @@ interface MainLayoutProps {
 const TAB_PERMISOS: Record<string, string[]> = {
   inicio: [],
   nueva_inspeccion: [], // Idealmente requiere permiso CREAR_INSPECCION, lo dejaremos vacio o como LISTA por ahora para que pueda verlo
+  linea: [], // Mismo caso que nueva_inspeccion
   inspecciones: ['LISTA_INSPECCION', 'VER_INSPECCION', 'CREAR_INSPECCION'],
   personas: ['EDITAR_PERSONA'],
   vehiculos: ['EDITAR_VEHICULO'],
@@ -115,6 +117,10 @@ export function MainLayout({
               setInspeccionIdBorrador(id);
               setActiveTab('nueva_inspeccion');
             }}
+            onLinea={(id) => {
+              setInspeccionIdBorrador(id);
+              setActiveTab('linea');
+            }}
           />
         );
 
@@ -124,9 +130,24 @@ export function MainLayout({
             onBack={() => {
               setInspeccionIdBorrador(undefined);
               setActiveTab('inicio');
-            }} 
+            }}
+            onContinueToVerificacion={(id) => {
+              setInspeccionIdBorrador(id);
+              setActiveTab('linea');
+            }}
             plantaSeleccionada={plantaKey} 
             inspeccionIdBorrador={inspeccionIdBorrador}
+          />
+        );
+
+      case 'linea':
+        return (
+          <LineaView
+            nroInspeccion={inspeccionIdBorrador}
+            onBack={() => {
+              setInspeccionIdBorrador(undefined);
+              setActiveTab('inicio');
+            }}
           />
         );
 
@@ -208,6 +229,10 @@ export function MainLayout({
             onNuevaInspeccion={(id) => {
               setInspeccionIdBorrador(id);
               setActiveTab('nueva_inspeccion');
+            }}
+            onLinea={(id) => {
+              setInspeccionIdBorrador(id);
+              setActiveTab('linea');
             }}
           />
         );

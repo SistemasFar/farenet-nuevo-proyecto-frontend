@@ -1,0 +1,1 @@
+export { LineaView } from './LineaView';

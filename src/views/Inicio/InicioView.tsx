@@ -11,7 +11,8 @@ import type { InspeccionPanel } from '../../types/operacion';
 interface InicioViewProps {
   plantaSeleccionada: string;
   plantaNombre: string;
-  onNuevaInspeccion?: (id?: string) => void;
+  onNuevaInspeccion?: (idBorrador?: string) => void;
+  onLinea?: (id: string) => void;
 }
 
 interface FiltrosPanel {
@@ -556,7 +557,7 @@ export function InicioView(props: InicioViewProps) {
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => props.onNuevaInspeccion?.(ins.numeroInspeccion)}
+                            onClick={() => esBorrador ? props.onNuevaInspeccion?.(ins.numeroInspeccion) : props.onLinea?.(ins.numeroInspeccion)}
                             className="rounded bg-white/90 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-white shadow-sm transition"
                           >
                             Ver

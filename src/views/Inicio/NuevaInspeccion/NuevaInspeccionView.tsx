@@ -29,6 +29,7 @@ const customSelectStyles = {
 
 interface NuevaInspeccionViewProps {
   onBack?: () => void;
+  onContinueToVerificacion?: (id: string) => void;
   plantaSeleccionada?: string;
   inspeccionIdBorrador?: string;
 }
@@ -41,7 +42,7 @@ const STEPS = [
   { id: 'verificacion', label: 'Verificación', icon: FileText }
 ];
 
-export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBorrador }: NuevaInspeccionViewProps) {
+export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSeleccionada, inspeccionIdBorrador }: NuevaInspeccionViewProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentBorradorId, setCurrentBorradorId] = useState<string | undefined>(inspeccionIdBorrador);
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
@@ -391,8 +392,13 @@ export function NuevaInspeccionView({ onBack, plantaSeleccionada, inspeccionIdBo
           title: '¡Guardado!',
           text: `La inspección se guardó correctamente en la base de datos. Código Oficial: ${finalId}`,
           confirmButtonColor: '#052a79'
+        }).then(() => {
+          if (onContinueToVerificacion) {
+            onContinueToVerificacion(finalId);
+          } else if (onBack) {
+            onBack();
+          }
         });
-        if (onBack) onBack();
       } catch (error: any) {
         Swal.fire({
           icon: 'error',
