@@ -5,6 +5,7 @@ import { PreVisualizacionStep } from './components/PreVisualizacionStep';
 import { ConsolidacionFinalStep } from './components/ConsolidacionFinalStep';
 import Swal from 'sweetalert2';
 import { lineaApi } from '../../../services/api/linea';
+import { CheckCircle2, ClipboardCheck, Activity, Eye, FileCheck, ArrowLeft } from 'lucide-react';
 
 interface LineaViewProps {
   nroInspeccion: string | undefined;
@@ -12,10 +13,10 @@ interface LineaViewProps {
 }
 
 const STEPS = [
-  '1. Consolidación',
-  '2. Línea',
-  '3. Pre Visualización Certificado',
-  '4. Consolidación'
+  { id: 'consolidacion_inicial', label: 'Consolidación', icon: ClipboardCheck },
+  { id: 'linea', label: 'Línea', icon: Activity },
+  { id: 'pre_visualizacion', label: 'Pre Visualización', icon: Eye },
+  { id: 'consolidacion_final', label: 'Consolidación', icon: FileCheck }
 ];
 
 export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
@@ -94,65 +95,52 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
   if (!nroInspeccion) return null;
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden font-sans">
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex-shrink-0 z-10 shadow-sm relative">
-        {/* Progress bar line base */}
-        <div className="absolute bottom-0 left-0 w-full h-[6px] bg-slate-100" />
-        
-        {/* Progress bar active */}
-        <div 
-          className="absolute bottom-0 left-0 h-[6px] bg-amber-400 transition-all duration-500 ease-out z-10 shadow-[0_0_10px_rgba(251,191,36,0.5)]"
-          style={{ width: `${((currentStep + 1) / STEPS.length) * 100}%` }}
-        />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-              <button 
-                onClick={onBack}
-                className="p-1 hover:bg-slate-100 rounded-full transition-colors"
-                title="Volver"
-              >
-                <svg className="w-6 h-6 text-slate-400 hover:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              Línea de Inspección
-            </h1>
-            <p className="text-sm text-slate-500 font-medium ml-10">Inspección Nro: <span className="text-amber-600 font-bold">{nroInspeccion}</span></p>
-          </div>
+    <div className="w-full min-h-[calc(100vh-10rem)] bg-white rounded-2xl shadow-xl border-t-[4px] border-solid border-t-[#f59e0b] overflow-hidden flex flex-col font-sans" style={{ borderImage: "linear-gradient(to right, #fde047 0%, #f59e0b 50%, #b45309 100%) 1" }}>
+      <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-1.5 text-slate-400 hover:text-[#052a79] hover:bg-slate-100 rounded-full transition"
+            title="Volver"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+            Línea de Inspección
+          </h2>
+          <p className="text-sm text-slate-500 font-medium ml-4 border-l border-slate-300 pl-4">
+            Inspección Nro: <span className="text-amber-600 font-bold">{nroInspeccion}</span>
+          </p>
         </div>
 
-        {/* Stepper Header */}
-        <div className="mt-8 flex justify-between relative max-w-4xl mx-auto px-4 md:px-12">
-          {STEPS.map((stepName, index) => {
-            const isCompleted = index < currentStep;
+        <div className="flex items-center justify-between relative">
+          <div className="absolute left-0 top-1/2 w-full h-1 bg-slate-200 -z-10 -translate-y-1/2">
+            <div
+              className="h-full bg-gold-3d transition-all duration-500"
+              style={{ width: `${(currentStep / (STEPS.length - 1)) * 100}%` }}
+            ></div>
+          </div>
+
+          {STEPS.map((step, index) => {
+            const StepIcon = step.icon;
             const isActive = index === currentStep;
+            const isCompleted = index < currentStep;
 
             return (
-              <div key={stepName} className="flex flex-col items-center relative z-10 w-24 md:w-32">
-                <div 
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 shadow-sm border-2
-                    ${isActive 
-                      ? 'bg-amber-400 text-slate-900 border-amber-400 scale-110 shadow-amber-400/30' 
-                      : isCompleted 
-                        ? 'bg-slate-800 text-white border-slate-800'
-                        : 'bg-white text-slate-400 border-slate-200'
-                    }
-                  `}
+              <div key={step.id} className="flex flex-col items-center gap-2 bg-[#f4f9ff] px-2">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 
+'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
+                    isCompleted ? 'bg-gold-3d shadow-sm border-none text-white' :
+                      'bg-white text-slate-400 border-2 border-slate-200'
+                    }`}
                 >
-                  {isCompleted ? (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    index + 1
-                  )}
+                  {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                 </div>
-                <span className={`mt-3 text-[10px] md:text-xs font-bold text-center uppercase tracking-wide transition-colors duration-300
-                  ${isActive ? 'text-slate-800' : isCompleted ? 'text-slate-600' : 'text-slate-400'}
-                `}>
-                  {stepName.replace(/^\d+\.\s*/, '')}
+                <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : 
+isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
+                  {step.label}
                 </span>
               </div>
             );
@@ -160,8 +148,8 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 relative z-0">
-        <div className="max-w-4xl mx-auto h-full animate-fade-in-up pb-10">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 relative z-0">
+        <div className="w-full h-full animate-fade-in-up pb-10">
           {loading && <div className="p-8 text-center text-slate-500">Cargando inspección...</div>}
           
           {!loading && currentStep === 0 && (
