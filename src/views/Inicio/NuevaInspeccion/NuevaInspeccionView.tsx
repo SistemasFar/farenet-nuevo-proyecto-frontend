@@ -304,15 +304,23 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
 
   const handleSelectChange = (name: string, option: any) => {
     const value = option ? option.value : '';
-    setFormCaja((prev) => ({ ...prev, [name]: value, ...(name === 'tipoPlaca' ? { placa: '' } : {}) }));
+    setFormCaja((prev) => ({ ...prev, [name]: value }));
+    const critical = ['tipoPlaca', 'placa', 'concepto', 'categoria', 'tipoCertificado', 'tipoAutorizacion'];
+    if (critical.includes(name)) {
+      setIsConsultado(false);
+    }
   };
 
   const handleCajaChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
     const { name, value } = e.target;
+    const critical = ['tipoPlaca', 'placa', 'concepto', 'categoria', 'tipoCertificado', 'tipoAutorizacion'];
 
-    // Si cambia el tipo de placa, limpiamos la placa para evitar problemas de formato
+    if (critical.includes(name)) {
+      setIsConsultado(false);
+    }
+
     if (name === 'tipoPlaca') {
-      setFormCaja((prev) => ({ ...prev, [name]: value, placa: '' }));
+      setFormCaja((prev) => ({ ...prev, [name]: value }));
       return;
     }
 
@@ -341,14 +349,51 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
   };
 
   const validarCaja = (opciones = { ignorarTipoPlaca: false }) => {
-    // Validar que todos los campos requeridos estén llenos
-    if ((!opciones.ignorarTipoPlaca && !formCaja.tipoPlaca) || !formCaja.placa || !formCaja.concepto || !formCaja.categoria || !formCaja.tipoInspeccion || !formCaja.tipoCertificado) {
-      return false;
+    const faltantes = [];
+    if (!opciones.ignorarTipoPlaca && !formCaja.tipoPlaca) faltantes.push('Tipo de Placa');
+    if (!formCaja.placa) faltantes.push('Placa');
+    if (!formCaja.concepto) faltantes.push('Concepto');
+    if (!formCaja.categoria) faltantes.push('Categoría');
+    if (!formCaja.tipoCertificado) faltantes.push('Tipo Certificado');
+    if (!formCaja.tipoInspeccion) faltantes.push('Tipo Inspección');
+    if (!documentoPago || documentoPago === '' || documentoPago === 'Seleccione...') faltantes.push('Documento de pago');
+
+    if (faltantes.length > 0) {
+      return { valido: false, mensaje: `Falta completar: ${faltantes.join(', ')}.` };
     }
-    return true;
+
+    if (formCaja.tipoPlaca && formCaja.placa) {
+      let maxLen = 17;
+      let minLen = 6;
+      let exactLen = false;
+
+      const tp = maestros?.tiposPlaca?.find((x: any) => x.id?.toString() === formCaja.tipoPlaca?.toString());
+      if (tp) {
+        const n = tp.nombre?.toUpperCase() || '';
+        if (n.includes('DIPLOMATIC') || n.includes('DIPLOMÁTIC')) { maxLen = 6; minLen = 6; exactLen = true; }
+        else if (n.includes('INCORPORACI')) { maxLen = 17; minLen = 6; }
+        else if (n.includes('RUTINARI')) { maxLen = 6; minLen = 6; exactLen = true; }
+        else if (n.includes('EXTRANJER')) { maxLen = 7; minLen = 6; }
+        else { maxLen = 6; minLen = 6; exactLen = true; }
+      }
+
+      if (formCaja.placa.length > maxLen) {
+        return { valido: false, mensaje: `La placa ingresada no cumple el formato permitido para el tipo de placa seleccionado (máximo ${maxLen} caracteres).` };
+      }
+      if (formCaja.placa.length < minLen) {
+        return { valido: false, mensaje: `La placa ingresada no cumple el formato permitido para el tipo de placa seleccionado (mínimo ${minLen} caracteres).` };
+      }
+      if (exactLen && formCaja.placa.length !== maxLen) {
+        return { valido: false, mensaje: `La placa ingresada no cumple el formato permitido para el tipo de placa seleccionado (debe tener exactamente ${maxLen} caracteres).` };
+      }
+    }
+
+    return { valido: true };
   };
 
   const irSiguientePaso = async () => {
+    if (loading) return; // Protección anti doble click
+
     const esReanudacionConCajaCompletada = posicionActualGuardada >= 1;
     let cajaModificada = false;
 
@@ -362,17 +407,23 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
     }
 
     if (currentStepIndex === 0) {
-      if (esReanudacionConCajaCompletada && !cajaModificada) {
-        if (!validarCaja({ ignorarTipoPlaca: true }) || !isConsultado) {
-          alert('Por favor completa todos los campos de la caja y consulta exitosamente antes de continuar.');
-          return;
-        }
-      } else {
-        if (!validarCaja({ ignorarTipoPlaca: false }) || !isConsultado) {
-          alert('Por favor completa todos los campos de la caja y consulta exitosamente antes de continuar.');
-          return;
-        }
+      const ignorarTipoPlaca = esReanudacionConCajaCompletada && !cajaModificada;
+      const validacion = validarCaja({ ignorarTipoPlaca });
+
+      if (!validacion.valido) {
+        alert(validacion.mensaje);
+        return;
       }
+      
+      if (!isConsultado) {
+        alert('Por favor realiza la consulta exitosamente antes de continuar.');
+        return;
+      }
+    }
+
+    if (currentStepIndex === 1 && !documentoPago) {
+      alert('Por favor selecciona el documento de pago obligatorio antes de continuar.');
+      return;
     }
 
     if (currentStepIndex === 2 && !isVehiculoValid) {
@@ -390,83 +441,148 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
       return;
     }
 
-    // Auto-guardado progresivo en DB antes de pasar al siguiente o consolidar
     if (nrodocumentoinspeccion) {
       try {
-        await inspeccionesApi.guardarProceso({
-          nrodocumentoinspeccion,
-          posicion: currentStepIndex,
-          plantaKey: plantaSeleccionada,
-          formCaja,
-          pagosAgregados,
-          formVehiculo,
-          formFacturacion,
-          formVerificacion,
-          documentoPago,
-          isConsultado,
-          precioSubtotal,
-          descuento,
-          precioTotal
-        });
-      } catch (err) {
-        console.error("Error en guardado progresivo:", err);
-      }
-    }
-
-
-
-    if (currentStepIndex === STEPS.length - 1) {
-      try {
         setLoading(true);
-        const savePayload = {
-          nrodocumentoinspeccion,
-          plantaKey: plantaSeleccionada,
-          formCaja,
-          pagosAgregados,
-          formVehiculo,
-          formFacturacion,
-          formVerificacion,
-          documentoPago,
-          isConsultado,
-          precioSubtotal,
-          descuento,
-          precioTotal
-        };
-        const res = await inspeccionesApi.guardar(savePayload);
-        const finalId = res?.data?.data?.nroInspeccion || res?.data?.nroInspeccion || nrodocumentoinspeccion || 'Generado con éxito';
+        let targetPosicion = currentStepIndex + 1;
+        if (currentStepIndex >= 4) targetPosicion = 4;
 
-        if (formCaja.descuentoObj && formCaja.descuentoObj.source_table && formCaja.descuentoObj.source_id) {
-          try {
-            await inspeccionesApi.consumirDescuento(formCaja.descuentoObj.source_table, formCaja.descuentoObj.source_id);
-          } catch (e) {
-            console.error("No se pudo consumir el descuento", e);
+        if (currentStepIndex === STEPS.length - 1) {
+          // Guardado Final
+          const savePayload = {
+            nrodocumentoinspeccion,
+            plantaKey: plantaSeleccionada,
+            formCaja,
+            pagosAgregados,
+            formVehiculo,
+            formFacturacion,
+            formVerificacion,
+            documentoPago,
+            isConsultado,
+            precioSubtotal,
+            descuento,
+            precioTotal
+          };
+          const res = await inspeccionesApi.guardar(savePayload);
+          const finalId = res?.data?.data?.nroInspeccion || res?.data?.nroInspeccion || nrodocumentoinspeccion || 'Generado con éxito';
+
+          if (formCaja.descuentoObj && formCaja.descuentoObj.source_table && formCaja.descuentoObj.source_id) {
+            try {
+              await inspeccionesApi.consumirDescuento(formCaja.descuentoObj.source_table, formCaja.descuentoObj.source_id);
+            } catch (e) {
+              console.error("No se pudo consumir el descuento", e);
+            }
+          }
+
+          Swal.fire({
+            icon: 'success',
+            title: '¡Guardado!',
+            text: `La inspección se guardó correctamente en la base de datos. Código Oficial: ${finalId}`,
+            confirmButtonColor: '#052a79'
+          }).then(() => {
+            if (onContinueToVerificacion) {
+              onContinueToVerificacion(finalId);
+            } else if (onBack) {
+              onBack();
+            }
+          });
+        } else {
+          // Guardado Progresivo Asíncrono Estricto
+          const payload = {
+            nrodocumentoinspeccion,
+            posicionActual: currentStepIndex,
+            siguientePosicion: targetPosicion,
+            plantaKey: plantaSeleccionada,
+            formCaja,
+            pagosAgregados,
+            formVehiculo,
+            formFacturacion,
+            formVerificacion,
+            documentoPago,
+            isConsultado,
+            precioSubtotal,
+            descuento,
+            precioTotal
+          };
+          console.log('[FRONT guardarProceso payload]', payload);
+          const res = await inspeccionesApi.guardarProceso(payload);
+          console.log('[FRONT guardarProceso response]', res);
+
+          if (res?.ok) {
+            setCurrentStepIndex(res.posicionActual);
+            setPosicionActualGuardada(res.posicionActual);
+          } else {
+            alert(res?.message || 'No se pudo guardar el paso actual en el servidor.');
           }
         }
-
-        Swal.fire({
-          icon: 'success',
-          title: '¡Guardado!',
-          text: `La inspección se guardó correctamente en la base de datos. Código Oficial: ${finalId}`,
-          confirmButtonColor: '#052a79'
-        }).then(() => {
-          if (onContinueToVerificacion) {
-            onContinueToVerificacion(finalId);
-          } else if (onBack) {
-            onBack();
-          }
-        });
-      } catch (error: any) {
+      } catch (err: any) {
+        console.error("Error en guardado:", err);
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          'No se pudo guardar la información.';
         Swal.fire({
           icon: 'error',
-          title: 'Error',
-          text: error.message || 'No se pudo guardar la inspección.',
+          title: 'Error de Guardado',
+          text: msg,
           confirmButtonColor: '#d33'
         });
       } finally {
         setLoading(false);
       }
     } else {
-      setCurrentStepIndex((prev) => prev + 1);
+      if (currentStepIndex < STEPS.length - 1) {
+        setCurrentStepIndex((prev) => prev + 1);
+      }
+    }
+  };
+
+  const guardarParcialAsync = async (tabDestino: string) => {
+    if (loading) return; // Protección anti doble click
+    if (!nrodocumentoinspeccion) {
+      setVehiculoTab(tabDestino);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const payload = {
+        nrodocumentoinspeccion,
+        posicionActual: currentStepIndex,
+        siguientePosicion: currentStepIndex,
+        plantaKey: plantaSeleccionada,
+        formCaja,
+        pagosAgregados,
+        formVehiculo,
+        formFacturacion,
+        formVerificacion,
+        documentoPago,
+        isConsultado,
+        precioSubtotal,
+        descuento,
+        precioTotal
+      };
+      console.log('[FRONT guardarParcial payload]', payload);
+      const res = await inspeccionesApi.guardarProceso(payload);
+      console.log('[FRONT guardarParcial response]', res);
+
+      if (res?.ok) {
+        setPosicionActualGuardada(res.posicionActual);
+        setVehiculoTab(tabDestino);
+      } else {
+        alert(res?.message || 'Error al guardar parcialmente los datos.');
+      }
+    } catch (err: any) {
+      console.error("Error guardado parcial:", err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Error al guardar parcialmente los datos.';
+      alert(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -717,6 +833,7 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
             documentoPago={documentoPago}
             setDocumentoPago={setDocumentoPago}
             customSelectStyles={customSelectStyles}
+            isReadOnly={posicionActualGuardada >= 1}
           />
         )}
 
@@ -757,6 +874,7 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
               onValidationChange={setIsVehiculoValid}
               placaCaja={formCaja.placa}
               isReinspeccion={!!formCaja.nrodocumentoreinspeccion}
+              guardarParcialAsync={guardarParcialAsync}
             />
           </div>
         )}

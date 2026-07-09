@@ -296,6 +296,7 @@ interface VehiculoStepProps {
   onValidationChange?: (isValid: boolean) => void;
   placaCaja?: string;
   isReinspeccion?: boolean;
+  guardarParcialAsync?: (tabDestino: string) => void;
 }
 
 export function VehiculoStep({
@@ -307,7 +308,8 @@ export function VehiculoStep({
   getCategoriaName,
   onValidationChange,
   placaCaja,
-  isReinspeccion
+  isReinspeccion,
+  guardarParcialAsync
 }: VehiculoStepProps) {
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -766,7 +768,7 @@ export function VehiculoStep({
                 <button
                   type="button"
                   disabled={!isDatosValid}
-                  onClick={() => setVehiculoTab('SOAT')}
+                  onClick={() => guardarParcialAsync ? guardarParcialAsync('SOAT') : setVehiculoTab('SOAT')}
                   className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-md
                     ${isDatosValid
                       ? 'bg-gold-3d hover:-translate-y-0.5'
@@ -838,7 +840,7 @@ export function VehiculoStep({
                   <button
                     type="button"
                     disabled={!isSoatValid}
-                    onClick={() => setVehiculoTab('PROPIETARIO')}
+                    onClick={() => guardarParcialAsync ? guardarParcialAsync('PROPIETARIO') : setVehiculoTab('PROPIETARIO')}
                     className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-md
                         ${isSoatValid
                         ? 'bg-gold-3d hover:-translate-y-0.5'

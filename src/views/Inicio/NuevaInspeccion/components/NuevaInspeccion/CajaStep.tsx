@@ -11,7 +11,7 @@ interface CajaStepProps {
   handleCajaChange: (e: any) => void;
   handleSelectChange: (name: string, option: any) => void;
   setFormVehiculo?: (data: any) => void;
-  validarCaja: () => boolean;
+  validarCaja: (opciones?: any) => { valido: boolean, mensaje?: string };
   irSiguientePaso: () => void;
   isConsultado: boolean;
   setIsConsultado: (val: boolean) => void;
@@ -30,6 +30,7 @@ interface CajaStepProps {
   documentoPago: string;
   setDocumentoPago: (val: string) => void;
   customSelectStyles: any;
+  isReadOnly?: boolean;
 }
 
 export function CajaStep({
@@ -57,7 +58,8 @@ export function CajaStep({
   setPrecioTotal,
   documentoPago,
   setDocumentoPago,
-  customSelectStyles
+  customSelectStyles,
+  isReadOnly = false
 }: CajaStepProps) {
   const [listaDescuentos, setListaDescuentos] = useState<any[]>([]);
   const [showDescuentosModal, setShowDescuentosModal] = useState(false);
@@ -682,7 +684,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
-                isDisabled={isConsultado || isLockedForReinspeccion}
+                isDisabled={isReadOnly || isConsultado || isLockedForReinspeccion}
               />
             </div>
 
@@ -703,7 +705,7 @@ export function CajaStep({
                 placeholder="Ej: ABC-123"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
                 maxLength={getPlacaMaxLength()}
-                disabled={isConsultado || isLockedForReinspeccion}
+                disabled={isReadOnly || isConsultado || isLockedForReinspeccion}
               />
             </div>
 
@@ -716,7 +718,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
-                isDisabled={isLockedForReinspeccion}
+                isDisabled={isReadOnly || isLockedForReinspeccion}
               />
             </div>
 
@@ -729,7 +731,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
-                isDisabled={isConsultado || isLockedForReinspeccion}
+                isDisabled={isReadOnly || isConsultado || isLockedForReinspeccion}
               />
             </div>
 
@@ -742,7 +744,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
-                isDisabled={isLockedForReinspeccion}
+                isDisabled={isReadOnly || isLockedForReinspeccion}
               />
             </div>
 
@@ -755,7 +757,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
-                isDisabled={isLockedForReinspeccion}
+                isDisabled={isReadOnly || isLockedForReinspeccion}
               />
             </div>
 
@@ -771,7 +773,7 @@ export function CajaStep({
                 placeholder="Seleccione..."
                 isClearable
                 styles={customSelectStyles}
-                isDisabled={isConsultado || isLockedForReinspeccion}
+                isDisabled={isReadOnly || isConsultado || isLockedForReinspeccion}
                 menuPlacement="top"
                 menuPortalTarget={document.body}
               />
@@ -785,7 +787,8 @@ export function CajaStep({
         <button
           type="button"
           onClick={handleConsultar}
-          className="flex items-center gap-2 rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-900 border border-[#052a79] transition uppercase tracking-wide"
+          disabled={isReadOnly}
+          className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold shadow-md border transition uppercase tracking-wide ${isReadOnly ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed' : 'bg-[#052a79] text-white hover:bg-blue-900 border-[#052a79]'}`}
         >
           <Search className="w-4 h-4" />
           Consultar
@@ -803,7 +806,8 @@ export function CajaStep({
             setIsReinspeccionGratuita(false);
             setIsLockedForReinspeccion(false);
           }}
-          className="flex items-center gap-2 rounded-lg bg-white border border-red-200 text-red-600 px-6 py-2.5 text-xs font-bold hover:bg-red-50 shadow-sm transition uppercase tracking-wide"
+          disabled={isReadOnly}
+          className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold shadow-sm transition uppercase tracking-wide ${isReadOnly ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border border-red-200 text-red-600 hover:bg-red-50'}`}
         >
           <XCircle className="w-4 h-4" />
           Anular
@@ -853,7 +857,7 @@ export function CajaStep({
             <button 
               type="button" 
               onClick={(e) => handleBuscarDescuentos(e)} 
-              disabled={formCaja.descuentoObj?.isCuponidad || isLockedForReinspeccion}
+              disabled={isReadOnly || isConsultado || !formCaja.placa || !formCaja.tipoPlaca || isLockedForReinspeccion}
               className={`text-white px-6 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 uppercase ${(formCaja.descuentoObj?.isCuponidad || isLockedForReinspeccion) ? 'bg-slate-400 cursor-not-allowed opacity-80' : 'bg-[#052a79] hover:bg-blue-900'}`}
             >
               <Search className="w-3 h-3" /> Buscar
@@ -1003,7 +1007,8 @@ export function CajaStep({
           <button
             type="button"
             onClick={() => setShowAnularModal(true)}
-            className="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-sm"
+            disabled={isReadOnly}
+            className={`rounded-lg px-6 py-2.5 text-xs font-bold border transition uppercase tracking-wide ${isReadOnly ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 shadow-sm'}`}
           >
             ANULAR
           </button>
