@@ -445,76 +445,58 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
       try {
         setLoading(true);
         let targetPosicion = currentStepIndex + 1;
-        if (currentStepIndex >= 4) targetPosicion = 4;
-
+        // Si estamos en VERIFICACION (currentStepIndex === 4), avanzamos a 5
         if (currentStepIndex === STEPS.length - 1) {
-          // Guardado Final
-          const savePayload = {
-            nrodocumentoinspeccion,
-            plantaKey: plantaSeleccionada,
-            formCaja,
-            pagosAgregados,
-            formVehiculo,
-            formFacturacion,
-            formVerificacion,
-            documentoPago,
-            isConsultado,
-            precioSubtotal,
-            descuento,
-            precioTotal
-          };
-          const res = await inspeccionesApi.guardar(savePayload);
-          const finalId = res?.data?.data?.nroInspeccion || res?.data?.nroInspeccion || nrodocumentoinspeccion || 'Generado con éxito';
+          targetPosicion = 5;
+        }
 
-          if (formCaja.descuentoObj && formCaja.descuentoObj.source_table && formCaja.descuentoObj.source_id) {
-            try {
-              await inspeccionesApi.consumirDescuento(formCaja.descuentoObj.source_table, formCaja.descuentoObj.source_id);
-            } catch (e) {
-              console.error("No se pudo consumir el descuento", e);
+        const payload = {
+          nrodocumentoinspeccion,
+          posicionActual: currentStepIndex,
+          siguientePosicion: targetPosicion,
+          plantaKey: plantaSeleccionada,
+          formCaja,
+          pagosAgregados,
+          formVehiculo,
+          formFacturacion,
+          formVerificacion,
+          documentoPago,
+          isConsultado,
+          precioSubtotal,
+          descuento,
+          precioTotal
+        };
+
+        console.log('[FRONT guardarProceso payload]', payload);
+        const res = await inspeccionesApi.guardarProceso(payload);
+        console.log('[FRONT guardarProceso response]', res);
+
+        if (res?.ok) {
+          if (currentStepIndex === STEPS.length - 1) {
+            // Se consumen los descuentos si existen
+            if (formCaja.descuentoObj && formCaja.descuentoObj.source_table && formCaja.descuentoObj.source_id) {
+              try {
+                await inspeccionesApi.consumirDescuento(formCaja.descuentoObj.source_table, formCaja.descuentoObj.source_id);
+              } catch (e) {
+                console.error("No se pudo consumir el descuento", e);
+              }
             }
-          }
-
-          Swal.fire({
-            icon: 'success',
-            title: '¡Guardado!',
-            text: `La inspección se guardó correctamente en la base de datos. Código Oficial: ${finalId}`,
-            confirmButtonColor: '#052a79'
-          }).then(() => {
-            if (onContinueToVerificacion) {
-              onContinueToVerificacion(finalId);
-            } else if (onBack) {
-              onBack();
-            }
-          });
-        } else {
-          // Guardado Progresivo Asíncrono Estricto
-          const payload = {
-            nrodocumentoinspeccion,
-            posicionActual: currentStepIndex,
-            siguientePosicion: targetPosicion,
-            plantaKey: plantaSeleccionada,
-            formCaja,
-            pagosAgregados,
-            formVehiculo,
-            formFacturacion,
-            formVerificacion,
-            documentoPago,
-            isConsultado,
-            precioSubtotal,
-            descuento,
-            precioTotal
-          };
-          console.log('[FRONT guardarProceso payload]', payload);
-          const res = await inspeccionesApi.guardarProceso(payload);
-          console.log('[FRONT guardarProceso response]', res);
-
-          if (res?.ok) {
+            Swal.fire({
+              icon: 'success',
+              title: '¡Pase a Línea Exitoso!',
+              text: `La inspección ha sido enviada a la línea de pruebas (Gases). Código Oficial: ${nrodocumentoinspeccion}`,
+              confirmButtonColor: '#052a79'
+            }).then(() => {
+              if (onBack) onBack();
+            });
+          } else {
             setCurrentStepIndex(res.posicionActual);
             setPosicionActualGuardada(res.posicionActual);
-          } else {
-            alert(res?.message || 'No se pudo guardar el paso actual en el servidor.');
           }
+        } else {
+          alert(res?.message || 'No se pudo guardar el paso actual en el servidor.');
         }
+
       } catch (err: any) {
         console.error("Error en guardado:", err);
         const msg =
