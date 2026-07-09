@@ -17,6 +17,17 @@ export interface InspeccionPanel {
   numeroCertificado: string;
   resultado: string;
   estadoCertificado: string;
+
+  estadoRaw?: string;
+  etapa?: string;
+  flujoActual?: string;
+  puedeContinuarFlujo1?: boolean;
+  puedeModificarFlujo1?: boolean;
+  puedeFinalizarVerificacion?: boolean;
+  debeAbrirFlujo2?: boolean;
+  puedeAnular?: boolean;
+  colorGrupo?: string;
+  colorIntensidad?: number;
 }
 
 export interface InspeccionesFiltroRequest {

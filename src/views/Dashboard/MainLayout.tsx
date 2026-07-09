@@ -58,7 +58,8 @@ export function MainLayout({
   onLogout
 }: MainLayoutProps) {
   const [activeTab, setActiveTab] = useState('inicio');
-  const [inspeccionIdBorrador, setInspeccionIdBorrador] = useState<string | undefined>(undefined);
+  const [inspeccionActivaId, setInspeccionActivaId] = useState<string | undefined>(undefined);
+  const [inspeccionIdToResume, setInspeccionIdToResume] = useState<string | null>(null);
 
   const [sidebarPinned, setSidebarPinned] = useState(() => {
     return localStorage.getItem('sidebarPinned') === 'true';
@@ -113,12 +114,16 @@ export function MainLayout({
           <InicioView
             plantaSeleccionada={plantaKey}
             plantaNombre={plantaNombre}
-            onNuevaInspeccion={(id) => {
-              setInspeccionIdBorrador(id);
+            onNuevaInspeccion={() => {
+              setInspeccionIdToResume(null);
+              setActiveTab('nueva_inspeccion');
+            }}
+            onContinuarInspeccion={(id: string) => {
+              setInspeccionIdToResume(id);
               setActiveTab('nueva_inspeccion');
             }}
             onLinea={(id) => {
-              setInspeccionIdBorrador(id);
+              setInspeccionActivaId(id);
               setActiveTab('linea');
             }}
           />
@@ -127,25 +132,26 @@ export function MainLayout({
       case 'nueva_inspeccion':
         return (
           <NuevaInspeccionView 
+            plantaSeleccionada={plantaKey}
+            inspeccionIdToResume={inspeccionIdToResume}
             onBack={() => {
-              setInspeccionIdBorrador(undefined);
+              setInspeccionIdToResume(null);
               setActiveTab('inicio');
             }}
-            onContinueToVerificacion={(id) => {
-              setInspeccionIdBorrador(id);
+            onContinueToVerificacion={(id: string) => {
+              setInspeccionIdToResume(null);
+              setInspeccionActivaId(id);
               setActiveTab('linea');
             }}
-            plantaSeleccionada={plantaKey} 
-            inspeccionIdBorrador={inspeccionIdBorrador}
           />
         );
 
       case 'linea':
         return (
           <LineaView
-            nroInspeccion={inspeccionIdBorrador}
+            nroInspeccion={inspeccionActivaId}
             onBack={() => {
-              setInspeccionIdBorrador(undefined);
+              setInspeccionActivaId(undefined);
               setActiveTab('inicio');
             }}
           />
@@ -226,12 +232,16 @@ export function MainLayout({
           <InicioView
             plantaSeleccionada={plantaKey}
             plantaNombre={plantaNombre}
-            onNuevaInspeccion={(id) => {
-              setInspeccionIdBorrador(id);
+            onNuevaInspeccion={() => {
+              setInspeccionIdToResume(null);
+              setActiveTab('nueva_inspeccion');
+            }}
+            onContinuarInspeccion={(id: string) => {
+              setInspeccionIdToResume(id);
               setActiveTab('nueva_inspeccion');
             }}
             onLinea={(id) => {
-              setInspeccionIdBorrador(id);
+              setInspeccionActivaId(id);
               setActiveTab('linea');
             }}
           />

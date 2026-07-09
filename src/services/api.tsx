@@ -567,31 +567,42 @@ export const inspeccionesApi = {
     if (!response.ok) throw new Error('Error al guardar inspeccion');
     return await parseJsonResponse<any>(response);
   },
-  guardarBorrador: async (data: any) => {
-    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/borrador`, {
+  generarNroInspeccion: async (plantaKey: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/generar-nro/${plantaKey}`, {
+      method: 'GET'
+    });
+    if (!response.ok) throw new Error('Error al generar Nro Inspección');
+    return await parseJsonResponse<any>(response);
+  },
+  guardarProceso: async (data: any) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/guardar/proceso`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error('Error al guardar borrador');
-    return await parseJsonResponse<{ status: string; data?: { idBorrador?: string } }>(response);
-  },
-  obtenerBorrador: async (id: string) => {
-    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/borrador/${id}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    if (!response.ok) throw new Error('Error al obtener borrador');
-    return await parseJsonResponse<{ status: string; data?: any }>(response);
-  },
-  eliminarBorrador: async (id: string) => {
-    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/borrador/${id}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    if (!response.ok) throw new Error('Error al eliminar borrador');
+    if (!response.ok) throw new Error('Error al guardar progreso de inspección');
     return await parseJsonResponse<any>(response);
   },
+  obtenerProceso: async (nrodocumentoinspeccion: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/proceso/${nrodocumentoinspeccion}`, {
+      method: 'GET'
+    });
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error('Error al obtener proceso de inspección');
+    }
+    return await parseJsonResponse<any>(response);
+  },
+  anularInspeccion: async (nrodocumentoinspeccion: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/anular/guardar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nrodocumentoinspeccion })
+    });
+    if (!response.ok) throw new Error('Error al anular inspección');
+    return await parseJsonResponse<any>(response);
+  },
+
   buscarInspeccionesAsync: async (
     plantaKey: string,
     filtros?: {

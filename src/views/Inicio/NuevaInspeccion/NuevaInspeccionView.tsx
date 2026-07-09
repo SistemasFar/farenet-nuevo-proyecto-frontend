@@ -31,7 +31,7 @@ interface NuevaInspeccionViewProps {
   onBack?: () => void;
   onContinueToVerificacion?: (id: string) => void;
   plantaSeleccionada?: string;
-  inspeccionIdBorrador?: string;
+  inspeccionIdToResume?: string | null;
 }
 
 const STEPS = [
@@ -42,15 +42,19 @@ const STEPS = [
   { id: 'verificacion', label: 'Verificación', icon: FileText }
 ];
 
-export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSeleccionada, inspeccionIdBorrador }: NuevaInspeccionViewProps) {
+export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSeleccionada, inspeccionIdToResume }: NuevaInspeccionViewProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [currentBorradorId, setCurrentBorradorId] = useState<string | undefined>(inspeccionIdBorrador);
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
   const [maestrosVehiculo, setMaestrosVehiculo] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [isConsultado, setIsConsultado] = useState(false);
+  const [posicionActualGuardada, setPosicionActualGuardada] = useState(0);
+  const [formCajaOriginalRehidratado, setFormCajaOriginalRehidratado] = useState<any>(null);
+  const [puedeModificarFlujo1, setPuedeModificarFlujo1] = useState(true);
+
+  // Estados de vehiculo y facturacion (comunes)
   const [showAnularModal, setShowAnularModal] = useState(false);
   const [showCamposVaciosModal, setShowCamposVaciosModal] = useState(false);
   const [documentoDescuento, setDocumentoDescuento] = useState('');
@@ -60,6 +64,7 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
   const [precioTotal, setPrecioTotal] = useState<number>(0);
 
   const [documentoPago, setDocumentoPago] = useState<string>('');
+  const [nrodocumentoinspeccion, setNrodocumentoinspeccion] = useState<string>('');
 
   // Form State (Caja)
   const [formCaja, setFormCaja] = useState<any>({
@@ -138,33 +143,65 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
     };
   }, []);
 
-  useEffect(() => {
-    if (inspeccionIdBorrador) {
-      setLoading(true);
-      inspeccionesApi.obtenerBorrador(inspeccionIdBorrador)
-        .then(res => {
-          if (res?.data) {
-            const data = res.data;
-            if (data.formCaja) setFormCaja(data.formCaja);
-            if (data.formVehiculo) setFormVehiculo(data.formVehiculo);
-            if (data.formFacturacion) setFormFacturacion(data.formFacturacion);
-            if (data.formVerificacion) setFormVerificacion(data.formVerificacion);
-            if (data.pagosAgregados) setPagosAgregados(data.pagosAgregados);
-            if (data.currentStepIndex) setCurrentStepIndex(data.currentStepIndex);
 
-            // Restaurar estado del Resumen de Pago
-            if (data.isConsultado) setIsConsultado(data.isConsultado);
-            if (data.documentoPago) setDocumentoPago(data.documentoPago);
-            if (data.precioSubtotal) setPrecioSubtotal(data.precioSubtotal);
-            if (data.descuento) setDescuento(data.descuento);
-            if (data.precioTotal) setPrecioTotal(data.precioTotal);
-            if (data.documentoDescuento) setDocumentoDescuento(data.documentoDescuento);
+
+  useEffect(() => {
+    const initNroInspeccion = async () => {
+      try {
+        if (inspeccionIdToResume) {
+          const res = await inspeccionesApi.obtenerProceso(inspeccionIdToResume);
+          if (res?.data) {
+            if (res.data.debeAbrirFlujo2) {
+              Swal.fire({
+                icon: 'warning',
+                title: 'Inspección en línea',
+                text: 'Esta inspección ya ha sido enviada a la línea de inspección.',
+                confirmButtonText: 'Ir a Línea'
+              }).then(() => {
+                if (onContinueToVerificacion) {
+                  onContinueToVerificacion(inspeccionIdToResume);
+                } else if (onBack) {
+                  onBack();
+                }
+              });
+              return;
+            }
+
+            setNrodocumentoinspeccion(inspeccionIdToResume);
+            if (res.data.formCaja) {
+              setFormCaja(res.data.formCaja);
+              setFormCajaOriginalRehidratado(res.data.formCaja);
+            }
+            if (res.data.formVehiculo) setFormVehiculo(res.data.formVehiculo);
+            if (res.data.formFacturacion) setFormFacturacion(res.data.formFacturacion);
+            if (res.data.formVerificacion) setFormVerificacion(res.data.formVerificacion);
+            if (res.data.pagosAgregados) setPagosAgregados(res.data.pagosAgregados);
+            if (res.data.documentoPago) setDocumentoPago(res.data.documentoPago);
+            if (res.data.precioSubtotal !== undefined) setPrecioSubtotal(res.data.precioSubtotal);
+            if (res.data.descuento !== undefined) setDescuento(res.data.descuento);
+            if (res.data.precioTotal !== undefined) setPrecioTotal(res.data.precioTotal);
+
+            if (res.data.isConsultado !== undefined) setIsConsultado(res.data.isConsultado);
+            if (res.data.puedeModificarFlujo1 !== undefined) setPuedeModificarFlujo1(res.data.puedeModificarFlujo1);
+            
+            if (res.data.posicion !== undefined) {
+              const pos = Number(res.data.posicion);
+              setPosicionActualGuardada(pos);
+              setCurrentStepIndex(pos);
+            }
           }
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false));
-    }
-  }, [inspeccionIdBorrador]);
+        } else if (!nrodocumentoinspeccion && plantaSeleccionada) {
+          const res = await inspeccionesApi.generarNroInspeccion(plantaSeleccionada);
+          if (res?.nrodocumentoinspeccion) {
+            setNrodocumentoinspeccion(res.nrodocumentoinspeccion);
+          }
+        }
+      } catch (e) {
+        console.error('Error al generar NRO', e);
+      }
+    };
+    initNroInspeccion();
+  }, [plantaSeleccionada, nrodocumentoinspeccion, inspeccionIdToResume]);
 
   const cargarMaestros = async () => {
     try {
@@ -303,18 +340,39 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
     setFormCaja((prev) => ({ ...prev, [name]: value }));
   };
 
-  const validarCaja = () => {
+  const validarCaja = (opciones = { ignorarTipoPlaca: false }) => {
     // Validar que todos los campos requeridos estén llenos
-    if (!formCaja.tipoPlaca || !formCaja.placa || !formCaja.concepto || !formCaja.categoria || !formCaja.tipoInspeccion || !formCaja.tipoCertificado) {
+    if ((!opciones.ignorarTipoPlaca && !formCaja.tipoPlaca) || !formCaja.placa || !formCaja.concepto || !formCaja.categoria || !formCaja.tipoInspeccion || !formCaja.tipoCertificado) {
       return false;
     }
     return true;
   };
 
   const irSiguientePaso = async () => {
-    if (currentStepIndex === 0 && (!validarCaja() || !isConsultado)) {
-      alert('Por favor completa todos los campos de la caja y consulta exitosamente antes de continuar.');
-      return;
+    const esReanudacionConCajaCompletada = posicionActualGuardada >= 1;
+    let cajaModificada = false;
+
+    if (esReanudacionConCajaCompletada && formCajaOriginalRehidratado) {
+      cajaModificada = formCaja.placa !== formCajaOriginalRehidratado.placa ||
+                       formCaja.concepto !== formCajaOriginalRehidratado.concepto ||
+                       formCaja.categoria !== formCajaOriginalRehidratado.categoria ||
+                       formCaja.tipoInspeccion !== formCajaOriginalRehidratado.tipoInspeccion ||
+                       formCaja.tipoCertificado !== formCajaOriginalRehidratado.tipoCertificado ||
+                       formCaja.tipoAutorizacion !== formCajaOriginalRehidratado.tipoAutorizacion;
+    }
+
+    if (currentStepIndex === 0) {
+      if (esReanudacionConCajaCompletada && !cajaModificada) {
+        if (!validarCaja({ ignorarTipoPlaca: true }) || !isConsultado) {
+          alert('Por favor completa todos los campos de la caja y consulta exitosamente antes de continuar.');
+          return;
+        }
+      } else {
+        if (!validarCaja({ ignorarTipoPlaca: false }) || !isConsultado) {
+          alert('Por favor completa todos los campos de la caja y consulta exitosamente antes de continuar.');
+          return;
+        }
+      }
     }
 
     if (currentStepIndex === 2 && !isVehiculoValid) {
@@ -332,44 +390,42 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
       return;
     }
 
-    try {
-      // Auto-guardar borrador
-      const payload = {
-        idBorrador: currentBorradorId,
-        currentStepIndex: currentStepIndex + 1,
-        plantaKey: plantaSeleccionada,
-        formCaja,
-        pagosAgregados,
-        formVehiculo,
-        formFacturacion,
-        formVerificacion,
-        precioSubtotal,
-        descuento,
-        precioTotal,
-        documentoPago,
-        isConsultado,
-        documentoDescuento
-      };
-
-      const res = await inspeccionesApi.guardarBorrador(payload);
-      if (res?.data?.idBorrador) {
-        setCurrentBorradorId(res.data.idBorrador);
-      }
-    } catch (err) {
-      console.warn('No se pudo guardar el borrador silenciosamente', err);
-    }
-
-    if (currentStepIndex === STEPS.length - 1) {
+    // Auto-guardado progresivo en DB antes de pasar al siguiente o consolidar
+    if (nrodocumentoinspeccion) {
       try {
-        setLoading(true);
-        const savePayload = {
+        await inspeccionesApi.guardarProceso({
+          nrodocumentoinspeccion,
+          posicion: currentStepIndex,
           plantaKey: plantaSeleccionada,
           formCaja,
           pagosAgregados,
           formVehiculo,
           formFacturacion,
           formVerificacion,
-          idBorrador: currentBorradorId,
+          documentoPago,
+          isConsultado,
+          precioSubtotal,
+          descuento,
+          precioTotal
+        });
+      } catch (err) {
+        console.error("Error en guardado progresivo:", err);
+      }
+    }
+
+
+
+    if (currentStepIndex === STEPS.length - 1) {
+      try {
+        setLoading(true);
+        const savePayload = {
+          nrodocumentoinspeccion,
+          plantaKey: plantaSeleccionada,
+          formCaja,
+          pagosAgregados,
+          formVehiculo,
+          formFacturacion,
+          formVerificacion,
           documentoPago,
           isConsultado,
           precioSubtotal,
@@ -377,7 +433,7 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
           precioTotal
         };
         const res = await inspeccionesApi.guardar(savePayload);
-        const finalId = res?.data?.data?.nroInspeccion || res?.data?.nroInspeccion || 'Generado con éxito';
+        const finalId = res?.data?.data?.nroInspeccion || res?.data?.nroInspeccion || nrodocumentoinspeccion || 'Generado con éxito';
 
         if (formCaja.descuentoObj && formCaja.descuentoObj.source_table && formCaja.descuentoObj.source_id) {
           try {
@@ -413,48 +469,13 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
       setCurrentStepIndex((prev) => prev + 1);
     }
   };
-  const handleGuardarSoloBorrador = async () => {
-    try {
-      setLoading(true);
-      const payload = {
-        idBorrador: currentBorradorId,
-        currentStepIndex: currentStepIndex,
-        plantaKey: plantaSeleccionada,
-        formCaja,
-        pagosAgregados,
-        formVehiculo,
-        formFacturacion,
-        formVerificacion,
-        precioSubtotal,
-        descuento,
-        precioTotal,
-        documentoPago,
-        isConsultado,
-        documentoDescuento
-      };
-      const res = await inspeccionesApi.guardarBorrador(payload);
-      if (res?.data?.idBorrador) {
-        setCurrentBorradorId(res.data.idBorrador);
-      }
-      Swal.fire({
-        icon: 'success',
-        title: 'Borrador Guardado',
-        text: 'Los datos han sido guardados temporalmente. Puedes salir y continuar más tarde.',
-        timer: 3000,
-        showConfirmButton: false
-      });
-    } catch (err: any) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: err.message || 'No se pudo guardar el borrador.',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const irPasoAnterior = () => {
+    if (!puedeModificarFlujo1) {
+      alert('Esta inspección ya se encuentra en Verificación y no puede ser modificada en pasos anteriores.');
+      return;
+    }
     if (currentStepIndex > 0) {
       setCurrentStepIndex(currentStepIndex - 1);
     }
@@ -795,36 +816,29 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={handleGuardarSoloBorrador}
-                  className="rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm bg-slate-200 text-slate-700 hover:bg-slate-300 hover:-translate-y-0.5"
-                >
-                  GUARDAR (BORRADOR)
-                </button>
-                <button
-                  type="button"
                   onClick={irSiguientePaso}
-                  disabled={!validarVerificacion()}
+                  disabled={!validarVerificacion() || loading}
                   className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                    ${!validarVerificacion()
+                    ${!validarVerificacion() || loading
                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                       : 'bg-gold-3d hover:-translate-y-0.5'
                     }`}
                 >
-                  FINALIZAR
+                  {loading ? 'GUARDANDO...' : 'FINALIZAR'}
                 </button>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={irSiguientePaso}
-                disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid)}
+                disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || loading}
                 className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                  ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid)
+                  ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || loading
                     ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                     : 'bg-gold-3d hover:-translate-y-0.5'
                   }`}
               >
-                Siguiente Paso
+                {loading ? 'CARGANDO...' : 'Siguiente Paso'}
               </button>
             )}
           </div>

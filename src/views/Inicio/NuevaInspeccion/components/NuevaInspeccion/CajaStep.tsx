@@ -510,7 +510,7 @@ export function CajaStep({
             setShowDescuentosModal(true);
           }
         } catch (err) {
-          console.error("Error auto-fetching descuentos para borrador:", err);
+          console.error("Error auto-fetching descuentos para formulario:", err);
         }
       };
       fetchList();

@@ -11,7 +11,8 @@ import type { InspeccionPanel } from '../../types/operacion';
 interface InicioViewProps {
   plantaSeleccionada: string;
   plantaNombre: string;
-  onNuevaInspeccion?: (idBorrador?: string) => void;
+  onNuevaInspeccion?: () => void;
+  onContinuarInspeccion?: (id: string) => void;
   onLinea?: (id: string) => void;
 }
 
@@ -34,10 +35,7 @@ const normalizarTexto = (valor?: string | null): string => {
   return valor.trim();
 };
 
-const obtenerClaseBadge = (valor?: string | null, esBorrador?: boolean): string => {
-  if (esBorrador) {
-    return 'bg-white text-red-800 border-red-800 font-black shadow-sm';
-  }
+const obtenerClaseBadge = (valor?: string | null): string => {
 
   const estado = normalizarTexto(valor).toUpperCase();
 
@@ -53,8 +51,7 @@ const obtenerClaseBadge = (valor?: string | null, esBorrador?: boolean): string 
     estado.includes('ANULADO') ||
     estado.includes('DESAPROBADO') ||
     estado.includes('VENCIDO') ||
-    estado.includes('INACTIVO') ||
-    estado.includes('BORRADOR')
+    estado.includes('INACTIVO')
   ) {
     return 'bg-red-50 text-red-700 border-red-200';
   }
@@ -70,15 +67,14 @@ const obtenerClaseBadge = (valor?: string | null, esBorrador?: boolean): string 
   return 'bg-slate-50 text-slate-700 border-slate-200';
 };
 
-function BadgeEstado({ value, esBorrador }: { value?: string | null, esBorrador?: boolean }) {
+function BadgeEstado({ value }: { value?: string | null }) {
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${obtenerClaseBadge(
-        value,
-        esBorrador
+        value
       )}`}
     >
-      {esBorrador ? 'BORRADOR' : normalizarTexto(value)}
+      {normalizarTexto(value)}
     </span>
   );
 }
@@ -113,18 +109,7 @@ export function InicioView(props: InicioViewProps) {
     return plantaSeleccionada && plantaSeleccionada.trim() !== '';
   }, [plantaSeleccionada]);
 
-  const handleEliminarBorrador = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que deseas anular este borrador? El registro quedará guardado como anulado.')) return;
-    try {
-      setLoading(true);
-      await inspeccionesApi.eliminarBorrador(id);
-      cargarInspecciones();
-    } catch (err: any) {
-      setError(err.message || 'Error al anular el borrador');
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const cargarInspecciones = async (
     paginaConsulta = page,
@@ -434,53 +419,52 @@ export function InicioView(props: InicioViewProps) {
           </div>
         )}
 
-        <div className="mt-6 overflow-x-auto rounded border border-slate-200">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-[#26b49a] text-white font-semibold">
-                <th className="p-3 border-r border-teal-600">
+        <div className="mt-6 overflow-hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-[1400px] w-full border-collapse text-sm">
+            <thead className="bg-[#0033a0] text-xs uppercase text-white font-semibold tracking-wider">
+              <tr>
+                <th className="px-4 py-3 text-left">
                   N° Inspección
                 </th>
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   Fecha y hora
                 </th>
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   Placa
                 </th>
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   DNI / RUC
                 </th>
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   Nombres / Razón Social
                 </th>
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   Concepto vehicular
                 </th>
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   Línea
                 </th>
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   Estado actual
                 </th>
-
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   Resultado
                 </th>
-                <th className="p-3 border-r border-teal-600">
+                <th className="px-4 py-3 text-left">
                   Estado certificado
                 </th>
-                <th className="p-3">
+                <th className="px-4 py-3 text-center">
                   Acción
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-200 text-slate-700">
+            <tbody className="divide-y divide-slate-100">
               {loading && (
                 <tr>
                   <td
                     colSpan={12}
-                    className="p-6 text-center text-slate-500 font-medium"
+                    className="px-4 py-8 text-center text-slate-500 font-medium"
                   >
                     Cargando inspecciones...
                   </td>
@@ -491,7 +475,7 @@ export function InicioView(props: InicioViewProps) {
                 <tr>
                   <td
                     colSpan={12}
-                    className="p-6 text-center text-slate-400"
+                    className="px-4 py-8 text-center text-slate-400"
                   >
                     No hay inspecciones registradas para el día actual.
                   </td>
@@ -500,78 +484,114 @@ export function InicioView(props: InicioViewProps) {
 
               {!loading &&
                 inspecciones.map((ins, idx) => {
-                  const posicion = Number(ins.posicion ?? 0);
-                  const estadoActual = ins.estadoActual || ins.estado;
-                  const estadosBorrador = ['CAJA', 'PAGO', 'VEHICULO', 'FACTURACION', 'CLIENTE', 'VERIFICACION', 'BORRADOR'];
-                  const esBorrador = (posicion < 3 || estadosBorrador.includes(estadoActual?.toUpperCase())) && estadoActual !== 'ANULADO';
+                  const posicion = Number(ins.posicion || 0);
+                  const etapa = ins.etapa || ins.estadoActual || 'SIN ESTADO';
+                  const puedeContinuar = ins.puedeContinuarFlujo1 === true;
+                  const debeAbrirFlujo2 = ins.debeAbrirFlujo2 === true;
+                  const puedeAnular = ins.puedeAnular === true;
+                  
+                  let claseFila = 'hover:bg-slate-50';
+                  let etapaBadgeClase = 'bg-slate-100 text-slate-700 border-slate-200';
 
-                  const claseFila =
-                    posicion >= 11
-                      ? 'bg-emerald-50 hover:bg-emerald-100'
-                      : posicion >= 6
-                        ? 'bg-amber-50 hover:bg-amber-100'
-                        : esBorrador
-                          ? 'bg-slate-100 hover:bg-slate-200' // Plomo muy sutil para borradores
-                          : 'bg-red-50 hover:bg-red-100';
+                  if (ins.colorGrupo === 'GRIS') {
+                    claseFila = 'bg-slate-50 hover:bg-slate-100';
+                    etapaBadgeClase = 'bg-slate-200 text-slate-800 border-slate-300';
+                  } else if (ins.colorGrupo === 'ROJO') {
+                    claseFila = 'bg-red-50 hover:bg-red-100';
+                    etapaBadgeClase = 'bg-red-200 text-red-800 border-red-300';
+                  } else if (ins.colorGrupo === 'AMARILLO') {
+                    claseFila = 'bg-yellow-50 hover:bg-yellow-100';
+                    etapaBadgeClase = 'bg-yellow-200 text-yellow-800 border-yellow-300';
+                  } else if (ins.colorGrupo === 'VERDE') {
+                    claseFila = 'bg-emerald-50 hover:bg-emerald-100';
+                    etapaBadgeClase = 'bg-emerald-200 text-emerald-800 border-emerald-300';
+                  }
+                  
+                  if (ins.estado === 'ANULADO') {
+                    claseFila = 'bg-slate-100/50 opacity-60';
+                  }
 
-                  // Al usar un fondo sutil, el texto ya no debe ser blanco, sino oscuro como el resto
-                  const textoClase = esBorrador ? 'text-slate-700' : 'text-slate-700';
-                  const labelClase = esBorrador ? 'text-slate-500' : 'text-slate-500';
+                  const textoClase = 'text-slate-700';
+                  const labelClase = 'text-slate-500';
 
                   return (
                     <tr
                       key={`${ins.numeroInspeccion}-${idx}`}
                       className={`transition-colors ${claseFila} ${textoClase}`}
                     >
-                      <td className={`p-3 font-semibold whitespace-nowrap ${esBorrador ? 'text-slate-800' : 'text-blue-700'}`}>
+                      <td className={`px-4 py-3 font-semibold whitespace-nowrap text-blue-700`}>
                         {normalizarTexto(ins.numeroInspeccion)}
                       </td>
-                      <td className={`p-3 whitespace-nowrap ${labelClase}`}>
+                      <td className={`px-4 py-3 whitespace-nowrap ${labelClase}`}>
                         {normalizarTexto(ins.fechaHora)}
                       </td>
-                      <td className="p-3 font-bold whitespace-nowrap">
+                      <td className="px-4 py-3 font-bold whitespace-nowrap">
                         {normalizarTexto(ins.placa)}
                       </td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         {normalizarTexto(ins.clienteDocumento)}
                       </td>
-                      <td className="p-3 min-w-[220px]">
+                      <td className="px-4 py-3 min-w-[220px]">
                         {normalizarTexto(ins.clienteNombre)}
                       </td>
-                      <td className="p-3 min-w-[180px]">
+                      <td className="px-4 py-3 min-w-[180px]">
                         {normalizarTexto(ins.conceptoVehicular)}
                       </td>
-                      <td className="p-3 font-mono text-center whitespace-nowrap">
+                      <td className="px-4 py-3 font-mono text-left whitespace-nowrap">
                         {normalizarTexto(ins.linea)}
                       </td>
-                      <td className="p-3 whitespace-nowrap">
-                        <BadgeEstado value={ins.estadoActual || ins.estado} esBorrador={esBorrador} />
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide ${etapaBadgeClase}`}>
+                          {posicion}: {etapa}
+                        </span>
                       </td>
-                      <td className="p-3 whitespace-nowrap">
+
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <BadgeEstado value={ins.resultado} />
                       </td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <BadgeEstado value={ins.estadoCertificado} />
                       </td>
-                      <td className="p-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => esBorrador ? props.onNuevaInspeccion?.(ins.numeroInspeccion) : props.onLinea?.(ins.numeroInspeccion)}
-                            className="rounded bg-white/90 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-white shadow-sm transition"
-                          >
-                            Ver
-                          </button>
-                          {esBorrador && (
+                      <td className="px-4 py-3 whitespace-nowrap text-center align-middle">
+                        <div className="flex items-center justify-center gap-2 h-full">
+                          {puedeContinuar && !debeAbrirFlujo2 ? (
                             <button
                               type="button"
-                              onClick={() => handleEliminarBorrador(ins.numeroInspeccion)}
-                              title="Anular borrador"
-                              className="p-1.5 text-slate-500 hover:text-white hover:bg-red-500 rounded transition-colors"
+                              onClick={() => props.onContinuarInspeccion?.(ins.numeroInspeccion)}
+                              className="rounded bg-[#f59e0b] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#d97706] shadow-sm transition"
                             >
-                              <Trash2 size={16} />
+                              Continuar
                             </button>
-                          )}
+                          ) : null}
+
+                          {puedeAnular && !debeAbrirFlujo2 ? (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (confirm('¿Estás seguro de anular esta inspección en proceso?')) {
+                                  try {
+                                    await inspeccionesApi.anularInspeccion(ins.numeroInspeccion);
+                                    cargarInspecciones(page, pageSize);
+                                  } catch (e) {
+                                    console.error('Error al anular', e);
+                                  }
+                                }
+                              }}
+                              className="rounded bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700 shadow-sm transition"
+                            >
+                              Anular
+                            </button>
+                          ) : null}
+
+                          {(!puedeContinuar || debeAbrirFlujo2) ? (
+                            <button
+                              type="button"
+                              onClick={() => props.onLinea?.(ins.numeroInspeccion)}
+                              className="rounded bg-white/90 border border-slate-300 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100 shadow-sm transition"
+                            >
+                              Ver
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

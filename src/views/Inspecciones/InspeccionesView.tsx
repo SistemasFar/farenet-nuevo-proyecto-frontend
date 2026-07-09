@@ -247,10 +247,10 @@ export default function InspeccionesView() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-[1400px] w-full border-collapse text-sm">
-            <thead className="bg-slate-100 text-xs uppercase text-slate-600">
+            <thead className="bg-[#0033a0] text-xs uppercase text-white font-semibold tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left">N° Inspección</th>
                 <th className="px-4 py-3 text-left">Fecha y hora</th>
