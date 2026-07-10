@@ -8,7 +8,9 @@ interface LineaStepProps {
 }
 
 export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepProps) {
-  const { recibidas = [], faltantes = [], noAplicables = [], obligatorias = [] } = estadoLinea;
+  const { recibidas = [], faltantes = [], noAplicables = [], obligatorias = [], modo } = estadoLinea;
+  const isHistorico = modo?.startsWith('HISTORICO_');
+  const isEmptyHistorico = isHistorico && recibidas.length === 0;
 
   const aprobados = recibidas.filter((p: any) => p.resultado === 'A');
   const desaprobados = recibidas.filter((p: any) => p.resultado === 'D');
@@ -39,16 +41,23 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
     <div className="flex flex-col h-full bg-slate-50 font-sans animate-fade-in-up">
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
         
-        {/* Panel Superior: Fotos y Resumen */}
+        {isEmptyHistorico ? (
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-6 rounded-xl shadow-sm text-center">
+            <AlertCircle className="w-8 h-8 mx-auto mb-3 text-blue-500" />
+            <p className="font-bold">No existen resultados de máquina registrados en la tabla resultado_maquina para esta inspección histórica.</p>
+          </div>
+        ) : (
+          <>
+            {/* Panel Superior: Fotos y Resumen */}
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 bg-white p-5 border border-slate-200 rounded-xl shadow-sm">
             <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
               <Eye className="w-5 h-5 text-blue-600" /> Control Visual (Fotos)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {renderFotoItem('Ver Frenos', '25381385')}
-              {renderFotoItem('Ver Gases', '25381382')}
-              {renderFotoItem('Ver Luces', '25381387')}
+              {renderFotoItem('Ver Frenos', '15')}
+              {renderFotoItem('Ver Gases', '11')}
+              {renderFotoItem('Ver Luces', '12')}
             </div>
           </div>
           <div className="w-full md:w-64 bg-slate-800 text-white p-5 rounded-xl shadow-sm flex flex-col justify-center items-center relative overflow-hidden">
@@ -123,6 +132,8 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
               <span key={p.tipomaquina_key} className="text-xs bg-white text-slate-400 px-2 py-1 rounded border border-slate-200">{p.nombre_prueba}</span>
             ))}
           </div>
+        )}
+      </>
         )}
       </div>
     </div>

@@ -26,12 +26,27 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [formConsolidacion, setFormConsolidacion] = useState({
+    ingenieroCertificadorUsername: '',
+    observacion: '',
+  });
+
+  useEffect(() => {
+    if (estadoLinea) {
+      setFormConsolidacion(prev => ({
+        ...prev,
+        ingenieroCertificadorUsername: estadoLinea.ingenieroCertificador || prev.ingenieroCertificadorUsername,
+        observacion: estadoLinea.observacion || prev.observacion,
+      }));
+    }
+  }, [estadoLinea]);
+
   const fetchEstadoLinea = async () => {
     if (!nroInspeccion) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await lineaApi.obtenerEstadoLinea(nroInspeccion);
+      const data = await lineaApi.obtenerWizardModel(nroInspeccion);
       if (data.ok) {
         setEstadoLinea(data);
       } else {
@@ -152,6 +167,8 @@ isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400 group-hover:text-[
                   nroInspeccion={nroInspeccion}
                   estadoLinea={estadoLinea}
                   onRefresh={fetchEstadoLinea}
+                  formConsolidacion={formConsolidacion}
+                  onChangeFormConsolidacion={setFormConsolidacion}
                 />
               )}
               {currentStep === 1 && (
@@ -173,6 +190,8 @@ isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400 group-hover:text-[
                   nroInspeccion={nroInspeccion}
                   estadoLinea={estadoLinea}
                   onRefresh={fetchEstadoLinea}
+                  formConsolidacion={formConsolidacion}
+                  onChangeFormConsolidacion={setFormConsolidacion}
                 />
               )}
             </>

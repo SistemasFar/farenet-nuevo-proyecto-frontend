@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, CheckCircle2, Lock, AlertTriangle, XCircle, 
-  Printer, Ban, Save, FileSignature, Truck, Settings, ShieldAlert
+  Printer, Ban, Save, FileSignature, Truck, Settings, ShieldAlert,
+  Activity
 } from 'lucide-react';
 import { maestrosApi } from '../../../../services/api';
 
@@ -10,24 +11,43 @@ interface ConsolidacionLegacyPanelProps {
   nroInspeccion: string;
   estadoLinea: any;
   onRefresh?: () => void;
+  formConsolidacion: any;
+  onChangeFormConsolidacion: (val: any) => void;
 }
 
 export function ConsolidacionLegacyPanel({ 
   mode, 
   nroInspeccion, 
   estadoLinea,
-  onRefresh 
+  onRefresh,
+  formConsolidacion,
+  onChangeFormConsolidacion
 }: ConsolidacionLegacyPanelProps) {
 
-  const { posicionActual, inspeccionestado_key, puedeConsolidar, faltantes, vehiculo, comprobante } = estadoLinea;
-  const isConsolidada = inspeccionestado_key === 'CON';
-  const readyToConsolidate = posicionActual >= 14 || (puedeConsolidar && faltantes.length === 0);
+  const { posicionActual, inspeccionestado_key, puedeConsolidar: estPuedeConsol, faltantes, vehiculo, comprobante, modo } = estadoLinea;
+  
+  // Reglas frontend
+  const esHistorico =
+    modo === 'HISTORICO_CONSOLIDADO' ||
+    modo === 'HISTORICO_ANULADO' ||
+    modo === 'HISTORICO_RETIRADO';
+
+  const puedeEditarCamposPreparacion =
+    modo === 'LINEA_EN_PROCESO' ||
+    modo === 'LISTA_PARA_CONSOLIDAR';
+
+  const puedeConsolidar =
+    modo === 'LISTA_PARA_CONSOLIDAR' &&
+    estadoLinea.puedeConsolidar === true &&
+    estadoLinea.faltantes?.length === 0 &&
+    estadoLinea.inspeccionestado_key !== 'CON';
+
+  // Navigation enabled except for anu/ret
+  const allowNavegacion = modo !== 'HISTORICO_ANULADO' && modo !== 'HISTORICO_RETIRADO'; 
 
   const [loading, setLoading] = useState(mode === 'final');
   const [dataConsolidacion, setDataConsolidacion] = useState<any>(null);
   const [ingenieros, setIngenieros] = useState<any[]>([]);
-  const [ingenieroUsername, setIngenieroUsername] = useState<string>('');
-  const [observacion, setObservacion] = useState<string>('');
   const [consolidando, setConsolidando] = useState(false);
   const [resultadoOperacion, setResultadoOperacion] = useState<any>(null);
 
@@ -66,7 +86,7 @@ export function ConsolidacionLegacyPanel({
   };
 
   const handleConsolidar = async () => {
-    if (!ingenieroUsername) {
+    if (!formConsolidacion.ingenieroCertificadorUsername) {
       alert('Debe seleccionar un ingeniero certificador.');
       return;
     }
@@ -80,9 +100,9 @@ export function ConsolidacionLegacyPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ingenieroCertificadorUsername: ingenieroUsername,
+          ingenieroCertificadorUsername: formConsolidacion.ingenieroCertificadorUsername,
           usuarioConsolidadorUsername: 'admin', // Provisional
-          observacion: observacion || undefined
+          observacion: formConsolidacion.observacion || undefined
         })
       });
 
@@ -106,19 +126,27 @@ export function ConsolidacionLegacyPanel({
   let bannerText = "Modo Resumen";
   let bannerIcon = <FileText className="w-5 h-5 mr-2" />;
 
-  if (isConsolidada) {
-    bannerClass = "bg-blue-100 border-blue-300 text-blue-800";
-    bannerText = "La inspección se encuentra en estado SOLO LECTURA (Consolidada)";
-    bannerIcon = <Lock className="w-5 h-5 mr-2" />;
-  } else if (inspeccionestado_key === 'ANU') {
-    bannerClass = "bg-red-100 border-red-300 text-red-800";
-    bannerText = "La inspección ha sido Anulada";
-    bannerIcon = <Ban className="w-5 h-5 mr-2" />;
-  } else if (mode === 'resumen' || !readyToConsolidate) {
+  if (modo === 'LINEA_EN_PROCESO') {
     bannerClass = "bg-amber-100 border-amber-300 text-amber-800";
-    bannerText = "Aún no se puede certificar porque faltan más pruebas.";
+    bannerText = "Aún no se puede certificar porque faltan pruebas";
     bannerIcon = <AlertTriangle className="w-5 h-5 mr-2" />;
-  } else if (mode === 'final' && readyToConsolidate) {
+  } else if (modo === 'LISTA_PARA_CONSOLIDAR') {
+    bannerClass = "bg-green-100 border-green-300 text-green-800";
+    bannerText = "Inspección lista para consolidar. Proceda con la firma del ingeniero.";
+    bannerIcon = <CheckCircle2 className="w-5 h-5 mr-2" />;
+  } else if (modo === 'HISTORICO_CONSOLIDADO') {
+    bannerClass = "bg-blue-100 border-blue-300 text-blue-800";
+    bannerText = "La inspección se encuentra en estado solo lectura (consolidada).";
+    bannerIcon = <Lock className="w-5 h-5 mr-2" />;
+  } else if (modo === 'HISTORICO_ANULADO') {
+    bannerClass = "bg-red-100 border-red-300 text-red-800";
+    bannerText = "La inspección ha sido anulada.";
+    bannerIcon = <XCircle className="w-5 h-5 mr-2" />;
+  } else if (modo === 'HISTORICO_RETIRADO') {
+    bannerClass = "bg-slate-200 border-slate-400 text-slate-800";
+    bannerText = "La inspección se encuentra retirada.";
+    bannerIcon = <Ban className="w-5 h-5 mr-2" />;
+  } else if (mode === 'final' && puedeConsolidar) {
     // Si la data del servidor dice Aprobado (A) o Desaprobado (D)
     const sug = dataConsolidacion?.resumen?.resultadoSugerido;
     if (sug === 'D') {
@@ -176,9 +204,20 @@ export function ConsolidacionLegacyPanel({
                   <span className="font-bold text-slate-800">{vehiculo?.categoria || '-'}</span>
                 </div>
                 <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span className="text-slate-500 font-medium">Marca</span>
-                  <span className="font-bold text-slate-800">{vehiculo?.marca || '-'}</span>
+                  <span className="text-slate-500 font-medium">Marca / Modelo</span>
+                  <span className="font-bold text-slate-800">{vehiculo?.marca || 'No disponible'} / {vehiculo?.modelo || 'No disponible'}</span>
                 </div>
+              </div>
+              <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                <button 
+                  className={`text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1 ${
+                    (modo === 'HISTORICO_ANULADO' || modo === 'HISTORICO_RETIRADO') ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300'
+                  }`}
+                  disabled={modo === 'HISTORICO_ANULADO' || modo === 'HISTORICO_RETIRADO'}
+                  title="Funcionalidad pendiente de migración"
+                >
+                  Modificar Propietario
+                </button>
               </div>
             </div>
 
@@ -187,11 +226,11 @@ export function ConsolidacionLegacyPanel({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between border-b border-slate-100 pb-1">
                   <span className="text-slate-500 font-medium">Concepto</span>
-                  <span className="font-bold text-slate-800">{comprobante?.concepto || '-'}</span>
+                  <span className="font-bold text-slate-800">{comprobante?.concepto || 'No disponible'}</span>
                 </div>
                 <div className="flex justify-between border-b border-slate-100 pb-1">
                   <span className="text-slate-500 font-medium">Monto</span>
-                  <span className="font-bold text-slate-800">S/ {comprobante?.total || '0.00'}</span>
+                  <span className="font-bold text-slate-800">S/ {comprobante?.importetotal || comprobante?.total || '0.00'}</span>
                 </div>
               </div>
             </div>
@@ -219,10 +258,10 @@ export function ConsolidacionLegacyPanel({
                   Ingeniero Certificador
                 </label>
                 <select 
-                  className={`w-full border rounded p-2 text-sm ${!canConsolidar ? 'bg-slate-50 border-slate-300' : 'bg-white border-blue-400 focus:ring-2 focus:ring-blue-200'}`}
-                  disabled={!canConsolidar || consolidando}
-                  value={ingenieroUsername}
-                  onChange={e => setIngenieroUsername(e.target.value)}
+                  className={`w-full border rounded p-2 text-sm ${!puedeEditarCamposPreparacion ? 'bg-slate-50 border-slate-300' : 'bg-white border-blue-400 focus:ring-2 focus:ring-blue-200'}`}
+                  disabled={!puedeEditarCamposPreparacion || consolidando}
+                  value={formConsolidacion.ingenieroCertificadorUsername}
+                  onChange={e => onChangeFormConsolidacion({ ...formConsolidacion, ingenieroCertificadorUsername: e.target.value })}
                 >
                   <option value="">-- Seleccione Ingeniero --</option>
                   {ingenieros.map(ing => (
@@ -234,10 +273,10 @@ export function ConsolidacionLegacyPanel({
                 <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Observación</label>
                 <textarea 
                   rows={2}
-                  className={`w-full border rounded p-2 text-sm ${!canConsolidar ? 'bg-slate-50 border-slate-300' : 'bg-white border-slate-300'}`}
-                  disabled={!canConsolidar || consolidando}
-                  value={observacion}
-                  onChange={e => setObservacion(e.target.value)}
+                  className={`w-full border rounded p-2 text-sm ${!puedeEditarCamposPreparacion ? 'bg-slate-50 border-slate-300' : 'bg-white border-slate-300'}`}
+                  disabled={!puedeEditarCamposPreparacion || consolidando}
+                  value={formConsolidacion.observacion}
+                  onChange={e => onChangeFormConsolidacion({ ...formConsolidacion, observacion: e.target.value })}
                   placeholder="Opcional..."
                 />
               </div>
@@ -246,24 +285,41 @@ export function ConsolidacionLegacyPanel({
             {/* BOTONES PRINCIPALES DE ACCIÓN */}
             <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-2">
               <button 
-                className={`${btnLegacyClass} ${canConsolidar ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700' : btnDisabled}`}
-                disabled={!canConsolidar || consolidando}
+                className={`${btnLegacyClass} ${puedeConsolidar ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700' : btnDisabled}`}
+                disabled={!puedeConsolidar || consolidando}
                 onClick={handleConsolidar}
               >
                 <Save className="w-4 h-4" />
                 {consolidando ? 'Guardando...' : 'Consolidar / Guardar'}
               </button>
               
-              <button className={`${btnLegacyClass} ${btnDisabled}`} title="Funcionalidad pendiente de migración">
+              <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
                 <Ban className="w-4 h-4" /> Anular Inspección
               </button>
 
-              <button className={`${btnLegacyClass} ${isConsolidada ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 cursor-pointer opacity-100' : btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+              <button className={`${btnLegacyClass} ${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 cursor-pointer opacity-100' : btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
                 <Printer className="w-4 h-4" /> Reimprimir Certificado
               </button>
               
-              <button className={`${btnLegacyClass} ${isConsolidada ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 cursor-pointer opacity-100' : btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
-                <FileText className="w-4 h-4" /> Visualizar / Informe
+              <button className={`${btnLegacyClass} ${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 cursor-pointer opacity-100' : btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+                <FileText className="w-4 h-4" /> Visualizar
+              </button>
+              
+              <button className={`${btnLegacyClass} ${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 cursor-pointer opacity-100' : btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+                <FileText className="w-4 h-4" /> Visualizar Informe
+              </button>
+
+              {/* Botones legacy adicionales solicitados */}
+              <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+                <FileText className="w-4 h-4" /> Visualizar Recibo
+              </button>
+              
+              <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+                <AlertTriangle className="w-4 h-4" /> Error Impresión
+              </button>
+
+              <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+                <Activity className="w-4 h-4" /> Registro Resultados
               </button>
             </div>
           </div>
@@ -276,16 +332,16 @@ export function ConsolidacionLegacyPanel({
             Acciones de Soporte y Excepciones
           </h3>
           <div className="flex flex-wrap gap-2">
-            <button className={`${btnLegacyClass} ${btnDisabled}`} title="Funcionalidad pendiente de migración">
+            <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
               <ShieldAlert className="w-4 h-4" /> Cambiar Observación
             </button>
-            <button className={`${btnLegacyClass} ${btnDisabled}`} title="Funcionalidad pendiente de migración">
+            <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
               <Truck className="w-4 h-4" /> Registro Vehículo MTC
             </button>
-            <button className={`${btnLegacyClass} ${btnDisabled}`} title="Funcionalidad pendiente de migración">
+            <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
               <FileSignature className="w-4 h-4" /> Cambiar Firma
             </button>
-            <button className={`${btnLegacyClass} ${btnDisabled}`} title="Funcionalidad pendiente de migración">
+            <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
               <Settings className="w-4 h-4" /> Cambio Motor / Línea
             </button>
           </div>

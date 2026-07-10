@@ -968,6 +968,23 @@ export const maestrosApi = {
 };
 
 export const lineaApi = {
+  obtenerWizardModel: async (nroInspeccion: string) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/linea/wizard/${nroInspeccion}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        throw new Error(await getErrorMessage(response, 'Error al obtener modelo wizard'));
+      }
+
+      return await parseJsonResponse<any>(response);
+    } catch (error) {
+      console.error('Error fetching wizard model:', error);
+      return { ok: false, message: 'Error de conexión.' };
+    }
+  },
   obtenerEstadoLinea: async (nroInspeccion: string) => {
     const response = await fetchWithTimeout(`${BASE_URL}/linea/estado/${nroInspeccion}`, {
       method: 'GET',
@@ -976,6 +993,19 @@ export const lineaApi = {
 
     if (!response.ok) {
       throw new Error(await getErrorMessage(response, 'Error al obtener estado de línea'));
+    }
+
+    return parseJsonResponse<any>(response);
+  },
+
+  obtenerConsolidacion: async (nroInspeccion: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/linea/consolidacion/${nroInspeccion}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, 'Error al obtener consolidación de línea'));
     }
 
     return parseJsonResponse<any>(response);

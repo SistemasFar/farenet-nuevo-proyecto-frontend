@@ -12,28 +12,67 @@ import type {
 
 const PAGE_SIZES = [5, 10, 20, 25, 50];
 
+const INSPECCIONES_FILTERS_KEY = 'farenet_inspecciones_filters';
+
+const getInitialFilters = () => {
+  try {
+    const saved = sessionStorage.getItem(INSPECCIONES_FILTERS_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    // ignorar error de parseo
+  }
+  return {
+    fechaInicio: '',
+    fechaFin: '',
+    numeroInspeccion: '',
+    placa: '',
+    comprobante: '',
+    cliente: '',
+    estado: '',
+    page: 1,
+    pageSize: 5
+  };
+};
+
 interface InspeccionesViewProps {
   onVerInspeccion?: (id: string) => void;
 }
 
 export default function InspeccionesView({ onVerInspeccion }: InspeccionesViewProps) {
+  const initialFilters = getInitialFilters();
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const [inspecciones, setInspecciones] = useState<InspeccionPanel[]>([]);
 
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [page, setPage] = useState(initialFilters.page);
+  const [pageSize, setPageSize] = useState(initialFilters.pageSize);
   const [totalPages, setTotalPages] = useState(0);
 
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
-  const [numeroInspeccion, setNumeroInspeccion] = useState('');
-  const [placa, setPlaca] = useState('');
-  const [comprobante, setComprobante] = useState('');
-  const [cliente, setCliente] = useState('');
-  const [estado, setEstado] = useState('');
+  const [fechaInicio, setFechaInicio] = useState(initialFilters.fechaInicio);
+  const [fechaFin, setFechaFin] = useState(initialFilters.fechaFin);
+  const [numeroInspeccion, setNumeroInspeccion] = useState(initialFilters.numeroInspeccion);
+  const [placa, setPlaca] = useState(initialFilters.placa);
+  const [comprobante, setComprobante] = useState(initialFilters.comprobante);
+  const [cliente, setCliente] = useState(initialFilters.cliente);
+  const [estado, setEstado] = useState(initialFilters.estado);
+
+  useEffect(() => {
+    const filtersToSave = {
+      fechaInicio,
+      fechaFin,
+      numeroInspeccion,
+      placa,
+      comprobante,
+      cliente,
+      estado,
+      page,
+      pageSize
+    };
+    sessionStorage.setItem(INSPECCIONES_FILTERS_KEY, JSON.stringify(filtersToSave));
+  }, [fechaInicio, fechaFin, numeroInspeccion, placa, comprobante, cliente, estado, page, pageSize]);
 
   const cargarInspecciones = async (
     paginaActual = 1,
@@ -89,7 +128,7 @@ export default function InspeccionesView({ onVerInspeccion }: InspeccionesViewPr
   };
 
   useEffect(() => {
-    cargarInspecciones(1, pageSize);
+    cargarInspecciones(page, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -98,6 +137,8 @@ export default function InspeccionesView({ onVerInspeccion }: InspeccionesViewPr
   };
 
   const limpiarFiltros = () => {
+    sessionStorage.removeItem(INSPECCIONES_FILTERS_KEY);
+    
     setFechaInicio('');
     setFechaFin('');
     setNumeroInspeccion('');
@@ -105,6 +146,7 @@ export default function InspeccionesView({ onVerInspeccion }: InspeccionesViewPr
     setComprobante('');
     setCliente('');
     setEstado('');
+    setPage(1);
 
     cargarInspecciones(1, pageSize, true);
   };
