@@ -159,7 +159,12 @@ export function MainLayout({
 
       case 'inspecciones':
         return (
-          <InspeccionesView />
+          <InspeccionesView 
+            onVerInspeccion={(id) => {
+              setInspeccionActivaId(id);
+              setActiveTab('linea');
+            }}
+          />
         );
 
       case 'personas':

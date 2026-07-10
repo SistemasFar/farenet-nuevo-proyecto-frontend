@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ConsolidacionInicialStep } from './components/ConsolidacionInicialStep';
+import { ConsolidacionLegacyPanel } from './components/ConsolidacionLegacyPanel';
 import { LineaStep } from './components/LineaStep';
 import { PreVisualizacionStep } from './components/PreVisualizacionStep';
-import { ConsolidacionFinalStep } from './components/ConsolidacionFinalStep';
 import Swal from 'sweetalert2';
-import { lineaApi } from '../../../services/api/linea';
+import { lineaApi } from '../../../services/api';
 import { CheckCircle2, ClipboardCheck, Activity, Eye, FileCheck, ArrowLeft } from 'lucide-react';
 
 interface LineaViewProps {
@@ -19,13 +18,33 @@ const STEPS = [
   { id: 'consolidacion_final', label: 'Consolidación', icon: FileCheck }
 ];
 
+import { SeguimientoLineaDashboard } from './components/SeguimientoLineaDashboard';
+
 export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [inspeccionData, setInspeccionData] = useState<any>(null);
+  const [estadoLinea, setEstadoLinea] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEstadoLinea = async () => {
+    if (!nroInspeccion) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await lineaApi.obtenerEstadoLinea(nroInspeccion);
+      if (data.ok) {
+        setEstadoLinea(data);
+      } else {
+        setError(data.message || 'Error desconocido');
+      }
+    } catch (err: any) {
+      setError(err.message || "Error al obtener estado");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Si entran a esta vista sin una inspección, los devolvemos al inicio.
     if (!nroInspeccion) {
       Swal.fire({
         icon: 'error',
@@ -37,20 +56,8 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
       });
       return;
     }
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const data = await lineaApi.getInspeccion(nroInspeccion);
-        setInspeccionData(data);
-      } catch (err) {
-        console.error("Error fetching inspeccion", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [nroInspeccion, onBack]);
+    fetchEstadoLinea();
+  }, [nroInspeccion]);
 
   const handleSiguiente = () => {
     if (currentStep < STEPS.length - 1) {
@@ -61,35 +68,9 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
   const handleAnterior = () => {
     if (currentStep > 0) {
       setCurrentStep(prev => prev - 1);
-    }
-  };
-
-  const handleAnular = () => {
-    Swal.fire({
-      title: '¿Anular Proceso?',
-      text: 'Se cancelará el proceso de inspección actual. Esta acción no se puede deshacer.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Sí, anular',
-      cancelButtonText: 'Cancelar'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        onBack();
-      }
-    });
-  };
-
-  const handleFinalizar = () => {
-    Swal.fire({
-      icon: 'success',
-      title: 'Proceso Terminado',
-      text: 'La inspección ha concluido exitosamente.',
-      confirmButtonColor: '#3085d6'
-    }).then(() => {
+    } else {
       onBack();
-    });
+    }
   };
 
   if (!nroInspeccion) return null;
@@ -128,18 +109,22 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
             const isCompleted = index < currentStep;
 
             return (
-              <div key={step.id} className="flex flex-col items-center gap-2 bg-[#f4f9ff] px-2">
+              <div 
+                key={step.id} 
+                className="flex flex-col items-center gap-2 bg-[#f4f9ff] px-2 cursor-pointer group"
+                onClick={() => setCurrentStep(index)}
+              >
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 
-'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
-                    isCompleted ? 'bg-gold-3d shadow-sm border-none text-white' :
-                      'bg-white text-slate-400 border-2 border-slate-200'
+'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100 group-hover:bg-[#041d54]' :
+                    isCompleted ? 'bg-gold-3d shadow-sm border-none text-white group-hover:bg-amber-600' :
+                      'bg-white text-slate-400 border-2 border-slate-200 group-hover:border-[#052a79] group-hover:text-[#052a79]'
                     }`}
                 >
                   {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                 </div>
-                <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : 
-isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
+                <span className={`text-xs font-bold uppercase tracking-wider mt-1 transition-colors ${isActive ? 'text-[#052a79]' : 
+isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400 group-hover:text-[#052a79]'}`}>
                   {step.label}
                 </span>
               </div>
@@ -148,42 +133,79 @@ isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 relative z-0">
-        <div className="w-full h-full animate-fade-in-up pb-10">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 relative z-0 flex flex-col">
+        <div className="flex-1 w-full h-full animate-fade-in-up">
           {loading && <div className="p-8 text-center text-slate-500">Cargando inspección...</div>}
           
-          {!loading && currentStep === 0 && (
-            <ConsolidacionInicialStep
-              nroInspeccion={nroInspeccion}
-              inspeccionData={inspeccionData}
-              onSiguiente={handleSiguiente}
-              onAnular={handleAnular}
-            />
+          {error && (
+            <div className="p-8 text-center text-red-500">
+              <h3 className="font-bold text-lg mb-2">No se pudo cargar el estado</h3>
+              <p>{error}</p>
+            </div>
           )}
-          {!loading && currentStep === 1 && (
-            <LineaStep
-              nroInspeccion={nroInspeccion}
-              inspeccionData={inspeccionData}
-              onSiguiente={handleSiguiente}
-              onAnterior={handleAnterior}
-            />
+
+          {!loading && !error && estadoLinea && (
+            <>
+              {currentStep === 0 && (
+                <ConsolidacionLegacyPanel
+                  mode="resumen"
+                  nroInspeccion={nroInspeccion}
+                  estadoLinea={estadoLinea}
+                  onRefresh={fetchEstadoLinea}
+                />
+              )}
+              {currentStep === 1 && (
+                <LineaStep
+                  nroInspeccion={nroInspeccion}
+                  estadoLinea={estadoLinea}
+                  onRefresh={fetchEstadoLinea}
+                />
+              )}
+              {currentStep === 2 && (
+                <PreVisualizacionStep
+                  nroInspeccion={nroInspeccion}
+                  estadoLinea={estadoLinea}
+                />
+              )}
+              {currentStep === 3 && (
+                <ConsolidacionLegacyPanel
+                  mode="final"
+                  nroInspeccion={nroInspeccion}
+                  estadoLinea={estadoLinea}
+                  onRefresh={fetchEstadoLinea}
+                />
+              )}
+            </>
           )}
-          {!loading && currentStep === 2 && (
-            <PreVisualizacionStep
-              nroInspeccion={nroInspeccion}
-              inspeccionData={inspeccionData}
-              onSiguiente={handleSiguiente}
-              onAnterior={handleAnterior}
-            />
-          )}
-          {!loading && currentStep === 3 && (
-            <ConsolidacionFinalStep
-              nroInspeccion={nroInspeccion}
-              inspeccionData={inspeccionData}
-              onAnterior={handleAnterior}
-              onFinalizar={handleFinalizar}
-            />
-          )}
+        </div>
+      </div>
+
+      {/* FOOTER WIZARD GLOBAL */}
+      <div className="bg-white border-t border-slate-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] relative z-10">
+        <div className="flex justify-between items-center max-w-5xl mx-auto">
+          <button
+            onClick={onBack}
+            className="px-6 py-2 border-2 border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-100 uppercase text-sm transition-colors"
+          >
+            Cancelar / Volver
+          </button>
+          
+          <div className="flex gap-3">
+            <button
+              onClick={handleAnterior}
+              disabled={currentStep === 0}
+              className={`px-6 py-2 font-bold rounded-lg uppercase text-sm transition-colors ${currentStep === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'border-2 border-[#052a79] text-[#052a79] hover:bg-blue-50'}`}
+            >
+              Anterior
+            </button>
+            <button
+              onClick={handleSiguiente}
+              disabled={currentStep === STEPS.length - 1}
+              className={`px-8 py-2 font-bold rounded-lg uppercase text-sm transition-colors ${currentStep === STEPS.length - 1 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-[#052a79] text-white hover:bg-[#041d54]'}`}
+            >
+              Siguiente
+            </button>
+          </div>
         </div>
       </div>
     </div>

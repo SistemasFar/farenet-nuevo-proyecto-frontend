@@ -18,6 +18,22 @@ console.log('API URL:', BASE_URL);
 
 const TIMEOUT_MS = 10000;
 
+// TODO FASE JWT: Cambiar por la implementación final cuando se tenga autenticación JWT
+const getAuthHeaders = (): Record<string, string> => {
+  const token =
+    localStorage.getItem('token') ||
+    localStorage.getItem('authToken') ||
+    localStorage.getItem('accessToken');
+
+  if (!token) {
+    return {};
+  }
+
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+};
+
 async function getErrorMessage(
   response: Response,
   defaultMessage: string
@@ -803,7 +819,7 @@ export const maestrosApi = {
     return parseJsonResponse<MaestrosCajaResponse>(response);
   },
 
-  obtenerIngenierosAsync: async (plantaKey: string): Promise<{ status: string, data: any[] }> => {
+  obtenerIngenierosAsync: async (plantaKey: string): Promise<{ ok: boolean, planta: string, ingenieros: any[] }> => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/ingenieros/${plantaKey}`, {
       method: 'GET'
     });
@@ -814,7 +830,7 @@ export const maestrosApi = {
       );
     }
 
-    return parseJsonResponse<{ status: string, data: any[] }>(response);
+    return parseJsonResponse<{ ok: boolean, planta: string, ingenieros: any[] }>(response);
   },
 
   obtenerPrecioConceptoAsync: async (plantaKey: string, conceptoKey: string): Promise<{ status: string, data: { precio: number } }> => {
@@ -947,6 +963,21 @@ export const maestrosApi = {
 
   obtenerLineasPorPlantaAsync: async (plantaKey: string) => {
     const response = await fetchWithTimeout(`${BASE_URL}/maestros/lineas/${plantaKey}`);
+    return parseJsonResponse<any>(response);
+  }
+};
+
+export const lineaApi = {
+  obtenerEstadoLinea: async (nroInspeccion: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/linea/estado/${nroInspeccion}`, {
+      method: 'GET',
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, 'Error al obtener estado de línea'));
+    }
+
     return parseJsonResponse<any>(response);
   }
 };

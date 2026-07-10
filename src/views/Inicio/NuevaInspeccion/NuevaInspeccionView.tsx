@@ -520,7 +520,7 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
     }
   };
 
-  const guardarParcialAsync = async (tabDestino: string) => {
+  const guardarParcialAsync = async (tabDestino: 'DATOS' | 'SOAT' | 'PROPIETARIO') => {
     if (loading) return; // Protección anti doble click
     if (!nrodocumentoinspeccion) {
       setVehiculoTab(tabDestino);

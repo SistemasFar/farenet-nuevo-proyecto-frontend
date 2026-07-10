@@ -28,5 +28,17 @@ export const lineaApi = {
     });
     if (!response.ok) throw new Error('Error consolidando inspeccion');
     return response.json();
+  },
+
+  obtenerConsolidacionLectura: async (nroInspeccion: string) => {
+    const response = await fetch(`${BASE_URL}/consolidacion/${nroInspeccion}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Error fetching consolidacion');
+    }
+    return response.json();
   }
 };

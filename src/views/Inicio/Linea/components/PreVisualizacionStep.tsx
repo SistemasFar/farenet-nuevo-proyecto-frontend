@@ -1,61 +1,63 @@
 import React from 'react';
+import { ArrowLeft, ArrowRight, EyeOff, Eye, FileText } from 'lucide-react';
 
 interface PreVisualizacionStepProps {
-  nroInspeccion?: string;
-  inspeccionData?: any;
-  onSiguiente: () => void;
-  onAnterior: () => void;
+  nroInspeccion: string;
+  estadoLinea: any;
 }
 
-export function PreVisualizacionStep({ nroInspeccion, inspeccionData, onSiguiente, onAnterior }: PreVisualizacionStepProps) {
-  const placa = inspeccionData?.form_data?.vehiculo?.placa || 'N/A';
-  const nombreCliente = inspeccionData?.form_data?.facturacion?.razonSocial || 'N/A';
+export function PreVisualizacionStep({ nroInspeccion, estadoLinea }: PreVisualizacionStepProps) {
+  const { posicionActual, inspeccionestado_key, nrodocumentocertificado } = estadoLinea;
+  const isConsolidada = inspeccionestado_key === 'CON';
+
   return (
-    <div className="flex flex-col h-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-          Pre Visualización Certificado
-        </h2>
+    <div className="flex flex-col h-full bg-slate-50 font-sans animate-fade-in-up">
+      <div className="flex-1 p-6 flex flex-col items-center justify-center">
         
-        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-          <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-2">
-            <h3 className="text-lg font-bold text-slate-800">Certificado (Borrador)</h3>
-            <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-0.5 rounded border border-amber-200">
-              VISTA PREVIA
-            </span>
+        {!isConsolidada ? (
+          <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-sm text-center max-w-md">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <EyeOff className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Previsualización Pendiente</h3>
+            <p className="text-slate-500 text-sm">
+              La inspección aún no está consolidada o no tiene certificado generado. Debes completar la consolidación en el siguiente paso.
+            </p>
           </div>
-          
-          <div className="bg-white border-2 border-dashed border-slate-300 rounded-lg p-8 text-center min-h-[400px] flex flex-col justify-center items-center relative overflow-hidden">
-            <div className="absolute inset-0 bg-slate-50/50 flex items-center justify-center opacity-10 pointer-events-none">
-              <span className="text-6xl font-black rotate-[-45deg] text-slate-900">BORRADOR</span>
+        ) : (
+          <div className="bg-white border-2 border-slate-200 p-8 rounded-lg shadow-md max-w-lg w-full relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-2 bg-blue-600"></div>
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="font-black text-xl text-slate-800 uppercase tracking-tight">Certificado Local</h3>
+                <p className="text-sm text-slate-500">Inspección {nroInspeccion}</p>
+              </div>
+              <FileText className="w-8 h-8 text-blue-600 opacity-20" />
             </div>
             
-            <svg className="w-16 h-16 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="text-slate-500 font-bold mb-2">Pre-visualización del certificado para la placa:</p>
-            <p className="text-3xl font-black text-slate-800 mb-4">{placa}</p>
-            <p className="text-sm text-slate-400">Cliente: {nombreCliente}</p>
-            <p className="text-sm text-slate-400 mt-2">Nro Inspección: {nroInspeccion}</p>
+            <div className="space-y-4 bg-slate-50 p-4 rounded border border-slate-100">
+              <div className="flex justify-between">
+                <span className="text-slate-500 text-sm font-bold">Estado:</span>
+                <span className="text-green-700 text-sm font-black uppercase">Consolidado</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 text-sm font-bold">Nro. Certificado:</span>
+                <span className="text-slate-800 text-sm font-bold">{nrodocumentocertificado || 'NO GENERADO (Rechazado)'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 text-sm font-bold">Resultado:</span>
+                <span className="text-slate-800 text-sm font-black">{estadoLinea.resultadoPreliminar || 'N/A'}</span>
+              </div>
+            </div>
+
+            <div className="mt-6 text-center text-xs text-slate-400 bg-amber-50 text-amber-700 p-2 rounded">
+              Previsualización legal final pendiente de fase PDF/MTC.
+            </div>
           </div>
-        </div>
+        )}
+
       </div>
 
-      <div className="flex-shrink-0 bg-slate-100 p-4 border-t border-slate-200 flex justify-between items-center">
-        <button
-          onClick={onAnterior}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-lg border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-200 hover:text-slate-800 transition-all text-sm uppercase"
-        >
-          Anterior
-        </button>
-
-        <button
-          onClick={onSiguiente}
-          className="flex items-center gap-2 px-8 py-2.5 rounded-lg bg-amber-500 text-slate-900 font-black hover:bg-amber-400 transition-all text-sm uppercase shadow-sm shadow-amber-500/20"
-        >
-          Siguiente
-        </button>
-      </div>
     </div>
   );
 }

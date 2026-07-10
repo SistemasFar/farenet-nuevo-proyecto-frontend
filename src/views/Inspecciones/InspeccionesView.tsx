@@ -12,7 +12,11 @@ import type {
 
 const PAGE_SIZES = [5, 10, 20, 25, 50];
 
-export default function InspeccionesView() {
+interface InspeccionesViewProps {
+  onVerInspeccion?: (id: string) => void;
+}
+
+export default function InspeccionesView({ onVerInspeccion }: InspeccionesViewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -307,6 +311,7 @@ export default function InspeccionesView() {
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                      onClick={() => onVerInspeccion && onVerInspeccion(item.numeroInspeccion)}
                     >
                       <Eye className="h-3.5 w-3.5" />
                       Ver
