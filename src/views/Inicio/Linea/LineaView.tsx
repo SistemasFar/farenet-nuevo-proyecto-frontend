@@ -48,6 +48,27 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
     try {
       const data = await lineaApi.obtenerWizardModel(nroInspeccion);
       if (data.ok) {
+        if (data.vehiculo) {
+          data.vehiculo.marca = data.vehiculo.marca || data.vehiculo.marcavehiculo_key;
+          data.vehiculo.modelo = data.vehiculo.modelo || data.vehiculo.modelovehiculo_key;
+          data.vehiculo.categoria = data.vehiculo.categoria || data.vehiculo.categoriavehiculo_key;
+          data.vehiculo.combustible = data.vehiculo.combustible || data.vehiculo.combustible_key;
+        }
+
+        // Mapeo linea
+        data.linea = data.linea || {};
+        data.linea.obligatorias = data.obligatorias || [];
+        data.linea.recibidas = data.recibidas || [];
+        data.linea.faltantes = data.faltantes || [];
+        data.linea.noAplicables = data.noAplicables || [];
+
+        // Mapeo botones y permisos visuales
+        data.botones = {
+          puedeConsolidar: data.modo === 'LISTA_PARA_CONSOLIDAR' && data.puedeConsolidar,
+          puedeEditarCampos: data.modo === 'LINEA_EN_PROCESO' || data.modo === 'LISTA_PARA_CONSOLIDAR',
+          soloLectura: data.modo.startsWith('HISTORICO_')
+        };
+
         setEstadoLinea(data);
       } else {
         setError(data.message || 'Error desconocido');

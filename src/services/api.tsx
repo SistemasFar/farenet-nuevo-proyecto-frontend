@@ -20,10 +20,7 @@ const TIMEOUT_MS = 10000;
 
 // TODO FASE JWT: Cambiar por la implementación final cuando se tenga autenticación JWT
 const getAuthHeaders = (): Record<string, string> => {
-  const token =
-    localStorage.getItem('token') ||
-    localStorage.getItem('authToken') ||
-    localStorage.getItem('accessToken');
+  const token = sessionStorage.getItem('accessToken');
 
   if (!token) {
     return {};
@@ -38,6 +35,19 @@ async function getErrorMessage(
   response: Response,
   defaultMessage: string
 ): Promise<string> {
+  if (response.status === 401) {
+    return 'Sesión expirada o no autenticada. Vuelva a iniciar sesión.';
+  }
+  if (response.status === 403) {
+    return 'No tiene permisos para acceder a inspecciones de esta planta.';
+  }
+  if (response.status === 404) {
+    return 'No se encontró la inspección.';
+  }
+  if (response.status === 500) {
+    return 'Error interno al cargar Línea. Revise backend.';
+  }
+
   const errorData = await response
     .json()
     .catch(() => ({}));
@@ -74,7 +84,7 @@ async function fetchWithTimeout(
     }
 
     throw new Error(
-      'No se pudo conectar con el servidor. Verifique que el backend esté encendido o que la red esté disponible.'
+      'No se pudo conectar con el servidor.'
     );
   } finally {
     window.clearTimeout(timeoutId);
@@ -980,9 +990,9 @@ export const lineaApi = {
       }
 
       return await parseJsonResponse<any>(response);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching wizard model:', error);
-      return { ok: false, message: 'Error de conexión.' };
+      return { ok: false, message: error.message || 'Error de conexión.' };
     }
   },
   obtenerEstadoLinea: async (nroInspeccion: string) => {
