@@ -356,7 +356,13 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
     if (!formCaja.categoria) faltantes.push('Categoría');
     if (!formCaja.tipoCertificado) faltantes.push('Tipo Certificado');
     if (!formCaja.tipoInspeccion) faltantes.push('Tipo Inspección');
-    if (!documentoPago || documentoPago === '' || documentoPago === 'Seleccione...') faltantes.push('Documento de pago');
+
+    const isReinspeccionGratuita = !!(formCaja.nrodocumentoreinspeccion && precioTotal === 0);
+    const requiereDocumentoPago = !isReinspeccionGratuita && Number(precioTotal || 0) > 0;
+
+    if (requiereDocumentoPago && (!documentoPago || documentoPago === '' || documentoPago === 'Seleccione...')) {
+      faltantes.push('Documento de pago');
+    }
 
     if (faltantes.length > 0) {
       return { valido: false, mensaje: `Falta completar: ${faltantes.join(', ')}.` };
@@ -421,7 +427,10 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
       }
     }
 
-    if (currentStepIndex === 1 && !documentoPago) {
+    const isReinspeccionGratuita = !!(formCaja.nrodocumentoreinspeccion && precioTotal === 0);
+    const requiereDocumentoPago = !isReinspeccionGratuita && Number(precioTotal || 0) > 0;
+
+    if (currentStepIndex === 1 && requiereDocumentoPago && !documentoPago) {
       alert('Por favor selecciona el documento de pago obligatorio antes de continuar.');
       return;
     }

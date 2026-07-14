@@ -31,6 +31,7 @@ export interface LoginResponse {
 
 export interface CambiarPlantaResponse {
   status: string;
+  accessToken?: string;
   refreshToken?: string;
   plantaSeleccionada: PlantaAsignada;
   permisos?: string[];

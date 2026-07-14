@@ -324,6 +324,7 @@ export interface AuditoriaAcceso {
   user_agent: string | null;
   fecha_evento: string;
 }
+
 export interface AuditoriaAccesoFiltro {
   username?: string;
   evento?: string;
@@ -995,6 +996,22 @@ export const lineaApi = {
       return { ok: false, message: error.message || 'Error de conexión.' };
     }
   },
+  anularInspeccion: async (nroInspeccion: string, motivo: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/linea/consolidacion/${nroInspeccion}/anular`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ motivo })
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, 'Error al anular la inspección.'));
+    }
+
+    return await parseJsonResponse<any>(response);
+  },
   obtenerEstadoLinea: async (nroInspeccion: string) => {
     const response = await fetchWithTimeout(`${BASE_URL}/linea/estado/${nroInspeccion}`, {
       method: 'GET',
@@ -1019,5 +1036,78 @@ export const lineaApi = {
     }
 
     return parseJsonResponse<any>(response);
+  },
+
+  obtenerPropietario: async (nroInspeccion: string) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/linea/propietario/${nroInspeccion}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) throw new Error('Sesión expirada o no autenticada.');
+        if (response.status === 403) throw new Error('No tiene permisos para modificar propietarios de esta planta.');
+        if (response.status === 404) throw new Error('No se encontró propietario para esta inspección.');
+        if (response.status === 500) throw new Error('Error interno al cargar propietario.');
+        throw new Error(await getErrorMessage(response, 'Error interno al cargar propietario.'));
+      }
+
+      return await parseJsonResponse<any>(response);
+    } catch (error: any) {
+      console.error('Error fetching propietario:', error);
+      throw error;
+    }
+  },
+
+  obtenerRecibo: async (nroInspeccion: string) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/linea/recibo/${nroInspeccion}`, {
+        method: 'GET',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(await getErrorMessage(response, 'Error al obtener recibo'));
+      }
+      return await parseJsonResponse<any>(response);
+    } catch (error: any) {
+      console.error('Error al obtener recibo:', error);
+      throw error;
+    }
+  },
+
+  modificarPropietario: async (nroInspeccion: string, data: any) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/linea/propietario/${nroInspeccion}`, {
+        method: 'PATCH',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        if (response.status === 400) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || 'Error de validación.');
+        }
+        if (response.status === 401) throw new Error('Sesión expirada o no autenticada.');
+        if (response.status === 403) throw new Error('No tiene permisos para modificar propietarios de esta planta.');
+        if (response.status === 409) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || 'Solo se puede modificar propietario antes de consolidar.');
+        }
+        throw new Error(await getErrorMessage(response, 'Error interno al actualizar propietario.'));
+      }
+
+      return await parseJsonResponse<any>(response);
+    } catch (error: any) {
+      console.error('Error al modificar propietario:', error);
+      throw error;
+    }
   }
 };

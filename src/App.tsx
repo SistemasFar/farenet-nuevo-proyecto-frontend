@@ -193,6 +193,10 @@ export default function App() {
 
     const permisosActualizados = resp.permisos || permisos;
 
+    if (resp.accessToken) {
+      sessionStorage.setItem('accessToken', resp.accessToken);
+    }
+
     plantaSession.guardar(resp.plantaSeleccionada);
     permisosSession.guardar(permisosActualizados);
 
