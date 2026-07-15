@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, XCircle, AlertCircle, Eye, Settings, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, ArrowRight, CheckCircle2, XCircle, AlertCircle, Eye, Settings, RefreshCw, X } from 'lucide-react';
 
 interface LineaStepProps {
   nroInspeccion: string;
@@ -7,32 +7,173 @@ interface LineaStepProps {
   onRefresh: () => void;
 }
 
+const NOMBRES_MAQUINA: Record<string, string> = {
+  '1': 'Alineación',
+  '2': 'Suspensión',
+  '3': 'Frenómetro',
+  '4': 'Analizador de Gases',
+  '5': 'Opacímetro',
+  '6': 'Sonómetro',
+  '7': 'Luxómetro',
+  '9': 'Inspección Visual',
+  '10': 'Profundímetro',
+  '11': 'Foto Gases',
+  '12': 'Foto Luces',
+  '13': 'Foto Frenos',
+  '15': 'Foto Frenos',
+};
+
+const getTipo = (item: any) => String(
+  item?.tipomaquina_key ??
+  item?.tipo_maquina_key ??
+  item?.tipoMaquinaKey ??
+  item?.tipomaquina?.key ??
+  ''
+).trim();
+
+const parseData = (data: any) => {
+  if (!data) return {};
+  if (typeof data === 'object') return data;
+  if (typeof data === 'string') {
+    try { return JSON.parse(data); } catch { return {}; }
+  }
+  return {};
+};
+
+const extraerFotoRaw = (item: any) => {
+  const dataObj = parseData(item?.data);
+  return (
+    dataObj?.foto ??
+    dataObj?.Foto ??
+    dataObj?.imagen ??
+    dataObj?.image ??
+    dataObj?.base64 ??
+    item?.foto ??
+    null
+  );
+};
+
+const hexToBase64 = (hex: string) => {
+  const clean = hex.replace(/^\\x/i, '').trim();
+  const bytes = new Uint8Array(clean.length / 2);
+
+  for (let i = 0; i < clean.length; i += 2) {
+    bytes[i / 2] = parseInt(clean.substring(i, i + 2), 16);
+  }
+
+  let binary = '';
+  const chunkSize = 0x8000;
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+
+  return btoa(binary);
+};
+
+const normalizarFoto = (foto: any) => {
+  if (!foto || typeof foto !== 'string') return null;
+
+  const clean = foto.trim();
+
+  if (clean.startsWith('data:image')) return clean;
+  if (clean.startsWith('/9j/')) return `data:image/jpeg;base64,${clean}`;
+  if (clean.startsWith('iVBOR')) return `data:image/png;base64,${clean}`;
+
+  const hex = clean.replace(/^\\x/i, '').toLowerCase();
+
+  if (/^[0-9a-f]+$/.test(hex) && hex.startsWith('ffd8')) {
+    return `data:image/jpeg;base64,${hexToBase64(hex)}`;
+  }
+
+  return null;
+};
+
 export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepProps) {
-  const { recibidas = [], faltantes = [], noAplicables = [], obligatorias = [], modo } = estadoLinea;
-  const isHistorico = modo?.startsWith('HISTORICO_');
-  const isEmptyHistorico = isHistorico && recibidas.length === 0;
+  const [modalFoto, setModalFoto] = useState<{ open: boolean, src: string, titulo: string }>({ open: false, src: '', titulo: '' });
+
+  const source = estadoLinea?.linea?.recibidas ? estadoLinea.linea : estadoLinea;
+  const faltantes = source?.faltantes || [];
+  const noAplicables = source?.noAplicables || [];
+  const obligatorias = source?.obligatorias || [];
+
+  // 1. Fuente unica
+  const todosResultadosRaw = [
+    ...(estadoLinea?.resultadosMaquinaRaw || []),
+    ...(estadoLinea?.linea?.recibidas || []),
+    ...(estadoLinea?.linea?.resultadosMaquina || []),
+    ...(estadoLinea?.resultadosMaquina || []),
+  ];
+
+  // Eliminar duplicados
+  const mapUnique = new Map();
+  todosResultadosRaw.forEach((r: any) => {
+    const key = `${r.id || ''}-${getTipo(r)}`;
+    if (!mapUnique.has(key)) mapUnique.set(key, r);
+  });
+  const todosResultados = Array.from(mapUnique.values());
+
+  const recibidas = todosResultados;
 
   const aprobados = recibidas.filter((p: any) => p.resultado === 'A');
   const desaprobados = recibidas.filter((p: any) => p.resultado === 'D');
+  const faltantesNormales = faltantes;
 
-  // Mapeo visual de fotos (simulación UI)
-  const renderFotoItem = (titulo: string, pruebaKey: string) => {
-    const recibida = recibidas.find((r: any) => r.tipomaquina_key === pruebaKey);
-    const faltante = faltantes.find((f: any) => f.tipomaquina_key === pruebaKey);
-    const isListo = !!recibida;
+  const buscarFotoPorTipos = (tipos: string[]) => {
+    const item = todosResultados.find((r: any) => tipos.includes(getTipo(r)));
+    if (!item) return null;
+  
+    const raw = extraerFotoRaw(item);
+    const normalizada = normalizarFoto(raw);
+  
+    return {
+      item,
+      raw,
+      src: normalizada,
+    };
+  };
+
+  const fotoGases = buscarFotoPorTipos(['11']);
+  const fotoLuces = buscarFotoPorTipos(['12']);
+  const fotoFrenos = buscarFotoPorTipos(['13', '15']);
+
+  const renderFotoItem = (titulo: string, dataObj: any) => {
+    const isListo = !!dataObj?.src;
     
     return (
-      <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
-        <span className="font-bold text-slate-700 text-sm uppercase">{titulo}</span>
-        {isListo ? (
-          <span className="flex items-center gap-1 text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded">
-            <CheckCircle2 className="w-3 h-3" /> LISTO
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-xs font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded">
-            <AlertCircle className="w-3 h-3" /> PENDIENTE
-          </span>
-        )}
+      <div className="flex flex-col gap-2 p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-slate-700 text-sm uppercase">{titulo}</span>
+          {isListo ? (
+            <span className="flex items-center gap-1 text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded">
+              <CheckCircle2 className="w-3 h-3" /> LISTO
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-xs font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded">
+              <AlertCircle className="w-3 h-3" /> PENDIENTE
+            </span>
+          )}
+        </div>
+        
+        <div className="flex gap-2 mt-2">
+          <button 
+             className={`flex-1 text-xs font-bold py-1.5 rounded flex items-center justify-center gap-1 transition-colors ${isListo ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer' : 'bg-slate-100 text-slate-400 cursor-not-allowed opacity-50'}`}
+             onClick={() => {
+                if(isListo) {
+                   setModalFoto({ open: true, src: dataObj.src, titulo });
+                }
+             }}
+          >
+             <Eye className="w-3 h-3" /> Ver
+          </button>
+          
+          <button className="flex-1 text-xs bg-slate-100 text-slate-400 font-bold py-1.5 rounded cursor-not-allowed opacity-50 flex justify-center items-center" title="Cambiar foto deshabilitado (Lectura)">
+             Cambiar
+          </button>
+          <button className="flex-1 text-xs bg-slate-100 text-slate-400 font-bold py-1.5 rounded cursor-not-allowed opacity-50 flex justify-center items-center" title="Reiniciar foto deshabilitado (Lectura)">
+             Reiniciar
+          </button>
+        </div>
       </div>
     );
   };
@@ -40,24 +181,47 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
   return (
     <div className="flex flex-col h-full bg-slate-50 font-sans animate-fade-in-up">
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-        
-        {isEmptyHistorico ? (
-          <div className="bg-blue-50 border border-blue-200 text-blue-800 p-6 rounded-xl shadow-sm text-center">
-            <AlertCircle className="w-8 h-8 mx-auto mb-3 text-blue-500" />
-            <p className="font-bold">No existen resultados de máquina registrados en la tabla resultado_maquina para esta inspección histórica.</p>
+
+        {/* DEBUG FOTOS */}
+        <div className="bg-slate-900 text-green-400 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner">
+          <h4 className="font-bold text-white mb-2">DEBUG FOTOS:</h4>
+          <p>total resultadosMaquinaRaw: {estadoLinea?.resultadosMaquinaRaw?.length || 0}</p>
+          <p>total recibidas combinadas: {todosResultados.length}</p>
+          <p>tipos encontrados: {todosResultados.map((r: any) => getTipo(r)).join(', ')}</p>
+          <p>tipos foto encontrados: {todosResultados.filter((r: any) => ['11','12','13','15'].includes(getTipo(r))).map((r: any) => getTipo(r)).join(', ')}</p>
+          
+          <div className="mt-2 space-y-2">
+            {[fotoGases, fotoLuces, fotoFrenos].map((f, i) => {
+              if (!f?.item) return null;
+              const type = getTipo(f.item);
+              const dataObj = parseData(f.item.data);
+              const rawVal = f.raw;
+              const isString = typeof rawVal === 'string';
+              return (
+                <div key={i} className="pl-4 border-l border-green-700">
+                  <p>- tipo: {type}</p>
+                  <p>- resultado: {f.item.resultado}</p>
+                  <p>- tiene data: {f.item.data ? 'SI' : 'NO'}</p>
+                  <p>- keys de data: {Object.keys(dataObj).join(', ')}</p>
+                  <p>- fotoInicio: {isString ? rawVal.slice(0, 30) : 'N/A'}</p>
+                  <p>- fotoLength: {isString ? rawVal.length : 'N/A'}</p>
+                  <p>- normalizada: {f.src ? 'SI' : 'NO'}</p>
+                </div>
+              );
+            })}
           </div>
-        ) : (
-          <>
-            {/* Panel Superior: Fotos y Resumen */}
+        </div>
+        
+        {/* Panel Superior: Fotos y Resumen */}
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1 bg-white p-5 border border-slate-200 rounded-xl shadow-sm">
             <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2">
               <Eye className="w-5 h-5 text-blue-600" /> Control Visual (Fotos)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {renderFotoItem('Ver Frenos', '15')}
-              {renderFotoItem('Ver Gases', '11')}
-              {renderFotoItem('Ver Luces', '12')}
+              {renderFotoItem('Frenos', fotoFrenos)}
+              {renderFotoItem('Gases', fotoGases)}
+              {renderFotoItem('Luces', fotoLuces)}
             </div>
           </div>
           <div className="w-full md:w-64 bg-slate-800 text-white p-5 rounded-xl shadow-sm flex flex-col justify-center items-center relative overflow-hidden">
@@ -82,8 +246,9 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
             <div className="p-4 space-y-2 flex-1 max-h-64 overflow-y-auto">
               {aprobados.length === 0 && <p className="text-sm text-slate-400 text-center py-4">Ninguna prueba aprobada aún</p>}
               {aprobados.map((p: any) => (
-                <div key={p.id || p.tipomaquina_key} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
-                  <span>{p.nombre_prueba}</span>
+                <div key={p.id || getTipo(p)} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
+                  <span>{NOMBRES_MAQUINA[getTipo(p)] || p.nombre || p.nombre_prueba || `Tipo ${getTipo(p)}`}</span>
+                  <button className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 cursor-not-allowed opacity-50" title="Reinicio manual (Lectura)">Reiniciar</button>
                 </div>
               ))}
             </div>
@@ -98,8 +263,9 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
             <div className="p-4 space-y-2 flex-1 max-h-64 overflow-y-auto">
               {desaprobados.length === 0 && <p className="text-sm text-slate-400 text-center py-4">Ninguna prueba desaprobada</p>}
               {desaprobados.map((p: any) => (
-                <div key={p.id || p.tipomaquina_key} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
-                  <span>{p.nombre_prueba}</span>
+                <div key={p.id || getTipo(p)} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
+                  <span>{NOMBRES_MAQUINA[getTipo(p)] || p.nombre || p.nombre_prueba || `Tipo ${getTipo(p)}`}</span>
+                  <button className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 cursor-not-allowed opacity-50" title="Reinicio manual (Lectura)">Reiniciar</button>
                 </div>
               ))}
             </div>
@@ -109,14 +275,13 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
           <div className="bg-white border border-amber-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
             <div className="bg-amber-50 p-3 border-b border-amber-200 flex justify-between items-center">
               <span className="font-bold text-amber-800 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Faltantes</span>
-              <span className="bg-amber-200 text-amber-800 text-xs font-black px-2 py-0.5 rounded-full">{faltantes.length}</span>
+              <span className="bg-amber-200 text-amber-800 text-xs font-black px-2 py-0.5 rounded-full">{faltantesNormales.length}</span>
             </div>
             <div className="p-4 space-y-2 flex-1 max-h-64 overflow-y-auto">
-              {faltantes.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No hay pruebas faltantes</p>}
-              {faltantes.map((p: any) => (
-                <div key={p.tipomaquina_key} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
-                  <span>{p.nombre_prueba}</span>
-                  <button className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 cursor-not-allowed opacity-50" title="Reinicio manual (Próximamente)">Reiniciar</button>
+              {faltantesNormales.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No hay pruebas faltantes</p>}
+              {faltantesNormales.map((p: any) => (
+                <div key={getTipo(p)} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
+                  <span>{NOMBRES_MAQUINA[getTipo(p)] || p.nombre_prueba || `Tipo ${getTipo(p)}`}</span>
                 </div>
               ))}
             </div>
@@ -129,13 +294,50 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
           <div className="bg-slate-100 border border-slate-200 p-4 rounded-xl flex flex-wrap gap-2">
             <span className="text-sm font-bold text-slate-500 mr-2 flex items-center">No Aplica:</span>
             {noAplicables.map((p: any) => (
-              <span key={p.tipomaquina_key} className="text-xs bg-white text-slate-400 px-2 py-1 rounded border border-slate-200">{p.nombre_prueba}</span>
+              <span key={getTipo(p)} className="text-xs bg-white text-slate-400 px-2 py-1 rounded border border-slate-200">{NOMBRES_MAQUINA[getTipo(p)] || p.nombre_prueba || `Tipo ${getTipo(p)}`}</span>
             ))}
           </div>
         )}
-      </>
-        )}
+
       </div>
+
+      {/* Modal Foto */}
+      {modalFoto.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75 animate-fade-in">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                Foto: {modalFoto.titulo}
+              </h2>
+              <button onClick={() => setModalFoto({ ...modalFoto, open: false })} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 flex-1 overflow-auto flex justify-center items-center bg-slate-100">
+              <img 
+                src={modalFoto.src} 
+                alt={`Foto ${modalFoto.titulo}`} 
+                className="max-w-full max-h-[60vh] object-contain rounded border border-slate-300 shadow-sm"
+                onError={(e: any) => { e.target.src = 'https://via.placeholder.com/800x600?text=Error+cargando+imagen'; }}
+              />
+            </div>
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
+              <div className="text-sm text-slate-500 font-medium">
+                Inspección: {nroInspeccion}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalFoto({ ...modalFoto, open: false })}
+                  className="px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
