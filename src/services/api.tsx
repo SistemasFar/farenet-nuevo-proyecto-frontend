@@ -979,6 +979,18 @@ export const maestrosApi = {
 };
 
 export const lineaApi = {
+  obtenerPrevisualizacion: async (nroInspeccion: string) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/linea/previsualizacion/${nroInspeccion}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error al obtener previsualización:', error);
+      throw error;
+    }
+  },
   obtenerWizardModel: async (nroInspeccion: string) => {
     try {
       const response = await fetchWithTimeout(`${BASE_URL}/linea/wizard/${nroInspeccion}`, {

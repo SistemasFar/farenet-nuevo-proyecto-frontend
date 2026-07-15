@@ -222,9 +222,30 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
 
   const recibidas = todosResultados;
 
-  const aprobados = recibidas.filter((p: any) => p.resultado === 'A');
-  const desaprobados = recibidas.filter((p: any) => p.resultado === 'D');
-  const faltantesNormales = faltantes;
+  const TIPOS_FOTO = new Set(['11', '12', '13', '15']);
+  const TIPOS_PRUEBA = new Set(['1', '2', '3', '4', '5', '6', '7', '9', '10']);
+
+  const esFoto = (item: any) => TIPOS_FOTO.has(getTipo(item));
+  const esPrueba = (item: any) => TIPOS_PRUEBA.has(getTipo(item));
+
+  const resultadosPruebas = recibidas.filter(esPrueba);
+
+  const aprobados = resultadosPruebas.filter((p: any) => p.resultado === 'A');
+  const desaprobados = resultadosPruebas.filter((p: any) => p.resultado === 'D');
+  const faltantesNormales = faltantes.filter(esPrueba);
+
+  const obligatoriasPrueba = obligatorias.filter((o: any) => TIPOS_PRUEBA.has(getTipo(o)));
+
+  const totalPruebas = obligatoriasPrueba.length > 0
+    ? obligatoriasPrueba.length
+    : (aprobados.length + desaprobados.length + faltantesNormales.length);
+
+  const avanceCompletadas = aprobados.length + desaprobados.length;
+  
+  // En caso de que el total sea 0 (y hay resultadosPruebas sin fallbacks)
+  const avanceMostradoTotal = totalPruebas === 0 && resultadosPruebas.length > 0 
+    ? resultadosPruebas.length 
+    : totalPruebas;
 
   const buscarFotoPorTipos = (tipos: string[]) => {
     const item = todosResultados.find((r: any) => tipos.includes(getTipo(r)));
@@ -300,35 +321,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
 
-        {/* DEBUG FOTOS */}
-        <div className="bg-slate-900 text-green-400 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner">
-          <h4 className="font-bold text-white mb-2">DEBUG FOTOS:</h4>
-          <p>total resultadosMaquinaRaw: {estadoLinea?.resultadosMaquinaRaw?.length || 0}</p>
-          <p>total recibidas combinadas: {todosResultados.length}</p>
-          <p>tipos encontrados: {todosResultados.map((r: any) => getTipo(r)).join(', ')}</p>
-          <p>tipos foto encontrados: {todosResultados.filter((r: any) => ['11','12','13','15'].includes(getTipo(r))).map((r: any) => getTipo(r)).join(', ')}</p>
-          
-          <div className="mt-2 space-y-2">
-            {[fotoGases, fotoLuces, fotoFrenos].map((f, i) => {
-              if (!f?.item) return null;
-              const type = getTipo(f.item);
-              const dataObj = parseData(f.item.data);
-              const rawVal = f.raw;
-              const isString = typeof rawVal === 'string';
-              return (
-                <div key={i} className="pl-4 border-l border-green-700">
-                  <p>- tipo: {type}</p>
-                  <p>- resultado: {f.item.resultado}</p>
-                  <p>- tiene data: {f.item.data ? 'SI' : 'NO'}</p>
-                  <p>- keys de data: {Object.keys(dataObj).join(', ')}</p>
-                  <p>- fotoInicio: {isString ? rawVal.slice(0, 30) : 'N/A'}</p>
-                  <p>- fotoLength: {isString ? rawVal.length : 'N/A'}</p>
-                  <p>- normalizada: {f.src ? 'SI' : 'NO'}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+
         
         {/* Panel Superior: Fotos y Resumen */}
         <div className="flex flex-col md:flex-row gap-6">
@@ -345,7 +338,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
           <div className="w-full md:w-64 bg-slate-800 text-white p-5 rounded-xl shadow-sm flex flex-col justify-center items-center relative overflow-hidden">
              <Settings className="w-24 h-24 absolute -right-4 -bottom-4 text-white opacity-5" />
              <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Avance</span>
-             <span className="text-4xl font-black mt-1">{recibidas.length} <span className="text-xl text-slate-400 font-medium">/ {obligatorias.length}</span></span>
+             <span className="text-4xl font-black mt-1">{avanceCompletadas} <span className="text-xl text-slate-400 font-medium">/ {avanceMostradoTotal}</span></span>
              <button onClick={onRefresh} className="mt-3 text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-2 transition-colors">
                <RefreshCw className="w-3 h-3" /> Refrescar
              </button>
