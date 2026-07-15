@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, XCircle, AlertCircle, Eye, Settings, RefreshCw, X } from 'lucide-react';
 
 interface LineaStepProps {
@@ -91,6 +91,113 @@ const normalizarFoto = (foto: any) => {
 
 export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepProps) {
   const [modalFoto, setModalFoto] = useState<{ open: boolean, src: string, titulo: string }>({ open: false, src: '', titulo: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentChangeTipo, setCurrentChangeTipo] = useState('');
+  const [esSistemas, setEsSistemas] = useState(false);
+
+  React.useEffect(() => {
+    try {
+      const ustr = sessionStorage.getItem('user');
+      if (ustr) {
+        const parsed = JSON.parse(ustr);
+        const perfil = String(parsed.perfilId || parsed.perfil || parsed.perfilUsuario || '').toLowerCase();
+        setEsSistemas(
+          perfil.includes('sistema') ||
+          perfil.includes('admin') ||
+          perfil.includes('desarrollador')
+        );
+      }
+    } catch { }
+  }, []);
+
+  const handleCambiarClick = (titulo: string) => {
+    if (!esSistemas) return;
+    let tipo = 'FRENOS';
+    if (titulo === 'Gases') tipo = 'GASES';
+    if (titulo === 'Luces') tipo = 'LUCES';
+    setCurrentChangeTipo(tipo);
+    if (fileInputRef.current) fileInputRef.current.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('tipoFoto', currentChangeTipo);
+      
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:3000/api/linea/foto/${nroInspeccion}/cambiar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      if (!res.ok) throw new Error('Error al cambiar foto');
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Error interno');
+    } finally {
+      setIsSubmitting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleReiniciarFoto = async (titulo: string) => {
+    if (!esSistemas) return;
+    if (!window.confirm(`¿Está seguro de reiniciar la foto de ${titulo}?`)) return;
+    
+    let tipo = 'FRENOS';
+    if (titulo === 'Gases') tipo = 'GASES';
+    if (titulo === 'Luces') tipo = 'LUCES';
+    
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:3000/api/linea/foto/${nroInspeccion}/reiniciar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipoFoto: tipo })
+      });
+      if (!res.ok) throw new Error('Error al reiniciar foto');
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Error interno');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReiniciarPrueba = async (item: any) => {
+    if (!esSistemas) return;
+    if (!item.id) {
+      alert("La prueba no tiene un ID de resultado válido para reiniciar.");
+      return;
+    }
+    if (!window.confirm(`¿Está seguro de reiniciar esta prueba?`)) return;
+    
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:3000/api/linea/prueba/${nroInspeccion}/reiniciar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          resultadoMaquinaId: item.id,
+          tipoMaquinaKey: getTipo(item)
+        })
+      });
+      if (!res.ok) throw new Error('Error al reiniciar prueba');
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Error interno');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const source = estadoLinea?.linea?.recibidas ? estadoLinea.linea : estadoLinea;
   const faltantes = source?.faltantes || [];
@@ -167,10 +274,20 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
              <Eye className="w-3 h-3" /> Ver
           </button>
           
-          <button className="flex-1 text-xs bg-slate-100 text-slate-400 font-bold py-1.5 rounded cursor-not-allowed opacity-50 flex justify-center items-center" title="Cambiar foto deshabilitado (Lectura)">
+          <button 
+             className={`flex-1 text-xs font-bold py-1.5 rounded flex justify-center items-center transition-colors ${!esSistemas || isSubmitting ? 'bg-slate-100 text-slate-400 opacity-50 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+             onClick={() => handleCambiarClick(titulo)}
+             disabled={!esSistemas || isSubmitting}
+             title={!esSistemas ? "Solo Sistemas puede cambiar fotos" : ""}
+          >
              Cambiar
           </button>
-          <button className="flex-1 text-xs bg-slate-100 text-slate-400 font-bold py-1.5 rounded cursor-not-allowed opacity-50 flex justify-center items-center" title="Reiniciar foto deshabilitado (Lectura)">
+          <button 
+             className={`flex-1 text-xs font-bold py-1.5 rounded flex justify-center items-center transition-colors ${!esSistemas || !isListo || isSubmitting ? 'bg-slate-100 text-slate-400 opacity-50 cursor-not-allowed' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+             onClick={() => isListo && handleReiniciarFoto(titulo)}
+             disabled={!esSistemas || !isListo || isSubmitting}
+             title={!esSistemas ? "Solo Sistemas puede reiniciar fotos" : ""}
+          >
              Reiniciar
           </button>
         </div>
@@ -180,6 +297,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
 
   return (
     <div className="flex flex-col h-full bg-slate-50 font-sans animate-fade-in-up">
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
 
         {/* DEBUG FOTOS */}
@@ -248,7 +366,12 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
               {aprobados.map((p: any) => (
                 <div key={p.id || getTipo(p)} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
                   <span>{NOMBRES_MAQUINA[getTipo(p)] || p.nombre || p.nombre_prueba || `Tipo ${getTipo(p)}`}</span>
-                  <button className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 cursor-not-allowed opacity-50" title="Reinicio manual (Lectura)">Reiniciar</button>
+                  <button 
+                    className={`text-xs px-2 py-1 rounded disabled:opacity-50 ${!esSistemas ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-red-50 hover:bg-red-100 text-red-700'}`} 
+                    onClick={() => handleReiniciarPrueba(p)}
+                    disabled={!esSistemas || isSubmitting}
+                    title={!esSistemas ? "Solo Sistemas puede reiniciar pruebas" : ""}
+                  >Reiniciar</button>
                 </div>
               ))}
             </div>
@@ -265,7 +388,12 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
               {desaprobados.map((p: any) => (
                 <div key={p.id || getTipo(p)} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
                   <span>{NOMBRES_MAQUINA[getTipo(p)] || p.nombre || p.nombre_prueba || `Tipo ${getTipo(p)}`}</span>
-                  <button className="text-xs bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-slate-600 cursor-not-allowed opacity-50" title="Reinicio manual (Lectura)">Reiniciar</button>
+                  <button 
+                    className={`text-xs px-2 py-1 rounded disabled:opacity-50 ${!esSistemas ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-red-50 hover:bg-red-100 text-red-700'}`} 
+                    onClick={() => handleReiniciarPrueba(p)}
+                    disabled={!esSistemas || isSubmitting}
+                    title={!esSistemas ? "Solo Sistemas puede reiniciar pruebas" : ""}
+                  >Reiniciar</button>
                 </div>
               ))}
             </div>
