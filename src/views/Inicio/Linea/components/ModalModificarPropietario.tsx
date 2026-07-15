@@ -159,7 +159,16 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
     let val = e.target.value;
     if (isPhoneMasked) {
       setIsPhoneMasked(false);
-      val = '';
+      const nativeEvent = e.nativeEvent as any;
+      if (nativeEvent.inputType === 'deleteContentBackward') {
+        val = '';
+      } else if (nativeEvent.data) {
+        val = nativeEvent.data.replace(/[^0-9]/g, '');
+      } else if (!e.target.value.includes('*')) {
+        val = e.target.value.replace(/[^0-9]/g, '');
+      } else {
+        val = '';
+      }
     } else {
       val = val.replace(/[^0-9]/g, '');
     }

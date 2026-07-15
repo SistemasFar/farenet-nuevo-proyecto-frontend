@@ -251,7 +251,16 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
               } else if (filter === 'telefono') {
                 if (isMasked) {
                   setIsMasked(false);
-                  val = '';
+                  const nativeEvent = e.nativeEvent as any;
+                  if (nativeEvent.inputType === 'deleteContentBackward') {
+                    val = '';
+                  } else if (nativeEvent.data) {
+                    val = nativeEvent.data.replace(/[^0-9]/g, '');
+                  } else if (!e.target.value.includes('*')) {
+                    val = e.target.value.replace(/[^0-9]/g, '');
+                  } else {
+                    val = '';
+                  }
                 } else {
                   val = val.replace(/[^0-9]/g, '');
                 }
