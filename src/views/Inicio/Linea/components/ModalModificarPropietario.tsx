@@ -42,16 +42,61 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
     telefono: ''
   });
 
+  const [maestrosPropietario, setMaestrosPropietario] = useState<any>(null);
+  const [provincias, setProvincias] = useState<any[]>([]);
+  const [distritos, setDistritos] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      import('../../../../services/api').then(({ maestrosApi }) => {
+        maestrosApi.obtenerMaestrosPropietario().then((res: any) => setMaestrosPropietario(res.data)).catch(console.error);
+      });
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen && datosIniciales) {
       setFormData(datosIniciales);
     }
   }, [isOpen, datosIniciales]);
 
+  useEffect(() => {
+    if (formData.departamento) {
+      import('../../../../services/api').then(({ maestrosApi }) => {
+        maestrosApi.obtenerProvincias(formData.departamento).then((res: any) => setProvincias(res.data)).catch(console.error);
+      });
+    } else {
+      setProvincias([]);
+    }
+  }, [formData.departamento]);
+
+  useEffect(() => {
+    if (formData.provincia) {
+      import('../../../../services/api').then(({ maestrosApi }) => {
+        maestrosApi.obtenerDistritos(formData.provincia).then((res: any) => setDistritos(res.data)).catch(console.error);
+      });
+    } else {
+      setDistritos([]);
+    }
+  }, [formData.provincia]);
+
   if (!isOpen) return null;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    let { name, value, type } = e.target as HTMLInputElement;
+    const checked = (e.target as HTMLInputElement).checked;
+    
+    if (name === 'nombres' || name === 'apellidos') {
+      value = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+    } else if (name === 'telefono') {
+      value = value.replace(/[^0-9]/g, '');
+      if (value.length > 0 && value[0] !== '9') value = '9' + value.substring(1);
+      if (value.length > 9) value = value.substring(0, 9);
+    } else if (name === 'nroDocumento') {
+      value = value.replace(/[^0-9]/g, '');
+      if (value.length > 11) value = value.substring(0, 11);
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -59,17 +104,14 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
   };
 
   const handleAceptar = async () => {
-    if (formData.sinDni) {
-      alert("No se encontró convención legacy para propietarios sin DNI. Pendiente de definir.");
-      return;
+    if (!formData.sinDni) {
+      if (!formData.nroDocumento || (formData.nroDocumento.length !== 8 && formData.nroDocumento.length !== 11)) {
+        alert("El número de documento debe tener 8 (DNI) u 11 (RUC) dígitos.");
+        return;
+      }
     }
 
-    if (!formData.nroDocumento || formData.nroDocumento.trim() === '') {
-      alert("El número de documento es obligatorio.");
-      return;
-    }
-
-    if (!formData.nombres.trim() && !formData.razonSocial.trim()) {
+    if (!formData.sinDni && !formData.nombres.trim() && !formData.razonSocial.trim()) {
       alert("Debe proporcionar nombres o razón social.");
       return;
     }
@@ -90,6 +132,39 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
   const handleCancelar = () => {
     // Solo cierra, no toca nada
     onClose();
+  };
+
+  const [localPhone, setLocalPhone] = useState('');
+  const [isPhoneMasked, setIsPhoneMasked] = useState(false);
+
+  useEffect(() => {
+    if (formData.telefono !== localPhone) {
+      setLocalPhone(formData.telefono || '');
+      if (formData.telefono && formData.telefono.length > 3) {
+        setIsPhoneMasked(true);
+      } else {
+        setIsPhoneMasked(false);
+      }
+    }
+  }, [formData.telefono, localPhone]);
+
+  let displayPhone = formData.telefono || '';
+  if (isPhoneMasked && displayPhone.length > 3) {
+    displayPhone = '*'.repeat(displayPhone.length - 3) + displayPhone.slice(-3);
+  } else {
+    displayPhone = localPhone;
+  }
+
+  const handlePhoneChange = (e: any) => {
+    let val = e.target.value;
+    if (isPhoneMasked) {
+      setIsPhoneMasked(false);
+      val = '';
+    } else {
+      val = val.replace(/[^0-9]/g, '');
+    }
+    setLocalPhone(val);
+    handleInputChange({ target: { name: 'telefono', value: val } } as any);
   };
 
   return (
@@ -126,98 +201,117 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">DNI / RUC</label>
-              <input 
-                type="text" 
-                name="nroDocumento"
-                value={formData.nroDocumento}
-                onChange={handleInputChange}
-                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
-                disabled={formData.sinDni}
-              />
-            </div>
+            {!formData.sinDni && (
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">DNI / RUC</label>
+                <input 
+                  type="text" 
+                  name="nroDocumento"
+                  value={formData.nroDocumento}
+                  onChange={handleInputChange}
+                  className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                />
+              </div>
+            )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Razón Social (Si es Empresa)</label>
-              <input 
-                type="text" 
-                name="razonSocial"
-                value={formData.razonSocial}
-                onChange={handleInputChange}
-                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
-              />
-              <p className="text-[10px] text-slate-500 mt-1 italic">Ubigeo pendiente de selección por maestro.</p>
-            </div>
+            {!formData.sinDni && (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Razón Social (Si es Empresa)</label>
+                  <input 
+                    type="text" 
+                    name="razonSocial"
+                    value={formData.razonSocial}
+                    onChange={handleInputChange}
+                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1 italic">Ubigeo pendiente de selección por maestro.</p>
+                </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nombres</label>
-              <input 
-                type="text" 
-                name="nombres"
-                value={formData.nombres}
-                onChange={handleInputChange}
-                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nombres</label>
+                  <input 
+                    type="text" 
+                    name="nombres"
+                    value={formData.nombres}
+                    onChange={handleInputChange}
+                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Apellidos</label>
-              <input 
-                type="text" 
-                name="apellidos"
-                value={formData.apellidos}
-                onChange={handleInputChange}
-                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Apellidos</label>
+                  <input 
+                    type="text" 
+                    name="apellidos"
+                    value={formData.apellidos}
+                    onChange={handleInputChange}
+                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase mb-1">País</label>
-              <input 
-                type="text" 
+              <select 
                 name="pais"
                 value={formData.pais}
-                readOnly
-                disabled
-                className="w-full border border-slate-200 rounded p-2 text-sm bg-slate-100 text-slate-500 cursor-not-allowed uppercase"
-              />
+                onChange={handleInputChange}
+                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="">Seleccione...</option>
+                {maestrosPropietario?.paises?.map((x: any) => (
+                  <option key={x.key} value={x.key}>{x.nombre}</option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Departamento</label>
-              <input 
-                type="text" 
+              <select 
                 name="departamento"
                 value={formData.departamento}
-                readOnly
-                disabled
-                className="w-full border border-slate-200 rounded p-2 text-sm bg-slate-100 text-slate-500 cursor-not-allowed uppercase"
-              />
+                onChange={handleInputChange}
+                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="">Seleccione...</option>
+                {maestrosPropietario?.departamentos?.map((x: any) => (
+                  <option key={x.key} value={x.key}>{x.nombre}</option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Provincia</label>
-              <input 
-                type="text" 
+              <select 
                 name="provincia"
                 value={formData.provincia}
-                readOnly
-                disabled
-                className="w-full border border-slate-200 rounded p-2 text-sm bg-slate-100 text-slate-500 cursor-not-allowed uppercase"
-              />
+                onChange={handleInputChange}
+                disabled={!formData.departamento}
+                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+              >
+                <option value="">Seleccione...</option>
+                {provincias?.map((x: any) => (
+                  <option key={x.key} value={x.key}>{x.nombre}</option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Distrito</label>
-              <input 
-                type="text" 
+              <select 
                 name="distrito"
                 value={formData.distrito}
-                readOnly
-                disabled
-                className="w-full border border-slate-200 rounded p-2 text-sm bg-slate-100 text-slate-500 cursor-not-allowed uppercase"
-              />
+                onChange={handleInputChange}
+                disabled={!formData.provincia}
+                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+              >
+                <option value="">Seleccione...</option>
+                {distritos?.map((x: any) => (
+                  <option key={x.key} value={x.key}>{x.nombre}</option>
+                ))}
+              </select>
             </div>
 
             <div className="md:col-span-2">
@@ -247,8 +341,8 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
               <input 
                 type="tel" 
                 name="telefono"
-                value={formData.telefono}
-                onChange={handleInputChange}
+                value={displayPhone}
+                onChange={handlePhoneChange}
                 className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200"
               />
             </div>

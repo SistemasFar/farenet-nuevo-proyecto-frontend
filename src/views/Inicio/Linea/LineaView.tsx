@@ -35,8 +35,8 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
     if (estadoLinea) {
       setFormConsolidacion(prev => ({
         ...prev,
-        ingenieroCertificadorUsername: estadoLinea.ingenieroCertificador || prev.ingenieroCertificadorUsername,
-        observacion: estadoLinea.observacion || prev.observacion,
+        ingenieroCertificadorUsername: estadoLinea.certificacion?.ingenieroCertificadorUsername || prev.ingenieroCertificadorUsername,
+        observacion: estadoLinea.certificacion?.observacion || prev.observacion,
       }));
     }
   }, [estadoLinea]);

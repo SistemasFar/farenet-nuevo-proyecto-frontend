@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Save, AlertTriangle, Ban, FileText, Printer, ShieldAlert, CheckCircle2, Truck, Activity, FileSignature, Settings, Lock, XCircle
 } from 'lucide-react';
 import ModalVisualizarRecibo from './ModalVisualizarRecibo';
 import { ModalModificarPropietario } from './ModalModificarPropietario';
-import { maestrosApi } from '../../../../services/api';
+import { ModalPolizaMtc } from './ModalPolizaMtc';
+import { ModalCambiarLinea } from './ModalCambiarLinea';
+import { ModalCambioMotor } from './ModalCambioMotor';
+import { ModalCambiarFirma } from './ModalCambiarFirma';
+import { maestrosApi, lineaApi } from '../../../../services/api';
 
 interface ConsolidacionLegacyPanelProps {
   mode: 'resumen' | 'final';
@@ -48,6 +52,10 @@ export function ConsolidacionLegacyPanel({
   
   const [modalReciboOpen, setModalReciboOpen] = useState(false);
   const [modalPropietarioOpen, setModalPropietarioOpen] = useState(false);
+  const [modalPolizaOpen, setModalPolizaOpen] = useState(false);
+  const [modalLineaOpen, setModalLineaOpen] = useState(false);
+  const [modalMotorOpen, setModalMotorOpen] = useState(false);
+  const [modalFirmaOpen, setModalFirmaOpen] = useState(false);
   
   // Usuario y Perfil
   const [usuarioActual, setUsuarioActual] = useState<any>(null);
@@ -115,6 +123,14 @@ export function ConsolidacionLegacyPanel({
     } catch (e) {
       console.error('Error cargando ingenieros:', e);
       setIngenieros([{ id: 'incorporacion', username: 'INCORPORACION', nombreCompleto: 'INCORPORACIÓN' }]);
+    }
+  };
+
+  const handleAutoSaveDatos = async (nuevosDatos: any) => {
+    try {
+      await lineaApi.guardarDatosConsolidacion(nroInspeccion, nuevosDatos);
+    } catch (err) {
+      console.error('Error al autoguardar datos', err);
     }
   };
 
@@ -423,17 +439,24 @@ export function ConsolidacionLegacyPanel({
                   className={`w-full border rounded p-2 text-sm ${!puedeEditarCamposPreparacion ? 'bg-slate-50 border-slate-300' : 'bg-white border-blue-400 focus:ring-2 focus:ring-blue-200'}`}
                   disabled={!puedeEditarCamposPreparacion || consolidando}
                   value={formConsolidacion.ingenieroCertificadorUsername}
-                  onChange={e => onChangeFormConsolidacion({ ...formConsolidacion, ingenieroCertificadorUsername: e.target.value })}
+                  onChange={e => {
+                    const newForm = { ...formConsolidacion, ingenieroCertificadorUsername: e.target.value };
+                    onChangeFormConsolidacion(newForm);
+                    handleAutoSaveDatos(newForm);
+                  }}
                 >
                   <option value="">-- Seleccione Ingeniero --</option>
                   {ingenieros.map(ing => {
-                    const nombreVisible =
+                    let nombreVisible =
                       ing.nombreCompleto ||
                       ing.nombresApellidos ||
                       ing.nombre ||
                       ing.username ||
                       ing.usuario ||
                       'Ingeniero sin nombre';
+                    if (String(nombreVisible).toUpperCase().includes('INCORPORACION')) {
+                      nombreVisible = 'INCORPORACIÓN';
+                    }
                     const value = ing.username || ing.usuario || ing.id;
                     return (
                       <option key={ing.id || value} value={value}>{nombreVisible}</option>
@@ -450,6 +473,7 @@ export function ConsolidacionLegacyPanel({
                   disabled={!puedeEditarCamposPreparacion || consolidando}
                   value={formConsolidacion.observacion}
                   onChange={e => onChangeFormConsolidacion({ ...formConsolidacion, observacion: e.target.value })}
+                  onBlur={e => handleAutoSaveDatos({ ...formConsolidacion, observacion: e.target.value })}
                   placeholder="Opcional..."
                 />
               </div>
@@ -524,16 +548,16 @@ export function ConsolidacionLegacyPanel({
               <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => handlePendienteMigracion('Sistemas: Registro Resultados')}>
                 <Activity className="w-4 h-4" /> Registro Resultados
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => handlePendienteMigracion('Sistemas: Registro Póliza MTC')}>
+              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalPolizaOpen(true)}>
                 <FileText className="w-4 h-4" /> Registro Póliza MTC
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => handlePendienteMigracion('Sistemas: Cambiar Línea')}>
+              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalLineaOpen(true)}>
                 <Settings className="w-4 h-4" /> Cambiar Línea
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => handlePendienteMigracion('Sistemas: Cambio Motor')}>
+              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalMotorOpen(true)}>
                 <Settings className="w-4 h-4" /> Cambio Motor
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => handlePendienteMigracion('Sistemas: Cambiar Firma')}>
+              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalFirmaOpen(true)}>
                 <FileSignature className="w-4 h-4" /> Cambiar Firma
               </button>
             </div>
@@ -561,6 +585,51 @@ export function ConsolidacionLegacyPanel({
             nombres: estadoLinea.propietarioCertificado?.nombre?.split(' ')[0] || '',
             apellidos: estadoLinea.propietarioCertificado?.nombre?.split(' ').slice(1).join(' ') || '',
             nroDocumento: estadoLinea.propietarioCertificado?.nrodocumento || ''
+          }}
+        />
+      )}
+
+      {modalPolizaOpen && (
+        <ModalPolizaMtc
+          nroInspeccion={nroInspeccion}
+          onClose={() => setModalPolizaOpen(false)}
+          onRefresh={() => {
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {modalLineaOpen && (
+        <ModalCambiarLinea
+          nroInspeccion={nroInspeccion}
+          plantaKey={estadoLinea?.planta?.key || estadoLinea?.lineaInfo?.plantaKey || ''}
+          lineaActual={estadoLinea.lineaInfo?.nombre || estadoLinea.lineaInfo?.key || ''}
+          onClose={() => setModalLineaOpen(false)}
+          onRefresh={() => {
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {modalMotorOpen && (
+        <ModalCambioMotor
+          nroInspeccion={nroInspeccion}
+          motorActual={vehiculo?.nromotor || estadoLinea.vehiculo_nromotor || ''}
+          onClose={() => setModalMotorOpen(false)}
+          onRefresh={() => {
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
+      {modalFirmaOpen && (
+        <ModalCambiarFirma
+          nroInspeccion={nroInspeccion}
+          ingenieros={ingenieros}
+          ingenieroActual={estadoLinea.usuarioingcertificador_username || formConsolidacion.ingenieroCertificadorUsername || ''}
+          onClose={() => setModalFirmaOpen(false)}
+          onRefresh={() => {
+            if (onRefresh) onRefresh();
           }}
         />
       )}

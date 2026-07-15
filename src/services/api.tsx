@@ -1109,5 +1109,55 @@ export const lineaApi = {
       console.error('Error al modificar propietario:', error);
       throw error;
     }
+  },
+
+  guardarDatosConsolidacion: async (nroInspeccion: string, data: any) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/linea/consolidacion/${nroInspeccion}/datos`, {
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Error al guardar datos de consolidación.'));
+    return parseJsonResponse<any>(response);
+  },
+
+  registrarPoliza: async (nroInspeccion: string, data: any) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/linea/consolidacion/${nroInspeccion}/poliza`, {
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Error al registrar póliza.'));
+    return parseJsonResponse<any>(response);
+  },
+
+  cambiarLinea: async (nroInspeccion: string, lineaKey: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/linea/consolidacion/${nroInspeccion}/linea`, {
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lineaKey })
+    });
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Error al cambiar línea.'));
+    return parseJsonResponse<any>(response);
+  },
+
+  cambiarMotor: async (nroInspeccion: string, nroMotor: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/linea/consolidacion/${nroInspeccion}/motor`, {
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nroMotor })
+    });
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Error al cambiar motor.'));
+    return parseJsonResponse<any>(response);
+  },
+
+  cambiarFirma: async (nroInspeccion: string, ingenieroCertificadorUsername: string) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/linea/consolidacion/${nroInspeccion}/firma`, {
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ingenieroCertificadorUsername })
+    });
+    if (!response.ok) throw new Error(await getErrorMessage(response, 'Error al cambiar firma.'));
+    return parseJsonResponse<any>(response);
   }
 };

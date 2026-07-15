@@ -165,6 +165,32 @@ const customSelectStyles = {
 
 export const InputField = ({ label, name, type = "text", placeholder = "", required = false, isSelect = false, options = [], disabled = false, overrideValue, isAsyncSelect = false, loadOptions, defaultOptions = false, maxLength, minNumber, maxNumber, enforceStartWith, onAddNuevo, filter, onSearch, searching }: any) => {
   const { formVehiculo, setFormVehiculo } = React.useContext(FormVehiculoContext);
+  const [localVal, setLocalVal] = React.useState('');
+  const [isMasked, setIsMasked] = React.useState(false);
+  const externalVal = overrideValue !== undefined ? overrideValue : formVehiculo[name];
+  
+  React.useEffect(() => {
+    if (filter === 'telefono') {
+      if (externalVal !== localVal) {
+        setLocalVal(externalVal || '');
+        if (externalVal && externalVal.length > 3) {
+          setIsMasked(true);
+        } else {
+          setIsMasked(false);
+        }
+      }
+    }
+  }, [externalVal, filter, localVal]);
+
+  let displayValue = externalVal || '';
+  if (filter === 'telefono') {
+    if (isMasked && displayValue.length > 3) {
+      displayValue = '*'.repeat(displayValue.length - 3) + displayValue.slice(-3);
+    } else {
+      displayValue = localVal;
+    }
+  }
+
   return (
     <div className="flex flex-col gap-1.5 md:col-span-1">
       <div className="flex items-center justify-between">
@@ -214,7 +240,7 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
           <input
             type={type === 'number' ? 'text' : type}
             inputMode={type === 'number' ? 'numeric' : undefined}
-            value={overrideValue !== undefined ? overrideValue : formVehiculo[name]}
+            value={filter === 'telefono' ? displayValue : (overrideValue !== undefined ? overrideValue : formVehiculo[name])}
             onChange={(e) => {
               let val = type === 'email' ? e.target.value : e.target.value.toUpperCase();
               if (type === 'number') {
@@ -223,10 +249,16 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
               if (filter === 'letras') {
                 val = val.replace(/[^A-Z\sÑÁÉÍÓÚ]/g, '');
               } else if (filter === 'telefono') {
-                val = val.replace(/[^0-9]/g, '');
+                if (isMasked) {
+                  setIsMasked(false);
+                  val = '';
+                } else {
+                  val = val.replace(/[^0-9]/g, '');
+                }
                 if (enforceStartWith && val.length > 0 && !val.startsWith(enforceStartWith)) {
                   val = '';
                 }
+                setLocalVal(val);
               }
               if (maxLength && val.length > maxLength) {
                 val = val.slice(0, maxLength);
@@ -234,6 +266,9 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
               setFormVehiculo({ ...formVehiculo, [name]: val });
             }}
             onBlur={() => {
+              if (filter === 'telefono') {
+                setIsMasked(true);
+              }
               if (minNumber !== undefined && formVehiculo[name]) {
                 if (parseInt(formVehiculo[name], 10) < minNumber) {
                   setFormVehiculo({ ...formVehiculo, [name]: '' });
@@ -898,14 +933,14 @@ export function VehiculoStep({
                                 onSearch={handleSearchPropietario}
                                 searching={searchingPropietario}
                               />
-                            </>
-                          )}
-                          {isRuc ? (
-                            <InputField label="Nombre de la Empresa (Razón Social)" name="razonSocialProp" />
-                          ) : (
-                            <>
-                              <InputField label="Nombres" name="nombresProp" filter="letras" />
-                              <InputField label="Apellidos" name="apellidosProp" filter="letras" />
+                              {isRuc ? (
+                                <InputField label="Nombre de la Empresa (Razón Social)" name="razonSocialProp" />
+                              ) : (
+                                <>
+                                  <InputField label="Nombres" name="nombresProp" filter="letras" />
+                                  <InputField label="Apellidos" name="apellidosProp" filter="letras" />
+                                </>
+                              )}
                             </>
                           )}
                         </>
