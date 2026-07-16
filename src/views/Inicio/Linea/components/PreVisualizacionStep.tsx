@@ -54,7 +54,6 @@ export function PreVisualizacionStep({ nroInspeccion }: PreVisualizacionStepProp
               className="border-0 bg-white"
               style={{
                 width: '100%',
-                minWidth: '1800px',
                 minHeight: 'calc(100vh - 260px)',
                 height: 'calc(100vh - 260px)'
               }}
