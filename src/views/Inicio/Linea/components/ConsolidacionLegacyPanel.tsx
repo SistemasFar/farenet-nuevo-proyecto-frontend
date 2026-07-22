@@ -281,6 +281,68 @@ export function ConsolidacionLegacyPanel({
     if (el) el.focus();
   };
 
+  const handleVisualizar = async () => {
+    try {
+      setConsolidando(true);
+      const res = await lineaApi.obtenerPrevisualizacion(nroInspeccion);
+      if (res.ok && res.html) {
+        const documento = new DOMParser().parseFromString(res.html, 'text/html');
+        let base = documento.querySelector('base');
+        if (!base) {
+          base = documento.createElement('base');
+          documento.head.prepend(base);
+        }
+        base.href = `${window.location.origin}/`;
+
+        const style = documento.createElement('style');
+        style.innerHTML = `
+          @page { size: A4; margin: 0; }
+          html, body { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            background-color: #525659 !important;
+          }
+          .v-generated-body {
+            background-color: #525659 !important;
+          }
+          .body-certificadoinspeccion, .body-certificadoinspeccion33, .certificado-inspeccion {
+            width: 210mm !important;
+            min-height: 297mm !important;
+            margin: 20px auto !important;
+            padding: 10mm 10mm !important;
+            background-color: white !important;
+            background-image: url('https://planta.farenet.net/sede/VAADIN/themes/farenet/img/fondocert_U.png') !important;
+            background-repeat: no-repeat !important;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            box-sizing: border-box;
+            background-size: 100% auto !important;
+            background-position: top center !important;
+          }
+          @media print {
+            html, body, .v-generated-body { background-color: white !important; }
+            .body-certificadoinspeccion, .body-certificadoinspeccion33, .certificado-inspeccion {
+              margin: 0 !important;
+              box-shadow: none !important;
+              padding: 0 !important;
+            }
+          }
+        `;
+        documento.head.appendChild(style);
+
+        const htmlFinal = '<!DOCTYPE html>\n' + documento.documentElement.outerHTML;
+        const blob = new Blob([htmlFinal], { type: 'text/html;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } else {
+        alert(res.message || 'Error al obtener la previsualización oficial.');
+      }
+    } catch (e: any) {
+      alert(`Error al visualizar: ${e.message}`);
+    } finally {
+      setConsolidando(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-50 font-sans animate-fade-in-up">
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
@@ -502,7 +564,12 @@ export function ConsolidacionLegacyPanel({
               </div>
 
               <div className="flex flex-col gap-2">
-                <button className={`${btnLegacyClass} ${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 cursor-not-allowed opacity-80' : btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+                <button 
+                  className={`${btnLegacyClass} ${(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700' : btnDisabled}`} 
+                  disabled={!(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) || consolidando} 
+                  title={modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado) ? "Visualizar Certificado Oficial" : "Requiere que exista un certificado consolidado"}
+                  onClick={handleVisualizar}
+                >
                   <FileText className="w-4 h-4" /> Visualizar
                 </button>
                 
