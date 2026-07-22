@@ -991,6 +991,18 @@ export const lineaApi = {
       throw error;
     }
   },
+  obtenerCertificadoOficial: async (nroInspeccion: string) => {
+    try {
+      const response = await fetchWithTimeout(`${BASE_URL}/linea/certificado-oficial/${nroInspeccion}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error al obtener certificado oficial:', error);
+      throw error;
+    }
+  },
   obtenerWizardModel: async (nroInspeccion: string) => {
     try {
       const response = await fetchWithTimeout(`${BASE_URL}/linea/wizard/${nroInspeccion}`, {

@@ -282,76 +282,44 @@ export function ConsolidacionLegacyPanel({
   };
 
   const handleVisualizar = async () => {
+    setConsolidando(true);
+    let nuevaVentana: Window | null = null;
+    
     try {
-      setConsolidando(true);
-      const res = await lineaApi.obtenerPrevisualizacion(nroInspeccion);
+      // 1. Abrimos pestaña inmediatamente para evitar bloqueo de popups
+      nuevaVentana = window.open('about:blank', '_blank');
+      if (!nuevaVentana) {
+        alert('Por favor, permite las ventanas emergentes (popups) para este sitio.');
+        setConsolidando(false);
+        return;
+      }
+      nuevaVentana.opener = null;
+
+      // 2. Ejecutar la llamada
+      const res = await lineaApi.obtenerCertificadoOficial(nroInspeccion);
+      
       if (res.ok && res.html) {
-        const documento = new DOMParser().parseFromString(res.html, 'text/html');
+        const parser = new DOMParser();
+        const documento = parser.parseFromString(res.html, 'text/html');
         let base = documento.querySelector('base');
+        
         if (!base) {
           base = documento.createElement('base');
           documento.head.prepend(base);
         }
         base.href = `${window.location.origin}/`;
 
-        const style = documento.createElement('style');
-        style.innerHTML = `
-          @page { size: A4; margin: 0; }
-          .farenet.v-app, .farenet.v-app-loading {
-            margin: 0 !important; 
-            padding: 0 !important; 
-            background-color: #525659 !important;
-          }
-          .body-certificadoinspeccion table, .certificado-inspeccion table {
-            width: 100% !important;
-            max-width: 100% !important;
-            table-layout: fixed !important;
-          }
-          .body-certificadoinspeccion table tr td, .certificado-inspeccion table tr td {
-            font-size: 7px !important;
-            word-break: break-word !important;
-            overflow-wrap: break-word !important;
-            white-space: normal !important;
-          }
-          .v-generated-body {
-            background-color: #525659 !important;
-          }
-          .body-certificadoinspeccion, .body-certificadoinspeccion33, .certificado-inspeccion {
-            width: 720px !important;
-            min-height: 1020px !important;
-            margin: 20px auto !important;
-            padding: 90px 3px 15px 3px !important;
-            background-color: white !important;
-            background-image: url('https://planta.farenet.net/sede/VAADIN/themes/farenet/img/fondocert_U.png') !important;
-            background-repeat: no-repeat !important;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            box-sizing: border-box;
-            background-size: 100% auto !important;
-            background-position: top center !important;
-          }
-          h4.titulo {
-            margin-top: 25px !important;
-            margin-bottom: 5px !important;
-          }
-          @media print {
-            html, body, .v-generated-body { background-color: white !important; }
-            .body-certificadoinspeccion, .body-certificadoinspeccion33, .certificado-inspeccion {
-              margin: 0 !important;
-              box-shadow: none !important;
-              padding: 0 !important;
-            }
-          }
-        `;
-        documento.head.appendChild(style);
-
         const htmlFinal = '<!DOCTYPE html>\n' + documento.documentElement.outerHTML;
         const blob = new Blob([htmlFinal], { type: 'text/html;charset=utf-8' });
         const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
+        
+        nuevaVentana.location.replace(blobUrl);
       } else {
-        alert(res.message || 'Error al obtener la previsualización oficial.');
+        if (nuevaVentana) nuevaVentana.close();
+        alert(res.message || 'Error al obtener la visualización oficial del certificado.');
       }
     } catch (e: any) {
+      if (nuevaVentana) nuevaVentana.close();
       alert(`Error al visualizar: ${e.message}`);
     } finally {
       setConsolidando(false);
