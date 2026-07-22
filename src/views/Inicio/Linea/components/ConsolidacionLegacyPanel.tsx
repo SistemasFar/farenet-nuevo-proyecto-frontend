@@ -126,6 +126,51 @@ export function ConsolidacionLegacyPanel({
     }
   };
 
+  const handleVisualizarInforme = async () => {
+    setConsolidando(true);
+    let nuevaVentana: Window | null = null;
+    
+    try {
+      nuevaVentana = window.open('about:blank', '_blank');
+      if (!nuevaVentana) {
+        alert('Por favor, permite las ventanas emergentes (popups) para este sitio.');
+        setConsolidando(false);
+        return;
+      }
+      nuevaVentana.opener = null;
+
+      const res = await lineaApi.obtenerInformeVisualizacion(nroInspeccion);
+      
+      if (res.ok && res.html) {
+        const parser = new DOMParser();
+        const documento = parser.parseFromString(res.html, 'text/html');
+        let base = documento.querySelector('base');
+        
+        if (!base) {
+          base = documento.createElement('base');
+          documento.head.prepend(base);
+        }
+        
+        base.href = `${window.location.origin}/`;
+        
+        const htmlFinal = '<!DOCTYPE html>\n' + documento.documentElement.outerHTML;
+        const blob = new Blob([htmlFinal], { type: 'text/html;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        nuevaVentana.location.replace(blobUrl);
+      } else {
+        nuevaVentana.close();
+        alert(res.message || 'Error al generar la previsualización del informe');
+      }
+    } catch (error: any) {
+      console.error(error);
+      if (nuevaVentana) nuevaVentana.close();
+      alert(error.message || 'Error de conexión al intentar previsualizar el informe');
+    } finally {
+      setConsolidando(false);
+    }
+  };
+
   const handleAutoSaveDatos = async (nuevosDatos: any) => {
     try {
       await lineaApi.guardarDatosConsolidacion(nroInspeccion, nuevosDatos);
@@ -556,7 +601,12 @@ export function ConsolidacionLegacyPanel({
                   <FileText className="w-4 h-4" /> Visualizar
                 </button>
                 
-                <button className={`${btnLegacyClass} ${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 cursor-not-allowed opacity-80' : btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+                <button 
+                  className={`${btnLegacyClass} ${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700' : btnDisabled}`} 
+                  disabled={modo !== 'HISTORICO_CONSOLIDADO' || consolidando} 
+                  title={modo === 'HISTORICO_CONSOLIDADO' ? "Visualizar Informe" : "Requiere que la inspección esté consolidada"}
+                  onClick={handleVisualizarInforme}
+                >
                   <FileText className="w-4 h-4" /> Visualizar Informe
                 </button>
 
