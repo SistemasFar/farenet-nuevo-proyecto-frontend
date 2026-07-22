@@ -297,19 +297,30 @@ export function ConsolidacionLegacyPanel({
         const style = documento.createElement('style');
         style.innerHTML = `
           @page { size: A4; margin: 0; }
-          html, body { 
+          .farenet.v-app, .farenet.v-app-loading {
             margin: 0 !important; 
             padding: 0 !important; 
             background-color: #525659 !important;
+          }
+          .body-certificadoinspeccion table, .certificado-inspeccion table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+          }
+          .body-certificadoinspeccion table tr td, .certificado-inspeccion table tr td {
+            font-size: 7px !important;
+            word-break: break-word !important;
+            overflow-wrap: break-word !important;
+            white-space: normal !important;
           }
           .v-generated-body {
             background-color: #525659 !important;
           }
           .body-certificadoinspeccion, .body-certificadoinspeccion33, .certificado-inspeccion {
-            width: 210mm !important;
-            min-height: 297mm !important;
+            width: 720px !important;
+            min-height: 1020px !important;
             margin: 20px auto !important;
-            padding: 10mm 10mm !important;
+            padding: 90px 3px 15px 3px !important;
             background-color: white !important;
             background-image: url('https://planta.farenet.net/sede/VAADIN/themes/farenet/img/fondocert_U.png') !important;
             background-repeat: no-repeat !important;
@@ -317,6 +328,10 @@ export function ConsolidacionLegacyPanel({
             box-sizing: border-box;
             background-size: 100% auto !important;
             background-position: top center !important;
+          }
+          h4.titulo {
+            margin-top: 25px !important;
+            margin-bottom: 5px !important;
           }
           @media print {
             html, body, .v-generated-body { background-color: white !important; }
