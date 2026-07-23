@@ -585,6 +585,19 @@ export const inspeccionesApi = {
     }
     return await parseJsonResponse<any>(response);
   },
+
+  anularInspeccion: async (nroInspeccion: string, payload: { motivo: string; observacion: string }) => {
+    try {
+      const response = await fetchWithAuth(`${BASE_URL}/inspecciones/${encodeURIComponent(nroInspeccion)}/anular`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return handleResponse<any>(response);
+    } catch (error) {
+      return handleError(error);
+    }
+  },
+
   guardar: async (data: any) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/guardar`, {
       method: 'POST',

@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import ModalVisualizarRecibo from './ModalVisualizarRecibo';
 import { ModalModificarPropietario } from './ModalModificarPropietario';
+import { ModalAnularInspeccion } from './ModalAnularInspeccion';
 import { ModalPolizaMtc } from './ModalPolizaMtc';
 import { ModalCambiarLinea } from './ModalCambiarLinea';
 import { ModalCambioMotor } from './ModalCambioMotor';
@@ -56,6 +57,7 @@ export function ConsolidacionLegacyPanel({
   const [modalLineaOpen, setModalLineaOpen] = useState(false);
   const [modalMotorOpen, setModalMotorOpen] = useState(false);
   const [modalFirmaOpen, setModalFirmaOpen] = useState(false);
+  const [modalAnularInspeccionOpen, setModalAnularInspeccionOpen] = useState(false);
   
   // Usuario y Perfil
   const [usuarioActual, setUsuarioActual] = useState<any>(null);
@@ -582,7 +584,12 @@ export function ConsolidacionLegacyPanel({
                   {consolidando ? 'Guardando...' : 'Consolidar / Guardar'}
                 </button>
                 
-                <button className={`${btnLegacyClass} ${puedeEditarCamposPreparacion ? 'bg-red-500 text-white border-red-600 hover:bg-red-600' : btnDisabled}`} disabled={!puedeEditarCamposPreparacion || consolidando} title={puedeEditarCamposPreparacion ? "Anular Inspección" : "Inspección no anulable en este estado"} onClick={handleAnular}>
+                <button 
+                  className={`${btnLegacyClass} ${puedeCambiarObservacion ? 'bg-red-600 text-white border-red-700 hover:bg-red-700' : btnDisabled}`} 
+                  disabled={!puedeCambiarObservacion || consolidando} 
+                  title={puedeCambiarObservacion ? "Anular Inspección" : "Opción no disponible"}
+                  onClick={() => setModalAnularInspeccionOpen(true)}
+                >
                   <Ban className="w-4 h-4" /> Anular Inspección
                 </button>
 
@@ -620,6 +627,7 @@ export function ConsolidacionLegacyPanel({
                   <AlertTriangle className="w-4 h-4" /> Error Impresión
                 </button>
                 
+
                 <button 
                   className={`${btnLegacyClass} ${puedeCambiarObservacion || puedeEditarCamposPreparacion ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600' : btnDisabled}`} 
                   disabled={!puedeCambiarObservacion && !puedeEditarCamposPreparacion} 
@@ -664,6 +672,17 @@ export function ConsolidacionLegacyPanel({
           </div>
         )}
       </div>
+      
+      {modalAnularInspeccionOpen && (
+        <ModalAnularInspeccion
+          nroInspeccion={nroInspeccion}
+          onClose={() => setModalAnularInspeccionOpen(false)}
+          onSuccess={() => {
+            setModalAnularInspeccionOpen(false);
+            if (onActionSuccess) onActionSuccess();
+          }}
+        />
+      )}
       
       {modalReciboOpen && (
         <ModalVisualizarRecibo
