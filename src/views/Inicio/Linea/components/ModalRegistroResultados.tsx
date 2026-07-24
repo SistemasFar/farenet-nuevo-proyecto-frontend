@@ -48,7 +48,7 @@ export const ModalRegistroResultados: React.FC<ModalRegistroResultadosProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-6 flex justify-between items-center text-white">
           <div className="flex items-center gap-3">

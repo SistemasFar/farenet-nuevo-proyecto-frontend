@@ -360,7 +360,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
                 <div key={p.id || getTipo(p)} className="text-sm font-medium text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 flex justify-between items-center">
                   <span>{NOMBRES_MAQUINA[getTipo(p)] || p.nombre || p.nombre_prueba || `Tipo ${getTipo(p)}`}</span>
                   <button 
-                    className={`text-xs px-2 py-1 rounded disabled:opacity-50 ${!esSistemas ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-red-50 hover:bg-red-100 text-red-700'}`} 
+                    className={`text-xs px-2 py-1 rounded disabled:opacity-50 ${!esSistemas ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-green-50 hover:bg-green-100 text-green-700'}`} 
                     onClick={() => handleReiniciarPrueba(p)}
                     disabled={!esSistemas || isSubmitting}
                     title={!esSistemas ? "Solo Sistemas puede reiniciar pruebas" : ""}
@@ -371,10 +371,10 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
           </div>
 
           {/* Desaprobados */}
-          <div className="bg-white border border-red-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="bg-red-50 p-3 border-b border-red-200 flex justify-between items-center">
-              <span className="font-bold text-red-800 flex items-center gap-2"><XCircle className="w-4 h-4" /> Desaprobados</span>
-              <span className="bg-red-200 text-red-800 text-xs font-black px-2 py-0.5 rounded-full">{desaprobados.length}</span>
+          <div className={`bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col ${desaprobados.length > 0 ? 'border-red-100' : 'border-slate-200'}`}>
+            <div className={`p-3 border-b flex justify-between items-center ${desaprobados.length > 0 ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-200'}`}>
+              <span className={`font-bold flex items-center gap-2 ${desaprobados.length > 0 ? 'text-red-700' : 'text-slate-500'}`}><XCircle className="w-4 h-4" /> Desaprobados</span>
+              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${desaprobados.length > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-600'}`}>{desaprobados.length}</span>
             </div>
             <div className="p-4 space-y-2 flex-1 max-h-64 overflow-y-auto">
               {desaprobados.length === 0 && <p className="text-sm text-slate-400 text-center py-4">Ninguna prueba desaprobada</p>}
@@ -393,10 +393,10 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
           </div>
 
           {/* Faltantes */}
-          <div className="bg-white border border-amber-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="bg-amber-50 p-3 border-b border-amber-200 flex justify-between items-center">
-              <span className="font-bold text-amber-800 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Faltantes</span>
-              <span className="bg-amber-200 text-amber-800 text-xs font-black px-2 py-0.5 rounded-full">{faltantesNormales.length}</span>
+          <div className={`bg-white border rounded-xl shadow-sm overflow-hidden flex flex-col ${faltantesNormales.length > 0 ? 'border-amber-100' : 'border-slate-200'}`}>
+            <div className={`p-3 border-b flex justify-between items-center ${faltantesNormales.length > 0 ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-200'}`}>
+              <span className={`font-bold flex items-center gap-2 ${faltantesNormales.length > 0 ? 'text-amber-700' : 'text-slate-500'}`}><AlertCircle className="w-4 h-4" /> Faltantes</span>
+              <span className={`text-xs font-black px-2 py-0.5 rounded-full ${faltantesNormales.length > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>{faltantesNormales.length}</span>
             </div>
             <div className="p-4 space-y-2 flex-1 max-h-64 overflow-y-auto">
               {faltantesNormales.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No hay pruebas faltantes</p>}
@@ -424,7 +424,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
 
       {/* Modal Foto */}
       {modalFoto.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2">

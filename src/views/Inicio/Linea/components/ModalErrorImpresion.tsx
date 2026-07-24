@@ -48,7 +48,7 @@ const ModalErrorImpresion: React.FC<ModalErrorImpresionProps> = ({ nroInspeccion
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-md transition-opacity">
       <div className="bg-white rounded-xl shadow-2xl w-[500px] overflow-hidden flex flex-col transform transition-all scale-100">
         
         {/* Header */}

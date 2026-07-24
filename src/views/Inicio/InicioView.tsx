@@ -564,24 +564,7 @@ export function InicioView(props: InicioViewProps) {
                             </button>
                           ) : null}
 
-                          {puedeAnular && !debeAbrirFlujo2 ? (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (confirm('¿Estás seguro de anular esta inspección en proceso?')) {
-                                  try {
-                                    await inspeccionesApi.anularInspeccion(ins.numeroInspeccion);
-                                    cargarInspecciones(page, pageSize);
-                                  } catch (e) {
-                                    console.error('Error al anular', e);
-                                  }
-                                }
-                              }}
-                              className="rounded bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700 shadow-sm transition"
-                            >
-                              Anular
-                            </button>
-                          ) : null}
+
 
                           {(!puedeContinuar || debeAbrirFlujo2) ? (
                             <button

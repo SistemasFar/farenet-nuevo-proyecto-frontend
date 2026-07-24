@@ -10,6 +10,7 @@ import { ModalPolizaMtc } from './ModalPolizaMtc';
 import { ModalCambiarLinea } from './ModalCambiarLinea';
 import { ModalCambioMotor } from './ModalCambioMotor';
 import { ModalCambiarFirma } from './ModalCambiarFirma';
+import { ModalCambiarObservacion } from './ModalCambiarObservacion';
 import { ModalRegistroResultados } from './ModalRegistroResultados';
 import { maestrosApi, lineaApi, inspeccionesApi } from '../../../../services/api';
 
@@ -65,6 +66,7 @@ export function ConsolidacionLegacyPanel({
   const [modalAnularInspeccionOpen, setModalAnularInspeccionOpen] = useState(false);
   const [modalErrorImpresionOpen, setModalErrorImpresionOpen] = useState(false);
   const [modalRegistroResultadosOpen, setModalRegistroResultadosOpen] = useState(false);
+  const [modalObservacionOpen, setModalObservacionOpen] = useState(false);
   
   // Usuario y Perfil
   const [usuarioActual, setUsuarioActual] = useState<any>(null);
@@ -243,18 +245,10 @@ export function ConsolidacionLegacyPanel({
 
   const handleCambiarObservacion = async () => {
     if (!puedeCambiarObservacion) return;
-    
-    const obsActual = estadoLinea.certificacion?.observacion || '';
-    const nuevaObs = window.prompt(`Cambiar observación para ${nroInspeccion}\nObservación actual:`, obsActual);
-    
-    if (nuevaObs === null) return; // cancelado
-    if (nuevaObs.length > 1000) {
-      alert('La observación no puede superar los 1000 caracteres');
-      return;
-    }
+    setModalObservacionOpen(true);
+  };
 
-    if (!window.confirm('¿Está seguro de guardar la nueva observación?')) return;
-
+  const guardarNuevaObservacion = async (nuevaObs: string) => {
     try {
       const BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
       const token = sessionStorage.getItem('accessToken');
@@ -267,16 +261,14 @@ export function ConsolidacionLegacyPanel({
         body: JSON.stringify({ observacion: nuevaObs })
       });
       const data = await res.json();
-      
       if (res.ok) {
         alert('Observación actualizada correctamente');
-        if (onRefresh) onRefresh();
+        if(onRefresh) onRefresh();
       } else {
         alert(data.message || 'Error al actualizar observación');
       }
-    } catch (err) {
-      console.error(err);
-      alert('Error de conexión al actualizar observación');
+    } catch (e: any) {
+      alert(`Error de red: ${e.message}`);
     }
   };
 
@@ -806,6 +798,14 @@ export function ConsolidacionLegacyPanel({
           }}
         />
       )}
+      
+      <ModalCambiarObservacion 
+        isOpen={modalObservacionOpen}
+        onClose={() => setModalObservacionOpen(false)}
+        nroInspeccion={nroInspeccion}
+        observacionActual={estadoLinea.certificacion?.observacion || ''}
+        onSave={guardarNuevaObservacion}
+      />
     </div>
   );
 }

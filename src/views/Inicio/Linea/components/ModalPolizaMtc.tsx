@@ -61,7 +61,7 @@ export function ModalPolizaMtc({ nroInspeccion, onClose, onRefresh }: ModalPoliz
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4">
       <div className="bg-white rounded shadow-lg max-w-md w-full animate-fade-in-up">
         <div className="flex justify-between items-center bg-slate-100 p-4 border-b border-slate-200 rounded-t">
           <h3 className="font-bold text-slate-700 uppercase tracking-wide">Registro Póliza MTC</h3>
