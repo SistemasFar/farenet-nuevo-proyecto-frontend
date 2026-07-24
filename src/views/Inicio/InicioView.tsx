@@ -12,6 +12,7 @@ interface InicioViewProps {
   plantaSeleccionada: string;
   plantaNombre: string;
   onNuevaInspeccion?: () => void;
+  onNuevoDuplicado?: () => void;
   onContinuarInspeccion?: (id: string) => void;
   onLinea?: (id: string) => void;
 }
@@ -295,7 +296,11 @@ export function InicioView(props: InicioViewProps) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition">
+            <button 
+              type="button"
+              onClick={() => props.onNuevoDuplicado?.()}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition"
+            >
               + Nuevo Duplicado
             </button>
             <button className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition">

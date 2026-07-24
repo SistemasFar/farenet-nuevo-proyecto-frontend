@@ -488,6 +488,29 @@ export const operacionApi = {
 };
 
 export const inspeccionesApi = {
+  buscarInfoDuplicado: async (placa: string, plantaKey?: string) => {
+    const url = plantaKey 
+      ? `${BASE_URL}/inspecciones/buscar-info-duplicado/${placa}?plantaKey=${plantaKey}`
+      : `${BASE_URL}/inspecciones/buscar-info-duplicado/${placa}`;
+    const response = await fetchWithTimeout(url);
+    if (!response.ok) {
+      const errorData = await parseJsonResponse<{message?: string}>(response).catch(() => ({}));
+      throw new Error(errorData.message || 'Error al buscar info duplicado');
+    }
+    return await parseJsonResponse<any>(response);
+  },
+  guardarDuplicado: async (data: any) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/guardar-duplicado`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      const errorData = await parseJsonResponse<{message?: string}>(response).catch(() => ({}));
+      throw new Error(errorData.message || 'Error al guardar duplicado');
+    }
+    return await parseJsonResponse<any>(response);
+  },
   buscar: async (params: any) => {
     const query = new URLSearchParams(params).toString();
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/buscar?${query}`, {

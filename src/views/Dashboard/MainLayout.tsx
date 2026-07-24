@@ -6,6 +6,7 @@ import { AuditoriaView } from '../Auditoria/AuditoriaView';
 import { GenericView } from './GenericView';
 import InspeccionesView from '../Inspecciones/InspeccionesView';
 import { NuevaInspeccionView } from '../Inicio/NuevaInspeccion/NuevaInspeccionView';
+import { NuevoDuplicadoView } from '../Inicio/NuevoDuplicado/NuevoDuplicadoView';
 import { LineaView } from '../Inicio/Linea';
 
 import type {
@@ -25,6 +26,7 @@ interface MainLayoutProps {
 const TAB_PERMISOS: Record<string, string[]> = {
   inicio: [],
   nueva_inspeccion: [], // Idealmente requiere permiso CREAR_INSPECCION, lo dejaremos vacio o como LISTA por ahora para que pueda verlo
+  nuevo_duplicado: [],
   linea: [], // Mismo caso que nueva_inspeccion
   inspecciones: ['LISTA_INSPECCION', 'VER_INSPECCION', 'CREAR_INSPECCION'],
   personas: ['EDITAR_PERSONA'],
@@ -118,6 +120,9 @@ export function MainLayout({
               setInspeccionIdToResume(null);
               setActiveTab('nueva_inspeccion');
             }}
+            onNuevoDuplicado={() => {
+              setActiveTab('nuevo_duplicado');
+            }}
             onContinuarInspeccion={(id: string) => {
               setInspeccionIdToResume(id);
               setActiveTab('nueva_inspeccion');
@@ -143,6 +148,14 @@ export function MainLayout({
               setInspeccionActivaId(id);
               setActiveTab('linea');
             }}
+          />
+        );
+
+      case 'nuevo_duplicado':
+        return (
+          <NuevoDuplicadoView
+            plantaSeleccionada={plantaKey}
+            onVolver={() => setActiveTab('inicio')}
           />
         );
 
