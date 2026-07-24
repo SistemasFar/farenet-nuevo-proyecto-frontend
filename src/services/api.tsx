@@ -605,7 +605,10 @@ export const inspeccionesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error('Error al guardar inspeccion');
+    if (!response.ok) {
+      const errMsg = await getErrorMessage(response, 'Error al guardar inspeccion');
+      throw new Error(errMsg);
+    }
     return await parseJsonResponse<any>(response);
   },
   generarNroInspeccion: async (plantaKey: string) => {
