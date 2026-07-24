@@ -50,10 +50,11 @@ export const ModalAnularInspeccion: React.FC<ModalAnularInspeccionProps> = ({ nr
       if (data.ok) {
         onSuccess(); // Deberá refrescar la inspeccion en el padre
       } else {
-        setError(data.message || "Error al anular la inspección.");
+        setError("DATA: " + JSON.stringify(data));
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Error de red o servidor al intentar anular.");
+      const errorMsg = err.response?.data?.message || err.message || "Error de red o servidor al intentar anular.";
+      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }

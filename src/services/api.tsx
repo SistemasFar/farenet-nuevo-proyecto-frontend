@@ -587,15 +587,16 @@ export const inspeccionesApi = {
   },
 
   anularInspeccion: async (nroInspeccion: string, payload: { motivo: string; observacion: string }) => {
-    try {
-      const response = await fetchWithAuth(`${BASE_URL}/inspecciones/${encodeURIComponent(nroInspeccion)}/anular`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      return handleResponse<any>(response);
-    } catch (error) {
-      return handleError(error);
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/${encodeURIComponent(nroInspeccion)}/anular`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const errMsg = await getErrorMessage(response, 'Error al anular inspección');
+      throw new Error(errMsg);
     }
+    return await parseJsonResponse<any>(response);
   },
 
   guardar: async (data: any) => {
@@ -633,13 +634,18 @@ export const inspeccionesApi = {
     }
     return await parseJsonResponse<any>(response);
   },
-  anularInspeccion: async (nrodocumentoinspeccion: string) => {
-    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/anular/guardar`, {
+
+
+  errorImpresion: async (nroInspeccion: string, payload: { motivo: string; observacion: string }) => {
+    const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/${encodeURIComponent(nroInspeccion)}/error-impresion`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nrodocumentoinspeccion })
+      body: JSON.stringify(payload)
     });
-    if (!response.ok) throw new Error('Error al anular inspección');
+    if (!response.ok) {
+      const errMsg = await getErrorMessage(response, 'Error al reportar impresión');
+      throw new Error(errMsg);
+    }
     return await parseJsonResponse<any>(response);
   },
 

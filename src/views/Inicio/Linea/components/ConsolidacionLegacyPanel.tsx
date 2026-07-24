@@ -5,6 +5,7 @@ import {
 import ModalVisualizarRecibo from './ModalVisualizarRecibo';
 import { ModalModificarPropietario } from './ModalModificarPropietario';
 import { ModalAnularInspeccion } from './ModalAnularInspeccion';
+import ModalErrorImpresion from './ModalErrorImpresion';
 import { ModalPolizaMtc } from './ModalPolizaMtc';
 import { ModalCambiarLinea } from './ModalCambiarLinea';
 import { ModalCambioMotor } from './ModalCambioMotor';
@@ -58,6 +59,7 @@ export function ConsolidacionLegacyPanel({
   const [modalMotorOpen, setModalMotorOpen] = useState(false);
   const [modalFirmaOpen, setModalFirmaOpen] = useState(false);
   const [modalAnularInspeccionOpen, setModalAnularInspeccionOpen] = useState(false);
+  const [modalErrorImpresionOpen, setModalErrorImpresionOpen] = useState(false);
   
   // Usuario y Perfil
   const [usuarioActual, setUsuarioActual] = useState<any>(null);
@@ -301,27 +303,6 @@ export function ConsolidacionLegacyPanel({
   // ─── BOTONES LEGACY (Mock) ────────────────────────────────────────────────
   const btnLegacyClass = "px-3 py-2 text-xs font-bold uppercase rounded border shadow-sm flex items-center justify-center gap-1 transition-opacity";
   const btnDisabled = "bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-70";
-
-  const handleAnular = async () => {
-    const motivo = window.prompt('¿Está seguro de anular esta inspección?\n\nIngrese un motivo (opcional):');
-    if (motivo === null) return;
-
-    setConsolidando(true);
-    try {
-      const { lineaApi } = await import('../../../../services/api');
-      const res = await lineaApi.anularInspeccion(nroInspeccion, motivo);
-      if (res.ok || res.status === 'success') {
-        alert('Inspección anulada correctamente.');
-        if (onRefresh) onRefresh();
-      } else {
-        alert(res.message || 'Error al anular inspección.');
-      }
-    } catch (e: any) {
-      alert(`Error al anular: ${e.message}`);
-    } finally {
-      setConsolidando(false);
-    }
-  };
 
   const handleFocusObservacion = () => {
     const el = document.getElementById('observacionTextarea');
@@ -623,7 +604,12 @@ export function ConsolidacionLegacyPanel({
               </div>
 
               <div className="flex flex-col gap-2">
-                <button className={`${btnLegacyClass} ${btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
+                <button 
+                  className={`${btnLegacyClass} ${puedeCambiarObservacion ? 'bg-[#cc0000] text-white border-red-700 hover:bg-red-700' : btnDisabled}`} 
+                  disabled={!puedeCambiarObservacion} 
+                  title={puedeCambiarObservacion ? "Registrar error de impresión" : "Solo disponible en inspecciones consolidadas"}
+                  onClick={() => setModalErrorImpresionOpen(true)}
+                >
                   <AlertTriangle className="w-4 h-4" /> Error Impresión
                 </button>
                 
@@ -650,10 +636,10 @@ export function ConsolidacionLegacyPanel({
               Acciones de Soporte y Excepciones (Solo Sistemas)
             </h3>
             <div className="flex flex-wrap gap-2">
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => handlePendienteMigracion('Sistemas: Registro Vehículo MTC')}>
+              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => console.log('Pendiente de migración')}>
                 <Truck className="w-4 h-4" /> Registro Vehículo MTC
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => handlePendienteMigracion('Sistemas: Registro Resultados')}>
+              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => console.log('Pendiente de migración')}>
                 <Activity className="w-4 h-4" /> Registro Resultados
               </button>
               <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalPolizaOpen(true)}>
@@ -679,11 +665,22 @@ export function ConsolidacionLegacyPanel({
           onClose={() => setModalAnularInspeccionOpen(false)}
           onSuccess={() => {
             setModalAnularInspeccionOpen(false);
-            if (onActionSuccess) onActionSuccess();
+            if (onRefresh) onRefresh();
           }}
         />
       )}
       
+      {modalErrorImpresionOpen && (
+        <ModalErrorImpresion
+          nroInspeccion={nroInspeccion}
+          onClose={() => setModalErrorImpresionOpen(false)}
+          onSuccess={() => {
+            setModalErrorImpresionOpen(false);
+            if (onRefresh) onRefresh();
+          }}
+        />
+      )}
+
       {modalReciboOpen && (
         <ModalVisualizarRecibo
           nroInspeccion={nroInspeccion}
