@@ -1010,6 +1010,27 @@ export const lineaApi = {
       throw error;
     }
   },
+
+  traspasarResultados: async (
+    nroInspeccionAnulada: string,
+    inspeccionNueva: string,
+    placaNueva: string
+  ): Promise<any> => {
+    try {
+      const response = await axiosInstance.post(
+        `/api/inspecciones/${nroInspeccionAnulada}/traspaso-resultados`,
+        {
+          inspeccionNueva,
+          placaNueva
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error en traspaso de resultados:', error);
+      throw error;
+    }
+  },
+
   obtenerCertificadoOficial: async (nroInspeccion: string) => {
     try {
       const response = await fetchWithTimeout(`${BASE_URL}/linea/certificado-oficial/${nroInspeccion}`, {

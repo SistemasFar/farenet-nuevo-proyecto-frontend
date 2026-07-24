@@ -10,7 +10,8 @@ import { ModalPolizaMtc } from './ModalPolizaMtc';
 import { ModalCambiarLinea } from './ModalCambiarLinea';
 import { ModalCambioMotor } from './ModalCambioMotor';
 import { ModalCambiarFirma } from './ModalCambiarFirma';
-import { maestrosApi, lineaApi } from '../../../../services/api';
+import { ModalRegistroResultados } from './ModalRegistroResultados';
+import { maestrosApi, lineaApi, inspeccionesApi } from '../../../../services/api';
 
 interface ConsolidacionLegacyPanelProps {
   mode: 'resumen' | 'final';
@@ -47,6 +48,7 @@ export function ConsolidacionLegacyPanel({
 
   const puedeConsolidar = modo === 'LISTA_PARA_CONSOLIDAR' && estadoLinea.puedeConsolidar;
   const puedeCambiarObservacion = modo === 'HISTORICO_CONSOLIDADO';
+  const isAnulada = estadoLinea?.inspeccionestado === 'ANU';
 
   const [ingenieros, setIngenieros] = useState<any[]>([]);
   const [consolidando, setConsolidando] = useState(false);
@@ -60,10 +62,25 @@ export function ConsolidacionLegacyPanel({
   const [modalFirmaOpen, setModalFirmaOpen] = useState(false);
   const [modalAnularInspeccionOpen, setModalAnularInspeccionOpen] = useState(false);
   const [modalErrorImpresionOpen, setModalErrorImpresionOpen] = useState(false);
+  const [modalRegistroResultadosOpen, setModalRegistroResultadosOpen] = useState(false);
   
   // Usuario y Perfil
   const [usuarioActual, setUsuarioActual] = useState<any>(null);
   const [isSistemas, setIsSistemas] = useState(false);
+
+  const handleRegistroResultadosSubmit = async (placaNueva: string, nroInspeccionNueva: string) => {
+    try {
+      setConsolidando(true);
+      await inspeccionesApi.traspasarResultados(nroInspeccion, nroInspeccionNueva, placaNueva);
+      if (onRefresh) onRefresh();
+      setModalRegistroResultadosOpen(false);
+    } catch (err: any) {
+      alert(err.message || 'Error al traspasar resultados');
+      throw err;
+    } finally {
+      setConsolidando(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -639,9 +656,14 @@ export function ConsolidacionLegacyPanel({
               <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => console.log('Pendiente de migración')}>
                 <Truck className="w-4 h-4" /> Registro Vehículo MTC
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => console.log('Pendiente de migración')}>
-                <Activity className="w-4 h-4" /> Registro Resultados
-              </button>
+              <button 
+                  className={`${btnLegacyClass} ${isAnulada ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
+                  onClick={() => isAnulada && setModalRegistroResultadosOpen(true)}
+                  disabled={!isAnulada}
+                  title={!isAnulada ? "La inspección debe estar anulada para usar esta opción" : ""}
+                >
+                  <Activity className="w-4 h-4" /> Registro Resultados
+                </button>
               <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalPolizaOpen(true)}>
                 <FileText className="w-4 h-4" /> Registro Póliza MTC
               </button>
@@ -680,6 +702,14 @@ export function ConsolidacionLegacyPanel({
           }}
         />
       )}
+
+      <ModalRegistroResultados
+        isOpen={modalRegistroResultadosOpen}
+        onClose={() => setModalRegistroResultadosOpen(false)}
+        nroInspeccion={nroInspeccion}
+        placaAnulada={estadoLinea?.placamotor || 'DESCONOCIDA'}
+        onSubmit={handleRegistroResultadosSubmit}
+      />
 
       {modalReciboOpen && (
         <ModalVisualizarRecibo
