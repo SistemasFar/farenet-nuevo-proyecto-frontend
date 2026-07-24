@@ -49,6 +49,8 @@ export function ConsolidacionLegacyPanel({
   const puedeConsolidar = modo === 'LISTA_PARA_CONSOLIDAR' && estadoLinea.puedeConsolidar;
   const puedeCambiarObservacion = modo === 'HISTORICO_CONSOLIDADO';
   const isAnulada = estadoLinea?.inspeccionestado === 'ANU';
+  const puedeAnular = !isAnulada;
+  const isConsolidada = modo === 'HISTORICO_CONSOLIDADO';
 
   const [ingenieros, setIngenieros] = useState<any[]>([]);
   const [consolidando, setConsolidando] = useState(false);
@@ -583,9 +585,9 @@ export function ConsolidacionLegacyPanel({
                 </button>
                 
                 <button 
-                  className={`${btnLegacyClass} ${puedeCambiarObservacion ? 'bg-red-600 text-white border-red-700 hover:bg-red-700' : btnDisabled}`} 
-                  disabled={!puedeCambiarObservacion || consolidando} 
-                  title={puedeCambiarObservacion ? "Anular Inspección" : "Opción no disponible"}
+                  className={`${btnLegacyClass} ${puedeAnular ? 'bg-red-600 text-white border-red-700 hover:bg-red-700' : btnDisabled}`} 
+                  disabled={!puedeAnular || consolidando} 
+                  title={puedeAnular ? "Anular Inspección" : "Opción no disponible"}
                   onClick={() => setModalAnularInspeccionOpen(true)}
                 >
                   <Ban className="w-4 h-4" /> Anular Inspección
@@ -653,7 +655,12 @@ export function ConsolidacionLegacyPanel({
               Acciones de Soporte y Excepciones (Solo Sistemas)
             </h3>
             <div className="flex flex-wrap gap-2">
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => console.log('Pendiente de migración')}>
+              <button 
+                className={`${btnLegacyClass} ${isConsolidada ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
+                onClick={() => isConsolidada && console.log('Pendiente de migración')}
+                disabled={!isConsolidada}
+                title={!isConsolidada ? "Solo disponible en inspecciones consolidadas" : ""}
+              >
                 <Truck className="w-4 h-4" /> Registro Vehículo MTC
               </button>
               <button 
@@ -664,16 +671,36 @@ export function ConsolidacionLegacyPanel({
                 >
                   <Activity className="w-4 h-4" /> Registro Resultados
                 </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalPolizaOpen(true)}>
+              <button 
+                className={`${btnLegacyClass} ${isConsolidada ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
+                onClick={() => isConsolidada && setModalPolizaOpen(true)}
+                disabled={!isConsolidada}
+                title={!isConsolidada ? "Solo disponible en inspecciones consolidadas" : ""}
+              >
                 <FileText className="w-4 h-4" /> Registro Póliza MTC
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalLineaOpen(true)}>
+              <button 
+                className={`${btnLegacyClass} ${puedeEditarCamposPreparacion ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
+                onClick={() => puedeEditarCamposPreparacion && setModalLineaOpen(true)}
+                disabled={!puedeEditarCamposPreparacion}
+                title={!puedeEditarCamposPreparacion ? "No se puede cambiar la línea si la inspección ya está consolidada o anulada" : ""}
+              >
                 <Settings className="w-4 h-4" /> Cambiar Línea
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalMotorOpen(true)}>
+              <button 
+                className={`${btnLegacyClass} ${puedeEditarCamposPreparacion ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
+                onClick={() => puedeEditarCamposPreparacion && setModalMotorOpen(true)}
+                disabled={!puedeEditarCamposPreparacion}
+                title={!puedeEditarCamposPreparacion ? "No se puede cambiar el motor si la inspección ya está consolidada o anulada" : ""}
+              >
                 <Settings className="w-4 h-4" /> Cambio Motor
               </button>
-              <button className={`${btnLegacyClass} bg-slate-700 text-white border-slate-800 hover:bg-slate-800`} onClick={() => setModalFirmaOpen(true)}>
+              <button 
+                className={`${btnLegacyClass} ${puedeEditarCamposPreparacion ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
+                onClick={() => puedeEditarCamposPreparacion && setModalFirmaOpen(true)}
+                disabled={!puedeEditarCamposPreparacion}
+                title={!puedeEditarCamposPreparacion ? "No se puede cambiar la firma si la inspección ya está consolidada o anulada" : ""}
+              >
                 <FileSignature className="w-4 h-4" /> Cambiar Firma
               </button>
             </div>
