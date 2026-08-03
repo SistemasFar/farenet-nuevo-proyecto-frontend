@@ -6,6 +6,8 @@ import {
   plantaSession
 } from '../../services/api';
 
+import { useNavigate } from 'react-router-dom';
+
 import type {
   InspeccionPanel
 } from '../../types/operacion';
@@ -34,11 +36,8 @@ const getInitialFilters = () => {
   };
 };
 
-interface InspeccionesViewProps {
-  onVerInspeccion?: (id: string) => void;
-}
-
-export default function InspeccionesView({ onVerInspeccion }: InspeccionesViewProps) {
+export default function InspeccionesView() {
+  const navigate = useNavigate();
   const initialFilters = getInitialFilters();
 
   const [loading, setLoading] = useState(false);
@@ -353,7 +352,7 @@ export default function InspeccionesView({ onVerInspeccion }: InspeccionesViewPr
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
-                      onClick={() => onVerInspeccion && onVerInspeccion(item.numeroInspeccion)}
+                      onClick={() => navigate(`/linea/${item.numeroInspeccion}`)}
                     >
                       <Eye className="h-3.5 w-3.5" />
                       Ver

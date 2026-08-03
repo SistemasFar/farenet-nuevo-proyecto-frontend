@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { LoginView } from './views/LoginView';
 import { SelectPlantaView } from './views/SelectPlantaView';
 import { MainLayout } from './views/Dashboard/MainLayout';
+import { NotFoundView } from './views/NotFoundView';
+import { ForbiddenView } from './views/ForbiddenView';
+import { InicioView } from './views/Inicio/InicioView';
+import { AuditoriaView } from './views/Auditoria/AuditoriaView';
+import { GenericView } from './views/Dashboard/GenericView';
+import InspeccionesView from './views/Inspecciones/InspeccionesView';
+import { NuevaInspeccionView } from './views/Inicio/NuevaInspeccion/NuevaInspeccionView';
+import { NuevoDuplicadoView } from './views/Inicio/NuevoDuplicado/NuevoDuplicadoView';
+import { LineaView } from './views/Inicio/Linea';
 
 import type {
   UserSession,
@@ -17,6 +27,8 @@ import {
 type AuthStep = 'LOGIN' | 'SELECT_PLANTA' | 'DASHBOARD';
 
 export default function App() {
+  const navigate = useNavigate();
+  const [isInitializing, setIsInitializing] = useState(true);
   const [step, setStep] = useState<AuthStep>('LOGIN');
 
   const [usernameContext, setUsernameContext] = useState('');
@@ -36,6 +48,7 @@ export default function App() {
     setUsernameContext('');
     setPlantasDisponibles([]);
     setStep('LOGIN');
+    navigate('/login', { replace: true });
   };
 
   useEffect(() => {
@@ -46,6 +59,7 @@ export default function App() {
       const plantaSeleccionada = plantaSession.obtener();
 
       if (!token || !userRaw || !plantaSeleccionada) {
+        setIsInitializing(false);
         return;
       }
 
@@ -69,6 +83,8 @@ export default function App() {
       } catch (error) {
         console.error('Sesión expirada o inválida:', error);
         limpiarSesionFrontend();
+      } finally {
+        setIsInitializing(false);
       }
     };
 
@@ -117,6 +133,7 @@ export default function App() {
     );
 
     setStep('DASHBOARD');
+    navigate('/inicio', { replace: true });
   };
 
   const handleRequirePlanta = (
@@ -175,6 +192,7 @@ export default function App() {
     );
 
     setStep('DASHBOARD');
+    navigate('/inicio', { replace: true });
   };
 
   const handleCambiarPlanta = async (plantaKey: string) => {
@@ -216,33 +234,72 @@ export default function App() {
     }
   };
 
-  if (step === 'LOGIN') {
+  if (isInitializing) {
     return (
-      <LoginView
-        onLoginSuccess={handleLoginSuccess}
-        onRequirePlanta={handleRequirePlanta}
-      />
-    );
-  }
-
-  if (step === 'SELECT_PLANTA') {
-    return (
-      <SelectPlantaView
-        plantas={plantasDisponibles}
-        onConfirmPlanta={handleConfirmPlanta}
-        onCancel={limpiarSesionFrontend}
-      />
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-slate-500 font-medium">Restaurando sesión...</div>
+      </div>
     );
   }
 
   return (
-    <MainLayout
-      user={user}
-      permisos={permisos}
-      plantaSeleccionada={planta}
-      plantasDisponibles={plantasDisponibles}
-      onCambiarPlanta={handleCambiarPlanta}
-      onLogout={handleLogout}
-    />
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          step === 'DASHBOARD' ? (
+            <Navigate to="/inicio" replace />
+          ) : step === 'SELECT_PLANTA' ? (
+            <SelectPlantaView
+              plantas={plantasDisponibles}
+              onConfirmPlanta={handleConfirmPlanta}
+              onCancel={limpiarSesionFrontend}
+            />
+          ) : (
+            <LoginView
+              onLoginSuccess={handleLoginSuccess}
+              onRequirePlanta={handleRequirePlanta}
+            />
+          )
+        }
+      />
+      
+      <Route
+        element={
+          step !== 'DASHBOARD' ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <MainLayout
+              user={user}
+              permisos={permisos}
+              plantaSeleccionada={planta}
+              plantasDisponibles={plantasDisponibles}
+              onCambiarPlanta={handleCambiarPlanta}
+              onLogout={handleLogout}
+            />
+          )
+        }
+      >
+        <Route path="/inicio" element={<InicioView />} />
+        <Route path="/inspecciones" element={<InspeccionesView />} />
+        <Route path="/inspecciones/nueva" element={<NuevaInspeccionView />} />
+        <Route path="/inspecciones/:nroInspeccion/continuar" element={<NuevaInspeccionView />} />
+        <Route path="/inspecciones/duplicado" element={<NuevoDuplicadoView />} />
+        <Route path="/linea/:nroInspeccion" element={<LineaView />} />
+        <Route path="/auditoria" element={<AuditoriaView />} />
+        <Route path="/maestros/personas" element={<GenericView title="Control de Personas" description="Administración de clientes, inspectores y personal autorizado." />} />
+        <Route path="/maestros/vehiculos" element={<GenericView title="Registro de Vehículos" description="Búsqueda e historial vehicular filtrado." />} />
+        <Route path="/maestros/caja" element={<GenericView title="Módulo de Caja" description="Control de cobros, cierres de caja diaria y transacciones." />} />
+        <Route path="/maestros/correlativos" element={<GenericView title="Gestión de Correlativos" description="Mantenimiento de numeración y series de comprobantes." />} />
+        <Route path="/maestros/recibos" element={<GenericView title="Historial de Recibos" description="Búsqueda, visualización e impresión de recibos emitidos." />} />
+        <Route path="/maestros/usuarios" element={<GenericView title="Control de Usuarios" description="Administración de cuentas, perfiles y asignaciones de planta." />} />
+        <Route path="/maestros/empresas" element={<GenericView title="Catálogo de Empresas" description="Mantenimiento de convenios corporativos y entidades asociadas." />} />
+        <Route path="/maestros/descuentos" element={<GenericView title="Reglas de Descuentos" description="Configuración de campañas, promociones y tarifas especiales." />} />
+        <Route path="/sin-acceso" element={<ForbiddenView />} />
+      </Route>
+
+      <Route path="/" element={<Navigate to="/inicio" replace />} />
+      <Route path="*" element={<NotFoundView />} />
+    </Routes>
   );
 }

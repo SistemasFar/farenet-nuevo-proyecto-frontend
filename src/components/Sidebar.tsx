@@ -1,6 +1,8 @@
+import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
 interface MenuItem {
+  path: string;
   key: string;
   label: string;
   icon: ReactNode;
@@ -19,7 +21,7 @@ interface SidebarProps {
 
 const menuItems: MenuItem[] = [
   {
-    key: 'inicio',
+    key: 'inicio', path: '/inicio',
     label: 'INICIO',
     permisos: [],
     icon: (
@@ -34,7 +36,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'inspecciones',
+    key: 'inspecciones', path: '/inspecciones',
     label: 'INSPECCIONES',
     permisos: ['LISTA_INSPECCION', 'VER_INSPECCION', 'CREAR_INSPECCION'],
     icon: (
@@ -56,7 +58,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'personas',
+    key: 'personas', path: '/maestros/personas',
     label: 'PERSONAS',
     permisos: ['EDITAR_PERSONA'],
     icon: (
@@ -76,7 +78,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'vehiculos',
+    key: 'vehiculos', path: '/maestros/vehiculos',
     label: 'VEHÍCULOS',
     permisos: ['EDITAR_VEHICULO'],
     icon: (
@@ -111,7 +113,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'caja',
+    key: 'caja', path: '/maestros/caja',
     label: 'CAJA',
     permisos: ['CAJA_OPERAR'],
     icon: (
@@ -137,7 +139,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'correlativos',
+    key: 'correlativos', path: '/maestros/correlativos',
     label: 'CORRELATIVOS',
     permisos: ['EDITAR_MAESTRO'],
     icon: (
@@ -150,7 +152,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'recibos',
+    key: 'recibos', path: '/maestros/recibos',
     label: 'RECIBOS',
     permisos: ['WEB_REPORTE_SUNAT'],
     icon: (
@@ -166,7 +168,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'usuarios',
+    key: 'usuarios', path: '/maestros/usuarios',
     label: 'USUARIOS',
     permisos: ['EDITAR_MAESTRO'],
     icon: (
@@ -177,7 +179,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'empresas',
+    key: 'empresas', path: '/maestros/empresas',
     label: 'EMPRESAS',
     permisos: ['EDITAR_MAESTRO'],
     icon: (
@@ -187,7 +189,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    key: 'descuentos',
+    key: 'descuentos', path: '/maestros/descuentos',
     label: 'DESCUENTOS',
     permisos: ['EDITAR_MAESTRO'],
     icon: (
@@ -202,7 +204,7 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-  key: 'auditoria',
+  key: 'auditoria', path: '/auditoria',
   label: 'AUDITORÍA',
   permisos: ['EDITAR_MAESTRO'],
   icon: (
@@ -263,9 +265,9 @@ export function Sidebar({
       }}
     >
       <div className="flex items-center justify-center px-5 pt-6 pb-4 border-b border-blue-800/50">
-        <div
+        <Link
+          to="/inicio"
           className="flex w-full items-center justify-center cursor-pointer"
-          onClick={() => onTabChange('inicio')}
         >
           {collapsed ? (
             <div className="h-10 w-10 bg-gold-3d rounded-full flex items-center justify-center font-black text-white text-xl shadow-md select-none">
@@ -276,7 +278,7 @@ export function Sidebar({
               FARENET
             </h1>
           )}
-        </div>
+        </Link>
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -287,8 +289,8 @@ export function Sidebar({
 
               return (
                 <li key={item.key}>
-                  <button
-                    onClick={() => onTabChange(item.key)}
+                  <Link to={item.path}
+                    
                     className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
                       isActive
                         ? 'bg-gold-3d text-white shadow-lg scale-[1.01]'
@@ -304,7 +306,7 @@ export function Sidebar({
                         {item.label}
                       </span>
                     )}
-                  </button>
+                  </Link>
                 </li>
               );
             })}

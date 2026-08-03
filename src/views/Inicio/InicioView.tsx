@@ -8,14 +8,8 @@ const SOCKET_URL = import.meta.env.VITE_API_URL
   : 'http://127.0.0.1:3000';
 import type { InspeccionPanel } from '../../types/operacion';
 
-interface InicioViewProps {
-  plantaSeleccionada: string;
-  plantaNombre: string;
-  onNuevaInspeccion?: () => void;
-  onNuevoDuplicado?: () => void;
-  onContinuarInspeccion?: (id: string) => void;
-  onLinea?: (id: string) => void;
-}
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import type { MainLayoutContext } from '../Dashboard/MainLayout';
 
 interface FiltrosPanel {
   fechaInicio: string;
@@ -80,8 +74,9 @@ function BadgeEstado({ value }: { value?: string | null }) {
   );
 }
 
-export function InicioView(props: InicioViewProps) {
-  const { plantaSeleccionada } = props;
+export function InicioView() {
+  const navigate = useNavigate();
+  const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
   const [inspecciones, setInspecciones] = useState<InspeccionPanel[]>([]);
   const [lineasDisponibles, setLineasDisponibles] = useState<{ key: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -298,7 +293,7 @@ export function InicioView(props: InicioViewProps) {
           <div className="flex flex-wrap gap-2">
             <button 
               type="button"
-              onClick={() => props.onNuevoDuplicado?.()}
+              onClick={() => navigate('/inspecciones/duplicado')}
               className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition"
             >
               + Nuevo Duplicado
@@ -308,7 +303,7 @@ export function InicioView(props: InicioViewProps) {
             </button>
             <button
               type="button"
-              onClick={() => props.onNuevaInspeccion?.()}
+              onClick={() => navigate('/inspecciones/nueva')}
               className="px-3 py-1.5 bg-[#052a79] text-white rounded text-xs font-semibold hover:bg-blue-900 transition"
             >
               + Nueva Inspección
@@ -562,8 +557,8 @@ export function InicioView(props: InicioViewProps) {
                           {puedeContinuar && !debeAbrirFlujo2 ? (
                             <button
                               type="button"
-                              onClick={() => props.onContinuarInspeccion?.(ins.numeroInspeccion)}
-                              className="rounded bg-[#f59e0b] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#d97706] shadow-sm transition"
+                              onClick={() => navigate(`/inspecciones/${ins.numeroInspeccion}/continuar`)}
+                              className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                               Continuar
                             </button>
@@ -574,8 +569,8 @@ export function InicioView(props: InicioViewProps) {
                           {(!puedeContinuar || debeAbrirFlujo2) ? (
                             <button
                               type="button"
-                              onClick={() => props.onLinea?.(ins.numeroInspeccion)}
-                              className="rounded bg-white/90 border border-slate-300 px-3 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100 shadow-sm transition"
+                              onClick={() => navigate(`/linea/${ins.numeroInspeccion}`)}
+                              className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                               Ver
                             </button>

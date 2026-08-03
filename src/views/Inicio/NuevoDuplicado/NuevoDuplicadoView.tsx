@@ -3,6 +3,8 @@ import { ArrowLeft, Search, Save, UserCog, ShieldCheck } from 'lucide-react';
 import Select from 'react-select';
 import Swal from 'sweetalert2';
 import { maestrosApi, plantaSession, inspeccionesApi } from '../../../services/api';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import type { MainLayoutContext } from '../../Dashboard/MainLayout';
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({
@@ -20,12 +22,9 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-interface NuevoDuplicadoViewProps {
-  onVolver?: () => void;
-  plantaSeleccionada?: string;
-}
-
-export function NuevoDuplicadoView({ onVolver, plantaSeleccionada }: NuevoDuplicadoViewProps) {
+export function NuevoDuplicadoView() {
+  const navigate = useNavigate();
+  const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
   const [loading, setLoading] = useState(true);
   const [maestros, setMaestros] = useState<any>(null);
   
@@ -94,7 +93,7 @@ export function NuevoDuplicadoView({ onVolver, plantaSeleccionada }: NuevoDuplic
           title: 'Duplicado Guardado',
           text: `Se generó el comprobante ${res.data.nroComprobante}`
         });
-        if (onVolver) onVolver();
+        navigate('/inicio');
       }
     } catch (err: any) {
       Swal.fire('Error', err.message || 'Error al guardar duplicado', 'error');
@@ -118,7 +117,7 @@ export function NuevoDuplicadoView({ onVolver, plantaSeleccionada }: NuevoDuplic
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={onVolver}
+            onClick={() => navigate('/inicio')}
             className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-600"
           >
             <ArrowLeft className="w-5 h-5" />

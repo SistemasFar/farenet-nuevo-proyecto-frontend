@@ -1,13 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../../components/Sidebar';
 import { Header } from '../../components/Header';
-import { InicioView } from '../Inicio/InicioView';
-import { AuditoriaView } from '../Auditoria/AuditoriaView';
-import { GenericView } from './GenericView';
-import InspeccionesView from '../Inspecciones/InspeccionesView';
-import { NuevaInspeccionView } from '../Inicio/NuevaInspeccion/NuevaInspeccionView';
-import { NuevoDuplicadoView } from '../Inicio/NuevoDuplicado/NuevoDuplicadoView';
-import { LineaView } from '../Inicio/Linea';
 
 import type {
   UserSession,
@@ -23,33 +17,13 @@ interface MainLayoutProps {
   onLogout: () => void;
 }
 
-const TAB_PERMISOS: Record<string, string[]> = {
-  inicio: [],
-  nueva_inspeccion: [], // Idealmente requiere permiso CREAR_INSPECCION, lo dejaremos vacio o como LISTA por ahora para que pueda verlo
-  nuevo_duplicado: [],
-  linea: [], // Mismo caso que nueva_inspeccion
-  inspecciones: ['LISTA_INSPECCION', 'VER_INSPECCION', 'CREAR_INSPECCION'],
-  personas: ['EDITAR_PERSONA'],
-  vehiculos: ['EDITAR_VEHICULO'],
-  caja: ['CAJA_OPERAR'],
-  correlativos: ['EDITAR_MAESTRO'],
-  recibos: ['WEB_REPORTE_SUNAT'],
-  usuarios: ['EDITAR_MAESTRO'],
-  empresas: ['EDITAR_MAESTRO'],
-  descuentos: ['EDITAR_MAESTRO'],
-  auditoria: ['EDITAR_MAESTRO']
-};
-
-const tieneAlguno = (
-  permisosUsuario: string[],
-  permisosRequeridos: string[]
-) => {
-  if (permisosRequeridos.length === 0) return true;
-
-  return permisosRequeridos.some((permiso) =>
-    permisosUsuario.includes(permiso)
-  );
-};
+export interface MainLayoutContext {
+  user: UserSession | null;
+  permisos: string[];
+  plantaSeleccionada: PlantaAsignada | null;
+  plantaKey: string;
+  plantaNombre: string;
+}
 
 export function MainLayout({
   user,
@@ -59,14 +33,12 @@ export function MainLayout({
   onCambiarPlanta,
   onLogout
 }: MainLayoutProps) {
-  const [activeTab, setActiveTab] = useState('inicio');
-  const [inspeccionActivaId, setInspeccionActivaId] = useState<string | undefined>(undefined);
-  const [inspeccionIdToResume, setInspeccionIdToResume] = useState<string | null>(null);
+  const location = useLocation();
+  const path = location.pathname;
 
   const [sidebarPinned, setSidebarPinned] = useState(() => {
     return localStorage.getItem('sidebarPinned') === 'true';
   });
-
   const [sidebarHover, setSidebarHover] = useState(false);
 
   const sidebarCollapsed = !sidebarPinned && !sidebarHover;
@@ -79,202 +51,36 @@ export function MainLayout({
     });
   };
 
-  const plantaNombre =
-    plantaSeleccionada?.nombre ||
-    'Sin sede';
+  const plantaNombre = plantaSeleccionada?.nombre || 'Sin sede';
+  const plantaKey = plantaSeleccionada?.key || '';
 
-  const plantaKey =
-    plantaSeleccionada?.key ||
-    '';
+  let activeMenu = 'inicio';
+  if (path.startsWith('/inspecciones') || path.startsWith('/linea')) activeMenu = 'inspecciones';
+  else if (path.startsWith('/maestros/personas')) activeMenu = 'personas';
+  else if (path.startsWith('/maestros/vehiculos')) activeMenu = 'vehiculos';
+  else if (path.startsWith('/maestros/caja')) activeMenu = 'caja';
+  else if (path.startsWith('/maestros/correlativos')) activeMenu = 'correlativos';
+  else if (path.startsWith('/maestros/recibos')) activeMenu = 'recibos';
+  else if (path.startsWith('/maestros/usuarios')) activeMenu = 'usuarios';
+  else if (path.startsWith('/maestros/empresas')) activeMenu = 'empresas';
+  else if (path.startsWith('/maestros/descuentos')) activeMenu = 'descuentos';
+  else if (path.startsWith('/auditoria')) activeMenu = 'auditoria';
 
-  const puedeVerTab = useMemo(() => {
-    return (tab: string) => {
-      const requeridos = TAB_PERMISOS[tab] || [];
-      return tieneAlguno(permisos, requeridos);
-    };
-  }, [permisos]);
-
-  useEffect(() => {
-    if (!puedeVerTab(activeTab)) {
-      setActiveTab('inicio');
-    }
-  }, [activeTab, puedeVerTab]);
-
-  const renderContent = () => {
-    if (!puedeVerTab(activeTab)) {
-      return (
-        <GenericView
-          title="Acceso restringido"
-          description="No tienes permisos para visualizar este módulo."
-        />
-      );
-    }
-
-    switch (activeTab) {
-      case 'inicio':
-        return (
-          <InicioView
-            plantaSeleccionada={plantaKey}
-            plantaNombre={plantaNombre}
-            onNuevaInspeccion={() => {
-              setInspeccionIdToResume(null);
-              setActiveTab('nueva_inspeccion');
-            }}
-            onNuevoDuplicado={() => {
-              setActiveTab('nuevo_duplicado');
-            }}
-            onContinuarInspeccion={(id: string) => {
-              setInspeccionIdToResume(id);
-              setActiveTab('nueva_inspeccion');
-            }}
-            onLinea={(id) => {
-              setInspeccionActivaId(id);
-              setActiveTab('linea');
-            }}
-          />
-        );
-
-      case 'nueva_inspeccion':
-        return (
-          <NuevaInspeccionView 
-            plantaSeleccionada={plantaKey}
-            inspeccionIdToResume={inspeccionIdToResume}
-            onBack={() => {
-              setInspeccionIdToResume(null);
-              setActiveTab('inicio');
-            }}
-            onContinueToVerificacion={(id: string) => {
-              setInspeccionIdToResume(null);
-              setInspeccionActivaId(id);
-              setActiveTab('linea');
-            }}
-          />
-        );
-
-      case 'nuevo_duplicado':
-        return (
-          <NuevoDuplicadoView
-            plantaSeleccionada={plantaKey}
-            onVolver={() => setActiveTab('inicio')}
-          />
-        );
-
-      case 'linea':
-        return (
-          <LineaView
-            nroInspeccion={inspeccionActivaId}
-            onBack={() => {
-              setInspeccionActivaId(undefined);
-              setActiveTab('inicio');
-            }}
-          />
-        );
-
-      case 'inspecciones':
-        return (
-          <InspeccionesView 
-            onVerInspeccion={(id) => {
-              setInspeccionActivaId(id);
-              setActiveTab('linea');
-            }}
-          />
-        );
-
-      case 'personas':
-        return (
-          <GenericView
-            title="Control de Personas"
-            description={`Administración de clientes, inspectores y personal autorizado para la sede ${plantaNombre}.`}
-          />
-        );
-
-      case 'vehiculos':
-        return (
-          <GenericView
-            title="Registro de Vehículos"
-            description={`Búsqueda e historial vehicular filtrado por la sede ${plantaNombre}.`}
-          />
-        );
-
-      case 'caja':
-        return (
-          <GenericView
-            title="Módulo de Caja"
-            description={`Control de cobros, cierres de caja diaria y transacciones de la sede ${plantaNombre}.`}
-          />
-        );
-
-      case 'correlativos':
-        return (
-          <GenericView
-            title="Gestión de Correlativos"
-            description={`Mantenimiento de numeración y series de comprobantes para la sede ${plantaNombre}.`}
-          />
-        );
-
-      case 'recibos':
-        return (
-          <GenericView
-            title="Historial de Recibos"
-            description={`Búsqueda, visualización e impresión de recibos emitidos en la sede ${plantaNombre}.`}
-          />
-        );
-
-      case 'usuarios':
-        return (
-          <GenericView
-            title="Control de Usuarios"
-            description="Administración de cuentas, perfiles y asignaciones de planta."
-          />
-        );
-
-      case 'empresas':
-        return (
-          <GenericView
-            title="Catálogo de Empresas"
-            description="Mantenimiento de convenios corporativos y entidades asociadas."
-          />
-        );
-
-      case 'descuentos':
-        return (
-          <GenericView
-            title="Reglas de Descuentos"
-            description="Configuración de campañas, promociones y tarifas especiales."
-          />
-        );
-      case 'auditoria':
-        return <AuditoriaView />;
-      default:
-        return (
-          <InicioView
-            plantaSeleccionada={plantaKey}
-            plantaNombre={plantaNombre}
-            onNuevaInspeccion={() => {
-              setInspeccionIdToResume(null);
-              setActiveTab('nueva_inspeccion');
-            }}
-            onContinuarInspeccion={(id: string) => {
-              setInspeccionIdToResume(id);
-              setActiveTab('nueva_inspeccion');
-            }}
-            onLinea={(id) => {
-              setInspeccionActivaId(id);
-              setActiveTab('linea');
-            }}
-          />
-        );
-    }
+  const contextValue: MainLayoutContext = {
+    user,
+    permisos,
+    plantaSeleccionada,
+    plantaKey,
+    plantaNombre
   };
 
   return (
     <div className="flex min-h-screen bg-slate-100 font-sans antialiased overflow-hidden">
       <Sidebar
         collapsed={sidebarCollapsed}
-        activeMenu={activeTab}
+        activeMenu={activeMenu}
         permisos={permisos}
         perfilId={user?.perfilId || ''}
-        onTabChange={setActiveTab}
         onMouseEnterSidebar={() => setSidebarHover(true)}
         onMouseLeaveSidebar={() => setSidebarHover(false)}
       />
@@ -284,14 +90,14 @@ export function MainLayout({
           plantaName={plantaNombre}
           plantaSeleccionada={plantaKey}
           plantasDisponibles={plantasDisponibles}
-          activeTab={activeTab}
+          activeTab={activeMenu}
           onCambiarPlanta={onCambiarPlanta}
           onToggleSidebar={toggleSidebar}
           onLogout={onLogout}
         />
 
         <main className="flex-1 overflow-y-auto p-6 bg-slate-50 transition-all duration-300">
-          {renderContent()}
+          <Outlet context={contextValue} />
         </main>
       </div>
     </div>

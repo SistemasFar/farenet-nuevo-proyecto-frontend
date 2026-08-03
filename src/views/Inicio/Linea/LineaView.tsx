@@ -5,11 +5,7 @@ import { PreVisualizacionStep } from './components/PreVisualizacionStep';
 import Swal from 'sweetalert2';
 import { lineaApi } from '../../../services/api';
 import { CheckCircle2, ClipboardCheck, Activity, Eye, FileCheck, ArrowLeft } from 'lucide-react';
-
-interface LineaViewProps {
-  nroInspeccion: string | undefined;
-  onBack: () => void;
-}
+import { useNavigate, useParams } from 'react-router-dom';
 
 const STEPS = [
   { id: 'consolidacion_inicial', label: 'Consolidación', icon: ClipboardCheck },
@@ -20,7 +16,9 @@ const STEPS = [
 
 import { SeguimientoLineaDashboard } from './components/SeguimientoLineaDashboard';
 
-export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
+export function LineaView() {
+  const navigate = useNavigate();
+  const { nroInspeccion } = useParams<{ nroInspeccion: string }>();
   const [currentStep, setCurrentStep] = useState(0);
   const [estadoLinea, setEstadoLinea] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -88,7 +86,7 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
         text: 'No se ha provisto un número de inspección válido.',
         confirmButtonColor: '#3085d6'
       }).then(() => {
-        onBack();
+        navigate('/inicio');
       });
       return;
     }
@@ -105,7 +103,7 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
     if (currentStep > 0) {
       setCurrentStep(prev => prev - 1);
     } else {
-      onBack();
+      navigate('/inicio');
     }
   };
 
@@ -117,7 +115,7 @@ export function LineaView({ nroInspeccion, onBack }: LineaViewProps) {
         <div className="flex items-center gap-3 mb-6">
           <button
             type="button"
-            onClick={onBack}
+            onClick={() => navigate('/inicio')}
             className="p-1.5 text-slate-400 hover:text-[#052a79] hover:bg-slate-100 rounded-full transition"
             title="Volver"
           >
@@ -224,7 +222,7 @@ isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400 group-hover:text-[
       <div className="bg-white border-t border-slate-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] relative z-10">
         <div className="flex justify-between items-center max-w-5xl mx-auto">
           <button
-            onClick={onBack}
+            onClick={() => navigate('/inicio')}
             className="px-6 py-2 border-2 border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-100 uppercase text-sm transition-colors"
           >
             Cancelar / Volver

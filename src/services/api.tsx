@@ -20,9 +20,13 @@ const TIMEOUT_MS = 10000;
 
 // TODO FASE JWT: Cambiar por la implementación final cuando se tenga autenticación JWT
 const getAuthHeaders = (): Record<string, string> => {
-  const token = sessionStorage.getItem('accessToken');
+  const token = sessionStorage.getItem('accessToken')?.trim();
 
-  if (!token) {
+  if (
+    !token ||
+    token.toLowerCase() === 'null' ||
+    token.toLowerCase() === 'undefined'
+  ) {
     return {};
   }
 
@@ -65,11 +69,20 @@ async function fetchWithTimeout(
     controller.abort();
   }, TIMEOUT_MS);
 
+  const isPublicRoute = url.includes('/auth/login') || url.includes('/auth/confirmar-planta');
+  const authHeaders = isPublicRoute ? {} : getAuthHeaders();
+
+  const mergedOptions: RequestInit = {
+    ...options,
+    headers: {
+      ...authHeaders,
+      ...(options.headers || {})
+    },
+    signal: controller.signal
+  };
+
   try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
+    return await fetch(url, mergedOptions);
   } catch (error: unknown) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new Error(
@@ -531,7 +544,7 @@ export const inspeccionesApi = {
   consultarReinspeccionesActivas: async (placa: string) => {
     const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/reinspecciones-activas/${placa}`, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      headers: { 'Content-Type': 'application/json' }
     });
     if (!response.ok) throw new Error('Error al consultar reinspecciones activas');
     return await parseJsonResponse<any>(response);

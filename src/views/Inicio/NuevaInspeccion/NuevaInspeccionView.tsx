@@ -10,6 +10,8 @@ import { PagoStep } from './components/NuevaInspeccion/PagoStep';
 import { VehiculoStep } from './components/NuevaInspeccion/VehiculoStep';
 import { FacturacionStep } from './components/NuevaInspeccion/FacturacionStep';
 import { VerificacionStep } from './components/NuevaInspeccion/VerificacionStep';
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import type { MainLayoutContext } from '../../Dashboard/MainLayout';
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({
@@ -27,13 +29,6 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-interface NuevaInspeccionViewProps {
-  onBack?: () => void;
-  onContinueToVerificacion?: (id: string) => void;
-  plantaSeleccionada?: string;
-  inspeccionIdToResume?: string | null;
-}
-
 const STEPS = [
   { id: 'caja', label: 'Caja', icon: Box },
   { id: 'pago', label: 'Pago', icon: CreditCard },
@@ -42,7 +37,12 @@ const STEPS = [
   { id: 'verificacion', label: 'Verificación', icon: FileText }
 ];
 
-export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSeleccionada, inspeccionIdToResume }: NuevaInspeccionViewProps) {
+export function NuevaInspeccionView() {
+  const navigate = useNavigate();
+  const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
+  const { nroInspeccion } = useParams<{ nroInspeccion: string }>();
+  const inspeccionIdToResume = nroInspeccion || null;
+
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
   const [maestrosVehiculo, setMaestrosVehiculo] = useState<any | null>(null);
@@ -157,11 +157,13 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
                 title: 'Inspección en línea',
                 text: 'Esta inspección ya ha sido enviada a la línea de inspección.',
                 confirmButtonText: 'Ir a Línea'
-              }).then(() => {
-                if (onContinueToVerificacion) {
-                  onContinueToVerificacion(inspeccionIdToResume);
-                } else if (onBack) {
-                  onBack();
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  if (inspeccionIdToResume) {
+                    navigate(`/linea/${inspeccionIdToResume}`);
+                  } else {
+                    navigate('/inicio');
+                  }
                 }
               });
               return;
@@ -495,8 +497,10 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
               title: '¡Pase a Línea Exitoso!',
               text: `La inspección ha sido enviada a la línea de pruebas (Gases). Código Oficial: ${nrodocumentoinspeccion}`,
               confirmButtonColor: '#052a79'
-            }).then(() => {
-              if (onBack) onBack();
+            }).then((result) => {
+              if (result.isConfirmed) {
+                navigate('/inicio');
+              }
             });
           } else {
             setCurrentStepIndex(res.posicionActual);
@@ -750,7 +754,7 @@ export function NuevaInspeccionView({ onBack, onContinueToVerificacion, plantaSe
         <div className="flex items-center gap-3 mb-6">
           <button
             type="button"
-            onClick={onBack}
+            onClick={() => navigate('/inicio')}
             className="p-1.5 text-slate-400 hover:text-[#052a79] hover:bg-slate-100 rounded-full transition"
             title="Volver"
           >
