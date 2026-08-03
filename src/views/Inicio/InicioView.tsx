@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { operacionApi, inspeccionesApi } from '../../services/api';
-import { Trash2 } from 'lucide-react';
+import { operacionApi } from '../../services/api';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '')
@@ -488,7 +487,7 @@ export function InicioView() {
                   const etapa = ins.etapa || ins.estadoActual || 'SIN ESTADO';
                   const puedeContinuar = ins.puedeContinuarFlujo1 === true;
                   const debeAbrirFlujo2 = ins.debeAbrirFlujo2 === true;
-                  const puedeAnular = ins.puedeAnular === true;
+                  // const puedeAnular = ins.puedeAnular === true;
                   
                   let claseFila = 'hover:bg-slate-50';
                   let etapaBadgeClase = 'bg-slate-100 text-slate-700 border-slate-200';

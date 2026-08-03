@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import  { useEffect, useState } from 'react';
 import { lineaApi } from '../../../../services/api';
 import { ArrowLeft, RefreshCw, AlertCircle, FileCheck, XCircle, Settings, CheckCircle2 } from 'lucide-react';
-import Swal from 'sweetalert2';
+// import Swal from 'sweetalert2';
 
 interface SeguimientoLineaProps {
   nroInspeccion: string;

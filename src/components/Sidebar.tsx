@@ -14,7 +14,7 @@ interface SidebarProps {
   activeMenu: string;
   permisos: string[];
   perfilId: string; // 🎯 1. Agregamos el perfilId al contrato de props del Sidebar
-  onTabChange: (tab: string) => void;
+
   onMouseEnterSidebar: () => void;
   onMouseLeaveSidebar: () => void;
 }
@@ -231,7 +231,7 @@ export function Sidebar({
   activeMenu,
   permisos,
   perfilId, // 🎯 2. Desestructuramos la nueva prop recibida
-  onTabChange,
+
   onMouseEnterSidebar,
   onMouseLeaveSidebar
 }: SidebarProps) {

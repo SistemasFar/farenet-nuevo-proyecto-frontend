@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Search, Save, UserCog, ShieldCheck } from 'lucide-react';
+import type { MaestroOption, MaestroAbreviaturaOption } from '../../../types/maestros';
 import Select from 'react-select';
 import Swal from 'sweetalert2';
 import { maestrosApi, plantaSession, inspeccionesApi } from '../../../services/api';
@@ -22,11 +23,18 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
+interface MaestrosDuplicado {
+  conceptos: MaestroAbreviaturaOption[];
+  pagos: MaestroOption[];
+  documentos: MaestroOption[];
+}
+
 export function NuevoDuplicadoView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
+
   const [loading, setLoading] = useState(true);
-  const [maestros, setMaestros] = useState<any>(null);
+  const [maestros, setMaestros] = useState<MaestrosDuplicado | null>(null);
   
   const [form, setForm] = useState({
     placa: '',
@@ -36,7 +44,7 @@ export function NuevoDuplicadoView() {
     motivoDuplicado: ''
   });
 
-  const [precios, setPrecios] = useState({
+  const [precios] = useState({
     subtotal: 0,
     descuento: 0,
     baseImponible: 0,
@@ -49,9 +57,17 @@ export function NuevoDuplicadoView() {
       try {
         const planta = plantaSession.obtener();
         if (planta?.key) {
-          const res = await maestrosApi.obtenerMaestrosCaja(planta.key);
-          if (res.status === 'success') {
-            setMaestros(res.data);
+          const [resCaja, resPago] = await Promise.all([
+            maestrosApi.obtenerMaestrosCajaAsync(),
+            maestrosApi.obtenerMaestrosPagoAsync()
+          ]);
+          
+          if (resCaja.status === 'success' && resPago.status === 'success') {
+            setMaestros({
+              conceptos: resCaja.data.conceptos,
+              pagos: resPago.data as unknown as MaestroOption[],
+              documentos: resCaja.data.tiposDocumento
+            });
           }
         }
       } catch (err) {

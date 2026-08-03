@@ -20,7 +20,7 @@ interface PropietarioData {
 interface ModalModificarPropietarioProps {
   isOpen: boolean;
   onClose: () => void;
-  datosIniciales: PropietarioData | null;
+  datosIniciales: Partial<PropietarioData> | null;
   nroInspeccion: string;
   onSaved?: () => void;
 }
@@ -56,7 +56,7 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
 
   useEffect(() => {
     if (isOpen && datosIniciales) {
-      setFormData(datosIniciales);
+      setFormData(prev => ({ ...prev, ...datosIniciales }));
     }
   }, [isOpen, datosIniciales]);
 

@@ -507,7 +507,7 @@ export const inspeccionesApi = {
       : `${BASE_URL}/inspecciones/buscar-info-duplicado/${placa}`;
     const response = await fetchWithTimeout(url);
     if (!response.ok) {
-      const errorData = await parseJsonResponse<{message?: string}>(response).catch(() => ({}));
+      const errorData: any = await parseJsonResponse(response).catch(() => ({}));
       throw new Error(errorData.message || 'Error al buscar info duplicado');
     }
     return await parseJsonResponse<any>(response);
@@ -519,7 +519,7 @@ export const inspeccionesApi = {
       body: JSON.stringify(data)
     });
     if (!response.ok) {
-      const errorData = await parseJsonResponse<{message?: string}>(response).catch(() => ({}));
+      const errorData: any = await parseJsonResponse(response).catch(() => ({}));
       throw new Error(errorData.message || 'Error al guardar duplicado');
     }
     return await parseJsonResponse<any>(response);
@@ -1056,14 +1056,18 @@ export const lineaApi = {
     placaNueva: string
   ): Promise<any> => {
     try {
-      const response = await axiosInstance.post(
-        `/api/inspecciones/${nroInspeccionAnulada}/traspaso-resultados`,
-        {
+      const response = await fetchWithTimeout(`${BASE_URL}/inspecciones/${nroInspeccionAnulada}/traspaso-resultados`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
+        body: JSON.stringify({
           inspeccionNueva,
           placaNueva
-        }
-      );
-      return response.data;
+        })
+      });
+      return await parseJsonResponse<any>(response);
     } catch (error) {
       console.error('Error en traspaso de resultados:', error);
       throw error;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Save, AlertTriangle, Ban, FileText, Printer, ShieldAlert, CheckCircle2, Truck, Activity, FileSignature, Settings, Lock, XCircle
 } from 'lucide-react';
@@ -12,7 +12,7 @@ import { ModalCambioMotor } from './ModalCambioMotor';
 import { ModalCambiarFirma } from './ModalCambiarFirma';
 import { ModalCambiarObservacion } from './ModalCambiarObservacion';
 import { ModalRegistroResultados } from './ModalRegistroResultados';
-import { maestrosApi, lineaApi, inspeccionesApi } from '../../../../services/api';
+import { maestrosApi, lineaApi } from '../../../../services/api';
 
 interface ConsolidacionLegacyPanelProps {
   mode: 'resumen' | 'final';
@@ -75,7 +75,7 @@ export function ConsolidacionLegacyPanel({
   const handleRegistroResultadosSubmit = async (placaNueva: string, nroInspeccionNueva: string) => {
     try {
       setConsolidando(true);
-      await inspeccionesApi.traspasarResultados(nroInspeccion, nroInspeccionNueva, placaNueva);
+      await lineaApi.traspasarResultados(nroInspeccion, nroInspeccionNueva, placaNueva);
       if (onRefresh) onRefresh();
       setModalRegistroResultadosOpen(false);
     } catch (err: any) {

@@ -20,7 +20,7 @@ export function VerificacionStep({
   maestros,
   formCaja,
   formVehiculo,
-  formPropietario,
+  
   formFacturacion,
   formVerificacion,
   setFormVerificacion,

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, XCircle, AlertCircle, Eye, Settings, RefreshCw, X } from 'lucide-react';
+import {   CheckCircle2, XCircle, AlertCircle, Eye, Settings, RefreshCw, X } from 'lucide-react';
 
 interface LineaStepProps {
   nroInspeccion: string;
@@ -222,10 +222,10 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
 
   const recibidas = todosResultados;
 
-  const TIPOS_FOTO = new Set(['11', '12', '13', '15']);
+  // const TIPOS_FOTO = new Set(['11', '12', '13', '15']);
   const TIPOS_PRUEBA = new Set(['1', '2', '3', '4', '5', '6', '7', '9', '10']);
 
-  const esFoto = (item: any) => TIPOS_FOTO.has(getTipo(item));
+  // const esFoto = (item: any) => TIPOS_FOTO.has(getTipo(item));
   const esPrueba = (item: any) => TIPOS_PRUEBA.has(getTipo(item));
 
   const resultadosPruebas = recibidas.filter(esPrueba);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import  { useState, useEffect } from 'react';
 import { ConsolidacionLegacyPanel } from './components/ConsolidacionLegacyPanel';
 import { LineaStep } from './components/LineaStep';
 import { PreVisualizacionStep } from './components/PreVisualizacionStep';
@@ -14,7 +14,7 @@ const STEPS = [
   { id: 'consolidacion_final', label: 'Consolidación', icon: FileCheck }
 ];
 
-import { SeguimientoLineaDashboard } from './components/SeguimientoLineaDashboard';
+// import { SeguimientoLineaDashboard } from './components/SeguimientoLineaDashboard';
 
 export function LineaView() {
   const navigate = useNavigate();

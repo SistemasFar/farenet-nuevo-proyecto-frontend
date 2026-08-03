@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from 'react';
-import { plantaSession, maestrosApi, inspeccionesApi } from '../../../services/api';
+import { maestrosApi, inspeccionesApi } from '../../../services/api';
 import Swal from 'sweetalert2';
-import type { MaestrosCajaResponse, MaestrosPagoResponse } from '../../../types/maestros';
+import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '../../../types/maestros';
 import { CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Search } from 'lucide-react';
 import { CajaStep } from './components/NuevaInspeccion/CajaStep';
 import { PagoStep } from './components/NuevaInspeccion/PagoStep';
@@ -37,6 +37,52 @@ const STEPS = [
   { id: 'verificacion', label: 'Verificación', icon: FileText }
 ];
 
+export interface FormCajaState {
+  tipoPlaca: string;
+  placa: string;
+  concepto: string;
+  categoria: string;
+  tipoInspeccion: string;
+  tipoCertificado: string;
+  tipoAutorizacion: string;
+  descuentoObj?: { source_table: string; source_id: string; isCuponidad?: boolean; documentoBusqueda?: string; uuid?: string };
+  nrodocumentoreinspeccion?: string;
+}
+
+export interface FormPagoState {
+  importe: string;
+  tarjetaKey: string;
+  entidadFinancieraKey: string;
+  voucher?: string;
+  nroOperacion?: string;
+  fechaOperacion?: string;
+  cuentaCorrienteKey?: string;
+  fechaDeposito?: string;
+  digitosTarjeta?: string;
+}
+
+export interface FormVehiculoState {
+  clase: string; marca: string; modelo: string; carroceria: string; marcaCarroceria: string; placaNueva: string;
+  anioFabricacion: string; combustible: string; nroSerie: string; nroMotor: string; color: string;
+  nroAsientos: string; nroPasajeros: string; nroPisos: string; longitud: string; ancho: string; altura: string;
+  pesoNeto?: string; pesoSeco?: string; pesoBruto: string; cargaUtil: string; nroCilindros: string; nroRuedas: string; nroEjes: string;
+  formulaRodante?: string; nroPuertas: string; nroTubosEscape?: string; kilometraje: string; salidasEmergencia?: string;
+  fechaEmisionSoat?: string; fechaVencimientoSoat?: string; aseguradora?: string; poliza?: string; useMtcParams?: boolean;
+}
+
+export interface FormFacturacionState {
+  tipoDocFac: string; nroDocFac: string; razonSocialFac: string; nombresFac: string; apellidosFac: string;
+  paisFac: string; departamentoFac: string; provinciaFac: string; distritoFac: string; direccionFac: string;
+  emailFac: string; telefonoFac: string;
+}
+
+export interface FormVerificacionState {
+  tipoInspeccion: string;
+  tipoCertificado: string;
+  tipoAutorizacion: string;
+  linea?: string;
+}
+
 export function NuevaInspeccionView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
@@ -45,13 +91,13 @@ export function NuevaInspeccionView() {
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
-  const [maestrosVehiculo, setMaestrosVehiculo] = useState<any | null>(null);
+  const [maestrosVehiculo, setMaestrosVehiculo] = useState<MaestrosVehiculoResponse['data'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [isConsultado, setIsConsultado] = useState(false);
   const [posicionActualGuardada, setPosicionActualGuardada] = useState(0);
-  const [formCajaOriginalRehidratado, setFormCajaOriginalRehidratado] = useState<any>(null);
+  const [formCajaOriginalRehidratado, setFormCajaOriginalRehidratado] = useState<FormCajaState | null>(null);
   const [puedeModificarFlujo1, setPuedeModificarFlujo1] = useState(true);
 
   // Estados de vehiculo y facturacion (comunes)
@@ -67,7 +113,7 @@ export function NuevaInspeccionView() {
   const [nrodocumentoinspeccion, setNrodocumentoinspeccion] = useState<string>('');
 
   // Form State (Caja)
-  const [formCaja, setFormCaja] = useState<any>({
+  const [formCaja, setFormCaja] = useState<FormCajaState>({
     tipoPlaca: '',
     placa: '',
     concepto: '',
@@ -84,7 +130,7 @@ export function NuevaInspeccionView() {
   const [disablePagoTabs, setDisablePagoTabs] = useState(false);
 
   // Form State (Pago)
-  const [formPago, setFormPago] = useState({
+  const [formPago, setFormPago] = useState<FormPagoState>({
     importe: '',
     tarjetaKey: '',
     entidadFinancieraKey: '',
@@ -99,7 +145,7 @@ export function NuevaInspeccionView() {
   // Form State (Vehículo)
   const [isVehiculoValid, setIsVehiculoValid] = useState(false);
   const [vehiculoTab, setVehiculoTab] = useState<'DATOS' | 'SOAT' | 'PROPIETARIO'>('DATOS');
-  const [formVehiculo, setFormVehiculo] = useState({
+  const [formVehiculo, setFormVehiculo] = useState<FormVehiculoState>({
     clase: '', marca: '', modelo: '', carroceria: '', marcaCarroceria: '', placaNueva: '',
     anioFabricacion: '', combustible: '', nroSerie: '', nroMotor: '', color: '',
     nroAsientos: '', nroPasajeros: '', nroPisos: '', longitud: '', ancho: '', altura: '',
@@ -109,14 +155,14 @@ export function NuevaInspeccionView() {
 
   // Form State (Facturación)
   const [isFacturacionValid, setIsFacturacionValid] = useState(false);
-  const [formFacturacion, setFormFacturacion] = useState({
+  const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
     tipoDocFac: '', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
     emailFac: '', telefonoFac: ''
   });
 
   // Form State (Verificación)
-  const [formVerificacion, setFormVerificacion] = useState({
+  const [formVerificacion, setFormVerificacion] = useState<FormVerificacionState>({
     tipoInspeccion: '',
     tipoCertificado: '',
     tipoAutorizacion: '',
@@ -146,64 +192,72 @@ export function NuevaInspeccionView() {
 
 
   useEffect(() => {
-    const initNroInspeccion = async () => {
-      try {
-        if (inspeccionIdToResume) {
-          const res = await inspeccionesApi.obtenerProceso(inspeccionIdToResume);
-          if (res?.data) {
-            if (res.data.debeAbrirFlujo2) {
-              Swal.fire({
-                icon: 'warning',
-                title: 'Inspección en línea',
-                text: 'Esta inspección ya ha sido enviada a la línea de inspección.',
-                confirmButtonText: 'Ir a Línea'
-              }).then((result) => {
-                if (result.isConfirmed) {
-                  if (inspeccionIdToResume) {
-                    navigate(`/linea/${inspeccionIdToResume}`);
-                  } else {
-                    navigate('/inicio');
+      const initNroInspeccion = async () => {
+        try {
+          if (inspeccionIdToResume && inspeccionIdToResume !== 'nueva') {
+            const res = await inspeccionesApi.obtenerProceso(inspeccionIdToResume);
+            if (res) {
+              if (res.data.inspeccionestado_key === 'CON' || Number(res.data.posicion) === 5) {
+                Swal.fire({
+                  icon: 'info',
+                  title: 'Inspección en línea',
+                  text: 'Esta inspección ya ha sido enviada a la línea de inspección.',
+                  confirmButtonText: 'Ir a Línea'
+                }).then((result) => {
+                  if (result.isConfirmed) {
+                    if (inspeccionIdToResume) {
+                      navigate(`/linea/${inspeccionIdToResume}`);
+                    } else {
+                      navigate('/inicio');
+                    }
                   }
-                }
-              });
-              return;
+                });
+                return;
+              }
+  
+              setNrodocumentoinspeccion(inspeccionIdToResume);
+              if (res.data.formCaja) {
+                setFormCaja(res.data.formCaja);
+                setFormCajaOriginalRehidratado(res.data.formCaja);
+              }
+              if (res.data.formVehiculo) setFormVehiculo(res.data.formVehiculo);
+              if (res.data.formFacturacion) setFormFacturacion(res.data.formFacturacion);
+              if (res.data.formVerificacion) setFormVerificacion(res.data.formVerificacion);
+              if (res.data.pagosAgregados) setPagosAgregados(res.data.pagosAgregados);
+              if (res.data.documentoPago) setDocumentoPago(res.data.documentoPago);
+              if (res.data.precioSubtotal !== undefined) setPrecioSubtotal(Number(res.data.precioSubtotal));
+              if (res.data.descuento !== undefined) setDescuento(Number(res.data.descuento));
+              if (res.data.precioTotal !== undefined) {
+                console.log("[DEBUG] Hidratando precioTotal con: ", res.data.precioTotal);
+                setPrecioTotal(Number(res.data.precioTotal));
+              }
+  
+              if (res.data.isConsultado !== undefined) setIsConsultado(res.data.isConsultado);
+              if (res.data.puedeModificarFlujo1 !== undefined) setPuedeModificarFlujo1(res.data.puedeModificarFlujo1);
+  
+              if (res.data.posicion !== undefined && res.data.posicion !== null) {
+                const pos = Number(res.data.posicion);
+                setPosicionActualGuardada(pos);
+                setCurrentStepIndex(pos);
+              }
             }
-
-            setNrodocumentoinspeccion(inspeccionIdToResume);
-            if (res.data.formCaja) {
-              setFormCaja(res.data.formCaja);
-              setFormCajaOriginalRehidratado(res.data.formCaja);
-            }
-            if (res.data.formVehiculo) setFormVehiculo(res.data.formVehiculo);
-            if (res.data.formFacturacion) setFormFacturacion(res.data.formFacturacion);
-            if (res.data.formVerificacion) setFormVerificacion(res.data.formVerificacion);
-            if (res.data.pagosAgregados) setPagosAgregados(res.data.pagosAgregados);
-            if (res.data.documentoPago) setDocumentoPago(res.data.documentoPago);
-            if (res.data.precioSubtotal !== undefined) setPrecioSubtotal(res.data.precioSubtotal);
-            if (res.data.descuento !== undefined) setDescuento(res.data.descuento);
-            if (res.data.precioTotal !== undefined) setPrecioTotal(res.data.precioTotal);
-
-            if (res.data.isConsultado !== undefined) setIsConsultado(res.data.isConsultado);
-            if (res.data.puedeModificarFlujo1 !== undefined) setPuedeModificarFlujo1(res.data.puedeModificarFlujo1);
-            
-            if (res.data.posicion !== undefined) {
-              const pos = Number(res.data.posicion);
-              setPosicionActualGuardada(pos);
-              setCurrentStepIndex(pos);
+          } else if (!nrodocumentoinspeccion && plantaSeleccionada) {
+            console.log('FRONTEND DEBUG: Llamando a generarNroInspeccion con planta:', plantaSeleccionada);
+            const res = await inspeccionesApi.generarNroInspeccion(plantaSeleccionada);
+            console.log('FRONTEND DEBUG: Respuesta generarNroInspeccion:', res);
+            if (res?.nrodocumentoinspeccion) {
+              setNrodocumentoinspeccion(res.nrodocumentoinspeccion);
+            } else {
+              alert("DEBUG INFO: El API respondió pero no trajo nrodocumentoinspeccion. Respuesta: " + JSON.stringify(res));
             }
           }
-        } else if (!nrodocumentoinspeccion && plantaSeleccionada) {
-          const res = await inspeccionesApi.generarNroInspeccion(plantaSeleccionada);
-          if (res?.nrodocumentoinspeccion) {
-            setNrodocumentoinspeccion(res.nrodocumentoinspeccion);
-          }
+        } catch (e: any) {
+          console.error('Error al generar NRO', e);
+          alert("DEBUG INFO: Hubo un error al generar el NRO: " + (e.message || ''));
         }
-      } catch (e) {
-        console.error('Error al generar NRO', e);
-      }
-    };
-    initNroInspeccion();
-  }, [plantaSeleccionada, nrodocumentoinspeccion, inspeccionIdToResume]);
+      };
+      initNroInspeccion();
+    }, [plantaSeleccionada, nrodocumentoinspeccion, inspeccionIdToResume]);
 
   const cargarMaestros = async () => {
     try {
@@ -306,7 +360,7 @@ export function NuevaInspeccionView() {
 
   const handleSelectChange = (name: string, option: any) => {
     const value = option ? option.value : '';
-    setFormCaja((prev) => ({ ...prev, [name]: value }));
+    setFormCaja((prev: any) => ({ ...prev, [name]: value }));
     const critical = ['tipoPlaca', 'placa', 'concepto', 'categoria', 'tipoCertificado', 'tipoAutorizacion'];
     if (critical.includes(name)) {
       setIsConsultado(false);
@@ -322,7 +376,7 @@ export function NuevaInspeccionView() {
     }
 
     if (name === 'tipoPlaca') {
-      setFormCaja((prev) => ({ ...prev, [name]: value }));
+      setFormCaja((prev: any) => ({ ...prev, [name]: value }));
       return;
     }
 
@@ -343,11 +397,11 @@ export function NuevaInspeccionView() {
         val = val.slice(0, maxLen);
       }
 
-      setFormCaja((prev) => ({ ...prev, [name]: val }));
+      setFormCaja((prev: any) => ({ ...prev, [name]: val }));
       return;
     }
 
-    setFormCaja((prev) => ({ ...prev, [name]: value }));
+    setFormCaja((prev: any) => ({ ...prev, [name]: value }));
   };
 
   const validarCaja = (opciones = { ignorarTipoPlaca: false }) => {
@@ -527,9 +581,7 @@ export function NuevaInspeccionView() {
         setLoading(false);
       }
     } else {
-      if (currentStepIndex < STEPS.length - 1) {
-        setCurrentStepIndex((prev) => prev + 1);
-      }
+      alert("Error crítico: No se ha generado el número de inspección oficial. Por favor recarga la página e intenta de nuevo.");
     }
   };
 
@@ -708,7 +760,7 @@ export function NuevaInspeccionView() {
       tipo: pagoTab,
       ...formPago,
       importe: importeNumerico.toFixed(2),
-      nroOperacion: formPago.nroOperacion.trim()
+      nroOperacion: formPago.nroOperacion?.trim() || ''
     };
 
     if (editingPagoIndex !== null) {
@@ -809,7 +861,6 @@ export function NuevaInspeccionView() {
             setFormVehiculo={setFormVehiculo}
             handleCajaChange={handleCajaChange}
             handleSelectChange={handleSelectChange}
-            validarCaja={validarCaja}
             irSiguientePaso={irSiguientePaso}
             isConsultado={isConsultado}
             setIsConsultado={setIsConsultado}
@@ -849,7 +900,7 @@ export function NuevaInspeccionView() {
               eliminarPago={eliminarPago}
               editingPagoIndex={editingPagoIndex}
               setEditingPagoIndex={setEditingPagoIndex}
-              disablePagoTabs={disablePagoTabs || (formCaja.nrodocumentoreinspeccion && montoPendiente === 0)}
+              disablePagoTabs={disablePagoTabs || !!(formCaja.nrodocumentoreinspeccion && montoPendiente === 0)}
               descuentoObj={formCaja.descuentoObj}
               isReinspeccionGratuita={!!(formCaja.nrodocumentoreinspeccion && montoPendiente === 0)}
             />

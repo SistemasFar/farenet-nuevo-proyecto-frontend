@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Select from 'react-select';
 import { Search, XCircle, Frown, HelpCircle } from 'lucide-react';
-import { plantaSession, maestrosApi, inspeccionesApi } from '../../../../../services/api';
+import { plantaSession,  inspeccionesApi } from '../../../../../services/api';
 import Swal from 'sweetalert2';
 //hola
 interface CajaStepProps {
@@ -11,7 +11,6 @@ interface CajaStepProps {
   handleCajaChange: (e: any) => void;
   handleSelectChange: (name: string, option: any) => void;
   setFormVehiculo?: (data: any) => void;
-  validarCaja: (opciones?: any) => { valido: boolean, mensaje?: string };
   irSiguientePaso: () => void;
   isConsultado: boolean;
   setIsConsultado: (val: boolean) => void;
@@ -40,7 +39,6 @@ export function CajaStep({
   setFormVehiculo,
   handleCajaChange,
   handleSelectChange,
-  validarCaja,
   irSiguientePaso,
   isConsultado,
   setIsConsultado,
@@ -67,8 +65,6 @@ export function CajaStep({
   const [reinspeccionMensaje, setReinspeccionMensaje] = useState<string | null>(null);
   const [isReinspeccionAplica, setIsReinspeccionAplica] = useState<boolean>(false);
   const [isReinspeccionGratuita, setIsReinspeccionGratuita] = useState(false);
-  const [vehiculoRapidoEncontrado, setVehiculoRapidoEncontrado] = useState(false);
-  const [activasReinspecciones, setActivasReinspecciones] = useState<any[]>([]);
   const [isLockedForReinspeccion, setIsLockedForReinspeccion] = useState(false);
 
   const handlePlacaBlur = async () => {
@@ -82,16 +78,12 @@ export function CajaStep({
             categoria: veh.categoria_key || prev.categoria,
             tipoPlaca: veh.tipoplaca_key || prev.tipoPlaca
           }));
-          setVehiculoRapidoEncontrado(true);
-        } else {
-          setVehiculoRapidoEncontrado(false);
         }
 
         // Consultar reinspecciones activas para mostrar notificación
         try {
           const resActivas = await inspeccionesApi.consultarReinspeccionesActivas(formCaja.placa);
           if (resActivas?.data && resActivas.data.length > 0) {
-            setActivasReinspecciones(resActivas.data);
             
             // Mostrar Toast "Ojito" inmediatamente al detectar la placa
             let reinsHtml = '<ul style="margin: 8px 0 0 20px; padding: 0; list-style-type: disc; color: #1f2937; line-height: 1.6;">';
@@ -114,18 +106,16 @@ export function CajaStep({
               timerProgressBar: true
             });
           } else {
-            setActivasReinspecciones([]);
+            // setActivasReinspecciones([]);
           }
         } catch(e) {
-          setActivasReinspecciones([]);
+          // setActivasReinspecciones([]);
         }
       } catch (err) {
-        setVehiculoRapidoEncontrado(false);
-        setActivasReinspecciones([]);
+        // setActivasReinspecciones([]);
       }
     } else {
-      setVehiculoRapidoEncontrado(false);
-      setActivasReinspecciones([]);
+      // setActivasReinspecciones([]);
     }
   };
 
@@ -307,14 +297,7 @@ export function CajaStep({
           // ---------------------------------------------
           // MOSTRAR TOAST COMBINADO PERMANENTE
           // ---------------------------------------------
-          let currentActivas = activasReinspecciones;
           try {
-            // Asegurarnos de tener la info más reciente (evita race condition si consultó muy rápido)
-            const resActivas = await inspeccionesApi.consultarReinspeccionesActivas(formCaja.placa);
-            if (resActivas?.data) {
-              currentActivas = resActivas.data;
-              setActivasReinspecciones(resActivas.data);
-            }
           } catch(e) {}
 
           let toastHtml = '';
@@ -533,9 +516,9 @@ export function CajaStep({
           return 17; // default max
         };
 
-        const calcTotal = precioSubtotal - descuento;
-        const calcBaseImponible = calcTotal / 1.18;
-        const calcIgv = calcTotal - calcBaseImponible;
+        // const calcTotal = precioSubtotal - descuento;
+        // const calcBaseImponible = calcTotal / 1.18;
+        // const calcIgv = calcTotal - calcBaseImponible;
 
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">

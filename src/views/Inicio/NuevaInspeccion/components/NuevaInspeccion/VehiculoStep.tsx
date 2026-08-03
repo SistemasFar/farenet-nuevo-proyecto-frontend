@@ -340,7 +340,7 @@ interface VehiculoStepProps {
   onValidationChange?: (isValid: boolean) => void;
   placaCaja?: string;
   isReinspeccion?: boolean;
-  guardarParcialAsync?: (tabDestino: string) => void;
+  guardarParcialAsync?: (tabDestino: 'DATOS' | 'SOAT' | 'PROPIETARIO') => Promise<void>;
 }
 
 export function VehiculoStep({
