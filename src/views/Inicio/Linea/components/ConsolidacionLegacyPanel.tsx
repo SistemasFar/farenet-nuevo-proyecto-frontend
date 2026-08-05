@@ -35,7 +35,10 @@ export function ConsolidacionLegacyPanel({
   const { vehiculo, comprobante, modo } = estadoLinea;
   
   const getNombreORazonSocial = (persona: any) => {
-    return (
+  
+  console.log(bannerClass, bannerIcon, btnLegacyClass, btnDisabled, Save, FileText, Printer, ShieldAlert, Truck, Activity, FileSignature, Settings);
+  return (
+
       persona?.nombrerazonsocial?.trim() ||
       persona?.razonSocial?.trim() ||
       persona?.nombre?.trim() ||
@@ -367,160 +370,104 @@ export function ConsolidacionLegacyPanel({
 
   return (
     <div className="flex flex-col h-full bg-slate-50 font-sans animate-fade-in-up">
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 md:px-12 w-full">
         
-        {/* BANNER DE ESTADO */}
-        <div className={`border p-3 rounded-lg flex items-center ${bannerClass}`}>
-          {bannerIcon}
-          <span className="font-bold text-sm uppercase tracking-tight">{bannerText}</span>
+        <h2 className="text-[#204080] text-xl md:text-2xl font-bold mb-8">Resumen de la Inspección</h2>
+
+        <div className="flex flex-col lg:flex-row justify-between items-start mb-8 text-xs md:text-sm gap-8">
+          <div className="space-y-6 w-full lg:w-1/3">
+            <div>
+              <div className="text-[10px] text-slate-500 mb-1 uppercase font-semibold">VEHICULO</div>
+              <div className="font-bold text-slate-800">{vehiculo?.placa || ''} - {vehiculo?.marca || ''} - {vehiculo?.modelo || ''}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-500 mb-1 uppercase font-semibold">CONCEPTO</div>
+              <div className="font-bold text-slate-800">{comprobante?.concepto || ''}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-500 mb-1 uppercase font-semibold">TOTAL PAGADO</div>
+              <div className="font-bold text-slate-800">S/. {comprobante?.importetotal || comprobante?.total || '0.00'}</div>
+            </div>
+          </div>
+
+          <div className="w-full lg:w-2/3 flex flex-col gap-8">
+            <div>
+               <div className="text-center text-xs font-bold text-slate-700 mb-3">Cliente (Recibo)</div>
+               <div className="flex text-[11px] md:text-xs border-t border-slate-200 pt-3">
+                  <div className="w-1/3 text-center">
+                    <div className="text-[10px] text-slate-500 mb-1 font-semibold">DNI / RUC</div>
+                    <div className="font-bold text-[#204080]">{estadoLinea.clienteRecibo?.nrodocumento || '-'}</div>
+                  </div>
+                  <div className="w-2/3 text-center">
+                    <div className="text-[10px] text-slate-500 mb-1 font-semibold">NOMBRES / RAZÓN SOCIAL</div>
+                    <div className="font-bold text-[#204080]">{getNombreORazonSocial(estadoLinea.clienteRecibo)}</div>
+                  </div>
+               </div>
+            </div>
+            <div>
+               <div className="text-center text-xs font-bold text-slate-700 mb-3 flex items-center justify-center gap-4">
+                  Propietario (Certificado)
+                  <button 
+                    className="bg-[#103070] hover:bg-[#204080] disabled:bg-slate-400 disabled:cursor-not-allowed disabled:opacity-70 text-white px-6 py-1.5 rounded-sm text-xs font-semibold shadow-sm transition-colors" 
+                    onClick={() => setModalPropietarioOpen(true)}
+                    disabled={!(puedeEditarCamposPreparacion && !estadoLinea.fechconsolidado)}
+                  >
+                    Modificar
+                  </button>
+               </div>
+               <div className="flex text-[11px] md:text-xs border-t border-slate-200 pt-3">
+                  <div className="w-1/3 text-center">
+                    <div className="text-[10px] text-slate-500 mb-1 font-semibold">DNI / RUC</div>
+                    <div className="font-bold text-[#204080]">{estadoLinea.propietarioCertificado?.nrodocumento || '-'}</div>
+                  </div>
+                  <div className="w-2/3 text-center">
+                    <div className="text-[10px] text-slate-500 mb-1 font-semibold">NOMBRES / RAZÓN SOCIAL</div>
+                    <div className="font-bold text-[#204080]">{getNombreORazonSocial(estadoLinea.propietarioCertificado)}</div>
+                  </div>
+               </div>
+            </div>
+          </div>
         </div>
 
-        {/* INFO CERTIFICADO/INFORME PARA HISTÓRICOS O POST CONSOLIDACIÓN */}
-        {resultadoOperacion ? (
-          <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded shadow-sm">
-            <h4 className="text-green-800 font-bold uppercase text-sm">Consolidación Exitosa</h4>
-            <p className="text-green-700 text-xs mt-1">
-              Certificado: {resultadoOperacion.nrodocumentocertificado || 'N/A'} | 
-              Informe: {resultadoOperacion.nrodocumentoinforme || 'N/A'}
-            </p>
-          </div>
-        ) : modo === 'HISTORICO_CONSOLIDADO' && (
-          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded shadow-sm">
-            <h4 className="text-blue-800 font-bold uppercase text-sm">Documentos Generados</h4>
-            <p className="text-blue-700 text-xs mt-1">
-              Certificado: {estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado || 'N/A'} | 
-              Informe: {estadoLinea.inspeccion?.nrodocumentoinforme || estadoLinea.informe?.nrodocumentoinforme || 'N/A'}
-            </p>
-          </div>
-        )}
+        {/* YELLOW BANNER */}
+        <div className="bg-[#fcf5b4] text-[#85712c] font-semibold text-center py-2 mb-8 text-xs md:text-sm rounded shadow-sm border border-[#e8df82]">
+          {bannerText}
+        </div>
 
-        {/* BLOQUE PRINCIPAL: DATOS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-              <h3 className="text-xs font-black text-slate-400 uppercase mb-3 tracking-wider">Vehículo</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span className="text-slate-500 font-medium">Placa</span>
-                  <span className="font-bold text-slate-800">{vehiculo?.placa || '-'}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span className="text-slate-500 font-medium">Categoría</span>
-                  <span className="font-bold text-slate-800">{vehiculo?.categoria || '-'}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span className="text-slate-500 font-medium">Marca / Modelo</span>
-                  <span className="font-bold text-slate-800">{vehiculo?.marca || 'No disponible'} / {vehiculo?.modelo || 'No disponible'}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-              <h3 className="text-xs font-black text-slate-400 uppercase mb-3 tracking-wider">Personas</h3>
-              <div className="space-y-4 text-sm">
-                
-                <div>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Cliente (Recibo)</h4>
-                  <div className="flex justify-between border-b border-slate-100 pb-1">
-                    <span className="font-semibold text-slate-800">DNI / RUC</span>
-                    <span className="font-semibold text-slate-800 text-right">Nombres / Razón Social</span>
-                  </div>
-                  <div className="flex justify-between pt-1">
-                    <span className="text-slate-600">{estadoLinea.clienteRecibo?.nrodocumento || '-'}</span>
-                    <span className="text-slate-600 text-right">{getNombreORazonSocial(estadoLinea.clienteRecibo)}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase">Propietario (Certificado)</h4>
-                    <button 
-                      className={`px-3 py-1 text-xs font-bold uppercase rounded border shadow-sm transition-opacity ${puedeEditarCamposPreparacion && !estadoLinea.fechconsolidado ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-70'}`}
-                      disabled={!(puedeEditarCamposPreparacion && !estadoLinea.fechconsolidado)}
-                      title={!(puedeEditarCamposPreparacion && !estadoLinea.fechconsolidado) ? "Solo se puede modificar propietario antes de consolidar." : ""}
-                      onClick={() => setModalPropietarioOpen(true)}
-                    >
-                      Modificar
-                    </button>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-100 pb-1">
-                    <span className="font-semibold text-slate-800">DNI / RUC</span>
-                    <span className="font-semibold text-slate-800 text-right">Nombres / Razón Social</span>
-                  </div>
-                  <div className="flex justify-between pt-1">
-                    <span className="text-slate-600">{estadoLinea.propietarioCertificado?.nrodocumento || '-'}</span>
-                    <span className="text-slate-600 text-right">{getNombreORazonSocial(estadoLinea.propietarioCertificado)}</span>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-              <h3 className="text-xs font-black text-slate-400 uppercase mb-3 tracking-wider">Comprobante y Ubicación</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span className="text-slate-500 font-medium">Concepto</span>
-                  <span className="font-bold text-slate-800 text-right">{comprobante?.concepto || 'No disponible'}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span className="text-slate-500 font-medium">Monto</span>
-                  <span className="font-bold text-slate-800">S/ {comprobante?.importetotal || comprobante?.total || '0.00'}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span className="text-slate-500 font-medium">Línea</span>
-                  <span className="font-bold text-slate-800 text-right">
-                    {estadoLinea.lineaInfo?.nombre || estadoLinea.lineaInfo?.key || 'No definido'}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-1">
-                  <span className="text-slate-500 font-medium">Planta</span>
-                  <span className="font-bold text-slate-800 text-right">
-                    {estadoLinea.planta ? `${estadoLinea.planta.key} - ${estadoLinea.planta.nombre || ''}` : 'No definido'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Col 2 y 3: Formulario Consolidación */}
-          <div className="lg:col-span-2 bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider">Parámetros de Certificación</h3>
-              {usuarioActual && (
-                <div className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200 shadow-sm flex items-center gap-1 font-medium">
-                  <CheckCircle2 className="w-3 h-3 text-green-600" />
-                  Usuario que certifica: <span className="font-bold text-slate-800">{usuarioActual.nombreCompleto || usuarioActual.username || usuarioActual.usuario || 'Desconocido'}</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Tipo Inspección</label>
-                <select disabled className="w-full border border-slate-300 rounded p-2 text-sm bg-slate-50">
-                  <option>{estadoLinea.certificacion?.tipoInspeccion || 'No definido'}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Tipo Certificado</label>
-                <select disabled className="w-full border border-slate-300 rounded p-2 text-sm bg-slate-50">
-                  <option>{estadoLinea.certificacion?.tipoCertificado || 'No definido'}</option>
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Tipo Autorización</label>
-                <select disabled className="w-full border border-slate-300 rounded p-2 text-sm bg-slate-50">
-                  <option>{estadoLinea.certificacion?.tipoAutorizacion || 'No definido'}</option>
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">
-                  Ingeniero Certificador
-                </label>
-                <select 
-                  className={`w-full border rounded p-2 text-sm ${!puedeEditarCamposPreparacion ? 'bg-slate-50 border-slate-300' : 'bg-white border-blue-400 focus:ring-2 focus:ring-blue-200'}`}
+        {/* WHITE BORDERED BLOCK */}
+        <div className="border border-slate-200 bg-white mb-8 shadow-sm">
+           <div className="flex flex-col md:flex-row border-b border-slate-200">
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">* TIPO INSPECCIÓN:</div>
+             <div className="w-full md:w-3/4 p-2">
+               <select disabled className="w-full border border-slate-200 p-2 text-xs bg-slate-50 text-slate-500 outline-none">
+                 <option>{estadoLinea.certificacion?.tipoInspeccion || 'ORDINARIA - COMPLEMENTARIA'}</option>
+               </select>
+             </div>
+           </div>
+           
+           <div className="flex flex-col md:flex-row border-b border-slate-200">
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">* TIPO CERTIFICADO:</div>
+             <div className="w-full md:w-3/4 p-2">
+               <select disabled className="w-full border border-slate-200 p-2 text-xs bg-slate-50 text-slate-500 outline-none">
+                 <option>{estadoLinea.certificacion?.tipoCertificado || 'TRANSPORTE PUBLICO DE PERSONAS EN TAXI'}</option>
+               </select>
+             </div>
+           </div>
+           
+           <div className="flex flex-col md:flex-row border-b border-slate-200">
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">* TIPO AUTORIZACIÓN:</div>
+             <div className="w-full md:w-3/4 p-2">
+               <select disabled className="w-full border border-slate-200 p-2 text-xs bg-slate-50 text-slate-500 outline-none">
+                 <option>{estadoLinea.certificacion?.tipoAutorizacion || 'TAXI INDEPENDIENTE'}</option>
+               </select>
+             </div>
+           </div>
+           
+           <div className="flex flex-col md:flex-row border-b border-slate-200 bg-slate-50">
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">* INGENIERO CERTIFICADOR:</div>
+             <div className="w-full md:w-3/4 p-2">
+               <select 
+                  className="w-full border border-slate-300 p-2 text-xs bg-white focus:border-[#204080] outline-none"
                   disabled={!puedeEditarCamposPreparacion || consolidando}
                   value={formConsolidacion.ingenieroCertificadorUsername}
                   onChange={e => {
@@ -528,179 +475,187 @@ export function ConsolidacionLegacyPanel({
                     onChangeFormConsolidacion(newForm);
                     handleAutoSaveDatos(newForm);
                   }}
-                >
-                  <option value="">-- Seleccione Ingeniero --</option>
+               >
+                  <option value=""></option>
                   {ingenieros.map(ing => {
                     let nombreVisible =
-                      ing.nombreCompleto ||
-                      ing.nombresApellidos ||
-                      ing.nombre ||
-                      ing.username ||
-                      ing.usuario ||
-                      'Ingeniero sin nombre';
-                    if (String(nombreVisible).toUpperCase().includes('INCORPORACION')) {
-                      nombreVisible = 'INCORPORACIÓN';
-                    }
+                      ing.nombreCompleto || ing.nombresApellidos || ing.nombre || ing.username || ing.usuario || 'Ingeniero sin nombre';
+                    if (String(nombreVisible).toUpperCase().includes('INCORPORACION')) nombreVisible = 'INCORPORACIÓN';
                     const value = ing.username || ing.usuario || ing.id;
-                    return (
-                      <option key={ing.id || value} value={value}>{nombreVisible}</option>
-                    );
+                    return <option key={ing.id || value} value={value}>{nombreVisible}</option>;
                   })}
-                </select>
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Observación</label>
-                <textarea 
+               </select>
+             </div>
+           </div>
+           
+           <div className="flex flex-col md:flex-row border-b border-slate-200">
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">OBSERVACION:</div>
+             <div className="w-full md:w-3/4 p-2">
+               <input 
                   id="observacionTextarea"
-                  rows={2}
-                  className={`w-full border rounded p-2 text-sm ${!puedeEditarCamposPreparacion ? 'bg-slate-50 border-slate-300' : 'bg-white border-slate-300'}`}
+                  type="text"
+                  className="w-full border border-slate-200 p-2 text-xs bg-white outline-none focus:border-[#204080]"
                   disabled={!puedeEditarCamposPreparacion || consolidando}
                   value={formConsolidacion.observacion}
                   onChange={e => onChangeFormConsolidacion({ ...formConsolidacion, observacion: e.target.value })}
                   onBlur={e => handleAutoSaveDatos({ ...formConsolidacion, observacion: e.target.value })}
-                  placeholder="Opcional..."
-                />
+               />
+             </div>
+           </div>
+           
+           <div className="flex flex-col md:flex-row border-b border-slate-200 bg-slate-50/50">
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest">USUARIO CERTIFICA:</div>
+             <div className="w-full md:w-3/4 p-3 text-[10px] md:text-xs font-black text-[#204080] uppercase tracking-wider">
+               {usuarioActual?.nombreCompleto || usuarioActual?.username || usuarioActual?.usuario || ''}
+             </div>
+           </div>
+           
+           {/* GAS BLOCK (Oculto a petición)
+           <div className="p-4 flex flex-col md:flex-row gap-4 md:gap-6 md:items-end bg-slate-50/50">
+              <div className="flex items-center gap-2 mb-2 w-full md:w-1/4 pl-2">
+                 <input type="checkbox" className="w-4 h-4 border-slate-300 rounded text-[#204080] focus:ring-[#204080]" />
+                 <label className="text-[11px] font-bold text-slate-700">Sin Certificado de Gas</label>
               </div>
-            </div>
-
-            {/* BOTONES PRINCIPALES DE ACCIÓN */}
-            <div className="mt-6 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              <div className="flex flex-col gap-2">
-                <button 
-                  className={`${btnLegacyClass} ${puedeConsolidar ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700' : btnDisabled}`}
-                  disabled={!puedeConsolidar || consolidando}
-                  onClick={handleConsolidar}
-                >
-                  <Save className="w-4 h-4" />
-                  {consolidando ? 'Guardando...' : 'Consolidar / Guardar'}
-                </button>
-                
-                <button 
-                  className={`${btnLegacyClass} ${puedeAnular ? 'bg-red-600 text-white border-red-700 hover:bg-red-700' : btnDisabled}`} 
-                  disabled={!puedeAnular || consolidando} 
-                  title={puedeAnular ? "Anular Inspección" : "Opción no disponible"}
-                  onClick={() => setModalAnularInspeccionOpen(true)}
-                >
-                  <Ban className="w-4 h-4" /> Anular Inspección
-                </button>
-
-                <button className={`${btnLegacyClass} ${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 cursor-not-allowed opacity-80' : btnDisabled}`} disabled={true} title="Funcionalidad pendiente de migración">
-                  <Printer className="w-4 h-4" /> Reimprimir Certificado
-                </button>
+              <div className="w-full md:w-1/4">
+                <label className="block text-[10px] font-bold text-slate-700 mb-1.5">* COD. CERTIFICADO GAS</label>
+                <input type="text" className="w-full border border-slate-200 p-2.5 text-xs bg-white" placeholder="Ej: 52-65-0060934" />
               </div>
-
-              <div className="flex flex-col gap-2">
-                <button 
-                  className={`${btnLegacyClass} ${(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700' : btnDisabled}`} 
-                  disabled={!(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) || consolidando} 
-                  title={modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado) ? "Visualizar Certificado Oficial" : "Requiere que exista un certificado consolidado"}
-                  onClick={handleVisualizar}
-                >
-                  <FileText className="w-4 h-4" /> Visualizar
-                </button>
-                
-                <button 
-                  className={`${btnLegacyClass} ${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700' : btnDisabled}`} 
-                  disabled={modo !== 'HISTORICO_CONSOLIDADO' || consolidando} 
-                  title={modo === 'HISTORICO_CONSOLIDADO' ? "Visualizar Informe" : "Requiere que la inspección esté consolidada"}
-                  onClick={handleVisualizarInforme}
-                >
-                  <FileText className="w-4 h-4" /> Visualizar Informe
-                </button>
-
-                <button className={`${btnLegacyClass} ${puedeEditarCamposPreparacion ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700' : btnDisabled}`} disabled={!puedeEditarCamposPreparacion} title={puedeEditarCamposPreparacion ? "Visualizar Recibo" : "Funcionalidad pendiente de migración"} onClick={() => setModalReciboOpen(true)}>
-                  <FileText className="w-4 h-4" /> Visualizar Recibo
-                </button>
+              <div className="w-full md:w-1/4">
+                <label className="block text-[10px] font-bold text-slate-700 mb-1.5">* EMP. CERTIFICADORA GAS</label>
+                <select className="w-full border border-slate-200 p-2.5 text-xs bg-white">
+                  <option>MOTOR GAS COMPANY S.A</option>
+                </select>
               </div>
-
-              <div className="flex flex-col gap-2">
-                <button 
-                  className={`${btnLegacyClass} ${puedeCambiarObservacion ? 'bg-[#cc0000] text-white border-red-700 hover:bg-red-700' : btnDisabled}`} 
-                  disabled={!puedeCambiarObservacion} 
-                  title={puedeCambiarObservacion ? "Registrar error de impresión" : "Solo disponible en inspecciones consolidadas"}
-                  onClick={() => setModalErrorImpresionOpen(true)}
-                >
-                  <AlertTriangle className="w-4 h-4" /> Error Impresión
-                </button>
-                
-
-                <button 
-                  className={`${btnLegacyClass} ${puedeCambiarObservacion || puedeEditarCamposPreparacion ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600' : btnDisabled}`} 
-                  disabled={!puedeCambiarObservacion && !puedeEditarCamposPreparacion} 
-                  title={puedeCambiarObservacion || puedeEditarCamposPreparacion ? "Cambiar Observación" : "Funcionalidad solo en Histórico"}
-                  onClick={puedeCambiarObservacion ? handleCambiarObservacion : handleFocusObservacion}
-                >
-                  <ShieldAlert className="w-4 h-4" /> Cambiar Observación
-                </button>
+              <div className="w-full md:w-1/4">
+                <label className="block text-[10px] font-bold text-slate-700 mb-1.5">* FECHA VENC. CERT. GAS</label>
+                <input type="text" className="w-full border border-slate-200 p-2.5 text-xs bg-white" placeholder="05/12/2026" />
               </div>
-
-            </div>
-          </div>
+           </div>
+           */}
         </div>
 
-        {/* BLOQUE SOPORTE MTC / LOCAL */}
+        {/* ACTION BUTTONS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 mb-10 px-0 md:px-4">
+           <div className="flex flex-col gap-2.5">
+              <button 
+                className={`${puedeConsolidar ? 'bg-[#7a9cc6] hover:bg-[#6080b0] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                disabled={!puedeConsolidar || consolidando}
+                onClick={handleConsolidar}
+              >
+                {consolidando ? 'Guardando...' : 'Consolidar'}
+              </button>
+              <button 
+                className={`${puedeAnular ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                disabled={!puedeAnular || consolidando} 
+                onClick={() => setModalAnularInspeccionOpen(true)}
+              >
+                Anular Inspección
+              </button>
+              <button className="bg-[#103070] hover:bg-[#0c2455] text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors cursor-not-allowed opacity-80" disabled>Reimprimir Certificado</button>
+           </div>
+           
+           <div className="flex flex-col gap-2.5">
+              <button 
+                className={`${(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                disabled={!(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) || consolidando} 
+                onClick={handleVisualizar}
+              >
+                Visualizar
+              </button>
+              <button 
+                className={`${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                disabled={modo !== 'HISTORICO_CONSOLIDADO' || consolidando} 
+                onClick={handleVisualizarInforme}
+              >
+                Visualizar Informe
+              </button>
+              <button 
+                className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                disabled={!puedeEditarCamposPreparacion} 
+                onClick={() => setModalReciboOpen(true)}
+              >
+                Visualizar Recibo
+              </button>
+           </div>
+           
+           <div className="flex flex-col gap-2.5">
+              <button 
+                className={`${puedeCambiarObservacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                disabled={!puedeCambiarObservacion} 
+                onClick={() => setModalErrorImpresionOpen(true)}
+              >
+                Error Impresion
+              </button>
+              <button 
+                className={`${puedeCambiarObservacion || puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                disabled={!puedeCambiarObservacion && !puedeEditarCamposPreparacion} 
+                onClick={puedeCambiarObservacion ? handleCambiarObservacion : handleFocusObservacion}
+              >
+                Cambiar Observacion
+              </button>
+           </div>
+        </div>
+
+        {/* SOPORTE */}
         {isSistemas && (
-          <div className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm">
-            <h3 className="text-xs font-black text-slate-400 uppercase mb-3 tracking-wider flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              Acciones de Soporte y Excepciones (Solo Sistemas)
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <button 
-                className={`${btnLegacyClass} ${isConsolidada ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
-                onClick={() => isConsolidada && console.log('Pendiente de migración')}
-                disabled={!isConsolidada}
-                title={!isConsolidada ? "Solo disponible en inspecciones consolidadas" : ""}
-              >
-                <Truck className="w-4 h-4" /> Registro Vehículo MTC
-              </button>
-              <button 
-                  className={`${btnLegacyClass} ${isAnulada ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
-                  onClick={() => isAnulada && setModalRegistroResultadosOpen(true)}
-                  disabled={!isAnulada}
-                  title={!isAnulada ? "La inspección debe estar anulada para usar esta opción" : ""}
-                >
-                  <Activity className="w-4 h-4" /> Registro Resultados
-                </button>
-              <button 
-                className={`${btnLegacyClass} ${isConsolidada ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
-                onClick={() => isConsolidada && setModalPolizaOpen(true)}
-                disabled={!isConsolidada}
-                title={!isConsolidada ? "Solo disponible en inspecciones consolidadas" : ""}
-              >
-                <FileText className="w-4 h-4" /> Registro Póliza MTC
-              </button>
-              <button 
-                className={`${btnLegacyClass} ${puedeEditarCamposPreparacion ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
-                onClick={() => puedeEditarCamposPreparacion && setModalLineaOpen(true)}
-                disabled={!puedeEditarCamposPreparacion}
-                title={!puedeEditarCamposPreparacion ? "No se puede cambiar la línea si la inspección ya está consolidada o anulada" : ""}
-              >
-                <Settings className="w-4 h-4" /> Cambiar Línea
-              </button>
-              <button 
-                className={`${btnLegacyClass} ${puedeEditarCamposPreparacion ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
-                onClick={() => puedeEditarCamposPreparacion && setModalMotorOpen(true)}
-                disabled={!puedeEditarCamposPreparacion}
-                title={!puedeEditarCamposPreparacion ? "No se puede cambiar el motor si la inspección ya está consolidada o anulada" : ""}
-              >
-                <Settings className="w-4 h-4" /> Cambio Motor
-              </button>
-              <button 
-                className={`${btnLegacyClass} ${puedeEditarCamposPreparacion ? 'bg-slate-700 hover:bg-slate-800' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white border-transparent`} 
-                onClick={() => puedeEditarCamposPreparacion && setModalFirmaOpen(true)}
-                disabled={!puedeEditarCamposPreparacion}
-                title={!puedeEditarCamposPreparacion ? "No se puede cambiar la firma si la inspección ya está consolidada o anulada" : ""}
-              >
-                <FileSignature className="w-4 h-4" /> Cambiar Firma
-              </button>
-            </div>
+          <div className="mt-8 mb-4">
+             <h3 className="text-[#204080] text-lg font-bold mb-4 px-2">Soporte</h3>
+             <div className="border-t border-slate-300 pt-6 flex flex-col md:flex-row gap-6 px-0 md:px-4">
+                <div className="flex flex-col gap-2.5 w-full md:w-1/3">
+                   <button 
+                     className={`${isConsolidada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     onClick={() => isConsolidada && console.log('Pendiente de migración')}
+                     disabled={!isConsolidada}
+                   >
+                     Registro Vehiculo MTC
+                   </button>
+                   <button 
+                     className={`${isAnulada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     onClick={() => isAnulada && setModalRegistroResultadosOpen(true)}
+                     disabled={!isAnulada}
+                   >
+                     Registro Resultados
+                   </button>
+                </div>
+                <div className="flex flex-col gap-2.5 w-full md:w-1/3">
+                   <button 
+                     className={`${isConsolidada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     onClick={() => isConsolidada && setModalPolizaOpen(true)}
+                     disabled={!isConsolidada}
+                   >
+                     Registro Póliza MTC
+                   </button>
+                   <button 
+                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     onClick={() => puedeEditarCamposPreparacion && setModalLineaOpen(true)}
+                     disabled={!puedeEditarCamposPreparacion}
+                   >
+                     Cambiar Linea
+                   </button>
+                </div>
+                <div className="flex flex-col gap-2.5 w-full md:w-1/3">
+                   <button 
+                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     onClick={() => puedeEditarCamposPreparacion && setModalMotorOpen(true)}
+                     disabled={!puedeEditarCamposPreparacion}
+                   >
+                     Cambio Motor
+                   </button>
+                   <button 
+                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     onClick={() => puedeEditarCamposPreparacion && setModalFirmaOpen(true)}
+                     disabled={!puedeEditarCamposPreparacion}
+                   >
+                     Cambiar firma
+                   </button>
+                </div>
+             </div>
           </div>
         )}
       </div>
       
       {modalAnularInspeccionOpen && (
+
         <ModalAnularInspeccion
           nroInspeccion={nroInspeccion}
           onClose={() => setModalAnularInspeccionOpen(false)}
