@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { authApi } from '../services/api';
+import { authApi } from '@/services/api';
 
 interface CambiarContrasenaModalProps {
   isOpen: boolean;

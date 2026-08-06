@@ -1,21 +1,30 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { LoginView } from './views/LoginView';
-import { SelectPlantaView } from './views/SelectPlantaView';
-import { MainLayout } from './views/Dashboard/MainLayout';
-import { NotFoundView } from './views/NotFoundView';
-import { ForbiddenView } from './views/ForbiddenView';
-import { InicioView } from './views/Inicio/InicioView';
-import { AuditoriaView } from './views/Auditoria/AuditoriaView';
-import { GenericView } from './views/Dashboard/GenericView';
-import InspeccionesView from './views/Inspecciones/InspeccionesView';
-import { NuevaInspeccionView } from './views/Inicio/NuevaInspeccion/NuevaInspeccionView';
-import { NuevoDuplicadoView } from './views/Inicio/NuevoDuplicado/NuevoDuplicadoView';
-import { LineaView } from './views/Inicio/Linea';
+import { LoginView } from './core/views/LoginView';
+import { SelectPlantaView } from './core/views/SelectPlantaView';
+import { NotFoundView } from './core/views/NotFoundView';
+import { ForbiddenView } from './core/views/ForbiddenView';
+import { SeleccionEmpresaView } from './core/views/SeleccionEmpresaView';
+
+import { MainLayout } from './modules/farenet/views/Dashboard/MainLayout';
+import { InicioView } from './modules/farenet/views/Inicio/InicioView';
+import { AuditoriaView } from './modules/farenet/views/Auditoria/AuditoriaView';
+import { GenericView } from './modules/farenet/views/Dashboard/GenericView';
+import InspeccionesView from './modules/farenet/views/Inspecciones/InspeccionesView';
+import { NuevaInspeccionView } from './modules/farenet/views/Inicio/NuevaInspeccion/NuevaInspeccionView';
+import { NuevoDuplicadoView } from './modules/farenet/views/Inicio/NuevoDuplicado/NuevoDuplicadoView';
+import { LineaView } from './modules/farenet/views/Inicio/Linea';
+
+import { MainLayout as FaregasMainLayout } from './modules/faregas/views/Dashboard/MainLayout';
+import { InicioView as FaregasInicioView } from './modules/faregas/views/Inicio/InicioView';
+import { NuevaInspeccionView as FaregasNuevaInspeccionView } from './modules/faregas/views/Inicio/NuevaInspeccion/NuevaInspeccionView';
+
+import { useEmpresa } from './context/EmpresaContext';
 
 import type {
   UserSession,
-  PlantaAsignada
+  PlantaAsignada,
+  EmpresaAsignada
 } from './types/auth';
 
 import {
@@ -24,7 +33,7 @@ import {
   permisosSession
 } from './services/api';
 
-type AuthStep = 'LOGIN' | 'SELECT_PLANTA' | 'DASHBOARD';
+type AuthStep = 'LOGIN' | 'SELECT_EMPRESA' | 'SELECT_PLANTA' | 'DASHBOARD';
 
 export default function App() {
   const navigate = useNavigate();
@@ -36,11 +45,15 @@ export default function App() {
   const [permisos, setPermisos] = useState<string[]>([]);
   const [planta, setPlanta] = useState<PlantaAsignada | null>(null);
   const [plantasDisponibles, setPlantasDisponibles] = useState<PlantaAsignada[]>([]);
+  const { establecerEmpresasDisponibles, limpiarEmpresa, tieneEmpresaSeleccionada, empresaSeleccionada } = useEmpresa();
+
+  const isFaregas = empresaSeleccionada?.nombre?.toUpperCase().includes('FAREGAS');
 
   const limpiarSesionFrontend = () => {
     sessionStorage.clear();
     plantaSession.limpiar();
     permisosSession.limpiar();
+    limpiarEmpresa();
 
     setUser(null);
     setPermisos([]);
@@ -79,7 +92,13 @@ export default function App() {
         setPlanta(plantaSeleccionada);
         setUsernameContext(userSession.username);
         setPlantasDisponibles(plantasSession);
-        setStep('DASHBOARD');
+        
+        if (tieneEmpresaSeleccionada) {
+          setStep('DASHBOARD');
+        } else {
+          // Fallback en caso recargue en paso medio
+          limpiarSesionFrontend();
+        }
       } catch (error) {
         console.error('Sesión expirada o inválida:', error);
         limpiarSesionFrontend();
@@ -117,7 +136,8 @@ export default function App() {
     userData: UserSession,
     userPermisos: string[],
     plantaSeleccionada?: PlantaAsignada | null,
-    plantas: PlantaAsignada[] = []
+    plantas: PlantaAsignada[] = [],
+    empresas: EmpresaAsignada[] = []
   ) => {
     if (!plantaSeleccionada) {
       console.error('No se recibió plantaSeleccionada en login directo.');
@@ -132,8 +152,35 @@ export default function App() {
       plantas
     );
 
+    if (empresas.length > 0) {
+      establecerEmpresasDisponibles(empresas);
+    }
+
     setStep('DASHBOARD');
     navigate('/inicio', { replace: true });
+  };
+
+  const handleRequireEmpresa = (
+    username: string,
+    plantas: PlantaAsignada[],
+    empresas: EmpresaAsignada[],
+    userData?: UserSession,
+    userPermisos: string[] = []
+  ) => {
+    setUsernameContext(username);
+    setPlantasDisponibles(plantas);
+    setPermisos(userPermisos);
+
+    if (userData) {
+      setUser(userData);
+      sessionStorage.setItem('user', JSON.stringify(userData));
+    }
+    sessionStorage.setItem('plantasDisponibles', JSON.stringify(plantas));
+    permisosSession.guardar(userPermisos);
+    
+    establecerEmpresasDisponibles(empresas);
+    setStep('SELECT_EMPRESA');
+    navigate('/seleccionar-empresa', { replace: true });
   };
 
   const handleRequirePlanta = (
@@ -255,19 +302,48 @@ export default function App() {
               onConfirmPlanta={handleConfirmPlanta}
               onCancel={limpiarSesionFrontend}
             />
+          ) : step === 'SELECT_EMPRESA' ? (
+            <Navigate to="/seleccionar-empresa" replace />
           ) : (
             <LoginView
               onLoginSuccess={handleLoginSuccess}
               onRequirePlanta={handleRequirePlanta}
+              onRequireEmpresa={handleRequireEmpresa}
             />
           )
         }
       />
       
+      <Route 
+        path="/seleccionar-empresa" 
+        element={
+          step === 'SELECT_EMPRESA' ? (
+            <SeleccionEmpresaView 
+              onLogout={handleLogout} 
+              onSelect={() => {
+                setStep('SELECT_PLANTA');
+                navigate('/login', { replace: true });
+              }} 
+            />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
       <Route
         element={
           step !== 'DASHBOARD' ? (
             <Navigate to="/login" replace />
+          ) : isFaregas ? (
+            <FaregasMainLayout
+              user={user}
+              permisos={permisos}
+              plantaSeleccionada={planta}
+              plantasDisponibles={plantasDisponibles}
+              onCambiarPlanta={handleCambiarPlanta}
+              onLogout={handleLogout}
+            />
           ) : (
             <MainLayout
               user={user}
@@ -280,21 +356,30 @@ export default function App() {
           )
         }
       >
-        <Route path="/inicio" element={<InicioView />} />
-        <Route path="/inspecciones" element={<InspeccionesView />} />
-        <Route path="/inspecciones/nueva" element={<NuevaInspeccionView />} />
-        <Route path="/inspecciones/:nroInspeccion/continuar" element={<NuevaInspeccionView />} />
-        <Route path="/inspecciones/duplicado" element={<NuevoDuplicadoView />} />
-        <Route path="/linea/:nroInspeccion" element={<LineaView />} />
-        <Route path="/auditoria" element={<AuditoriaView />} />
-        <Route path="/maestros/personas" element={<GenericView title="Control de Personas" description="Administración de clientes, inspectores y personal autorizado." />} />
-        <Route path="/maestros/vehiculos" element={<GenericView title="Registro de Vehículos" description="Búsqueda e historial vehicular filtrado." />} />
-        <Route path="/maestros/caja" element={<GenericView title="Módulo de Caja" description="Control de cobros, cierres de caja diaria y transacciones." />} />
-        <Route path="/maestros/correlativos" element={<GenericView title="Gestión de Correlativos" description="Mantenimiento de numeración y series de comprobantes." />} />
-        <Route path="/maestros/recibos" element={<GenericView title="Historial de Recibos" description="Búsqueda, visualización e impresión de recibos emitidos." />} />
-        <Route path="/maestros/usuarios" element={<GenericView title="Control de Usuarios" description="Administración de cuentas, perfiles y asignaciones de planta." />} />
-        <Route path="/maestros/empresas" element={<GenericView title="Catálogo de Empresas" description="Mantenimiento de convenios corporativos y entidades asociadas." />} />
-        <Route path="/maestros/descuentos" element={<GenericView title="Reglas de Descuentos" description="Configuración de campañas, promociones y tarifas especiales." />} />
+        {isFaregas ? (
+          <>
+            <Route path="/inicio" element={<FaregasInicioView />} />
+            <Route path="/inspecciones/nueva" element={<FaregasNuevaInspeccionView />} />
+          </>
+        ) : (
+          <>
+            <Route path="/inicio" element={<InicioView />} />
+            <Route path="/inspecciones" element={<InspeccionesView />} />
+            <Route path="/inspecciones/nueva" element={<NuevaInspeccionView />} />
+            <Route path="/inspecciones/:nroInspeccion/continuar" element={<NuevaInspeccionView />} />
+            <Route path="/inspecciones/duplicado" element={<NuevoDuplicadoView />} />
+            <Route path="/linea/:nroInspeccion" element={<LineaView />} />
+            <Route path="/auditoria" element={<AuditoriaView />} />
+            <Route path="/maestros/personas" element={<GenericView title="Control de Personas" description="Administración de clientes, inspectores y personal autorizado." />} />
+            <Route path="/maestros/vehiculos" element={<GenericView title="Registro de Vehículos" description="Búsqueda e historial vehicular filtrado." />} />
+            <Route path="/maestros/caja" element={<GenericView title="Módulo de Caja" description="Control de cobros, cierres de caja diaria y transacciones." />} />
+            <Route path="/maestros/correlativos" element={<GenericView title="Gestión de Correlativos" description="Mantenimiento de numeración y series de comprobantes." />} />
+            <Route path="/maestros/recibos" element={<GenericView title="Historial de Recibos" description="Búsqueda, visualización e impresión de recibos emitidos." />} />
+            <Route path="/maestros/usuarios" element={<GenericView title="Control de Usuarios" description="Administración de cuentas, perfiles y asignaciones de planta." />} />
+            <Route path="/maestros/empresas" element={<GenericView title="Catálogo de Empresas" description="Mantenimiento de convenios corporativos y entidades asociadas." />} />
+            <Route path="/maestros/descuentos" element={<GenericView title="Reglas de Descuentos" description="Configuración de campañas, promociones y tarifas especiales." />} />
+          </>
+        )}
         <Route path="/sin-acceso" element={<ForbiddenView />} />
       </Route>
 

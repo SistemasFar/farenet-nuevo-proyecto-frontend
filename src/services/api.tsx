@@ -3,12 +3,12 @@ import type {
   CambiarPlantaResponse,
   PermisosResponse,
   PlantaAsignada
-} from '../types/auth';
+} from '@/types/auth';
 
 import type {
   InspeccionesResponse,
   BuscarInspeccionesResponse
-} from '../types/operacion';
+} from '@/types/operacion';
 
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
@@ -866,7 +866,7 @@ export const permisosSession = {
   }
 };
 
-import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '../types/maestros';
+import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
 
 export const maestrosApi = {
   obtenerMaestrosCajaAsync: async (): Promise<MaestrosCajaResponse> => {

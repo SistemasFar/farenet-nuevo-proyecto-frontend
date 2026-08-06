@@ -13,7 +13,8 @@ interface SidebarProps {
   collapsed: boolean;
   activeMenu: string;
   permisos: string[];
-  perfilId: string; // 🎯 1. Agregamos el perfilId al contrato de props del Sidebar
+  perfilId: string; // ✨ 1. Agregamos el perfilId al contrato de props del Sidebar
+  isFaregas?: boolean;
 
   onMouseEnterSidebar: () => void;
   onMouseLeaveSidebar: () => void;
@@ -230,14 +231,20 @@ export function Sidebar({
   collapsed,
   activeMenu,
   permisos,
-  perfilId, // 🎯 2. Desestructuramos la nueva prop recibida
+  perfilId, // ✨ 2. Desestructuramos la nueva prop recibida
+  isFaregas,
 
   onMouseEnterSidebar,
   onMouseLeaveSidebar
 }: SidebarProps) {
   
-  // ── 🚀 AQUÍ SE LIBERA EL BLOQUEO ──
+  // 🔐 ✨ AQUÍ SE LIBERA EL BLOQUEO ✨ 🔐
   const menuVisible = menuItems.filter((item) => {
+    // Si estamos en Faregas, solo permitimos Inicio
+    if (isFaregas) {
+      if (item.key !== 'inicio') return false;
+    }
+
     // Si el usuario es de 'sistemas', la regla estricta no aplica y ve TODO de frente.
     if (perfilId === 'sistemas') {
       return true;
@@ -271,7 +278,20 @@ export function Sidebar({
         >
           {collapsed ? (
             <div className="h-10 w-10 bg-gold-3d rounded-full flex items-center justify-center font-black text-white text-xl shadow-md select-none">
-              F
+              {isFaregas ? 'FG' : 'F'}
+            </div>
+          ) : isFaregas ? (
+            <div className="flex items-center justify-center select-none drop-shadow-md">
+              <h1 className="text-[2.6rem] font-black tracking-[0.02em] text-gold-3d leading-none" style={{ fontFamily: '"Impact", "Arial Black", sans-serif' }}>FARE</h1>
+              <div className="mx-1 mt-1">
+                <svg width="25" height="35" viewBox="0 0 100 130" className="drop-shadow-md">
+                  <path d="M 50,0 C 50,0 10,70 10,95 C 10,117 28,130 50,130 C 72,130 90,117 90,95 C 90,70 50,0 50,0 Z" fill="#25a5e3" />
+                  <path d="M 52,40 C 52,40 75,75 75,100 C 75,115 65,125 50,125 C 60,110 50,90 48,70 C 47,60 52,40 52,40 Z" fill="#e6201b" />
+                  <path d="M 54,65 C 54,65 67,85 67,105 C 67,115 60,120 52,120 C 58,110 52,95 50,85 C 49,80 54,65 54,65 Z" fill="#fbd304" />
+                  <path d="M 20,95 C 20,80 35,45 45,25 C 35,45 25,75 25,95 C 25,105 32,115 40,120 C 30,115 20,105 20,95 Z" fill="#69c8f5" opacity="0.8" />
+                </svg>
+              </div>
+              <h1 className="text-[2.6rem] font-black tracking-[0.02em] text-gold-3d leading-none" style={{ fontFamily: '"Impact", "Arial Black", sans-serif' }}>GAS</h1>
             </div>
           ) : (
             <h1 className="text-3xl font-black tracking-tight text-gold-3d font-serif select-none drop-shadow-md">

@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import type {
   PlantaAsignada,
   UserSession
-} from '../types/auth';
+} from '@/types/auth';
 import { NetworkStatus } from './NetworkStatus';
 import { BackendStatus } from './BackendStatus';
 import { CambiarContrasenaModal } from './CambiarContrasenaModal';
+import { useEmpresa } from '@/context/EmpresaContext';
 
 interface HeaderProps {
   user: UserSession | null;
@@ -59,6 +60,8 @@ export function Header({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [changingPlanta, setChangingPlanta] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+
+  const { empresaSeleccionada } = useEmpresa();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -114,6 +117,9 @@ export function Header({
           </button>
 
           <div className="leading-tight min-w-0">
+            <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-0.5 opacity-90">
+              {empresaSeleccionada ? `${empresaSeleccionada.nombre} [${empresaSeleccionada.key}]` : 'EMPRESA NO SELECCIONADA'}
+            </div>
             <div className="text-lg font-black tracking-wide text-gold-3d uppercase truncate">
               SEDE ACTIVA: {plantaName || 'SIN SEDE'}
             </div>

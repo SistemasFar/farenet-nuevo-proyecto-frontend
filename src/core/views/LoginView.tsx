@@ -1,0 +1,207 @@
+import { useState, type FormEvent } from 'react';
+import { authApi } from '@/services/api';
+import { NetworkStatus } from '@/components/NetworkStatus';
+import { BackendStatus } from '@/components/BackendStatus';
+
+import type {
+  LoginResponse,
+  PlantaAsignada,
+  UserSession,
+  EmpresaAsignada
+} from '@/types/auth';
+
+import { useEmpresa } from '@/context/EmpresaContext';
+
+import bgFarenet from '@/assets/images/farenet1.png';
+
+interface LoginViewProps {
+  onLoginSuccess: (
+    token: string,
+    user: UserSession,
+    permisos: string[],
+    plantaSeleccionada?: PlantaAsignada | null,
+    plantas?: PlantaAsignada[],
+    empresas?: EmpresaAsignada[]
+  ) => void;
+
+  onRequirePlanta: (
+    username: string,
+    plantas: PlantaAsignada[],
+    user?: UserSession,
+    permisos?: string[]
+  ) => void;
+
+  onRequireEmpresa: (
+    username: string,
+    plantas: PlantaAsignada[],
+    empresas: EmpresaAsignada[],
+    user?: UserSession,
+    permisos?: string[]
+  ) => void;
+}
+
+export function LoginView({
+  onLoginSuccess,
+  onRequirePlanta,
+  onRequireEmpresa
+}: LoginViewProps) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  
+  const { seleccionarEmpresa, limpiarEmpresa } = useEmpresa();
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanUsername || !cleanPassword) {
+      setError('Por favor ingresa tu usuario y contraseña.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const resp: LoginResponse = await authApi.loginAsync(
+        cleanUsername,
+        cleanPassword
+      );
+
+      const plantasReales = resp.plantas || [];
+      const permisos = resp.permisos || [];
+      const empresas = resp.empresas || [];
+
+      // Validar si el usuario tiene empresas asignadas
+      if (empresas.length === 0) {
+        limpiarEmpresa();
+        setError('El usuario no tiene empresas asignadas.');
+        return;
+      }
+
+      if (empresas.length === 1) {
+        // Tiene 1 sola empresa: Selección automática
+        seleccionarEmpresa(empresas[0]);
+      } else {
+        // Tiene más de 1 empresa: Requiere selector de empresa
+        onRequireEmpresa(
+          cleanUsername,
+          plantasReales,
+          empresas,
+          resp.user,
+          permisos
+        );
+        return;
+      }
+
+      if (resp.requiereSeleccionarPlanta) {
+        onRequirePlanta(
+          cleanUsername,
+          plantasReales,
+          resp.user,
+          permisos
+        );
+        return;
+      }
+
+      if (resp.accessToken && resp.user) {
+        onLoginSuccess(
+          resp.accessToken,
+          resp.user,
+          permisos,
+          resp.plantaSeleccionada,
+          plantasReales,
+          empresas
+        );
+        return;
+      }
+
+      setError('No se recibió una sesión válida desde el servidor.');
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Ocurrió un error inesperado.';
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="flex min-h-screen flex-col items-center justify-center p-4 select-none bg-cover bg-center bg-no-repeat relative"
+      style={{ backgroundImage: `url(${bgFarenet})` }}
+    >
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" />
+
+      <div className="absolute right-5 top-5 z-20 flex items-center gap-3">
+        <NetworkStatus />
+        <BackendStatus />
+      </div>
+
+      <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
+        <div className="mb-4 text-center">
+          <h1 className="text-6xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
+            FARENET
+          </h1>
+
+          <p className="mt-1 text-xl font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+            Sistema de Línea
+          </p>
+        </div>
+
+        
+
+        <div className="w-full rounded-xl bg-white/10 backdrop-blur-md border border-white/20 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded bg-red-500/20 backdrop-blur-sm p-3 text-center border-l-4 border-red-500">
+                <p className="text-xs font-semibold text-red-200">
+                  {error}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <input
+                type="text"
+                placeholder="Usuario"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={loading}
+                autoComplete="username"
+                className="w-full rounded border border-white/10 bg-white/15 px-4 py-3 text-sm text-white placeholder-slate-300 outline-none transition focus:border-white/30 focus:bg-white/25 disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                autoComplete="current-password"
+                className="w-full rounded border border-white/10 bg-white/15 px-4 py-3 text-sm text-white placeholder-slate-300 outline-none transition focus:border-white/30 focus:bg-white/25 disabled:opacity-50"
+              />
+            </div>
+
+            <button
+                type="submit"
+                disabled={loading}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gold-3d py-3 text-sm font-black uppercase tracking-wider transition disabled:opacity-50"
+              >
+              {loading ? 'Procesando...' : 'Ok'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}

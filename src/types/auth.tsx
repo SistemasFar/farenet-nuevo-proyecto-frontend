@@ -7,6 +7,15 @@ export interface UserSession {
   userType?: string;
 }
 
+export interface EmpresaAsignada {
+  key: string;
+  nombre: string;
+  ruc?: string;
+  direccion?: string;
+  telefono?: string;
+  logoUrl?: string;
+}
+
 export interface PlantaAsignada {
   key: string;
   nombre: string;
@@ -23,6 +32,7 @@ export interface LoginResponse {
   permisos?: string[];
 
   plantas?: PlantaAsignada[];
+  empresas?: EmpresaAsignada[];
 
   plantaSeleccionada?: PlantaAsignada | null;
 
