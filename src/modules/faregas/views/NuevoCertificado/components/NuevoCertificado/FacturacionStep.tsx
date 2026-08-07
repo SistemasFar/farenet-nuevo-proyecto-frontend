@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { InputField, FormVehiculoContext } from './VehiculoStep';
+import { InputField } from './SharedForms';
 import { maestrosApi, externosApi } from '@/services/api';
 
 interface FacturacionStepProps {
@@ -159,7 +159,7 @@ export function FacturacionStep({
   // Reutilizamos el contexto temporalmente para el InputField que espera leer de "formVehiculo"
   // Para evitar rediseñar InputField ahora, pasaremos formVehiculo = formFacturacion y setFormVehiculo = setFormFacturacion
   return (
-    <FormVehiculoContext.Provider value={{formVehiculo: formFacturacion, setFormVehiculo: setFormFacturacion}}>
+    
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm max-w-4xl mx-auto">
         
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
@@ -178,7 +178,7 @@ export function FacturacionStep({
 
         <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <InputField 
+            <InputField formData={formFacturacion} setFormData={setFormFacturacion} 
               label="TIPO DOCUMENTO DE IDENTIDAD" 
               name="tipoDocFac" 
               isSelect 
@@ -193,7 +193,7 @@ export function FacturacionStep({
 
               return (
                 <>
-                  <InputField 
+                  <InputField formData={formFacturacion} setFormData={setFormFacturacion} 
                     label="NRO. DOCUMENTO DE IDENTIDAD" 
                     name="nroDocFac" 
                     type="number"
@@ -202,28 +202,28 @@ export function FacturacionStep({
                     searching={searchingFacturacion}
                   />
                   {isRuc ? (
-                    <InputField label="NOMBRE DE LA EMPRESA (RAZÓN SOCIAL)" name="razonSocialFac" />
+                    <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="NOMBRE DE LA EMPRESA (RAZÓN SOCIAL)" name="razonSocialFac" />
                   ) : (
                             <>
-                              <InputField label="NOMBRES" name="nombresFac" filter="letras" />
-                              <InputField label="APELLIDOS" name="apellidosFac" filter="letras" />
+                              <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="NOMBRES" name="nombresFac" filter="letras" />
+                              <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="APELLIDOS" name="apellidosFac" filter="letras" />
                             </>
                           )}
                         </>
                       );
             })()}
             
-            <InputField label="PAÍS" name="paisFac" isSelect options={optsPaises} />
-            <InputField label="DEPARTAMENTO" name="departamentoFac" isSelect options={optsDept} />
-            <InputField label="PROVINCIA" name="provinciaFac" isSelect options={optsProv} disabled={!formFacturacion.departamentoFac} />
-            <InputField label="DISTRITO" name="distritoFac" isSelect options={optsDist} disabled={!formFacturacion.provinciaFac} />
+            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="PAÍS" name="paisFac" isSelect options={optsPaises} />
+            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="DEPARTAMENTO" name="departamentoFac" isSelect options={optsDept} />
+            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="PROVINCIA" name="provinciaFac" isSelect options={optsProv} disabled={!formFacturacion.departamentoFac} />
+            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="DISTRITO" name="distritoFac" isSelect options={optsDist} disabled={!formFacturacion.provinciaFac} />
             
             <div className="lg:col-span-2">
-              <InputField label="DIRECCIÓN" name="direccionFac" />
+              <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="DIRECCIÓN" name="direccionFac" />
             </div>
             
-            <InputField label="EMAIL" name="emailFac" type="email" />
-            <InputField label="TELÉFONO" name="telefonoFac" filter="telefono" maxLength={9} enforceStartWith="9" />
+            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="EMAIL" name="emailFac" type="email" />
+            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="TELÉFONO" name="telefonoFac" filter="telefono" maxLength={9} enforceStartWith="9" />
           </div>
         </div>
 
@@ -233,6 +233,6 @@ export function FacturacionStep({
           </p>
         )}
       </div>
-    </FormVehiculoContext.Provider>
+    
   );
 }

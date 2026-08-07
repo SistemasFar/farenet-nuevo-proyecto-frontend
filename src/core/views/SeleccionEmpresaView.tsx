@@ -20,7 +20,7 @@ const EMPRESA_THEME: Record<string, { colorPrincipal: string; colorHover: string
 
 interface SeleccionEmpresaViewProps {
   onLogout: () => void;
-  onSelect: () => void;
+  onSelect: (empresa: EmpresaAsignada) => void;
 }
 
 export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaViewProps) {
@@ -42,7 +42,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
       seleccionarEmpresa(empresa);
 
       // 3. Informar éxito al componente padre (App) para que cambie la ruta
-      onSelect();
+      onSelect(empresa);
     } catch (err) {
       setError('Ocurrió un error al seleccionar la empresa.');
       setLoading(false);

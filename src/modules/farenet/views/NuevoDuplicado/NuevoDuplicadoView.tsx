@@ -5,7 +5,7 @@ import Select from 'react-select';
 import Swal from 'sweetalert2';
 import { maestrosApi, plantaSession, inspeccionesApi } from '@/services/api';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import type { MainLayoutContext } from '../../Dashboard/MainLayout';
+import type { MainLayoutContext } from '../Dashboard/MainLayout';
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({

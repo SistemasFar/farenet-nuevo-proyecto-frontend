@@ -524,19 +524,6 @@ export function CajaStep({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Placa *</label>
-              <Select
-                options={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })) || []}
-                value={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoPlaca?.toString()) || null}
-                onChange={(o) => handleSelectChange('tipoPlaca', o)}
-                placeholder="Seleccione..."
-                isClearable
-                styles={customSelectStyles}
-                isDisabled={isReadOnly || isConsultado || isLockedForReinspeccion}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600 uppercase">Placa *</label>
               <input
                 type="text"
@@ -571,32 +558,6 @@ export function CajaStep({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Categoría *</label>
-              <Select
-                options={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })) || []}
-                value={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })).find((o: any) => o.value?.toString() === formCaja.categoria?.toString()) || null}
-                onChange={(o) => handleSelectChange('categoria', o)}
-                placeholder="Seleccione..."
-                isClearable
-                styles={customSelectStyles}
-                isDisabled={isReadOnly || isConsultado || isLockedForReinspeccion}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Inspección *</label>
-              <Select
-                options={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })) || []}
-                value={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoInspeccion?.toString()) || null}
-                onChange={(o) => handleSelectChange('tipoInspeccion', o)}
-                placeholder="Seleccione..."
-                isClearable
-                styles={customSelectStyles}
-                isDisabled={isReadOnly || isLockedForReinspeccion}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-slate-600 uppercase">Tipo Certificado *</label>
               <Select
                 options={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })) || []}
@@ -606,24 +567,6 @@ export function CajaStep({
                 isClearable
                 styles={customSelectStyles}
                 isDisabled={isReadOnly || isLockedForReinspeccion}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5 md:col-span-2">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización</label>
-              <Select
-                options={[
-                  { value: '', label: 'NINGUNO / EN BLANCO' },
-                  ...(maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })) || [])
-                ]}
-                value={maestros?.tiposAutorizacion.map((ta: any) => ({ value: ta.key, label: ta.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoAutorizacion?.toString()) || null}
-                onChange={(o) => setFormCaja({ ...formCaja, tipoAutorizacion: o?.value || '' })}
-                placeholder="Seleccione..."
-                isClearable
-                styles={customSelectStyles}
-                isDisabled={isReadOnly || isConsultado || isLockedForReinspeccion}
-                menuPlacement="top"
-                menuPortalTarget={document.body}
               />
             </div>
 

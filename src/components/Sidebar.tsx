@@ -273,7 +273,7 @@ export function Sidebar({
     >
       <div className="flex items-center justify-center px-5 pt-6 pb-4 border-b border-blue-800/50">
         <Link
-          to="/inicio"
+          to={isFaregas ? '/faregas/inicio' : '/inicio'}
           className="flex w-full items-center justify-center cursor-pointer"
         >
           {collapsed ? (
@@ -306,10 +306,11 @@ export function Sidebar({
           <ul className="flex flex-col gap-1.5">
             {menuVisible.map((item) => {
               const isActive = activeMenu === item.key;
+              const linkPath = isFaregas ? `/faregas${item.path}` : item.path;
 
               return (
                 <li key={item.key}>
-                  <Link to={item.path}
+                  <Link to={linkPath}
                     
                     className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
                       isActive

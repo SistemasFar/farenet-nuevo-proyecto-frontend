@@ -264,7 +264,7 @@ export function InicioView() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => navigate('/inspecciones/nueva')}
+              onClick={() => navigate('/faregas/certificados/nuevo')}
               className="px-3 py-1.5 bg-[#052a79] text-white rounded text-xs font-semibold hover:bg-blue-900 transition"
             >
               + Nuevo Certificado

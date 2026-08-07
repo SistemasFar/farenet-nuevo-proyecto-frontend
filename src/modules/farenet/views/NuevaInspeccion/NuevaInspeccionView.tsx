@@ -11,7 +11,7 @@ import { VehiculoStep } from './components/NuevaInspeccion/VehiculoStep';
 import { FacturacionStep } from './components/NuevaInspeccion/FacturacionStep';
 import { VerificacionStep } from './components/NuevaInspeccion/VerificacionStep';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import type { MainLayoutContext } from '../../Dashboard/MainLayout';
+import type { MainLayoutContext } from '../Dashboard/MainLayout';
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from 'react';
@@ -5,13 +6,22 @@ import { maestrosApi, inspeccionesApi } from '@/services/api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
 import { CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Search } from 'lucide-react';
-import { CajaStep } from './components/NuevaInspeccion/CajaStep';
-import { PagoStep } from './components/NuevaInspeccion/PagoStep';
-import { VehiculoStep } from './components/NuevaInspeccion/VehiculoStep';
-import { FacturacionStep } from './components/NuevaInspeccion/FacturacionStep';
-import { VerificacionStep } from './components/NuevaInspeccion/VerificacionStep';
+import { CajaStep } from './components/NuevoCertificado/CajaStep';
+import { PagoStep } from './components/NuevoCertificado/PagoStep';
+import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
+import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
+import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
+import type { TipoCertificadoFaregas } from '@/types/faregas';
+import { TipoCertificadoStep } from './components/NuevoCertificado/TipoCertificadoStep';
+import { PropietarioStep } from './components/NuevoCertificado/PropietarioStep';
+import { DatosGlpStep } from './components/NuevoCertificado/glp/DatosGlpStep';
+import { ComponentesGlpStep } from './components/NuevoCertificado/glp/ComponentesGlpStep';
+import { InspeccionGnvStep } from './components/NuevoCertificado/gnv/InspeccionGnvStep';
+import { TipoConformidadStep } from './components/NuevoCertificado/conformidad/TipoConformidadStep';
+import { CaracteristicasFinalesStep } from './components/NuevoCertificado/conformidad/CaracteristicasFinalesStep';
+import { EmisionStep } from './components/NuevoCertificado/EmisionStep';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
-import type { MainLayoutContext } from '../../Dashboard/MainLayout';
+import type { MainLayoutContext } from '../Dashboard/MainLayout';
 
 const customSelectStyles = {
   control: (base: any, state: any) => ({
@@ -29,13 +39,7 @@ const customSelectStyles = {
   menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-const STEPS = [
-  { id: 'caja', label: 'Caja', icon: Box },
-  { id: 'pago', label: 'Pago', icon: CreditCard },
-  { id: 'vehiculo', label: 'Vehículo', icon: Search },
-  { id: 'cliente', label: 'Facturación', icon: User },
-  { id: 'verificacion', label: 'Verificación', icon: FileText }
-];
+
 
 export interface FormCajaState {
   tipoPlaca: string;
@@ -83,7 +87,7 @@ export interface FormVerificacionState {
   linea?: string;
 }
 
-export function NuevaInspeccionView() {
+export function NuevoCertificadoView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
   const { nroInspeccion } = useParams<{ nroInspeccion: string }>();
@@ -96,9 +100,9 @@ export function NuevaInspeccionView() {
   const [error, setError] = useState('');
 
   const [isConsultado, setIsConsultado] = useState(false);
-  const [posicionActualGuardada, setPosicionActualGuardada] = useState(0);
-  const [formCajaOriginalRehidratado, setFormCajaOriginalRehidratado] = useState<FormCajaState | null>(null);
-  const [puedeModificarFlujo1, setPuedeModificarFlujo1] = useState(true);
+  
+  
+  
 
   // Estados de vehiculo y facturacion (comunes)
   const [showAnularModal, setShowAnularModal] = useState(false);
@@ -143,8 +147,15 @@ export function NuevaInspeccionView() {
   const [editingPagoIndex, setEditingPagoIndex] = useState<number | null>(null);
 
   // Form State (Vehículo)
+    // Nuevos estados FAREGAS
+  const [tipoCertificadoFaregas, setTipoCertificadoFaregas] = useState<TipoCertificadoFaregas>(null);
+  const [formPropietario, setFormPropietario] = useState<any>({});
+  const [formGlp, setFormGlp] = useState<any>({});
+  const [formGnv, setFormGnv] = useState<any>({});
+  const [formConformidad, setFormConformidad] = useState<any>({});
+  
   const [isVehiculoValid, setIsVehiculoValid] = useState(false);
-  const [vehiculoTab, setVehiculoTab] = useState<'DATOS' | 'SOAT' | 'PROPIETARIO'>('DATOS');
+  const [vehiculoTab, setVehiculoTab] = useState<'DATOS' | 'SOAT'>('DATOS');
   const [formVehiculo, setFormVehiculo] = useState<FormVehiculoState>({
     clase: '', marca: '', modelo: '', carroceria: '', marcaCarroceria: '', placaNueva: '',
     anioFabricacion: '', combustible: '', nroSerie: '', nroMotor: '', color: '',
@@ -169,6 +180,34 @@ export function NuevaInspeccionView() {
     linea: ''
   });
 
+  const STEPS = React.useMemo(() => {
+    let base = [
+      { id: 'tipo', label: 'Tipo', icon: FileText },
+      { id: 'vehiculo', label: 'Vehículo', icon: Search },
+      { id: 'propietario', label: 'Propietario', icon: User }
+    ];
+
+    if (tipoCertificadoFaregas === 'GLP') {
+      base.push({ id: 'datos_glp', label: 'Datos GLP', icon: Box });
+      base.push({ id: 'comp_glp', label: 'Comp. GLP', icon: Box });
+    } else if (tipoCertificadoFaregas === 'GNV') {
+      base.push({ id: 'gnv', label: 'Insp. GNV', icon: Box });
+    } else if (tipoCertificadoFaregas === 'CONFORMIDAD') {
+      base.push({ id: 'tipo_conf', label: 'Conf.', icon: Box });
+      base.push({ id: 'caract', label: 'Caract.', icon: Box });
+    }
+
+    base = base.concat([
+      { id: 'verificacion', label: 'Verificación', icon: FileText },
+      { id: 'caja', label: 'Caja', icon: Box },
+      { id: 'pago', label: 'Pago', icon: CreditCard },
+      { id: 'facturacion', label: 'Facturación', icon: User },
+      { id: 'emision', label: 'Emisión', icon: CheckCircle2 }
+    ]);
+    return base;
+  }, [tipoCertificadoFaregas]);
+
+  
   const validarVerificacion = () => {
     return formVerificacion.tipoInspeccion !== '' &&
       formVerificacion.tipoCertificado !== '' &&
@@ -192,72 +231,72 @@ export function NuevaInspeccionView() {
 
 
   useEffect(() => {
-      const initNroInspeccion = async () => {
-        try {
-          if (inspeccionIdToResume && inspeccionIdToResume !== 'nueva') {
-            const res = await inspeccionesApi.obtenerProceso(inspeccionIdToResume);
-            if (res) {
-              if (res.data.inspeccionestado_key === 'CON' || Number(res.data.posicion) === 5) {
-                Swal.fire({
-                  icon: 'info',
-                  title: 'Inspección en línea',
-                  text: 'Esta inspección ya ha sido enviada a la línea de inspección.',
-                  confirmButtonText: 'Ir a Línea'
-                }).then((result) => {
-                  if (result.isConfirmed) {
-                    if (inspeccionIdToResume) {
-                      navigate(`/linea/${inspeccionIdToResume}`);
-                    } else {
-                      navigate('/inicio');
-                    }
+    const initNroInspeccion = async () => {
+      try {
+        if (inspeccionIdToResume && inspeccionIdToResume !== 'nueva') {
+          const res = await inspeccionesApi.obtenerProceso(inspeccionIdToResume);
+          if (res) {
+            if (res.data.inspeccionestado_key === 'CON' || Number(res.data.posicion) === 5) {
+              Swal.fire({
+                icon: 'info',
+                title: 'Inspección en línea',
+                text: 'Esta inspección ya ha sido enviada a la línea de inspección.',
+                confirmButtonText: 'Ir a Línea'
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  if (inspeccionIdToResume) {
+                    navigate(`/linea/${inspeccionIdToResume}`);
+                  } else {
+                    navigate('/faregas/inicio');
                   }
-                });
-                return;
-              }
-  
-              setNrodocumentoinspeccion(inspeccionIdToResume);
-              if (res.data.formCaja) {
-                setFormCaja(res.data.formCaja);
-                setFormCajaOriginalRehidratado(res.data.formCaja);
-              }
-              if (res.data.formVehiculo) setFormVehiculo(res.data.formVehiculo);
-              if (res.data.formFacturacion) setFormFacturacion(res.data.formFacturacion);
-              if (res.data.formVerificacion) setFormVerificacion(res.data.formVerificacion);
-              if (res.data.pagosAgregados) setPagosAgregados(res.data.pagosAgregados);
-              if (res.data.documentoPago) setDocumentoPago(res.data.documentoPago);
-              if (res.data.precioSubtotal !== undefined) setPrecioSubtotal(Number(res.data.precioSubtotal));
-              if (res.data.descuento !== undefined) setDescuento(Number(res.data.descuento));
-              if (res.data.precioTotal !== undefined) {
-                console.log("[DEBUG] Hidratando precioTotal con: ", res.data.precioTotal);
-                setPrecioTotal(Number(res.data.precioTotal));
-              }
-  
-              if (res.data.isConsultado !== undefined) setIsConsultado(res.data.isConsultado);
-              if (res.data.puedeModificarFlujo1 !== undefined) setPuedeModificarFlujo1(res.data.puedeModificarFlujo1);
-  
-              if (res.data.posicion !== undefined && res.data.posicion !== null) {
-                const pos = Number(res.data.posicion);
-                setPosicionActualGuardada(pos);
-                setCurrentStepIndex(pos);
-              }
+                }
+              });
+              return;
             }
-          } else if (!nrodocumentoinspeccion && plantaSeleccionada) {
-            console.log('FRONTEND DEBUG: Llamando a generarNroInspeccion con planta:', plantaSeleccionada);
-            const res = await inspeccionesApi.generarNroInspeccion(plantaSeleccionada);
-            console.log('FRONTEND DEBUG: Respuesta generarNroInspeccion:', res);
-            if (res?.nrodocumentoinspeccion) {
-              setNrodocumentoinspeccion(res.nrodocumentoinspeccion);
-            } else {
-              alert("DEBUG INFO: El API respondió pero no trajo nrodocumentoinspeccion. Respuesta: " + JSON.stringify(res));
+
+            setNrodocumentoinspeccion(inspeccionIdToResume);
+            if (res.data.formCaja) {
+              setFormCaja(res.data.formCaja);
+              
+            }
+            if (res.data.formVehiculo) setFormVehiculo(res.data.formVehiculo);
+            if (res.data.formFacturacion) setFormFacturacion(res.data.formFacturacion);
+            if (res.data.formVerificacion) setFormVerificacion(res.data.formVerificacion);
+            if (res.data.pagosAgregados) setPagosAgregados(res.data.pagosAgregados);
+            if (res.data.documentoPago) setDocumentoPago(res.data.documentoPago);
+            if (res.data.precioSubtotal !== undefined) setPrecioSubtotal(Number(res.data.precioSubtotal));
+            if (res.data.descuento !== undefined) setDescuento(Number(res.data.descuento));
+            if (res.data.precioTotal !== undefined) {
+              console.log("[DEBUG] Hidratando precioTotal con: ", res.data.precioTotal);
+              setPrecioTotal(Number(res.data.precioTotal));
+            }
+
+            if (res.data.isConsultado !== undefined) setIsConsultado(res.data.isConsultado);
+            if (res.data.puedeModificarFlujo1 !== undefined) 
+
+            if (res.data.posicion !== undefined && res.data.posicion !== null) {
+              const pos = Number(res.data.posicion);
+              
+              setCurrentStepIndex(pos);
             }
           }
-        } catch (e: any) {
-          console.error('Error al generar NRO', e);
-          alert("DEBUG INFO: Hubo un error al generar el NRO: " + (e.message || ''));
+        } else if (!nrodocumentoinspeccion && plantaSeleccionada) {
+          console.log('FRONTEND DEBUG: Llamando a generarNroInspeccion con planta:', plantaSeleccionada);
+          const res = await inspeccionesApi.generarNroInspeccion(plantaSeleccionada);
+          console.log('FRONTEND DEBUG: Respuesta generarNroInspeccion:', res);
+          if (res?.nrodocumentoinspeccion) {
+            setNrodocumentoinspeccion(res.nrodocumentoinspeccion);
+          } else {
+            alert("DEBUG INFO: El API respondió pero no trajo nrodocumentoinspeccion. Respuesta: " + JSON.stringify(res));
+          }
         }
-      };
-      initNroInspeccion();
-    }, [plantaSeleccionada, nrodocumentoinspeccion, inspeccionIdToResume]);
+      } catch (e: any) {
+        console.error('Error al generar NRO', e);
+        alert("DEBUG INFO: Hubo un error al generar el NRO: " + (e.message || ''));
+      }
+    };
+    initNroInspeccion();
+  }, [plantaSeleccionada, nrodocumentoinspeccion, inspeccionIdToResume]);
 
   const cargarMaestros = async () => {
     try {
@@ -332,18 +371,12 @@ export function NuevaInspeccionView() {
           if (vehiculoTab === 'DATOS') {
             setVehiculoTab('SOAT');
             return;
-          } else if (vehiculoTab === 'SOAT') {
-            setVehiculoTab('PROPIETARIO');
-            return;
           }
         }
         irSiguientePaso();
       } else if (e.key === 'ArrowLeft') {
         if (currentStepIndex === 2) {
-          if (vehiculoTab === 'PROPIETARIO') {
-            setVehiculoTab('SOAT');
-            return;
-          } else if (vehiculoTab === 'SOAT') {
+          if (vehiculoTab === 'SOAT') {
             setVehiculoTab('DATOS');
             return;
           }
@@ -404,241 +437,18 @@ export function NuevaInspeccionView() {
     setFormCaja((prev: any) => ({ ...prev, [name]: value }));
   };
 
-  const validarCaja = (opciones = { ignorarTipoPlaca: false }) => {
-    const faltantes = [];
-    if (!opciones.ignorarTipoPlaca && !formCaja.tipoPlaca) faltantes.push('Tipo de Placa');
-    if (!formCaja.placa) faltantes.push('Placa');
-    if (!formCaja.concepto) faltantes.push('Concepto');
-    if (!formCaja.categoria) faltantes.push('Categoría');
-    if (!formCaja.tipoCertificado) faltantes.push('Tipo Certificado');
-    if (!formCaja.tipoInspeccion) faltantes.push('Tipo Inspección');
+  
 
-    const isReinspeccionGratuita = !!(formCaja.nrodocumentoreinspeccion && precioTotal === 0);
-    const requiereDocumentoPago = !isReinspeccionGratuita && Number(precioTotal || 0) > 0;
-
-    if (requiereDocumentoPago && (!documentoPago || documentoPago === '' || documentoPago === 'Seleccione...')) {
-      faltantes.push('Documento de pago');
-    }
-
-    if (faltantes.length > 0) {
-      return { valido: false, mensaje: `Falta completar: ${faltantes.join(', ')}.` };
-    }
-
-    if (formCaja.tipoPlaca && formCaja.placa) {
-      let maxLen = 17;
-      let minLen = 6;
-      let exactLen = false;
-
-      const tp = maestros?.tiposPlaca?.find((x: any) => x.id?.toString() === formCaja.tipoPlaca?.toString());
-      if (tp) {
-        const n = tp.nombre?.toUpperCase() || '';
-        if (n.includes('DIPLOMATIC') || n.includes('DIPLOMÁTIC')) { maxLen = 6; minLen = 6; exactLen = true; }
-        else if (n.includes('INCORPORACI')) { maxLen = 17; minLen = 6; }
-        else if (n.includes('RUTINARI')) { maxLen = 6; minLen = 6; exactLen = true; }
-        else if (n.includes('EXTRANJER')) { maxLen = 7; minLen = 6; }
-        else { maxLen = 6; minLen = 6; exactLen = true; }
-      }
-
-      if (formCaja.placa.length > maxLen) {
-        return { valido: false, mensaje: `La placa ingresada no cumple el formato permitido para el tipo de placa seleccionado (máximo ${maxLen} caracteres).` };
-      }
-      if (formCaja.placa.length < minLen) {
-        return { valido: false, mensaje: `La placa ingresada no cumple el formato permitido para el tipo de placa seleccionado (mínimo ${minLen} caracteres).` };
-      }
-      if (exactLen && formCaja.placa.length !== maxLen) {
-        return { valido: false, mensaje: `La placa ingresada no cumple el formato permitido para el tipo de placa seleccionado (debe tener exactamente ${maxLen} caracteres).` };
-      }
-    }
-
-    return { valido: true };
-  };
-
-  const irSiguientePaso = async () => {
-    if (loading) return; // Protección anti doble click
-
-    const esReanudacionConCajaCompletada = posicionActualGuardada >= 1;
-    let cajaModificada = false;
-
-    if (esReanudacionConCajaCompletada && formCajaOriginalRehidratado) {
-      cajaModificada = formCaja.placa !== formCajaOriginalRehidratado.placa ||
-                       formCaja.concepto !== formCajaOriginalRehidratado.concepto ||
-                       formCaja.categoria !== formCajaOriginalRehidratado.categoria ||
-                       formCaja.tipoInspeccion !== formCajaOriginalRehidratado.tipoInspeccion ||
-                       formCaja.tipoCertificado !== formCajaOriginalRehidratado.tipoCertificado ||
-                       formCaja.tipoAutorizacion !== formCajaOriginalRehidratado.tipoAutorizacion;
-    }
-
-    if (currentStepIndex === 0) {
-      const ignorarTipoPlaca = esReanudacionConCajaCompletada && !cajaModificada;
-      const validacion = validarCaja({ ignorarTipoPlaca });
-
-      if (!validacion.valido) {
-        alert(validacion.mensaje);
-        return;
-      }
-      
-      if (!isConsultado) {
-        alert('Por favor realiza la consulta exitosamente antes de continuar.');
-        return;
-      }
-    }
-
-    const isReinspeccionGratuita = !!(formCaja.nrodocumentoreinspeccion && precioTotal === 0);
-    const requiereDocumentoPago = !isReinspeccionGratuita && Number(precioTotal || 0) > 0;
-
-    if (currentStepIndex === 1 && requiereDocumentoPago && !documentoPago) {
-      alert('Por favor selecciona el documento de pago obligatorio antes de continuar.');
-      return;
-    }
-
-    if (currentStepIndex === 2 && !isVehiculoValid) {
-      alert('Por favor completa todos los campos obligatorios del vehículo, SOAT y Propietario antes de continuar.');
-      return;
-    }
-
-    if (currentStepIndex === 3 && !isFacturacionValid) {
-      alert('Por favor completa todos los campos obligatorios de Facturación antes de continuar.');
-      return;
-    }
-
-    if (currentStepIndex === 4 && !validarVerificacion()) {
-      alert('Por favor completa todos los campos obligatorios de Operación (Tipos y Línea) antes de finalizar.');
-      return;
-    }
-
-    if (nrodocumentoinspeccion) {
-      try {
-        setLoading(true);
-        let targetPosicion = currentStepIndex + 1;
-        // Si estamos en VERIFICACION (currentStepIndex === 4), avanzamos a 5
-        if (currentStepIndex === STEPS.length - 1) {
-          targetPosicion = 5;
-        }
-
-        const payload = {
-          nrodocumentoinspeccion,
-          posicionActual: currentStepIndex,
-          siguientePosicion: targetPosicion,
-          plantaKey: plantaSeleccionada,
-          formCaja,
-          pagosAgregados,
-          formVehiculo,
-          formFacturacion,
-          formVerificacion,
-          documentoPago,
-          isConsultado,
-          precioSubtotal,
-          descuento,
-          precioTotal
-        };
-
-        console.log('[FRONT guardarProceso payload]', payload);
-        const res = await inspeccionesApi.guardarProceso(payload);
-        console.log('[FRONT guardarProceso response]', res);
-
-        if (res?.ok) {
-          if (currentStepIndex === STEPS.length - 1) {
-            // Se consumen los descuentos si existen
-            if (formCaja.descuentoObj && formCaja.descuentoObj.source_table && formCaja.descuentoObj.source_id) {
-              try {
-                await inspeccionesApi.consumirDescuento(formCaja.descuentoObj.source_table, formCaja.descuentoObj.source_id);
-              } catch (e) {
-                console.error("No se pudo consumir el descuento", e);
-              }
-            }
-            Swal.fire({
-              icon: 'success',
-              title: '¡Pase a Línea Exitoso!',
-              text: `La inspección ha sido enviada a la línea de pruebas (Gases). Código Oficial: ${nrodocumentoinspeccion}`,
-              confirmButtonColor: '#052a79'
-            }).then((result) => {
-              if (result.isConfirmed) {
-                navigate('/inicio');
-              }
-            });
-          } else {
-            setCurrentStepIndex(res.posicionActual);
-            setPosicionActualGuardada(res.posicionActual);
-          }
-        } else {
-          alert(res?.message || 'No se pudo guardar el paso actual en el servidor.');
-        }
-
-      } catch (err: any) {
-        console.error("Error en guardado:", err);
-        const msg =
-          err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          err?.message ||
-          'No se pudo guardar la información.';
-        Swal.fire({
-          icon: 'error',
-          title: 'Error de Guardado',
-          text: msg,
-          confirmButtonColor: '#d33'
-        });
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      alert("Error crítico: No se ha generado el número de inspección oficial. Por favor recarga la página e intenta de nuevo.");
+    const irSiguientePaso = () => {
+    if (currentStepIndex < STEPS.length - 1) {
+      setCurrentStepIndex(currentStepIndex + 1);
     }
   };
 
-  const guardarParcialAsync = async (tabDestino: 'DATOS' | 'SOAT' | 'PROPIETARIO') => {
-    if (loading) return; // Protección anti doble click
-    if (!nrodocumentoinspeccion) {
-      setVehiculoTab(tabDestino);
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      const payload = {
-        nrodocumentoinspeccion,
-        posicionActual: currentStepIndex,
-        siguientePosicion: currentStepIndex,
-        plantaKey: plantaSeleccionada,
-        formCaja,
-        pagosAgregados,
-        formVehiculo,
-        formFacturacion,
-        formVerificacion,
-        documentoPago,
-        isConsultado,
-        precioSubtotal,
-        descuento,
-        precioTotal
-      };
-      console.log('[FRONT guardarParcial payload]', payload);
-      const res = await inspeccionesApi.guardarProceso(payload);
-      console.log('[FRONT guardarParcial response]', res);
-
-      if (res?.ok) {
-        setPosicionActualGuardada(res.posicionActual);
-        setVehiculoTab(tabDestino);
-      } else {
-        alert(res?.message || 'Error al guardar parcialmente los datos.');
-      }
-    } catch (err: any) {
-      console.error("Error guardado parcial:", err);
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        'Error al guardar parcialmente los datos.';
-      alert(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
+  
 
 
-  const irPasoAnterior = () => {
-    if (!puedeModificarFlujo1) {
-      alert('Esta inspección ya se encuentra en Verificación y no puede ser modificada en pasos anteriores.');
-      return;
-    }
+    const irPasoAnterior = () => {
     if (currentStepIndex > 0) {
       setCurrentStepIndex(currentStepIndex - 1);
     }
@@ -651,7 +461,7 @@ export function NuevaInspeccionView() {
     if (formCaja.descuentoObj?.isCuponidad) {
       const uuid = formCaja.descuentoObj.documentoBusqueda || formCaja.descuentoObj.uuid;
       const cuponidadTarjeta = maestrosPago?.tarjetas?.find((t: any) => t.nombre.toUpperCase().includes('CUPONIDAD'));
-      
+
       if (cuponidadTarjeta) {
         const pagoExiste = pagosAgregados.some((p: any) => p.nroOperacion === uuid);
         if (!pagoExiste) {
@@ -674,7 +484,7 @@ export function NuevaInspeccionView() {
   // Efecto para auto-llenar pagos de Cortesía u otros que dejan el total en 0
   useEffect(() => {
     if (currentStepIndex === 1 && maestrosPago && formCaja.descuentoObj) {
-      
+
       // Si el monto pendiente es 0 (ej. Cortesía, 100% descuento)
       if (montoPendiente === 0) {
         setDisablePagoTabs(true);
@@ -806,14 +616,14 @@ export function NuevaInspeccionView() {
         <div className="flex items-center gap-3 mb-6">
           <button
             type="button"
-            onClick={() => navigate('/inicio')}
+            onClick={() => navigate('/faregas/inicio')}
             className="p-1.5 text-slate-400 hover:text-[#052a79] hover:bg-slate-100 rounded-full transition"
             title="Volver"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
-            Nueva Inspección
+            Nuevo Certificado
           </h2>
         </div>
 
@@ -851,107 +661,19 @@ export function NuevaInspeccionView() {
 
       {/* Content Area */}
       <div className="p-8">
-
-        {/* === PASO 1: CAJA === */}
-        {currentStepIndex === 0 && (
-          <CajaStep
-            maestros={maestros}
-            formCaja={formCaja}
-            setFormCaja={setFormCaja}
-            setFormVehiculo={setFormVehiculo}
-            handleCajaChange={handleCajaChange}
-            handleSelectChange={handleSelectChange}
-            irSiguientePaso={irSiguientePaso}
-            isConsultado={isConsultado}
-            setIsConsultado={setIsConsultado}
-            showAnularModal={showAnularModal}
-            setShowAnularModal={setShowAnularModal}
-            showCamposVaciosModal={showCamposVaciosModal}
-            setShowCamposVaciosModal={setShowCamposVaciosModal}
-            documentoDescuento={documentoDescuento}
-            setDocumentoDescuento={setDocumentoDescuento}
-            precioSubtotal={precioSubtotal}
-            setPrecioSubtotal={setPrecioSubtotal}
-            descuento={descuento}
-            setDescuento={setDescuento}
-            precioTotal={precioTotal}
-            setPrecioTotal={setPrecioTotal}
-            documentoPago={documentoPago}
-            setDocumentoPago={setDocumentoPago}
-            customSelectStyles={customSelectStyles}
-            isReadOnly={posicionActualGuardada >= 1}
-          />
-        )}
-
-        {/* PASO 2: PAGO */}
-        {currentStepIndex === 1 && (
-          <div className="p-6">
-            <PagoStep
-              precioTotal={precioTotal}
-              montoPendiente={montoPendiente}
-              pagoTab={pagoTab}
-              setPagoTab={setPagoTab}
-              formPago={formPago}
-              setFormPago={setFormPago}
-              maestrosPago={maestrosPago}
-              customSelectStyles={customSelectStyles}
-              handleAgregarPago={handleAgregarPago}
-              pagosAgregados={pagosAgregados}
-              eliminarPago={eliminarPago}
-              editingPagoIndex={editingPagoIndex}
-              setEditingPagoIndex={setEditingPagoIndex}
-              disablePagoTabs={disablePagoTabs || !!(formCaja.nrodocumentoreinspeccion && montoPendiente === 0)}
-              descuentoObj={formCaja.descuentoObj}
-              isReinspeccionGratuita={!!(formCaja.nrodocumentoreinspeccion && montoPendiente === 0)}
-            />
-          </div>
-        )}
-
-        {/* PASO 3: VEHÍCULO */}
-        {currentStepIndex === 2 && (
-          <div className="p-6">
-            <VehiculoStep
-              vehiculoTab={vehiculoTab}
-              setVehiculoTab={setVehiculoTab}
-              formVehiculo={formVehiculo}
-              setFormVehiculo={setFormVehiculo}
-              maestrosVehiculo={maestrosVehiculo}
-              getCategoriaName={getCategoriaName}
-              onValidationChange={setIsVehiculoValid}
-              placaCaja={formCaja.placa}
-              isReinspeccion={!!formCaja.nrodocumentoreinspeccion}
-              guardarParcialAsync={guardarParcialAsync}
-            />
-          </div>
-        )}
-
-        {/* PASO 4: FACTURACIÓN */}
-        {currentStepIndex === 3 && (
-          <div className="p-6">
-            <FacturacionStep
-              formFacturacion={formFacturacion}
-              setFormFacturacion={setFormFacturacion}
-              formVehiculo={formVehiculo}
-              documentoPago={documentoPago}
-              onValidationChange={setIsFacturacionValid}
-            />
-          </div>
-        )}
-
-        {/* === PASO 5: VERIFICACION === */}
-        {currentStepIndex === 4 && (
-          <VerificacionStep
-            maestros={maestros}
-            formCaja={formCaja}
-            formVehiculo={formVehiculo}
-            formPropietario={formVehiculo} // Usando el formVehiculo temporalmente ya que ahí están los datos de propietario
-            formFacturacion={formFacturacion}
-            formVerificacion={formVerificacion}
-            setFormVerificacion={setFormVerificacion}
-            precioTotal={precioTotal}
-            customSelectStyles={customSelectStyles}
-          />
-        )}
+        {STEPS[currentStepIndex].id === 'tipo' && <TipoCertificadoStep tipoCertificado={tipoCertificadoFaregas} setTipoCertificado={setTipoCertificadoFaregas} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'vehiculo' && <VehiculoStep vehiculoTab={vehiculoTab} setVehiculoTab={setVehiculoTab} formVehiculo={formVehiculo} setFormVehiculo={setFormVehiculo} maestrosVehiculo={maestrosVehiculo} getCategoriaName={getCategoriaName} onValidationChange={setIsVehiculoValid} isReinspeccion={false} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'propietario' && <PropietarioStep formPropietario={formPropietario} setFormPropietario={setFormPropietario}  onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'datos_glp' && <DatosGlpStep formData={formGlp} setFormData={setFormGlp} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'comp_glp' && <ComponentesGlpStep formData={formGlp} setFormData={setFormGlp} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'gnv' && <InspeccionGnvStep formData={formGnv} setFormData={setFormGnv} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'tipo_conf' && <TipoConformidadStep formData={formConformidad} setFormData={setFormConformidad} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'caract' && <CaracteristicasFinalesStep formData={formConformidad} setFormData={setFormConformidad} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'verificacion' && <VerificacionStep tipoCertificadoFaregas={tipoCertificadoFaregas} formVehiculo={formVehiculo} formPropietario={formPropietario} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'caja' && <CajaStep maestros={maestros} formCaja={formCaja} setFormCaja={setFormCaja} setFormVehiculo={setFormVehiculo} handleCajaChange={handleCajaChange} handleSelectChange={handleSelectChange} irSiguientePaso={irSiguientePaso} isConsultado={isConsultado} setIsConsultado={setIsConsultado} showAnularModal={showAnularModal} setShowAnularModal={setShowAnularModal} showCamposVaciosModal={showCamposVaciosModal} setShowCamposVaciosModal={setShowCamposVaciosModal} documentoDescuento={documentoDescuento} setDocumentoDescuento={setDocumentoDescuento} precioSubtotal={precioSubtotal} setPrecioSubtotal={setPrecioSubtotal} descuento={descuento} setDescuento={setDescuento} precioTotal={precioTotal} setPrecioTotal={setPrecioTotal} documentoPago={documentoPago} setDocumentoPago={setDocumentoPago} customSelectStyles={customSelectStyles} isReadOnly={false} />}
+        {STEPS[currentStepIndex].id === 'pago' && <PagoStep precioTotal={precioTotal} montoPendiente={montoPendiente} pagoTab={pagoTab} setPagoTab={setPagoTab} formPago={formPago} setFormPago={setFormPago} maestrosPago={maestrosPago} customSelectStyles={customSelectStyles} handleAgregarPago={handleAgregarPago} pagosAgregados={pagosAgregados} eliminarPago={eliminarPago} editingPagoIndex={editingPagoIndex} setEditingPagoIndex={setEditingPagoIndex} disablePagoTabs={disablePagoTabs} descuentoObj={formCaja.descuentoObj} isReinspeccionGratuita={false} />}
+        {STEPS[currentStepIndex].id === 'facturacion' && <FacturacionStep formFacturacion={formFacturacion} setFormFacturacion={setFormFacturacion} formVehiculo={formVehiculo} documentoPago={documentoPago} onValidationChange={setIsFacturacionValid} />}
+        {STEPS[currentStepIndex].id === 'emision' && <EmisionStep tipoCertificado={tipoCertificadoFaregas} placa={formVehiculo.placaNueva || formCaja.placa} />}
       </div>
 
       {/* FOOTER ACTIONS */}
