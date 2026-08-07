@@ -12,7 +12,7 @@ import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
 import type { TipoCertificadoFaregas } from '@/types/faregas';
-import { TipoCertificadoStep } from './components/NuevoCertificado/TipoCertificadoStep';
+// TipoCertificadoStep ya no se utiliza en FAREGAS, usamos CajaStep como Datos Iniciales
 import { PropietarioStep } from './components/NuevoCertificado/PropietarioStep';
 import { DatosGlpStep } from './components/NuevoCertificado/glp/DatosGlpStep';
 import { ComponentesGlpStep } from './components/NuevoCertificado/glp/ComponentesGlpStep';
@@ -148,7 +148,7 @@ export function NuevoCertificadoView() {
 
   // Form State (Vehículo)
     // Nuevos estados FAREGAS
-  const [tipoCertificadoFaregas, setTipoCertificadoFaregas] = useState<TipoCertificadoFaregas>(null);
+  // El tipoCertificado ahora vive en formCaja.tipoCertificado
   const [formPropietario, setFormPropietario] = useState<any>({});
   const [formGlp, setFormGlp] = useState<any>({});
   const [formGnv, setFormGnv] = useState<any>({});
@@ -182,30 +182,31 @@ export function NuevoCertificadoView() {
 
   const STEPS = React.useMemo(() => {
     let base = [
-      { id: 'tipo', label: 'Tipo', icon: FileText },
+      { id: 'datos_iniciales', label: 'Datos Iniciales', icon: FileText },
       { id: 'vehiculo', label: 'Vehículo', icon: Search },
       { id: 'propietario', label: 'Propietario', icon: User }
     ];
 
-    if (tipoCertificadoFaregas === 'GLP') {
+    const tipoActual = formCaja.tipoCertificado as TipoCertificadoFaregas;
+
+    if (tipoActual === 'GLP') {
       base.push({ id: 'datos_glp', label: 'Datos GLP', icon: Box });
       base.push({ id: 'comp_glp', label: 'Comp. GLP', icon: Box });
-    } else if (tipoCertificadoFaregas === 'GNV') {
+    } else if (tipoActual === 'GNV') {
       base.push({ id: 'gnv', label: 'Insp. GNV', icon: Box });
-    } else if (tipoCertificadoFaregas === 'CONFORMIDAD') {
+    } else if (tipoActual === 'CONFORMIDAD') {
       base.push({ id: 'tipo_conf', label: 'Conf.', icon: Box });
       base.push({ id: 'caract', label: 'Caract.', icon: Box });
     }
 
     base = base.concat([
       { id: 'verificacion', label: 'Verificación', icon: FileText },
-      { id: 'caja', label: 'Caja', icon: Box },
       { id: 'pago', label: 'Pago', icon: CreditCard },
       { id: 'facturacion', label: 'Facturación', icon: User },
       { id: 'emision', label: 'Emisión', icon: CheckCircle2 }
     ]);
     return base;
-  }, [tipoCertificadoFaregas]);
+  }, [formCaja.tipoCertificado]);
 
   
   const validarVerificacion = () => {
@@ -661,7 +662,7 @@ export function NuevoCertificadoView() {
 
       {/* Content Area */}
       <div className="p-8">
-        {STEPS[currentStepIndex].id === 'tipo' && <TipoCertificadoStep tipoCertificado={tipoCertificadoFaregas} setTipoCertificado={setTipoCertificadoFaregas} onNext={irSiguientePaso} />}
+        {STEPS[currentStepIndex].id === 'datos_iniciales' && <CajaStep maestros={maestros} formCaja={formCaja} setFormCaja={setFormCaja} setFormVehiculo={setFormVehiculo} handleCajaChange={handleCajaChange} handleSelectChange={handleSelectChange} irSiguientePaso={irSiguientePaso} isConsultado={isConsultado} setIsConsultado={setIsConsultado} showAnularModal={showAnularModal} setShowAnularModal={setShowAnularModal} showCamposVaciosModal={showCamposVaciosModal} setShowCamposVaciosModal={setShowCamposVaciosModal} documentoDescuento={documentoDescuento} setDocumentoDescuento={setDocumentoDescuento} precioSubtotal={precioSubtotal} setPrecioSubtotal={setPrecioSubtotal} descuento={descuento} setDescuento={setDescuento} precioTotal={precioTotal} setPrecioTotal={setPrecioTotal} documentoPago={documentoPago} setDocumentoPago={setDocumentoPago} customSelectStyles={customSelectStyles} isReadOnly={false} />}
         {STEPS[currentStepIndex].id === 'vehiculo' && <VehiculoStep vehiculoTab={vehiculoTab} setVehiculoTab={setVehiculoTab} formVehiculo={formVehiculo} setFormVehiculo={setFormVehiculo} maestrosVehiculo={maestrosVehiculo} getCategoriaName={getCategoriaName} onValidationChange={setIsVehiculoValid} isReinspeccion={false} onNext={irSiguientePaso} />}
         {STEPS[currentStepIndex].id === 'propietario' && <PropietarioStep formPropietario={formPropietario} setFormPropietario={setFormPropietario}  onNext={irSiguientePaso} />}
         {STEPS[currentStepIndex].id === 'datos_glp' && <DatosGlpStep formData={formGlp} setFormData={setFormGlp} onNext={irSiguientePaso} />}
@@ -669,11 +670,10 @@ export function NuevoCertificadoView() {
         {STEPS[currentStepIndex].id === 'gnv' && <InspeccionGnvStep formData={formGnv} setFormData={setFormGnv} onNext={irSiguientePaso} />}
         {STEPS[currentStepIndex].id === 'tipo_conf' && <TipoConformidadStep formData={formConformidad} setFormData={setFormConformidad} onNext={irSiguientePaso} />}
         {STEPS[currentStepIndex].id === 'caract' && <CaracteristicasFinalesStep formData={formConformidad} setFormData={setFormConformidad} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'verificacion' && <VerificacionStep tipoCertificadoFaregas={tipoCertificadoFaregas} formVehiculo={formVehiculo} formPropietario={formPropietario} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'caja' && <CajaStep maestros={maestros} formCaja={formCaja} setFormCaja={setFormCaja} setFormVehiculo={setFormVehiculo} handleCajaChange={handleCajaChange} handleSelectChange={handleSelectChange} irSiguientePaso={irSiguientePaso} isConsultado={isConsultado} setIsConsultado={setIsConsultado} showAnularModal={showAnularModal} setShowAnularModal={setShowAnularModal} showCamposVaciosModal={showCamposVaciosModal} setShowCamposVaciosModal={setShowCamposVaciosModal} documentoDescuento={documentoDescuento} setDocumentoDescuento={setDocumentoDescuento} precioSubtotal={precioSubtotal} setPrecioSubtotal={setPrecioSubtotal} descuento={descuento} setDescuento={setDescuento} precioTotal={precioTotal} setPrecioTotal={setPrecioTotal} documentoPago={documentoPago} setDocumentoPago={setDocumentoPago} customSelectStyles={customSelectStyles} isReadOnly={false} />}
+        {STEPS[currentStepIndex].id === 'verificacion' && <VerificacionStep tipoCertificadoFaregas={formCaja.tipoCertificado as TipoCertificadoFaregas} formVehiculo={formVehiculo} formPropietario={formPropietario} onNext={irSiguientePaso} />}
         {STEPS[currentStepIndex].id === 'pago' && <PagoStep precioTotal={precioTotal} montoPendiente={montoPendiente} pagoTab={pagoTab} setPagoTab={setPagoTab} formPago={formPago} setFormPago={setFormPago} maestrosPago={maestrosPago} customSelectStyles={customSelectStyles} handleAgregarPago={handleAgregarPago} pagosAgregados={pagosAgregados} eliminarPago={eliminarPago} editingPagoIndex={editingPagoIndex} setEditingPagoIndex={setEditingPagoIndex} disablePagoTabs={disablePagoTabs} descuentoObj={formCaja.descuentoObj} isReinspeccionGratuita={false} />}
         {STEPS[currentStepIndex].id === 'facturacion' && <FacturacionStep formFacturacion={formFacturacion} setFormFacturacion={setFormFacturacion} formVehiculo={formVehiculo} documentoPago={documentoPago} onValidationChange={setIsFacturacionValid} />}
-        {STEPS[currentStepIndex].id === 'emision' && <EmisionStep tipoCertificado={tipoCertificadoFaregas} placa={formVehiculo.placaNueva || formCaja.placa} />}
+        {STEPS[currentStepIndex].id === 'emision' && <EmisionStep tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas} placa={formVehiculo.placaNueva || formCaja.placa} />}
       </div>
 
       {/* FOOTER ACTIONS */}
