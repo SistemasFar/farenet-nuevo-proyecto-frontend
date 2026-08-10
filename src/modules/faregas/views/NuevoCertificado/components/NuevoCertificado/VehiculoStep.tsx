@@ -1,447 +1,264 @@
-import React, { useState } from 'react';
-import { vehiculoApi, maestrosApi } from '@/services/api';
-import { InputField, AgregarMaestroModal } from './SharedForms';
-
-export const loadModelos = async (inputValue: string) => {
-  try {
-    const response = await maestrosApi.buscarModelosAsync(inputValue);
-    return response.data.map((m: any) => ({ value: m.key, label: m.nombre }));
-  } catch (error) {
-    console.error(error);
-    return [];
-  }
-};
-
-const loadColores = async (inputValue: string) => {
-  try {
-    const response = await maestrosApi.buscarColoresAsync(inputValue);
-    return response.data.map((c: any) => ({ value: c.key, label: c.nombre }));
-  } catch (error) {
-    console.error(error);
-    return [];
-  }
-};
+import React from 'react';
+import type { TipoCertificadoFaregas } from '@/types/faregas';
 
 interface VehiculoStepProps {
-  vehiculoTab: 'DATOS' | 'SOAT';
-  setVehiculoTab: (tab: 'DATOS' | 'SOAT') => void;
+  tipoCertificado: TipoCertificadoFaregas;
   formVehiculo: any;
   setFormVehiculo: (data: any) => void;
-  maestrosVehiculo: any;
-  getCategoriaName: () => string;
-  onValidationChange?: (isValid: boolean) => void;
-  placaCaja?: string;
-  isReinspeccion?: boolean;
-  onNext?: () => void;
+  formPropietario: any;
+  setFormPropietario: (data: any) => void;
+  formGlp: any;
+  setFormGlp: (data: any) => void;
+  formGnv: any;
+  setFormGnv: (data: any) => void;
+  formConformidad: any;
+  setFormConformidad: (data: any) => void;
 }
 
 export function VehiculoStep({
-  vehiculoTab,
-  setVehiculoTab,
+  tipoCertificado,
   formVehiculo,
   setFormVehiculo,
-  maestrosVehiculo,
-  getCategoriaName,
-  onValidationChange,
-  placaCaja,
-  isReinspeccion,
-  onNext
+  formPropietario,
+  setFormPropietario,
+  formGlp,
+  setFormGlp,
+  formGnv,
+  setFormGnv,
+  formConformidad,
+  setFormConformidad
 }: VehiculoStepProps) {
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalTabla, setModalTabla] = useState('');
-  const [modalField, setModalField] = useState('');
-  const [modalOptions, setModalOptions] = useState([]);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [modalAsyncSearch, setModalAsyncSearch] = useState<any>(null);
-
-  const [searchingVehiculo, setSearchingVehiculo] = useState(false);
-
-  React.useEffect(() => {
-    if (formVehiculo.fechaEmisionSoat && formVehiculo.mesesSoat) {
-      const emision = new Date(formVehiculo.fechaEmisionSoat);
-      if (!isNaN(emision.getTime())) {
-        emision.setMonth(emision.getMonth() + parseInt(formVehiculo.mesesSoat, 10));
-        const vencimiento = emision.toISOString().split('T')[0];
-        if (formVehiculo.fechaVencimientoSoat !== vencimiento) {
-          setFormVehiculo((prev: any) => ({ ...prev, fechaVencimientoSoat: vencimiento }));
-        }
-      }
-    }
-  }, [formVehiculo.fechaEmisionSoat, formVehiculo.mesesSoat]);
-
-  const handleSearchVehiculo = async () => {
-    const p = formVehiculo.placaNueva || placaCaja;
-    if (!p) return;
-    setSearchingVehiculo(true);
-    try {
-      const res = await vehiculoApi.buscarPorPlaca(p);
-      if (res?.data) {
-        setFormVehiculo((prev: any) => ({
-          ...prev,
-          placaNueva: res.data.placamotor || p,
-          nroSerie: res.data.nrovin || res.data.nroserie || '',
-          nroMotor: res.data.nromotor || '',
-          anioFabricacion: res.data.aniofabricacion || '',
-          anioModelo: res.data.aniomodelo || '',
-          categoria: res.data.categoria_key || prev.categoria || '',
-          categoriaExtra: res.data.categoriaextra || '',
-          clase: res.data.vehiculoclase_key || '',
-          marca: res.data.marca_key || '',
-          modelo: res.data.modelo_key || '',
-          color: res.data.color_key || '',
-          carroceria: res.data.carroceria_key || '',
-          combustible: res.data.combustible_key || '',
-          nroCilindros: res.data.nrocilindros || '',
-          kilometraje: res.data.kilometraje || '',
-          kilometrajeOriginal: res.data.kilometraje || 0,
-          nroAsientos: res.data.nroasientos || '',
-          nroPasajeros: res.data.nropasajeros || '',
-          nroRuedas: res.data.nroruedas || '',
-          nroEjes: res.data.nroejes || '',
-          nroPuertas: res.data.nropuertas || '',
-          nroPisos: res.data.nropisos || '',
-          salidasEmergencia: res.data.nrosalidaemergencia || '',
-          pesoSeco: res.data.pesoseco || '',
-          pesoBruto: res.data.pesobruto || '',
-          cargaUtil: res.data.cargautil || '',
-          longitud: res.data.longitud || '',
-          altura: res.data.alto || res.data.altura || '',
-          ancho: res.data.ancho || '',
-          nroSoat: res.data.nrosoat || '',
-          tipoPoliza: res.data.tipopoliza_key || '',
-          aseguradora: res.data.aseguradora_key || '',
-          fechaEmisionSoat: res.data.fechiniciotarjetapropiedad ? res.data.fechiniciotarjetapropiedad.split('T')[0] : '',
-          fechaVencimientoSoat: res.data.fechfintarjetapropiedad ? res.data.fechfintarjetapropiedad.split('T')[0] : '',
-          mesesSoat: res.data.fechiniciotarjetapropiedad && res.data.fechfintarjetapropiedad ? 
-            (new Date(res.data.fechfintarjetapropiedad).getFullYear() - new Date(res.data.fechiniciotarjetapropiedad).getFullYear()) * 12 === 6 ? '6' : '12' : '12'
-        }));
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSearchingVehiculo(false);
-    }
+  const handleVehiculo = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormVehiculo((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
 
-  React.useEffect(() => {
-    if (placaCaja && !formVehiculo.placaNueva && !formVehiculo.marca) {
-      handleSearchVehiculo();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placaCaja]);
-
-  const handleAddNuevo = (title: string, tabla: string, field: string, options: any = [], asyncSearchFunc?: any) => {
-    setModalTitle(title);
-    setModalTabla(tabla);
-    setModalField(field);
-    setModalOptions(options);
-    setModalAsyncSearch(() => asyncSearchFunc);
-    setModalOpen(true);
+  const handlePropietario = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormPropietario((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
 
-  const handleSaveNuevo = async (valor: string) => {
-    try {
-      setModalLoading(true);
-      const res = await maestrosApi.agregarMaestroAsync(modalTabla, valor);
-
-      setFormVehiculo({
-        ...formVehiculo,
-        [modalField]: res.data.key,
-        [`${modalField}_label`]: res.data.nombre
-      });
-
-      if (modalTabla === 'clase' && maestrosVehiculo?.clases) maestrosVehiculo.clases.push(res.data);
-      if (modalTabla === 'marca' && maestrosVehiculo?.marcas) maestrosVehiculo.marcas.push(res.data);
-      if (modalTabla === 'carroceria' && maestrosVehiculo?.carrocerias) maestrosVehiculo.carrocerias.push(res.data);
-      if (modalTabla === 'color' && maestrosVehiculo?.colores) maestrosVehiculo.colores.push(res.data);
-
-      setModalOpen(false);
-    } catch (err: any) {
-      throw err;
-    } finally {
-      setModalLoading(false);
-    }
+  const handleGlp = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormGlp((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
 
-  const checkDatosValid = () => {
-    const catName = getCategoriaName() || '';
-    if (!catName) return ['Categoría'];
-
-    const isCategoriaO = catName.trim().startsWith('O');
-    const hasCategoriaExtra = ['M2', 'M3'].includes(catName);
-    const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
-
-    const coreFields = [
-      'clase', 'marca', 'modelo', 'color', 'carroceria',
-      'nroSerie', 'anioFabricacion', 'combustible',
-      'longitud', 'ancho', 'altura', 'nroEjes', 'nroRuedas',
-      'pesoSeco', 'cargaUtil', 'pesoBruto'
-    ];
-
-    let missing: string[] = [];
-
-    for (const f of coreFields) {
-      if (!isValid((formVehiculo as any)[f])) missing.push(f);
-    }
-
-    if (hasCategoriaExtra && !isValid(formVehiculo.categoriaExtra)) missing.push('categoriaExtra');
-
-    if (!isCategoriaO) {
-      const dynamicFields = [
-        'nroMotor', 'nroCilindros', 'kilometraje', 'nroAsientos',
-        'nroPasajeros', 'nroPuertas', 'nroPisos', 'salidasEmergencia'
-      ];
-      for (const f of dynamicFields) {
-        if (!isValid((formVehiculo as any)[f])) missing.push(f);
-      }
-
-      if (isValid((formVehiculo as any)['kilometraje'])) {
-        const kmActual = parseFloat((formVehiculo as any)['kilometraje']);
-        const kmOriginal = parseFloat((formVehiculo as any)['kilometrajeOriginal'] || 0);
-        if (kmOriginal > 0 && kmActual <= kmOriginal) {
-          missing.push(`Kilometraje (debe ser mayor a ${kmOriginal})`);
-        }
-      }
-    }
-
-    return missing;
+  const handleGnv = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormGnv((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
 
-  const missingDatos = checkDatosValid();
-  const isDatosValid = missingDatos.length === 0;
-
-  const checkSoatValid = () => {
-    const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
-    const soatFields = ['nroSoat', 'tipoPoliza', 'aseguradora', 'mesesSoat', 'fechaEmisionSoat', 'fechaVencimientoSoat'];
-    let missing: string[] = [];
-    for (const f of soatFields) {
-      if (!isValid((formVehiculo as any)[f])) missing.push(f);
-    }
-    return missing;
+  const handleConformidad = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormConformidad((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
-
-  const missingSoat = checkSoatValid();
-  const isSoatValid = missingSoat.length === 0;
-
-  const isAllValid = isDatosValid && isSoatValid;
-
-  React.useEffect(() => {
-    if (onValidationChange) {
-      onValidationChange(isAllValid);
-    }
-  }, [isAllValid, onValidationChange]);
 
   return (
-    <div className="space-y-6">
-      <AgregarMaestroModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSaveNuevo}
-        title={modalTitle}
-        loading={modalLoading}
-        existingOptions={modalOptions}
-        asyncSearch={modalAsyncSearch}
-      />
-      {/* Pestañas de Vehículo */}
-      <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
-        {(['DATOS DEL VEHÍCULO', 'SOAT'] as const).map(tab => {
-          const key = tab === 'DATOS DEL VEHÍCULO' ? 'DATOS' : tab as 'SOAT';
-
-          let isDisabled = false;
-          let disabledReason = '';
-
-          if (key === 'SOAT' && !isDatosValid) {
-            isDisabled = true;
-            disabledReason = 'Debe completar todos los datos del vehículo primero';
-          }
-
-          return (
-            <button
-              key={key}
-              onClick={() => !isDisabled && setVehiculoTab(key)}
-              disabled={isDisabled}
-              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all 
-                ${vehiculoTab === key ? 'bg-white text-[#052a79] shadow-sm' : 'text-slate-500 hover:text-slate-700'}
-                ${isDisabled ? 'opacity-50 cursor-not-allowed bg-slate-50' : ''}
-              `}
-              title={disabledReason}
-            >
-              {tab}
-            </button>
-          );
-        })}
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* 1. SECCIÓN GENERAL DEL VEHÍCULO */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h4 className="text-lg font-bold text-slate-800 uppercase tracking-wider mb-6 border-b pb-2">
+          A. DATOS GENERALES DEL VEHÍCULO
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">MARCA</label>
+            <input name="marca" value={formVehiculo.marca || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">MODELO</label>
+            <input name="modelo" value={formVehiculo.modelo || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">VERSIÓN</label>
+            <input name="version" value={formVehiculo.version || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">AÑO FABRICACIÓN</label>
+            <input name="anioFabricacion" value={formVehiculo.anioFabricacion || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">VIN / CHASIS</label>
+            <input name="nroSerie" value={formVehiculo.nroSerie || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">N° MOTOR</label>
+            <input name="nroMotor" value={formVehiculo.nroMotor || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">COMBUSTIBLE</label>
+            <input name="combustible" value={formVehiculo.combustible || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">COLOR</label>
+            <input name="color" value={formVehiculo.color || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">CILINDROS / CILINDRADA</label>
+            <input name="nroCilindros" value={formVehiculo.nroCilindros || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">EJES / RUEDAS</label>
+            <input name="nroEjes" value={formVehiculo.nroEjes || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">ASIENTOS / PASAJEROS</label>
+            <input name="nroAsientos" value={formVehiculo.nroAsientos || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">PESO NETO / BRUTO</label>
+            <input name="pesoNeto" value={formVehiculo.pesoNeto || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+        </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        {vehiculoTab === 'DATOS' && (() => {
-          const catName = getCategoriaName() || ''; 
-          const isCategoriaO = catName.trim().startsWith('O');
-          const hasCategoriaExtra = ['M2', 'M3'].includes(catName);
-          const hasMotor = !isCategoriaO;
-          const hasAsientos = !isCategoriaO;
-          const hasPasajeros = !isCategoriaO;
-          const hasPisos = !isCategoriaO;
-          const hasCargaUtil = true;
-          const hasPuertas = !isCategoriaO;
-          const hasSalidasEmergencia = !isCategoriaO;
-          const hasCilindros = !isCategoriaO;
-          const hasKilometraje = !isCategoriaO;
+      {/* 2. SECCIÓN DINÁMICA SEGÚN CERTIFICADO */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h4 className="text-lg font-bold text-[#052a79] uppercase tracking-wider mb-6 border-b pb-2">
+          B. INFORMACIÓN ESPECÍFICA: {tipoCertificado || 'NO SELECCIONADO'}
+        </h4>
 
-          const optsClases = maestrosVehiculo?.clases.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-          const optsMarcas = maestrosVehiculo?.marcas.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-          const optsCarrocerias = maestrosVehiculo?.carrocerias.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-          const optsCombustibles = maestrosVehiculo?.combustibles.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-          const optsCategoriasExtra = maestrosVehiculo?.categoriasExtra?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-
-          return (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-black text-[#052a79] uppercase">Datos del Vehículo</h3>
-                {catName && <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full border border-amber-200">Categoría {catName}</span>}
+        {/* --- DATOS GLP --- */}
+        {tipoCertificado === 'GLP' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">PROPIETARIO DEL VEHÍCULO</label>
+                <input name="nombre" value={formPropietario.nombre || ''} onChange={handlePropietario} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Nombre completo" />
               </div>
-
-              {!catName ? (
-                <div className="bg-amber-50 border border-amber-200 text-amber-700 p-4 rounded-xl text-sm font-semibold text-center">
-                  Selecciona una Categoría en el Paso 1 (Caja) para cargar los campos dinámicos del vehículo.
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
-                    <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Identificadores y Clasificación</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <InputField label="Categoría" name="categoria_display" overrideValue={catName} disabled={true} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      {hasCategoriaExtra && <InputField label="Categoría Extra" name="categoriaExtra" isSelect options={optsCategoriasExtra} formData={formVehiculo} setFormData={setFormVehiculo} />}
-                      <InputField label="Clase" name="clase" isSelect options={optsClases} onAddNuevo={() => handleAddNuevo('Clase', 'vehiculoclase', 'clase', optsClases)} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Marca" name="marca" isSelect options={optsMarcas} onAddNuevo={() => handleAddNuevo('Marca', 'marca', 'marca', optsMarcas)} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Modelo" name="modelo" isAsyncSelect defaultOptions={true} loadOptions={loadModelos} onAddNuevo={() => handleAddNuevo('Modelo', 'modelo', 'modelo', [], loadModelos)} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Color" name="color" isAsyncSelect defaultOptions={true} loadOptions={loadColores} onAddNuevo={() => handleAddNuevo('Color', 'color', 'color', [], loadColores)} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Carrocería" name="carroceria" isSelect options={optsCarrocerias} onAddNuevo={() => handleAddNuevo('Carrocería', 'carroceria', 'carroceria', optsCarrocerias)} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Marca Carrocería" name="marcaCarroceria" disabled={true} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Placa Nueva" name="placaNueva" onSearch={handleSearchVehiculo} searching={searchingVehiculo} disabled={!(isReinspeccion || parseFloat((formVehiculo as any)['kilometrajeOriginal'] || 0) > 0)} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Nro Serie (VIN)" name="nroSerie" maxLength={22} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      {hasMotor && <InputField label="Nro Motor" name="nroMotor" maxLength={20} formData={formVehiculo} setFormData={setFormVehiculo} />}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
-                    <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Especificaciones Técnicas</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <InputField label="Año Fabricación" name="anioFabricacion" type="number" maxLength={4} minNumber={1800} maxNumber={new Date().getFullYear() + 2} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Combustible" name="combustible" isSelect options={optsCombustibles} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      {hasCilindros && <InputField label="Nro Cilindros" name="nroCilindros" type="number" formData={formVehiculo} setFormData={setFormVehiculo} />}
-                      {hasKilometraje && <InputField label="Kilometraje" name="kilometraje" type="number" maxLength={6} formData={formVehiculo} setFormData={setFormVehiculo} />}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
-                    <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Capacidad y Dimensiones</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      {hasAsientos && <InputField label="Nro Asientos" name="nroAsientos" type="number" minNumber={0} maxNumber={80} formData={formVehiculo} setFormData={setFormVehiculo} />}
-                      {hasPasajeros && <InputField label="Nro Pasajeros" name="nroPasajeros" type="number" minNumber={0} maxNumber={80} formData={formVehiculo} setFormData={setFormVehiculo} />}
-                      {hasPuertas && <InputField label="Nro Puertas" name="nroPuertas" type="number" formData={formVehiculo} setFormData={setFormVehiculo} />}
-                      {hasPisos && <InputField label="Nro Pisos" name="nroPisos" type="number" formData={formVehiculo} setFormData={setFormVehiculo} />}
-                      {hasSalidasEmergencia && <InputField label="Salidas de Emergencia" name="salidasEmergencia" type="number" formData={formVehiculo} setFormData={setFormVehiculo} />}
-                      <InputField label="Peso Seco (Kg)" name="pesoSeco" type="number" maxLength={5} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      {hasCargaUtil && <InputField label="Carga Útil (Kg)" name="cargaUtil" type="number" maxLength={5} formData={formVehiculo} setFormData={setFormVehiculo} />}
-                      <InputField label="Peso Bruto (Kg)" name="pesoBruto" type="number" maxLength={5} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Longitud (m)" name="longitud" type="number" formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Ancho (m)" name="ancho" type="number" formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Altura (m)" name="altura" type="number" formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Nro Ejes" name="nroEjes" type="number" maxNumber={6} formData={formVehiculo} setFormData={setFormVehiculo} />
-                      <InputField label="Nro Ruedas" name="nroRuedas" type="number" maxNumber={24} formData={formVehiculo} setFormData={setFormVehiculo} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center justify-center">
-                {!isDatosValid && (
-                  <p className="text-xs text-amber-600 font-bold mb-3 bg-amber-50 px-4 py-2 rounded-lg border border-amber-200">
-                    ⚠️ Complete todos los campos obligatorios para continuar al SOAT
-                  </p>
-                )}
-                <button
-                  type="button"
-                  disabled={!isDatosValid}
-                  onClick={() => setVehiculoTab('SOAT')}
-                  className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-md
-                    ${isDatosValid ? 'bg-gold-3d hover:-translate-y-0.5' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}
-                  `}
-                >
-                  Continuar a SOAT
-                </button>
-                {!isDatosValid && (
-                  <p className="mt-3 text-xs text-red-500 font-semibold max-w-lg text-center">
-                    Falta completar: {missingDatos.join(', ')}
-                  </p>
-                )}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">DIRECCIÓN PROPIETARIO</label>
+                <input name="direccion" value={formPropietario.direccion || ''} onChange={handlePropietario} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Dirección" />
               </div>
             </div>
-          );
-        })()}
-        {vehiculoTab === 'SOAT' && (() => {
-          const optsTiposPoliza = maestrosVehiculo?.tiposPoliza?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-          const optsAseguradoras = maestrosVehiculo?.aseguradoras?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
 
-          return (
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <h5 className="font-bold text-slate-700 mb-3">COMPONENTES INSTALADOS GLP</h5>
+              <div className="grid grid-cols-5 gap-2 text-xs font-bold text-slate-500 uppercase mb-2">
+                <div>Componente</div>
+                <div>Marca</div>
+                <div>Modelo/Cap.</div>
+                <div>Año</div>
+                <div>N° Serie</div>
+              </div>
+              {/* Cilindro */}
+              <div className="grid grid-cols-5 gap-2 mb-2">
+                <div className="font-bold pt-2">CILINDRO</div>
+                <input name="cilindroMarca" value={formGlp.cilindroMarca || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                <input name="cilindroModelo" value={formGlp.cilindroModelo || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                <input name="cilindroAnio" value={formGlp.cilindroAnio || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                <input name="cilindroSerie" value={formGlp.cilindroSerie || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              </div>
+              {/* Regulador */}
+              <div className="grid grid-cols-5 gap-2">
+                <div className="font-bold pt-2">REGULADOR</div>
+                <input name="reguladorMarca" value={formGlp.reguladorMarca || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                <input name="reguladorModelo" value={formGlp.reguladorModelo || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                <div className="text-center text-slate-400 pt-2">-</div>
+                <input name="reguladorSerie" value={formGlp.reguladorSerie || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              </div>
+            </div>
+
             <div>
-              <h3 className="text-sm font-black text-[#052a79] uppercase mb-4">SOAT</h3>
-              <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <InputField
-                    label="Nro SOAT"
-                    name="nroSoat"
-                    maxLength={25}
-                    onKeyDown={(e: any) => {
-                      if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Tab') {
-                        e.preventDefault();
-                      }
-                    }}
-                    onChange={(e: any) => {
-                      const val = e.target.value.replace(/[^0-9]/g, '');
-                      setFormVehiculo({ ...formVehiculo, nroSoat: val });
-                    }}
-                    overrideValue={formVehiculo.nroSoat || ''}
-                    formData={formVehiculo} setFormData={setFormVehiculo}
-                  />
-                  <InputField label="Tipo de Póliza" name="tipoPoliza" isSelect options={optsTiposPoliza} formData={formVehiculo} setFormData={setFormVehiculo} />
-                  <InputField label="Aseguradora" name="aseguradora" isSelect options={optsAseguradoras} formData={formVehiculo} setFormData={setFormVehiculo} />
-                  <InputField
-                    label="Vigencia SOAT (Meses)"
-                    name="mesesSoat"
-                    isSelect
-                    options={[ { value: '6', label: '6 meses' }, { value: '12', label: '12 meses' } ]}
-                    formData={formVehiculo} setFormData={setFormVehiculo}
-                  />
-                  <InputField label="Fecha de Emisión" name="fechaEmisionSoat" type="date" formData={formVehiculo} setFormData={setFormVehiculo} />
-                  <InputField label="Fecha de Vencimiento" name="fechaVencimientoSoat" type="date" disabled={!!formVehiculo.fechaEmisionSoat} formData={formVehiculo} setFormData={setFormVehiculo} />
+              <h5 className="font-bold text-slate-700 mb-3">VERIFICACIONES DE SEGURIDAD GLP</h5>
+              <div className="space-y-2">
+                {['Instalación segura', 'Ventilación adecuada', 'Ausencia de fugas', 'Cierre hermético'].map(item => (
+                  <div key={item} className="flex items-center gap-2">
+                    <input type="checkbox" className="w-4 h-4" />
+                    <span className="text-sm">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">FECHA EMISIÓN</label>
+                <input type="date" name="fechaEmision" value={formGlp.fechaEmision || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA</label>
+                <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">OBSERVACIONES</label>
+              <input name="observaciones" value={formGlp.observaciones || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+            </div>
+          </div>
+        )}
+
+        {/* --- DATOS GNV --- */}
+        {tipoCertificado === 'GNV' && (
+          <div className="space-y-6">
+            <div>
+              <h5 className="font-bold text-slate-700 mb-3">VERIFICACIONES DE INSPECCIÓN ANUAL GNV</h5>
+              <div className="grid grid-cols-2 gap-2">
+                {['Equipo completo registrado', 'Ausencia de fugas', 'Cilindro sin deterioro', 'Sistema conforme a PEC', 'Tuberías alta/baja presión', 'Controles del tablero'].map(item => (
+                  <div key={item} className="flex items-center gap-2">
+                    <input type="checkbox" className="w-4 h-4" />
+                    <span className="text-sm">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">FECHA EMISIÓN</label>
+                <input type="date" name="fechaEmision" value={formGnv.fechaEmision || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA</label>
+                <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">OBSERVACIONES</label>
+              <input name="observaciones" value={formGnv.observaciones || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+            </div>
+          </div>
+        )}
+
+        {/* --- DATOS CONFORMIDAD --- */}
+        {tipoCertificado === 'CONFORMIDAD' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE CONFORMIDAD</label>
+                <select name="tipoConformidad" value={formConformidad.tipoConformidad || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
+                  <option value="">-- SELECCIONAR --</option>
+                  <option value="MODIFICACION">MODIFICACIÓN</option>
+                  <option value="MONTAJE">MONTAJE</option>
+                  <option value="FABRICACION">FABRICACIÓN</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">RAZÓN SOCIAL / PERSONA NATURAL</label>
+                <input name="razonSocial" value={formConformidad.razonSocial || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">DIRECCIÓN</label>
+                <input name="direccion" value={formConformidad.direccion || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <h5 className="font-bold text-slate-700 mb-3">CARACTERÍSTICAS REGISTRABLES Y MOTIVO</h5>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">MOTIVO / CARACTERÍSTICA A CERTIFICAR</label>
+                  <input name="motivo" value={formConformidad.motivo || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="EJ: RECTIFICACIÓN DE NÚMERO DE EJES" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">DESCRIPCIÓN / OBSERVACIONES COMPLEMENTARIAS</label>
+                  <input name="observaciones" value={formConformidad.observaciones || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
                 </div>
               </div>
-
-              {onNext && (
-                <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col items-center justify-center">
-                  {!isSoatValid && (
-                    <p className="text-xs text-amber-600 font-bold mb-3 bg-amber-50 px-4 py-2 rounded-lg border border-amber-200">
-                      ⚠️ Complete todos los campos del SOAT para continuar
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    disabled={!isSoatValid}
-                    onClick={onNext}
-                    className={`px-8 py-3 rounded-xl font-black text-sm transition-all shadow-md
-                        ${isSoatValid ? 'bg-[#052a79] text-white hover:bg-blue-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}
-                      `}
-                  >
-                    Siguiente Paso
-                  </button>
-                </div>
-              )}
             </div>
-          );
-        })()}
+          </div>
+        )}
       </div>
     </div>
   );

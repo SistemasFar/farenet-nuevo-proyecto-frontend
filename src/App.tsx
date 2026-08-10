@@ -319,7 +319,6 @@ export default function App() {
                 } 
               />
               <Route
-                path="*"
                 element={
                   !isDashboardReady ? (
                     <Navigate to="/faregas/seleccionar-planta" replace />

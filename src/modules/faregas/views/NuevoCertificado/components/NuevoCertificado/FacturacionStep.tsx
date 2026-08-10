@@ -1,238 +1,83 @@
-import React, { useState } from 'react';
-import { InputField } from './SharedForms';
-import { maestrosApi, externosApi } from '@/services/api';
+import React from 'react';
+import { User, FileText } from 'lucide-react';
 
 interface FacturacionStepProps {
   formFacturacion: any;
   setFormFacturacion: (data: any) => void;
-  formVehiculo: any; // Para poder copiar los datos del propietario
-  documentoPago: string; // Para saber si es Boleta ('4') o Factura ('5')
-  onValidationChange?: (isValid: boolean) => void;
 }
 
 export function FacturacionStep({
   formFacturacion,
-  setFormFacturacion,
-  formVehiculo,
-  documentoPago,
-  onValidationChange
+  setFormFacturacion
 }: FacturacionStepProps) {
 
-  const [maestrosFacturacion, setMaestrosFacturacion] = useState<any>(null);
-  const [provincias, setProvincias] = useState<any[]>([]);
-  const [distritos, setDistritos] = useState<any[]>([]);
-  
-  const [searchingFacturacion, setSearchingFacturacion] = useState(false);
-
-  React.useEffect(() => {
-    if (!maestrosFacturacion) {
-      maestrosApi.obtenerMaestrosPropietario().then((res: any) => setMaestrosFacturacion(res.data)).catch(console.error);
-    }
-  }, [maestrosFacturacion]);
-
-  React.useEffect(() => {
-    if (formFacturacion.departamentoFac) {
-      maestrosApi.obtenerProvincias(formFacturacion.departamentoFac).then((res: any) => setProvincias(res.data)).catch(console.error);
-    } else {
-      setProvincias([]);
-    }
-  }, [formFacturacion.departamentoFac]);
-
-  React.useEffect(() => {
-    if (formFacturacion.provinciaFac) {
-      maestrosApi.obtenerDistritos(formFacturacion.provinciaFac).then((res: any) => setDistritos(res.data)).catch(console.error);
-    } else {
-      setDistritos([]);
-    }
-  }, [formFacturacion.provinciaFac]);
-
-  // Lógica de Boleta vs Factura
-  React.useEffect(() => {
-    if (documentoPago === '5') { // 5 = FACTURA
-      if (formFacturacion.tipoDocFac !== 'ruc') {
-        setFormFacturacion((prev: any) => ({ ...prev, tipoDocFac: 'ruc' }));
-      }
-    } else if (documentoPago === '4') { // 4 = BOLETA
-      if (formFacturacion.tipoDocFac === 'ruc') {
-        setFormFacturacion((prev: any) => ({ ...prev, tipoDocFac: '' })); // No puede ser RUC en boleta
-      }
-    }
-  }, [documentoPago, formFacturacion.tipoDocFac, setFormFacturacion]);
-
-  const checkValid = () => {
-    const isValid = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
-    const req = ['tipoDocFac', 'nroDocFac', 'paisFac', 'departamentoFac', 'provinciaFac', 'distritoFac', 'direccionFac', 'emailFac', 'telefonoFac'];
-    
-    const selectedDoc = maestrosFacturacion?.tiposDocumento?.find((x: any) => x.key === formFacturacion.tipoDocFac);
-    const isRuc = selectedDoc?.nombre?.toUpperCase() === 'RUC';
-    
-    if (isRuc) {
-      req.push('razonSocialFac');
-    } else {
-      req.push('nombresFac', 'apellidosFac');
-    }
-    
-    let missing: string[] = [];
-    for (const f of req) {
-      if (!isValid((formFacturacion as any)[f])) missing.push(f);
-    }
-    return missing;
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormFacturacion((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
 
-  const missingFacturacion = checkValid();
-  const isFacturacionValid = missingFacturacion.length === 0;
-
-  React.useEffect(() => {
-    if (onValidationChange) {
-      onValidationChange(isFacturacionValid);
-    }
-  }, [isFacturacionValid, onValidationChange]);
-
-  const handleSearchFacturacion = async () => {
-    const nro = formFacturacion.nroDocFac;
-    const tipo = formFacturacion.tipoDocFac;
-    if (!nro) return;
-
-    setSearchingFacturacion(true);
-    try {
-      const selectedDoc = maestrosFacturacion?.tiposDocumento?.find((x: any) => x.key === tipo);
-      const isRuc = selectedDoc?.nombre?.toUpperCase() === 'RUC';
-      
-      if (isRuc && nro.length === 11) {
-        const res = await externosApi.consultarRuc(nro);
-        if (res?.data) {
-          setFormFacturacion((prev: any) => ({
-            ...prev,
-            razonSocialFac: res.data.razonSocial || '',
-            direccionFac: res.data.direccion || prev.direccionFac
-          }));
-        }
-      } else if (!isRuc && nro.length === 8) {
-        const res = await externosApi.consultarDni(nro);
-        if (res?.data) {
-          setFormFacturacion((prev: any) => ({
-            ...prev,
-            nombresFac: res.data.nombres || '',
-            apellidosFac: res.data.apellidos || ''
-          }));
-        }
-      }
-    } catch (e) {
-      console.error('Error autocompletando facturación', e);
-    } finally {
-      setSearchingFacturacion(false);
-    }
-  };
-
-  const handleCopiarPropietario = () => {
-    setFormFacturacion({
-      ...formFacturacion,
-      tipoDocFac: formVehiculo.tipoDocProp || '',
-      nroDocFac: formVehiculo.nroDocProp || '',
-      razonSocialFac: formVehiculo.razonSocialProp || '',
-      nombresFac: formVehiculo.nombresProp || '',
-      apellidosFac: formVehiculo.apellidosProp || '',
-      paisFac: formVehiculo.paisProp || '',
-      departamentoFac: formVehiculo.departamentoProp || '',
-      provinciaFac: formVehiculo.provinciaProp || '',
-      distritoFac: formVehiculo.distritoProp || '',
-      direccionFac: formVehiculo.direccionProp || '',
-      emailFac: formVehiculo.emailProp || '',
-      telefonoFac: formVehiculo.telefonoProp || ''
-    });
-  };
-
-  let optsDocs = maestrosFacturacion?.tiposDocumento?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-  
-  // Filtrar según Boleta / Factura
-  if (documentoPago === '5') {
-    optsDocs = optsDocs.filter((x: any) => x.value === 'ruc');
-  } else if (documentoPago === '4') {
-    optsDocs = optsDocs.filter((x: any) => x.value !== 'ruc');
-  }
-
-  const optsPaises = maestrosFacturacion?.paises?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-  const optsDept = maestrosFacturacion?.departamentos?.map((x: any) => ({ value: x.key, label: x.nombre })) || [];
-  const optsProv = provincias.map((x: any) => ({ value: x.key, label: x.nombre }));
-  const optsDist = distritos.map((x: any) => ({ value: x.key, label: x.nombre }));
-
-  // Reutilizamos el contexto temporalmente para el InputField que espera leer de "formVehiculo"
-  // Para evitar rediseñar InputField ahora, pasaremos formVehiculo = formFacturacion y setFormVehiculo = setFormFacturacion
   return (
-    
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm max-w-4xl mx-auto">
-        
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-          <div>
-            <h3 className="text-lg font-black text-[#052a79] uppercase">Datos del Recibo</h3>
-            <p className="text-xs font-semibold text-slate-500 mt-1">Complete los datos para la facturación</p>
-          </div>
-          <button 
-            type="button" 
-            onClick={handleCopiarPropietario}
-            className="text-xs font-bold bg-slate-100 hover:bg-amber-100 hover:text-amber-700 text-[#052a79] px-4 py-2 rounded-lg border border-slate-200 transition shadow-sm"
-          >
-            📄 Copiar datos del Propietario
-          </button>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+        <div className="bg-[#052a79]/10 p-2.5 rounded-xl">
+          <FileText className="w-6 h-6 text-[#052a79]" />
         </div>
-
-        <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <InputField formData={formFacturacion} setFormData={setFormFacturacion} 
-              label="TIPO DOCUMENTO DE IDENTIDAD" 
-              name="tipoDocFac" 
-              isSelect 
-              options={optsDocs} 
-              disabled={documentoPago === '5'} // Si es Factura, forzamos RUC y lo bloqueamos
-            />
-            {(() => {
-              const selectedDoc = maestrosFacturacion?.tiposDocumento?.find((x: any) => x.key === formFacturacion.tipoDocFac);
-              const isRuc = selectedDoc?.nombre?.toUpperCase() === 'RUC';
-              const isDni = selectedDoc?.nombre?.toUpperCase() === 'DNI';
-              const maxLen = isDni ? 8 : (isRuc ? 11 : 15);
-
-              return (
-                <>
-                  <InputField formData={formFacturacion} setFormData={setFormFacturacion} 
-                    label="NRO. DOCUMENTO DE IDENTIDAD" 
-                    name="nroDocFac" 
-                    type="number"
-                    maxLength={maxLen}
-                    onSearch={handleSearchFacturacion}
-                    searching={searchingFacturacion}
-                  />
-                  {isRuc ? (
-                    <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="NOMBRE DE LA EMPRESA (RAZÓN SOCIAL)" name="razonSocialFac" />
-                  ) : (
-                            <>
-                              <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="NOMBRES" name="nombresFac" filter="letras" />
-                              <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="APELLIDOS" name="apellidosFac" filter="letras" />
-                            </>
-                          )}
-                        </>
-                      );
-            })()}
-            
-            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="PAÍS" name="paisFac" isSelect options={optsPaises} />
-            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="DEPARTAMENTO" name="departamentoFac" isSelect options={optsDept} />
-            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="PROVINCIA" name="provinciaFac" isSelect options={optsProv} disabled={!formFacturacion.departamentoFac} />
-            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="DISTRITO" name="distritoFac" isSelect options={optsDist} disabled={!formFacturacion.provinciaFac} />
-            
-            <div className="lg:col-span-2">
-              <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="DIRECCIÓN" name="direccionFac" />
-            </div>
-            
-            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="EMAIL" name="emailFac" type="email" />
-            <InputField formData={formFacturacion} setFormData={setFormFacturacion} label="TELÉFONO" name="telefonoFac" filter="telefono" maxLength={9} enforceStartWith="9" />
-          </div>
-        </div>
-
-        {!isFacturacionValid && (
-          <p className="mt-4 text-xs text-red-500 font-semibold text-center bg-red-50 py-2 rounded-lg border border-red-100">
-            Falta completar campos obligatorios: {missingFacturacion.join(', ')}
+        <div>
+          <h3 className="text-xl font-bold text-slate-800">Facturación</h3>
+          <p className="text-sm text-slate-500">
+            Datos del comprobante de pago. Completamente independiente del propietario del vehículo.
           </p>
-        )}
+        </div>
       </div>
-    
+
+      <div className="bg-white border-2 border-slate-200 rounded-2xl p-8 max-w-4xl mx-auto space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE COMPROBANTE</label>
+            <select name="tipoDocFac" value={formFacturacion.tipoDocFac || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-800 uppercase focus:border-[#f59e0b] focus:ring-0">
+              <option value="">-- SELECCIONAR --</option>
+              <option value="BOLETA">BOLETA</option>
+              <option value="FACTURA">FACTURA</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">DNI / RUC</label>
+            <input type="text" name="nroDocFac" value={formFacturacion.nroDocFac || ''} onChange={handleInput} maxLength={11} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-800 uppercase focus:border-[#f59e0b] focus:ring-0" placeholder="Número de documento" />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold text-slate-500 mb-1">NOMBRE / RAZÓN SOCIAL</label>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input type="text" name="razonSocialFac" value={formFacturacion.razonSocialFac || ''} onChange={handleInput} className="w-full pl-12 pr-4 py-3 border-2 border-slate-200 rounded-xl font-bold text-slate-800 uppercase focus:border-[#f59e0b] focus:ring-0" placeholder="Nombre completo o razón social" />
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold text-slate-500 mb-1">DIRECCIÓN FISCAL</label>
+            <input type="text" name="direccionFac" value={formFacturacion.direccionFac || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-800 uppercase focus:border-[#f59e0b] focus:ring-0" placeholder="Dirección completa" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">CORREO ELECTRÓNICO (Opcional)</label>
+            <input type="email" name="emailFac" value={formFacturacion.emailFac || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-800 uppercase focus:border-[#f59e0b] focus:ring-0" placeholder="correo@ejemplo.com" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">TELÉFONO (Opcional)</label>
+            <input type="text" name="telefonoFac" value={formFacturacion.telefonoFac || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-slate-800 uppercase focus:border-[#f59e0b] focus:ring-0" placeholder="N° de contacto" />
+          </div>
+
+        </div>
+
+        <div className="bg-amber-50 p-4 border border-amber-200 rounded-xl mt-6 flex gap-3">
+          <div className="text-amber-500 mt-0.5">⚠️</div>
+          <div className="text-sm text-amber-700">
+            <strong>Nota Diseño:</strong> En la Fase 2, ingresar el RUC o DNI realizará la búsqueda en Nubefact/SUNAT. Por ahora, es de ingreso manual libre.
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

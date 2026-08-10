@@ -181,32 +181,14 @@ export function NuevoCertificadoView() {
   });
 
   const STEPS = React.useMemo(() => {
-    let base = [
+    return [
       { id: 'datos_iniciales', label: 'Datos Iniciales', icon: FileText },
-      { id: 'vehiculo', label: 'Vehículo', icon: Search },
-      { id: 'propietario', label: 'Propietario', icon: User }
-    ];
-
-    const tipoActual = formCaja.tipoCertificado as TipoCertificadoFaregas;
-
-    if (tipoActual === 'GLP') {
-      base.push({ id: 'datos_glp', label: 'Datos GLP', icon: Box });
-      base.push({ id: 'comp_glp', label: 'Comp. GLP', icon: Box });
-    } else if (tipoActual === 'GNV') {
-      base.push({ id: 'gnv', label: 'Insp. GNV', icon: Box });
-    } else if (tipoActual === 'CONFORMIDAD') {
-      base.push({ id: 'tipo_conf', label: 'Conf.', icon: Box });
-      base.push({ id: 'caract', label: 'Caract.', icon: Box });
-    }
-
-    base = base.concat([
-      { id: 'verificacion', label: 'Verificación', icon: FileText },
+      { id: 'vehiculo', label: 'Vehículo y Datos Técnicos', icon: Search },
       { id: 'pago', label: 'Pago', icon: CreditCard },
       { id: 'facturacion', label: 'Facturación', icon: User },
-      { id: 'emision', label: 'Emisión', icon: CheckCircle2 }
-    ]);
-    return base;
-  }, [formCaja.tipoCertificado]);
+      { id: 'verificacion', label: 'Verificación / Emisión', icon: CheckCircle2 }
+    ];
+  }, []);
 
   
   const validarVerificacion = () => {
@@ -662,23 +644,62 @@ export function NuevoCertificadoView() {
 
       {/* Content Area */}
       <div className="p-8">
-        {STEPS[currentStepIndex].id === 'datos_iniciales' && <CajaStep maestros={maestros} formCaja={formCaja} setFormCaja={setFormCaja} setFormVehiculo={setFormVehiculo} handleCajaChange={handleCajaChange} handleSelectChange={handleSelectChange} irSiguientePaso={irSiguientePaso} isConsultado={isConsultado} setIsConsultado={setIsConsultado} showAnularModal={showAnularModal} setShowAnularModal={setShowAnularModal} showCamposVaciosModal={showCamposVaciosModal} setShowCamposVaciosModal={setShowCamposVaciosModal} documentoDescuento={documentoDescuento} setDocumentoDescuento={setDocumentoDescuento} precioSubtotal={precioSubtotal} setPrecioSubtotal={setPrecioSubtotal} descuento={descuento} setDescuento={setDescuento} precioTotal={precioTotal} setPrecioTotal={setPrecioTotal} documentoPago={documentoPago} setDocumentoPago={setDocumentoPago} customSelectStyles={customSelectStyles} isReadOnly={false} />}
-        {STEPS[currentStepIndex].id === 'vehiculo' && <VehiculoStep vehiculoTab={vehiculoTab} setVehiculoTab={setVehiculoTab} formVehiculo={formVehiculo} setFormVehiculo={setFormVehiculo} maestrosVehiculo={maestrosVehiculo} getCategoriaName={getCategoriaName} onValidationChange={setIsVehiculoValid} isReinspeccion={false} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'propietario' && <PropietarioStep formPropietario={formPropietario} setFormPropietario={setFormPropietario}  onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'datos_glp' && <DatosGlpStep formData={formGlp} setFormData={setFormGlp} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'comp_glp' && <ComponentesGlpStep formData={formGlp} setFormData={setFormGlp} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'gnv' && <InspeccionGnvStep formData={formGnv} setFormData={setFormGnv} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'tipo_conf' && <TipoConformidadStep formData={formConformidad} setFormData={setFormConformidad} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'caract' && <CaracteristicasFinalesStep formData={formConformidad} setFormData={setFormConformidad} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'verificacion' && <VerificacionStep tipoCertificadoFaregas={formCaja.tipoCertificado as TipoCertificadoFaregas} formVehiculo={formVehiculo} formPropietario={formPropietario} onNext={irSiguientePaso} />}
-        {STEPS[currentStepIndex].id === 'pago' && <PagoStep precioTotal={precioTotal} montoPendiente={montoPendiente} pagoTab={pagoTab} setPagoTab={setPagoTab} formPago={formPago} setFormPago={setFormPago} maestrosPago={maestrosPago} customSelectStyles={customSelectStyles} handleAgregarPago={handleAgregarPago} pagosAgregados={pagosAgregados} eliminarPago={eliminarPago} editingPagoIndex={editingPagoIndex} setEditingPagoIndex={setEditingPagoIndex} disablePagoTabs={disablePagoTabs} descuentoObj={formCaja.descuentoObj} isReinspeccionGratuita={false} />}
-        {STEPS[currentStepIndex].id === 'facturacion' && <FacturacionStep formFacturacion={formFacturacion} setFormFacturacion={setFormFacturacion} formVehiculo={formVehiculo} documentoPago={documentoPago} onValidationChange={setIsFacturacionValid} />}
-        {STEPS[currentStepIndex].id === 'emision' && <EmisionStep tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas} placa={formVehiculo.placaNueva || formCaja.placa} />}
+        {STEPS[currentStepIndex].id === 'datos_iniciales' && (
+          <CajaStep
+            formCaja={formCaja}
+            setFormCaja={setFormCaja}
+          />
+        )}
+        {STEPS[currentStepIndex].id === 'vehiculo' && (
+          <VehiculoStep
+            tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
+            formVehiculo={formVehiculo}
+            setFormVehiculo={setFormVehiculo}
+            formPropietario={formPropietario}
+            setFormPropietario={setFormPropietario}
+            formGlp={formGlp}
+            setFormGlp={setFormGlp}
+            formGnv={formGnv}
+            setFormGnv={setFormGnv}
+            formConformidad={formConformidad}
+            setFormConformidad={setFormConformidad}
+          />
+        )}
+        {STEPS[currentStepIndex].id === 'pago' && (
+          <PagoStep
+            pagoTab={pagoTab}
+            setPagoTab={setPagoTab}
+            formPago={formPago}
+            setFormPago={setFormPago}
+            pagosAgregados={pagosAgregados}
+            handleAgregarPago={handleAgregarPago}
+            eliminarPago={eliminarPago}
+          />
+        )}
+        {STEPS[currentStepIndex].id === 'facturacion' && (
+          <FacturacionStep
+            formFacturacion={formFacturacion}
+            setFormFacturacion={setFormFacturacion}
+          />
+        )}
+        {STEPS[currentStepIndex].id === 'verificacion' && (
+          <VerificacionStep
+            tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
+            formCaja={formCaja}
+            formVehiculo={formVehiculo}
+            formPropietario={formPropietario}
+            formGlp={formGlp}
+            formGnv={formGnv}
+            formConformidad={formConformidad}
+            pagosAgregados={pagosAgregados}
+            formFacturacion={formFacturacion}
+          />
+        )}
       </div>
 
       {/* FOOTER ACTIONS */}
-      {currentStepIndex > 0 && (
-        <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
+      <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
+        {currentStepIndex > 0 ? (
           <button
             type="button"
             onClick={irPasoAnterior}
@@ -686,50 +707,35 @@ export function NuevoCertificadoView() {
           >
             Atrás
           </button>
+        ) : <div></div>}
 
-          <div className="flex flex-col items-end gap-1.5">
-            {currentStepIndex === 2 && !isVehiculoValid && (
-              <p className="text-[10px] text-red-500 font-bold uppercase">
-                Falta completar campos en Datos, SOAT o Propietario
-              </p>
-            )}
-            {currentStepIndex === 3 && !isFacturacionValid && (
-              <p className="text-[10px] text-red-500 font-bold uppercase">
-                Falta completar campos de facturación
-              </p>
-            )}
-            {currentStepIndex === STEPS.length - 1 ? (
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={irSiguientePaso}
-                  disabled={!validarVerificacion() || loading}
-                  className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                    ${!validarVerificacion() || loading
-                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                      : 'bg-gold-3d hover:-translate-y-0.5'
-                    }`}
-                >
-                  {loading ? 'GUARDANDO...' : 'FINALIZAR'}
-                </button>
-              </div>
-            ) : (
+        <div className="flex flex-col items-end gap-1.5">
+          {currentStepIndex === STEPS.length - 1 ? (
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={irSiguientePaso}
-                disabled={(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || loading}
-                className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                  ${(currentStepIndex === 1 && montoPendiente > 0) || (currentStepIndex === 2 && !isVehiculoValid) || (currentStepIndex === 3 && !isFacturacionValid) || loading
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                    : 'bg-gold-3d hover:-translate-y-0.5'
-                  }`}
+                className="bg-gold-3d hover:-translate-y-0.5 rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm"
               >
-                {loading ? 'CARGANDO...' : 'Siguiente Paso'}
+                FINALIZAR
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={irSiguientePaso}
+              disabled={currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || !formCaja.categoria)}
+              className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
+                ${(currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || !formCaja.categoria))
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  : 'bg-gold-3d hover:-translate-y-0.5'
+                }`}
+            >
+              Siguiente Paso
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
     </div>
   );
