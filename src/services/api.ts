@@ -1311,3 +1311,34 @@ export const lineaApi = {
     return parseJsonResponse<any>(response);
   }
 };
+export const authFaregasApi = {
+  loginAsync: async (username: string, password?: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/faregas/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username, password })
+    });
+    if (!response.ok) {
+      const error = await getErrorMessage(response, 'Error en inicio de sesión FAREGAS');
+      throw new Error(error);
+    }
+    return response.json();
+  },
+  confirmarPlantaAsync: async (plantaKey: string, preToken: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/faregas/auth/confirmar-planta`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${preToken}`
+      },
+      body: JSON.stringify({ plantaKey })
+    });
+    if (!response.ok) {
+      const error = await getErrorMessage(response, 'Error al confirmar planta en FAREGAS');
+      throw new Error(error);
+    }
+    return response.json();
+  }
+};

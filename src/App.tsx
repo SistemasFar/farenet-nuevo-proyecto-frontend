@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { LoginView } from './core/views/LoginView';
 import { SelectPlantaView } from './core/views/SelectPlantaView';
+import { SeleccionPlantaView as FaregasSeleccionPlantaView } from './modules/faregas/views/SeleccionPlanta/SeleccionPlantaView';
 import { NotFoundView } from './core/views/NotFoundView';
 import { ForbiddenView } from './core/views/ForbiddenView';
 import { SeleccionEmpresaView } from './core/views/SeleccionEmpresaView';
@@ -22,7 +23,7 @@ import { NuevoCertificadoView as FaregasNuevoCertificadoView } from './modules/f
 import { useEmpresa } from './context/EmpresaContext';
 
 import type { UserSession, PlantaAsignada, EmpresaAsignada } from './types/auth';
-import { authApi, plantaSession, permisosSession } from './services/api';
+import { authApi, authFaregasApi, plantaSession, permisosSession } from './services/api';
 
 export default function App() {
   const navigate = useNavigate();
@@ -34,6 +35,11 @@ export default function App() {
   const [permisos, setPermisos] = useState<string[]>([]);
   const [planta, setPlanta] = useState<PlantaAsignada | null>(null);
   const [plantasDisponibles, setPlantasDisponibles] = useState<PlantaAsignada[]>([]);
+  const [faregasPreToken, setFaregasPreToken] = useState<string>('');
+  const [faregasAccessToken, setFaregasAccessToken] = useState<string>('');
+  const [faregasPlantasDisponibles, setFaregasPlantasDisponibles] = useState<PlantaAsignada[]>([]);
+  const [faregasUser, setFaregasUser] = useState<UserSession | null>(null);
+  const [faregasPlanta, setFaregasPlanta] = useState<PlantaAsignada | null>(null);
   
   const { empresasDisponibles, establecerEmpresasDisponibles, limpiarEmpresa, empresaSeleccionada } = useEmpresa();
 
@@ -55,6 +61,12 @@ export default function App() {
 
   useEffect(() => {
     const restaurarSesion = async () => {
+      const fToken = sessionStorage.getItem('faregasAccessToken');
+      if(fToken) {
+        setFaregasAccessToken(fToken);
+        setFaregasUser(JSON.parse(sessionStorage.getItem('faregasUser') || 'null'));
+        setFaregasPlanta(JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null'));
+      }
       const token = sessionStorage.getItem('accessToken');
       const userRaw = sessionStorage.getItem('user');
       const plantasRaw = sessionStorage.getItem('plantasDisponibles');
@@ -231,6 +243,19 @@ export default function App() {
     setPermisos(permisosActualizados);
   };
 
+  const handleLogoutFaregas = () => {
+    sessionStorage.removeItem('faregasAccessToken');
+    sessionStorage.removeItem('faregasUser');
+    sessionStorage.removeItem('faregasPlanta');
+    sessionStorage.removeItem('faregasPreToken');
+    setFaregasAccessToken('');
+    setFaregasUser(null);
+    setFaregasPlanta(null);
+    setFaregasPreToken('');
+    setFaregasPlantasDisponibles([]);
+    navigate('/login');
+  };
+
   const handleLogout = async () => {
     setPendingPassword('');
     try {
@@ -284,9 +309,28 @@ export default function App() {
               onSelect={async (empresa) => {
                 const esFaregas = empresa.nombre.toUpperCase().includes('FAREGAS');
                 if (esFaregas) {
-                  setPendingPassword(''); // Descartar password inmediatamente
-                  navigate('/faregas/seleccionar-planta');
-                  return;
+                  try {
+                    const resp = await authFaregasApi.loginAsync(usernameContext, pendingPassword);
+                    
+                    setFaregasPreToken(resp.preToken);
+                    sessionStorage.setItem('faregasPreToken', resp.preToken);
+                    
+                    const plantasFaregas = resp.plantas || [];
+                    setFaregasPlantasDisponibles(plantasFaregas);
+                    sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(plantasFaregas));
+                    
+                    if (resp.user) {
+                      setFaregasUser(resp.user);
+                      sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
+                    }
+                    
+                    setPendingPassword('');
+                    navigate('/faregas/seleccionar-planta');
+                    return;
+                  } catch (e: any) {
+                    setPendingPassword('');
+                    throw e;
+                  }
                 }
                 
                 // ES FARENET -> Ejecutar Login original!
@@ -356,44 +400,61 @@ export default function App() {
       <Route
         path="/faregas/*"
         element={
-          !isAuthenticated ? (
-            <Navigate to="/login" replace />
-          ) : !isFaregas ? (
-            <Navigate to="/inicio" replace />
-          ) : (
-            <Routes>
-              <Route 
-                path="seleccionar-planta" 
-                element={
-                  <SelectPlantaView
-                    plantas={plantasDisponibles}
-                    onConfirmPlanta={handleConfirmPlanta}
-                    onCancel={limpiarSesionFrontend}
+          <Routes>
+            <Route 
+              path="seleccionar-planta" 
+              element={
+                (!faregasPreToken && !sessionStorage.getItem('faregasPreToken')) ? (
+                  <Navigate to="/login" replace />
+                ) : (
+                  <FaregasSeleccionPlantaView
+                    plantas={faregasPlantasDisponibles.length > 0 ? faregasPlantasDisponibles : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]')}
+                    onConfirmPlanta={async (plantaKey) => {
+                      const token = faregasPreToken || sessionStorage.getItem('faregasPreToken') || '';
+                      const resp = await authFaregasApi.confirmarPlantaAsync(plantaKey, token);
+                      
+                      setFaregasAccessToken(resp.accessToken);
+                      sessionStorage.setItem('faregasAccessToken', resp.accessToken);
+                      
+                      setFaregasUser(resp.user);
+                      sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
+                      
+                      setFaregasPlanta(resp.plantaSeleccionada);
+                      sessionStorage.setItem('faregasPlanta', JSON.stringify(resp.plantaSeleccionada));
+                      
+                      navigate('/faregas/inicio');
+                      
+                      setTimeout(() => {
+                        setFaregasPreToken('');
+                        sessionStorage.removeItem('faregasPreToken');
+                      }, 100);
+                    }}
+                    onCancel={handleLogoutFaregas}
                   />
-                } 
-              />
-              <Route
-                element={
-                  !isDashboardReady ? (
-                    <Navigate to="/faregas/seleccionar-planta" replace />
-                  ) : (
-                    <FaregasMainLayout
-                      user={user}
-                      permisos={permisos}
-                      plantaSeleccionada={planta}
-                      plantasDisponibles={plantasDisponibles}
-                      onCambiarPlanta={handleCambiarPlanta}
-                      onLogout={handleLogout}
-                    />
-                  )
-                }
-              >
-                <Route path="inicio" element={<FaregasInicioView />} />
-                <Route path="certificados/nuevo" element={<FaregasNuevoCertificadoView />} />
-                <Route path="*" element={<NotFoundView />} />
-              </Route>
-            </Routes>
-          )
+                )
+              } 
+            />
+            <Route
+              element={
+                (!faregasAccessToken && !sessionStorage.getItem('faregasAccessToken')) ? (
+                  <Navigate to="/login" replace />
+                ) : (
+                  <FaregasMainLayout
+                    user={faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || 'null')}
+                    permisos={[]}
+                    plantaSeleccionada={faregasPlanta || JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null')}
+                    plantasDisponibles={[]}
+                    onCambiarPlanta={() => {}}
+                    onLogout={handleLogoutFaregas}
+                  />
+                )
+              }
+            >
+              <Route path="inicio" element={<FaregasInicioView />} />
+              <Route path="certificados/nuevo" element={<FaregasNuevoCertificadoView />} />
+              <Route path="*" element={<NotFoundView />} />
+            </Route>
+          </Routes>
         }
       />
 
