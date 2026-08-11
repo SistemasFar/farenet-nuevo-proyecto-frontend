@@ -148,7 +148,76 @@ export default function App() {
     navigate(esSedeFaregas ? '/faregas/inicio' : '/inicio');
   };
 
-  const handleRequireEmpresa = (
+  
+  const ejecutarLoginEmpresa = async (empresa: EmpresaAsignada, usernameArg?: string, passwordArg?: string) => {
+    const userToUse = usernameArg || usernameContext;
+    const passToUse = passwordArg || pendingPassword;
+    
+    const esFaregas = empresa.nombre.toUpperCase().includes('FAREGAS');
+    if (esFaregas) {
+      try {
+        const resp = await authFaregasApi.loginAsync(userToUse, passToUse);
+        
+        setFaregasPreToken(resp.preToken);
+        sessionStorage.setItem('faregasPreToken', resp.preToken);
+        
+        const plantasFaregas = resp.plantas || [];
+        setFaregasPlantasDisponibles(plantasFaregas);
+        sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(plantasFaregas));
+        
+        if (resp.user) {
+          setFaregasUser(resp.user);
+          sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
+        }
+        
+        setPendingPassword('');
+        navigate('/faregas/seleccionar-planta');
+        return;
+      } catch (e: any) {
+        setPendingPassword('');
+        throw e;
+      }
+    }
+    
+    // ES FARENET -> Ejecutar Login original!
+    try {
+      const resp = await authApi.loginAsync(userToUse, passToUse);
+      
+      setPendingPassword('');
+      
+      const plantasReales = resp.plantas || [];
+      const permisosLocales = resp.permisos || [];
+      const empresasLocales = resp.empresas || [];
+      
+      if (resp.requiereSeleccionarPlanta) {
+        handleRequirePlanta(
+          userToUse,
+          plantasReales,
+          resp.user,
+          permisosLocales
+        );
+        return;
+      }
+
+      if (resp.accessToken && resp.user) {
+        handleLoginSuccess(
+          resp.accessToken,
+          resp.user,
+          permisosLocales,
+          resp.plantaSeleccionada,
+          plantasReales,
+          empresasLocales
+        );
+        return;
+      }
+      
+      throw new Error('No se recibió una sesión válida desde el servidor.');
+    } catch (e: any) {
+       setPendingPassword('');
+       throw e;
+    }
+  };
+  const handleRequireEmpresa = async (
     username: string,
     plantas: PlantaAsignada[],
     empresas: EmpresaAsignada[],
@@ -172,7 +241,12 @@ export default function App() {
     permisosSession.guardar(userPermisos);
     
     establecerEmpresasDisponibles(empresas);
-    navigate('/seleccionar-empresa');
+    
+    if (empresas.length === 1 && password) {
+      await ejecutarLoginEmpresa(empresas[0], username, password);
+    } else {
+      navigate('/seleccionar-empresa');
+    }
   };
 
   const handleRequirePlanta = (
@@ -307,74 +381,7 @@ export default function App() {
             <SeleccionEmpresaView 
               onLogout={handleLogout} 
               onSelect={async (empresa) => {
-                const esFaregas = empresa.nombre.toUpperCase().includes('FAREGAS');
-                if (esFaregas) {
-                  try {
-                    const resp = await authFaregasApi.loginAsync(usernameContext, pendingPassword);
-                    
-                    setFaregasPreToken(resp.preToken);
-                    sessionStorage.setItem('faregasPreToken', resp.preToken);
-                    
-                    const plantasFaregas = resp.plantas || [];
-                    setFaregasPlantasDisponibles(plantasFaregas);
-                    sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(plantasFaregas));
-                    
-                    if (resp.user) {
-                      setFaregasUser(resp.user);
-                      sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
-                    }
-                    
-                    setPendingPassword('');
-                    navigate('/faregas/seleccionar-planta');
-                    return;
-                  } catch (e: any) {
-                    setPendingPassword('');
-                    throw e;
-                  }
-                }
-                
-                // ES FARENET -> Ejecutar Login original!
-                try {
-                  const resp = await authApi.loginAsync(
-                    usernameContext,
-                    pendingPassword
-                  );
-                  
-                  // Borrar password inmediatamente después del uso
-                  setPendingPassword('');
-                  
-                  const plantasReales = resp.plantas || [];
-                  const permisosLocales = resp.permisos || [];
-                  const empresasLocales = resp.empresas || [];
-                  
-                  // flujo FARENET original:
-                  if (resp.requiereSeleccionarPlanta) {
-                    handleRequirePlanta(
-                      usernameContext,
-                      plantasReales,
-                      resp.user,
-                      permisosLocales
-                    );
-                    return;
-                  }
-            
-                  if (resp.accessToken && resp.user) {
-                    handleLoginSuccess(
-                      resp.accessToken,
-                      resp.user,
-                      permisosLocales,
-                      resp.plantaSeleccionada,
-                      plantasReales,
-                      empresasLocales
-                    );
-                    return;
-                  }
-                  
-                  throw new Error('No se recibió una sesión válida desde el servidor.');
-                } catch (e: any) {
-                   setPendingPassword('');
-                   throw e; // El error será atrapado por SeleccionEmpresaView y mostrado en pantalla
-                }
+                await ejecutarLoginEmpresa(empresa);
               }} 
             />
           )

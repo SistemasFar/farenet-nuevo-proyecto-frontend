@@ -73,34 +73,9 @@ const funcionEjecutar = `
   };
 `;
 
-const handleRequireEmpresaOriginal = `  const handleRequireEmpresa = (
-    username: string,
-    plantas: PlantaAsignada[],
-    empresas: EmpresaAsignada[],
-    userData?: UserSession,
-    userPermisos: string[] = [],
-    password?: string
-  ) => {
-    setUsernameContext(username);
-    setPlantasDisponibles(plantas);
-    setPermisos(userPermisos);
+const handleRequireEmpresaRegex = /const handleRequireEmpresa = \([\s\S]*?navigate\('\/seleccionar-empresa'\);\s*\};/;
 
-    if (password) {
-      setPendingPassword(password);
-    }
-
-    if (userData) {
-      setUser(userData);
-      sessionStorage.setItem('user', JSON.stringify(userData));
-    }
-    sessionStorage.setItem('plantasDisponibles', JSON.stringify(plantas));
-    permisosSession.guardar(userPermisos);
-    
-    establecerEmpresasDisponibles(empresas);
-    navigate('/seleccionar-empresa');
-  };`;
-
-const handleRequireEmpresaNuevo = `  const handleRequireEmpresa = async (
+const handleRequireEmpresaNuevo = `const handleRequireEmpresa = async (
     username: string,
     plantas: PlantaAsignada[],
     empresas: EmpresaAsignada[],
@@ -132,17 +107,25 @@ const handleRequireEmpresaNuevo = `  const handleRequireEmpresa = async (
     }
   };`;
 
-const onSelectRegex = /onSelect=\{async \(empresa\) => \{[\s\S]*?\}\} \r?\n\s*\/>/g;
+if(handleRequireEmpresaRegex.test(content)) {
+  content = content.replace(handleRequireEmpresaRegex, funcionEjecutar + '\\n  ' + handleRequireEmpresaNuevo);
+} else {
+  console.log("Could not find handleRequireEmpresa");
+  process.exit(1);
+}
+
+const onSelectRegex = /onSelect=\{async \(empresa\) => \{[\s\S]*?\}\} \r?\n\s*\/>/;
 const onSelectNuevo = `onSelect={async (empresa) => {
                 await ejecutarLoginEmpresa(empresa);
               }} 
             />`;
 
-// Inject funcionEjecutar before handleRequireEmpresaOriginal
-content = content.replace(handleRequireEmpresaOriginal, funcionEjecutar + '\\n' + handleRequireEmpresaNuevo);
-
-// Replace onSelect logic in SeleccionEmpresaView
-content = content.replace(onSelectRegex, onSelectNuevo);
+if(onSelectRegex.test(content)) {
+  content = content.replace(onSelectRegex, onSelectNuevo);
+} else {
+  console.log("Could not find onSelect");
+  process.exit(1);
+}
 
 fs.writeFileSync(path, content, 'utf8');
-console.log('App.tsx updated successfully');
+console.log('App.tsx updated successfully with regex');
