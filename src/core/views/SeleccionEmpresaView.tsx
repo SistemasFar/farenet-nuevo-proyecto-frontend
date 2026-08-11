@@ -20,7 +20,7 @@ const EMPRESA_THEME: Record<string, { colorPrincipal: string; colorHover: string
 
 interface SeleccionEmpresaViewProps {
   onLogout: () => void;
-  onSelect: (empresa: EmpresaAsignada) => void;
+  onSelect: (empresa: EmpresaAsignada) => Promise<void> | void;
 }
 
 export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaViewProps) {
@@ -28,7 +28,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSelectEmpresa = (empresa: EmpresaAsignada) => {
+  const handleSelectEmpresa = async (empresa: EmpresaAsignada) => {
     if (loading) return;
     setLoading(true);
     setError(null);
@@ -42,9 +42,9 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
       seleccionarEmpresa(empresa);
 
       // 3. Informar éxito al componente padre (App) para que cambie la ruta
-      onSelect(empresa);
-    } catch (err) {
-      setError('Ocurrió un error al seleccionar la empresa.');
+      await onSelect(empresa);
+    } catch (err: any) {
+      setError(err.message || 'Ocurrió un error al seleccionar la empresa.');
       setLoading(false);
     }
   };

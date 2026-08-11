@@ -36,7 +36,8 @@ interface LoginViewProps {
     plantas: PlantaAsignada[],
     empresas: EmpresaAsignada[],
     user?: UserSession,
-    permisos?: string[]
+    permisos?: string[],
+    password?: string
   ) => void;
 }
 
@@ -67,60 +68,29 @@ export function LoginView({
     setLoading(true);
 
     try {
-      const resp: LoginResponse = await authApi.loginAsync(
+      const resp = await authApi.detectarEmpresasAsync(
         cleanUsername,
         cleanPassword
       );
 
-      const plantasReales = resp.plantas || [];
-      const permisos = resp.permisos || [];
-      const empresas = resp.empresas || [];
+      const empresas = resp.empresasDisponibles || [];
 
       // Validar si el usuario tiene empresas asignadas
       if (empresas.length === 0) {
         limpiarEmpresa();
-        setError('El usuario no tiene empresas asignadas.');
+        setError('Credenciales inválidas o sin empresas asignadas.');
         return;
       }
 
-      if (empresas.length === 1) {
-        // Tiene 1 sola empresa: Selección automática
-        seleccionarEmpresa(empresas[0]);
-      } else {
-        // Tiene más de 1 empresa: Requiere selector de empresa
-        onRequireEmpresa(
-          cleanUsername,
-          plantasReales,
-          empresas,
-          resp.user,
-          permisos
-        );
-        return;
-      }
-
-      if (resp.requiereSeleccionarPlanta) {
-        onRequirePlanta(
-          cleanUsername,
-          plantasReales,
-          resp.user,
-          permisos
-        );
-        return;
-      }
-
-      if (resp.accessToken && resp.user) {
-        onLoginSuccess(
-          resp.accessToken,
-          resp.user,
-          permisos,
-          resp.plantaSeleccionada,
-          plantasReales,
-          empresas
-        );
-        return;
-      }
-
-      setError('No se recibió una sesión válida desde el servidor.');
+      // Mostrar SIEMPRE la pantalla de selección de empresa (el auto-login a FARENET/FAREGAS se hará después)
+      onRequireEmpresa(
+        cleanUsername,
+        [], // plantas vacías temporalmente, se obtendrán al elegir FARENET
+        empresas,
+        undefined,
+        undefined,
+        cleanPassword
+      );
     } catch (err: unknown) {
       const message =
         err instanceof Error

@@ -29,12 +29,13 @@ export default function App() {
   const [isInitializing, setIsInitializing] = useState(true);
 
   const [usernameContext, setUsernameContext] = useState('');
+  const [pendingPassword, setPendingPassword] = useState('');
   const [user, setUser] = useState<UserSession | null>(null);
   const [permisos, setPermisos] = useState<string[]>([]);
   const [planta, setPlanta] = useState<PlantaAsignada | null>(null);
   const [plantasDisponibles, setPlantasDisponibles] = useState<PlantaAsignada[]>([]);
   
-  const { establecerEmpresasDisponibles, limpiarEmpresa, empresaSeleccionada } = useEmpresa();
+  const { empresasDisponibles, establecerEmpresasDisponibles, limpiarEmpresa, empresaSeleccionada } = useEmpresa();
 
   const isFaregas = empresaSeleccionada?.nombre?.toUpperCase().includes('FAREGAS');
 
@@ -140,11 +141,16 @@ export default function App() {
     plantas: PlantaAsignada[],
     empresas: EmpresaAsignada[],
     userData?: UserSession,
-    userPermisos: string[] = []
+    userPermisos: string[] = [],
+    password?: string
   ) => {
     setUsernameContext(username);
     setPlantasDisponibles(plantas);
     setPermisos(userPermisos);
+
+    if (password) {
+      setPendingPassword(password);
+    }
 
     if (userData) {
       setUser(userData);
@@ -226,6 +232,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    setPendingPassword('');
     try {
       if (user?.username) {
         await authApi.logoutAsync(user.username);
@@ -269,14 +276,61 @@ export default function App() {
       <Route 
         path="/seleccionar-empresa" 
         element={
-          !isAuthenticated ? (
+          !(isAuthenticated || empresasDisponibles.length > 0) ? (
             <Navigate to="/login" replace />
           ) : (
             <SeleccionEmpresaView 
               onLogout={handleLogout} 
-              onSelect={(empresa) => {
+              onSelect={async (empresa) => {
                 const esFaregas = empresa.nombre.toUpperCase().includes('FAREGAS');
-                navigate(esFaregas ? '/faregas/seleccionar-planta' : '/seleccionar-planta');
+                if (esFaregas) {
+                  setPendingPassword(''); // Descartar password inmediatamente
+                  navigate('/faregas/seleccionar-planta');
+                  return;
+                }
+                
+                // ES FARENET -> Ejecutar Login original!
+                try {
+                  const resp = await authApi.loginAsync(
+                    usernameContext,
+                    pendingPassword
+                  );
+                  
+                  // Borrar password inmediatamente después del uso
+                  setPendingPassword('');
+                  
+                  const plantasReales = resp.plantas || [];
+                  const permisosLocales = resp.permisos || [];
+                  const empresasLocales = resp.empresas || [];
+                  
+                  // flujo FARENET original:
+                  if (resp.requiereSeleccionarPlanta) {
+                    handleRequirePlanta(
+                      usernameContext,
+                      plantasReales,
+                      resp.user,
+                      permisosLocales
+                    );
+                    return;
+                  }
+            
+                  if (resp.accessToken && resp.user) {
+                    handleLoginSuccess(
+                      resp.accessToken,
+                      resp.user,
+                      permisosLocales,
+                      resp.plantaSeleccionada,
+                      plantasReales,
+                      empresasLocales
+                    );
+                    return;
+                  }
+                  
+                  throw new Error('No se recibió una sesión válida desde el servidor.');
+                } catch (e: any) {
+                   setPendingPassword('');
+                   throw e; // El error será atrapado por SeleccionEmpresaView y mostrado en pantalla
+                }
               }} 
             />
           )

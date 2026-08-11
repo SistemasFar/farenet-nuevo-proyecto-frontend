@@ -144,6 +144,37 @@ export const authApi = {
     return parseJsonResponse<LoginResponse>(response);
   },
 
+  detectarEmpresasAsync: async (
+    username: string,
+    password?: string
+  ): Promise<{ status: string; empresasDisponibles: any[] }> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/global-auth/detectar-empresas`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        username: username.trim(),
+        password: password?.trim()
+      })
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Credenciales inválidas.');
+      }
+      throw new Error(
+        await getErrorMessage(
+          response,
+          'Usuario o contraseña incorrectos.'
+        )
+      );
+    }
+
+    return parseJsonResponse(response);
+  },
+
   validarSesionAsync: async (
     username: string
   ): Promise<{
