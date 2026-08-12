@@ -6,6 +6,7 @@ export function UsuariosView() {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [perfiles, setPerfiles] = useState<any[]>([]);
   const [plantas, setPlantas] = useState<any[]>([]);
+  const [permisos, setPermisos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -24,14 +25,16 @@ export function UsuariosView() {
     setLoading(true);
     setError('');
     try {
-      const [resUsuarios, resPerfiles, resPlantas] = await Promise.all([
+      const [resUsuarios, resPerfiles, resPlantas, resPermisos] = await Promise.all([
         faregasUsuariosApi.obtenerUsuarios(),
         faregasUsuariosApi.obtenerPerfiles(),
-        faregasUsuariosApi.obtenerPlantas()
+        faregasUsuariosApi.obtenerPlantas(),
+        faregasUsuariosApi.obtenerPermisos()
       ]);
       setUsuarios(resUsuarios);
       setPerfiles(resPerfiles);
       setPlantas(resPlantas);
+      setPermisos(resPermisos);
     } catch (e: any) {
       setError(e.message || 'Error al cargar datos');
     } finally {
@@ -51,9 +54,9 @@ export function UsuariosView() {
         username: usuario.username,
         perfil_id: usuario.perfil_id,
         estado: usuario.estado,
+        sedes: usuario.sedes ? usuario.sedes.map((s:any) => s.key) : [],
         password: '',
-        confirmPassword: '',
-        sedes: usuario.sedes ? usuario.sedes.map((s:any)=>s.key) : []
+        confirmPassword: ''
       });
     } else {
       setModalMode('crear');
@@ -62,11 +65,34 @@ export function UsuariosView() {
         password: '',
         confirmPassword: '',
         perfil_id: perfiles.length > 0 ? perfiles[0].clave : '',
-        estado: true,
-        sedes: []
+        sedes: [],
+        estado: true
       });
     }
     setShowModal(true);
+  };
+
+  const handlePerfilUsuarioChange = (newPerfilId: string) => {
+    if (newPerfilId === 'SISTEMAS') {
+      setFormData({ ...formData, perfil_id: newPerfilId, sedes: [] });
+    } else {
+      const perfilObj = perfiles.find(p => p.clave === newPerfilId);
+      const allowedSedes = perfilObj?.sedes || [];
+      const currentSedes = formData.sedes || [];
+      const validSedes = currentSedes.filter((s: string) => allowedSedes.includes(s));
+      setFormData({ ...formData, perfil_id: newPerfilId, sedes: validSedes });
+    }
+  };
+
+  const handleDeleteUsuario = async (username: string) => {
+    if (confirm(`¿Deseas eliminar el usuario ${username}? Esta acción eliminará el usuario de FAREGAS.`)) {
+      try {
+        await faregasUsuariosApi.eliminarUsuario(username);
+        cargarDatos();
+      } catch (e: any) {
+        alert(e.message || 'Error al eliminar usuario');
+      }
+    }
   };
 
   const handleSaveUsuario = async (e: React.FormEvent) => {
@@ -102,6 +128,15 @@ export function UsuariosView() {
       setFormData({ ...formData, sedes: current.filter((s:string) => s !== key) });
     } else {
       setFormData({ ...formData, sedes: [...current, key] });
+    }
+  };
+
+  const togglePermiso = (clave: string) => {
+    const current = formData.permisos || [];
+    if (current.includes(clave)) {
+      setFormData({ ...formData, permisos: current.filter((p:string) => p !== clave) });
+    } else {
+      setFormData({ ...formData, permisos: [...current, clave] });
     }
   };
 
@@ -218,7 +253,7 @@ export function UsuariosView() {
         {activeTab === 'perfiles' && (
             <button onClick={() => {
                 setModalMode('crear');
-                setFormData({ clave: '', nombre: '', visible: true });
+                setFormData({ clave: '', nombre: '', visible: true, sedes: [], permisos: [] });
                 setShowModal(true);
             }} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-blue-700 shadow-sm">
               + Crear Perfil
@@ -278,9 +313,12 @@ export function UsuariosView() {
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 flex gap-4">
                         <button onClick={() => handleOpenUsuario(u)} className="text-[#052a79] font-bold hover:underline">
                           Editar
+                        </button>
+                        <button onClick={() => handleDeleteUsuario(u.username)} className="text-red-600 font-bold hover:underline">
+                          Eliminar
                         </button>
                       </td>
                     </tr>
@@ -295,7 +333,13 @@ export function UsuariosView() {
                       <td className="px-4 py-3 flex gap-4">
                         <button onClick={() => {
                           setModalMode('editar');
-                          setFormData({ clave: p.clave, nombre: p.nombre, visible: p.visible });
+                          setFormData({ 
+                            clave: p.clave, 
+                            nombre: p.nombre, 
+                            visible: p.visible,
+                            sedes: p.sedes || [],
+                            permisos: p.permisos || []
+                          });
                           setShowModal(true);
                         }} className="text-[#052a79] font-bold hover:underline">
                           Editar
@@ -381,7 +425,7 @@ export function UsuariosView() {
                 <div>
                   <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Perfil</label>
                   <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                    value={formData.perfil_id} onChange={e => setFormData({...formData, perfil_id: e.target.value})}>
+                    value={formData.perfil_id} onChange={e => handlePerfilUsuarioChange(e.target.value)}>
                     {perfiles.map(p => <option key={p.clave} value={p.clave}>{p.nombre}</option>)}
                   </select>
                 </div>
@@ -406,23 +450,45 @@ export function UsuariosView() {
                 <label htmlFor="estadoCheck" className="text-sm font-semibold text-slate-700">Usuario Activo</label>
               </div>
 
-              {formData.perfil_id !== 'SISTEMAS' && (
-                <div className="border-t pt-4">
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {plantas.map(p => (
-                      <label key={p.key} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 cursor-pointer hover:bg-slate-100">
-                        <input type="checkbox" 
-                          className="h-4 w-4 text-[#052a79]"
-                          checked={formData.sedes.includes(p.key)}
-                          onChange={() => toggleSede(p.key)}
-                        />
-                        <span className="font-medium text-slate-700">{p.nombre}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="border-t pt-4">
+                {formData.perfil_id === 'SISTEMAS' ? (
+                  <>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
+                    <div className="text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded p-3">
+                        TODAS LAS SEDES
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles para este Perfil</label>
+                    <div className="mb-2">
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input type="checkbox" 
+                            className="h-4 w-4 text-[#052a79]"
+                            checked={(formData.sedes || []).length === (perfiles.find(p => p.clave === formData.perfil_id)?.sedes || []).length && (formData.sedes || []).length > 0}
+                            onChange={(e) => {
+                                const allowedSedes = perfiles.find(p => p.clave === formData.perfil_id)?.sedes || [];
+                                setFormData({ ...formData, sedes: e.target.checked ? allowedSedes : [] });
+                            }}
+                          />
+                          <span className="font-bold text-[#052a79]">Seleccionar todas</span>
+                        </label>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {plantas.filter(p => (perfiles.find(pf => pf.clave === formData.perfil_id)?.sedes || []).includes(p.key)).map(p => (
+                        <label key={p.key} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 cursor-pointer hover:bg-slate-100">
+                          <input type="checkbox" 
+                            className="h-4 w-4 text-[#052a79]"
+                            checked={(formData.sedes || []).includes(p.key)}
+                            onChange={() => toggleSede(p.key)}
+                          />
+                          <span className="font-medium text-slate-700">{p.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
               </>
               ) : (
                 <>
@@ -442,6 +508,38 @@ export function UsuariosView() {
                     <input type="checkbox" id="visibleCheck" className="h-4 w-4 text-[#052a79]"
                       checked={formData.visible} onChange={e => setFormData({...formData, visible: e.target.checked})} />
                     <label htmlFor="visibleCheck" className="text-sm font-semibold text-slate-700">Perfil Visible</label>
+                  </div>
+                  
+                  <div className="border-t pt-4 mt-4">
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {plantas.map(p => (
+                        <label key={p.key} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 cursor-pointer hover:bg-slate-100">
+                          <input type="checkbox" 
+                            className="h-4 w-4 text-[#052a79]"
+                            checked={(formData.sedes || []).includes(p.key)}
+                            onChange={() => toggleSede(p.key)}
+                          />
+                          <span className="font-medium text-slate-700">{p.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4 mt-4">
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Módulos / Menú</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {permisos.map(p => (
+                        <label key={p.clave} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 cursor-pointer hover:bg-slate-100">
+                          <input type="checkbox" 
+                            className="h-4 w-4 text-[#052a79]"
+                            checked={(formData.permisos || []).includes(p.clave)}
+                            onChange={() => togglePermiso(p.clave)}
+                          />
+                          <span className="font-medium text-slate-700">{p.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </>
               )}

@@ -17,6 +17,7 @@ interface HeaderProps {
   onCambiarPlanta: (plantaKey: string) => Promise<void> | void;
   onToggleSidebar: () => void;
   onLogout: () => void;
+  isFaregas?: boolean;
 }
 
 function routeToTitle(tabId: string): string {
@@ -55,7 +56,8 @@ export function Header({
   activeTab,
   onCambiarPlanta,
   onToggleSidebar,
-  onLogout
+  onLogout,
+  isFaregas
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [changingPlanta, setChangingPlanta] = useState(false);
@@ -200,16 +202,18 @@ export function Header({
                 </div>
 
                 <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDropdownOpen(false);
-                      setPasswordModalOpen(true);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition px-4 py-2.5 text-xs font-bold"
-                  >
-                    Cambiar Contraseña
-                  </button>
+                  {!isFaregas && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        setPasswordModalOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition px-4 py-2.5 text-xs font-bold"
+                    >
+                      Cambiar Contraseña
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={onLogout}

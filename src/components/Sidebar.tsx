@@ -239,13 +239,19 @@ export function Sidebar({
 }: SidebarProps) {
   
   // 🔐 ✨ AQUÍ SE LIBERA EL BLOQUEO ✨ 🔐
-  const menuVisible = menuItems.filter((item) => {
-    // Si estamos en Faregas, solo permitimos Inicio y Usuarios (si es sistemas)
+  let menuVisible = menuItems.filter((item) => {
+    // Si estamos en Faregas, validamos contra los permisos reales del perfil
     if (isFaregas) {
       if (item.key === 'usuarios') {
-        return perfilId.toUpperCase() === 'SISTEMAS';
+        return permisos.includes('MENU_USUARIOS');
       }
-      return item.key === 'inicio';
+      if (item.key === 'inicio') {
+        return permisos.includes('MENU_INICIO');
+      }
+      if (item.key === 'auditoria') {
+        return permisos.includes('MENU_AUDITORIA');
+      }
+      return false;
     }
 
     // Si el usuario es de 'sistemas', la regla estricta no aplica y ve TODO de frente.
@@ -263,6 +269,27 @@ export function Sidebar({
       permisos.includes(permiso)
     );
   });
+
+  // Reordenar dinámicamente si estamos en FAREGAS
+  // Se requiere que AUDITORÍA esté inmediatamente debajo de USUARIOS
+  if (isFaregas) {
+    const sorted = [];
+    menuVisible.forEach(item => {
+      if (item.key !== 'auditoria') {
+        sorted.push(item);
+        if (item.key === 'usuarios') {
+          const auditoriaItem = menuVisible.find(m => m.key === 'auditoria');
+          if (auditoriaItem) sorted.push(auditoriaItem);
+        }
+      }
+    });
+    // In case 'usuarios' was not present but 'auditoria' was (edge case)
+    if (menuVisible.some(m => m.key === 'auditoria') && !sorted.some(m => m.key === 'auditoria')) {
+       const auditoriaItem = menuVisible.find(m => m.key === 'auditoria');
+       if (auditoriaItem) sorted.push(auditoriaItem);
+    }
+    menuVisible = sorted;
+  }
 
   return (
     <aside

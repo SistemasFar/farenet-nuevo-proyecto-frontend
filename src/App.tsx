@@ -20,6 +20,7 @@ import { MainLayout as FaregasMainLayout } from './modules/faregas/views/Dashboa
 import { InicioView as FaregasInicioView } from './modules/faregas/views/Inicio/InicioView';
 import { NuevoCertificadoView as FaregasNuevoCertificadoView } from './modules/faregas/views/NuevoCertificado/NuevoCertificadoView';
 import { UsuariosView as FaregasUsuariosView } from './modules/faregas/views/Usuarios/UsuariosView';
+import { AuditoriaView as FaregasAuditoriaView } from './modules/faregas/views/Auditoria/AuditoriaView';
 
 import { useEmpresa } from './context/EmpresaContext';
 
@@ -449,7 +450,7 @@ export default function App() {
                 ) : (
                   <FaregasMainLayout
                     user={faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || 'null')}
-                    permisos={[]}
+                    permisos={faregasUser?.permisos || JSON.parse(sessionStorage.getItem('faregasUser') || '{}').permisos || []}
                     plantaSeleccionada={faregasPlanta || JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null')}
                     plantasDisponibles={[]}
                     onCambiarPlanta={() => {}}
@@ -465,9 +466,23 @@ export default function App() {
                 element={
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
-                    const profile = fUser?.perfilId || fUser?.perfil_id;
-                    return profile?.toUpperCase() === 'SISTEMAS' ? (
+                    const userPerms = fUser?.permisos || [];
+                    return userPerms.includes('MENU_USUARIOS') ? (
                       <FaregasUsuariosView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                } 
+              />
+              <Route 
+                path="auditoria" 
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    return userPerms.includes('MENU_AUDITORIA') ? (
+                      <FaregasAuditoriaView />
                     ) : (
                       <ForbiddenView />
                     );

@@ -46,6 +46,9 @@ export const faregasUsuariosApi = {
     method: 'PATCH',
     body: JSON.stringify({ password })
   }),
+  eliminarUsuario: (username: string) => fetchWithToken(`/usuarios/${username}`, {
+    method: 'DELETE'
+  }),
   obtenerPerfiles: () => fetchWithToken('/usuarios/perfiles'),
   crearPerfil: (data: any) => fetchWithToken('/usuarios/perfiles', {
     method: 'POST',
@@ -58,5 +61,6 @@ export const faregasUsuariosApi = {
   eliminarPerfil: (clave: string) => fetchWithToken(`/usuarios/perfiles/${clave}`, {
     method: 'DELETE'
   }),
-  obtenerPlantas: () => fetchWithToken('/usuarios/plantas')
+  obtenerPlantas: () => fetchWithToken('/usuarios/plantas'),
+  obtenerPermisos: () => fetchWithToken('/usuarios/permisos')
 };

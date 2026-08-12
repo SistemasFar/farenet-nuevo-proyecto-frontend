@@ -64,7 +64,7 @@ export function MainLayout({
   else if (path.startsWith('/maestros/usuarios') || path.startsWith('/faregas/usuarios')) activeMenu = 'usuarios';
   else if (path.startsWith('/maestros/empresas')) activeMenu = 'empresas';
   else if (path.startsWith('/maestros/descuentos')) activeMenu = 'descuentos';
-  else if (path.startsWith('/auditoria')) activeMenu = 'auditoria';
+  else if (path.startsWith('/auditoria') || path.startsWith('/faregas/auditoria')) activeMenu = 'auditoria';
 
   const contextValue: MainLayoutContext = {
     user,
@@ -95,6 +95,7 @@ export function MainLayout({
           onCambiarPlanta={onCambiarPlanta}
           onToggleSidebar={toggleSidebar}
           onLogout={onLogout}
+          isFaregas={true}
         />
 
         <main className="flex-1 overflow-y-auto p-6 bg-slate-50 transition-all duration-300">
