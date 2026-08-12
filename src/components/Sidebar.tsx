@@ -240,9 +240,12 @@ export function Sidebar({
   
   // 🔐 ✨ AQUÍ SE LIBERA EL BLOQUEO ✨ 🔐
   const menuVisible = menuItems.filter((item) => {
-    // Si estamos en Faregas, solo permitimos Inicio
+    // Si estamos en Faregas, solo permitimos Inicio y Usuarios (si es sistemas)
     if (isFaregas) {
-      if (item.key !== 'inicio') return false;
+      if (item.key === 'usuarios') {
+        return perfilId.toUpperCase() === 'SISTEMAS';
+      }
+      return item.key === 'inicio';
     }
 
     // Si el usuario es de 'sistemas', la regla estricta no aplica y ve TODO de frente.
@@ -306,7 +309,7 @@ export function Sidebar({
           <ul className="flex flex-col gap-1.5">
             {menuVisible.map((item) => {
               const isActive = activeMenu === item.key;
-              const linkPath = isFaregas ? `/faregas${item.path}` : item.path;
+              const linkPath = isFaregas ? (item.key === 'usuarios' ? '/faregas/usuarios' : `/faregas${item.path}`) : item.path;
 
               return (
                 <li key={item.key}>

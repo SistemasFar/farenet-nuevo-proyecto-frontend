@@ -61,7 +61,7 @@ export function MainLayout({
   else if (path.startsWith('/maestros/caja')) activeMenu = 'caja';
   else if (path.startsWith('/maestros/correlativos')) activeMenu = 'correlativos';
   else if (path.startsWith('/maestros/recibos')) activeMenu = 'recibos';
-  else if (path.startsWith('/maestros/usuarios')) activeMenu = 'usuarios';
+  else if (path.startsWith('/maestros/usuarios') || path.startsWith('/faregas/usuarios')) activeMenu = 'usuarios';
   else if (path.startsWith('/maestros/empresas')) activeMenu = 'empresas';
   else if (path.startsWith('/maestros/descuentos')) activeMenu = 'descuentos';
   else if (path.startsWith('/auditoria')) activeMenu = 'auditoria';
@@ -81,7 +81,7 @@ export function MainLayout({
         collapsed={sidebarCollapsed}
         activeMenu={activeMenu}
         permisos={permisos}
-        perfilId={user?.perfilId || ''}
+        perfilId={user?.perfilId || (user as any)?.perfil_id || ''}
         onMouseEnterSidebar={() => setSidebarHover(true)}
         onMouseLeaveSidebar={() => setSidebarHover(false)}
       />

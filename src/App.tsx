@@ -19,6 +19,7 @@ import { LineaView } from './modules/farenet/views/Linea';
 import { MainLayout as FaregasMainLayout } from './modules/faregas/views/Dashboard/MainLayout';
 import { InicioView as FaregasInicioView } from './modules/faregas/views/Inicio/InicioView';
 import { NuevoCertificadoView as FaregasNuevoCertificadoView } from './modules/faregas/views/NuevoCertificado/NuevoCertificadoView';
+import { UsuariosView as FaregasUsuariosView } from './modules/faregas/views/Usuarios/UsuariosView';
 
 import { useEmpresa } from './context/EmpresaContext';
 
@@ -459,6 +460,20 @@ export default function App() {
             >
               <Route path="inicio" element={<FaregasInicioView />} />
               <Route path="certificados/nuevo" element={<FaregasNuevoCertificadoView />} />
+              <Route 
+                path="usuarios" 
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const profile = fUser?.perfilId || fUser?.perfil_id;
+                    return profile?.toUpperCase() === 'SISTEMAS' ? (
+                      <FaregasUsuariosView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                } 
+              />
               <Route path="*" element={<NotFoundView />} />
             </Route>
           </Routes>
