@@ -61,7 +61,7 @@ export function UsuariosView() {
         username: '',
         password: '',
         confirmPassword: '',
-        perfil_id: 'OPERADOR',
+        perfil_id: perfiles.length > 0 ? perfiles[0].clave : '',
         estado: true,
         sedes: []
       });
