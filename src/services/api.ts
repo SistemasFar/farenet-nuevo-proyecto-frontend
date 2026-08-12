@@ -1340,5 +1340,20 @@ export const authFaregasApi = {
       throw new Error(error);
     }
     return response.json();
+  },
+  cambiarPlantaAsync: async (plantaKey: string, token: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/faregas/auth/cambiar-planta`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ plantaKey })
+    });
+    if (!response.ok) {
+      const error = await getErrorMessage(response, 'Error al cambiar de planta en FAREGAS');
+      throw new Error(error);
+    }
+    return response.json();
   }
 };

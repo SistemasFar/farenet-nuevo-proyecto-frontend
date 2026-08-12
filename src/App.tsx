@@ -319,6 +319,24 @@ export default function App() {
     setPermisos(permisosActualizados);
   };
 
+  const handleCambiarPlantaFaregas = async (plantaKey: string) => {
+    const token = faregasAccessToken || sessionStorage.getItem('faregasAccessToken');
+    if (!token) throw new Error('No hay sesión activa en FAREGAS.');
+
+    const resp = await authFaregasApi.cambiarPlantaAsync(plantaKey, token);
+    
+    setFaregasAccessToken(resp.accessToken);
+    sessionStorage.setItem('faregasAccessToken', resp.accessToken);
+    
+    setFaregasPlanta(resp.plantaSeleccionada);
+    sessionStorage.setItem('faregasPlanta', JSON.stringify(resp.plantaSeleccionada));
+    
+    setFaregasUser(resp.user);
+    sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
+    
+    navigate('/faregas/inicio');
+  };
+
   const handleLogoutFaregas = () => {
     sessionStorage.removeItem('faregasAccessToken');
     sessionStorage.removeItem('faregasUser');
@@ -452,8 +470,8 @@ export default function App() {
                     user={faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || 'null')}
                     permisos={faregasUser?.permisos || JSON.parse(sessionStorage.getItem('faregasUser') || '{}').permisos || []}
                     plantaSeleccionada={faregasPlanta || JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null')}
-                    plantasDisponibles={[]}
-                    onCambiarPlanta={() => {}}
+                    plantasDisponibles={faregasPlantasDisponibles.length > 0 ? faregasPlantasDisponibles : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]')}
+                    onCambiarPlanta={handleCambiarPlantaFaregas}
                     onLogout={handleLogoutFaregas}
                   />
                 )
