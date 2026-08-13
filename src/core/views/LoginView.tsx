@@ -116,14 +116,10 @@ export function LoginView({
       </div>
 
       <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
-        <div className="mb-4 text-center">
-          <h1 className="text-6xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
-            FARENET
+        <div className="mb-4 text-center w-full min-w-max">
+          <h1 className="text-4xl whitespace-nowrap font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
+            SISTEMA EN LÍNEA
           </h1>
-
-          <p className="mt-1 text-xl font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
-            Sistema de Línea
-          </p>
         </div>
 
         

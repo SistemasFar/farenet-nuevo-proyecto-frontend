@@ -135,10 +135,7 @@ export function Header({
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
             <NetworkStatus />
-
-            {mostrarBackendStatus && (
-              <BackendStatus />
-            )}
+            <BackendStatus />
           </div>
 
           <div className="relative" ref={dropdownRef}>

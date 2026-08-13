@@ -127,6 +127,15 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
             <p className="text-white/80 font-bold">No se encontraron empresas autorizadas.</p>
           </div>
         )}
+
+        <div className="mt-8 text-center">
+          <button
+            onClick={onLogout}
+            className="text-white/60 hover:text-white/90 text-sm font-bold uppercase tracking-wider transition-colors"
+          >
+            Volver al login
+          </button>
+        </div>
       </div>
     </div>
   );

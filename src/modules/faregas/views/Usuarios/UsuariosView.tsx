@@ -21,6 +21,8 @@ export function UsuariosView() {
   const [formData, setFormData] = useState<any>({});
   const [selectedUsername, setSelectedUsername] = useState('');
 
+  const currentUsername = JSON.parse(sessionStorage.getItem('faregasUser') || '{}').username;
+
   const cargarDatos = async () => {
     setLoading(true);
     setError('');
@@ -317,9 +319,11 @@ export function UsuariosView() {
                         <button onClick={() => handleOpenUsuario(u)} className="text-[#052a79] font-bold hover:underline">
                           Editar
                         </button>
-                        <button onClick={() => handleDeleteUsuario(u.username)} className="text-red-600 font-bold hover:underline">
-                          Eliminar
-                        </button>
+                        {u.username !== currentUsername && (
+                          <button onClick={() => handleDeleteUsuario(u.username)} className="text-red-600 font-bold hover:underline">
+                            Eliminar
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -446,8 +450,9 @@ export function UsuariosView() {
 
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="estadoCheck" className="h-4 w-4 text-[#052a79]"
+                  disabled={modalMode === 'editar' && formData.username === currentUsername}
                   checked={formData.estado} onChange={e => setFormData({...formData, estado: e.target.checked})} />
-                <label htmlFor="estadoCheck" className="text-sm font-semibold text-slate-700">Usuario Activo</label>
+                <label htmlFor="estadoCheck" className={`text-sm font-semibold ${modalMode === 'editar' && formData.username === currentUsername ? 'text-slate-400' : 'text-slate-700'}`}>Usuario Activo</label>
               </div>
 
               <div className="border-t pt-4">

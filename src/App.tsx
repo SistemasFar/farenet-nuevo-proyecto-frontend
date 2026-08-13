@@ -132,7 +132,8 @@ export default function App() {
     userPermisos: string[],
     plantaSeleccionada?: PlantaAsignada | null,
     plantas: PlantaAsignada[] = [],
-    empresas: EmpresaAsignada[] = []
+    empresas: EmpresaAsignada[] = [],
+    isAutoRedirect: boolean = false
   ) => {
     if (!plantaSeleccionada) {
       console.error('No se recibió plantaSeleccionada en login directo.');
@@ -147,11 +148,13 @@ export default function App() {
     
     // Determinamos si redirigir a faregas o farenet según si se autoseleccionó faregas
     const esSedeFaregas = plantaSeleccionada.nombre.toUpperCase().includes('FAREGAS');
-    navigate(esSedeFaregas ? '/faregas/inicio' : '/inicio');
+    setTimeout(() => {
+      navigate(esSedeFaregas ? '/faregas/inicio' : '/inicio', { replace: isAutoRedirect });
+    }, 0);
   };
 
   
-  const ejecutarLoginEmpresa = async (empresa: EmpresaAsignada, usernameArg?: string, passwordArg?: string) => {
+  const ejecutarLoginEmpresa = async (empresa: EmpresaAsignada, usernameArg?: string, passwordArg?: string, isAutoRedirect: boolean = false) => {
     const userToUse = usernameArg || usernameContext;
     const passToUse = passwordArg || pendingPassword;
     
@@ -173,7 +176,9 @@ export default function App() {
         }
         
         setPendingPassword('');
-        navigate('/faregas/seleccionar-planta');
+        setTimeout(() => {
+          navigate('/faregas/seleccionar-planta', { replace: isAutoRedirect });
+        }, 0);
         return;
       } catch (e: any) {
         setPendingPassword('');
@@ -196,7 +201,8 @@ export default function App() {
           userToUse,
           plantasReales,
           resp.user,
-          permisosLocales
+          permisosLocales,
+          isAutoRedirect
         );
         return;
       }
@@ -208,7 +214,8 @@ export default function App() {
           permisosLocales,
           resp.plantaSeleccionada,
           plantasReales,
-          empresasLocales
+          empresasLocales,
+          isAutoRedirect
         );
         return;
       }
@@ -245,9 +252,9 @@ export default function App() {
     establecerEmpresasDisponibles(empresas);
     
     if (empresas.length === 1 && password) {
-      await ejecutarLoginEmpresa(empresas[0], username, password);
+      await ejecutarLoginEmpresa(empresas[0], username, password, true);
     } else {
-      navigate('/seleccionar-empresa');
+      setTimeout(() => navigate('/seleccionar-empresa'), 0);
     }
   };
 
@@ -255,7 +262,8 @@ export default function App() {
     username: string,
     plantas: PlantaAsignada[],
     userData?: UserSession,
-    userPermisos: string[] = []
+    userPermisos: string[] = [],
+    isAutoRedirect: boolean = false
   ) => {
     setUsernameContext(username);
     setPlantasDisponibles(plantas);
@@ -269,7 +277,10 @@ export default function App() {
     permisosSession.guardar(userPermisos);
 
     // Si ya seleccionó FAREGAS en sessionStorage/Context, redirigir a faregas/seleccionar-planta
-    navigate(isFaregas ? '/faregas/seleccionar-planta' : '/seleccionar-planta');
+    setTimeout(() => {
+      const actualIsFaregas = JSON.parse(sessionStorage.getItem('empresaSeleccionada') || '{}')?.nombre?.toUpperCase().includes('FAREGAS');
+      navigate(actualIsFaregas ? '/faregas/seleccionar-planta' : '/seleccionar-planta', { replace: isAutoRedirect });
+    }, 0);
   };
 
   const handleConfirmPlanta = async (plantaKey: string) => {
@@ -295,7 +306,10 @@ export default function App() {
 
     guardarSesionFrontend(token, userData, permisosFinales, resp.plantaSeleccionada, plantasDisponibles);
     
-    navigate(isFaregas ? '/faregas/inicio' : '/inicio');
+    setTimeout(() => {
+      const actualIsFaregas = JSON.parse(sessionStorage.getItem('empresaSeleccionada') || '{}')?.nombre?.toUpperCase().includes('FAREGAS');
+      navigate(actualIsFaregas ? '/faregas/inicio' : '/inicio');
+    }, 0);
   };
 
   const handleCambiarPlanta = async (plantaKey: string) => {
@@ -334,7 +348,9 @@ export default function App() {
     setFaregasUser(resp.user);
     sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
     
-    navigate('/faregas/inicio');
+    setTimeout(() => {
+      navigate('/faregas/inicio');
+    }, 0);
   };
 
   const handleLogoutFaregas = () => {
@@ -347,7 +363,7 @@ export default function App() {
     setFaregasPlanta(null);
     setFaregasPreToken('');
     setFaregasPlantasDisponibles([]);
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   const handleLogout = async () => {
