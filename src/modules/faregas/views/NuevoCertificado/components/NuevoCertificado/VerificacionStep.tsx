@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Eye, X } from 'lucide-react';
 import type { TipoCertificadoFaregas } from '@/types/faregas';
 import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
 import Swal from 'sweetalert2';
@@ -39,6 +39,36 @@ export function VerificacionStep({
   const [validacionResult, setValidacionResult] = useState<{ valido: boolean; errores: any[] } | null>(null);
   const [isEmitting, setIsEmitting] = useState(false);
   const [emisionResult, setEmisionResult] = useState<{ numero_certificado: string; fecha_emision: string; estado: string } | null>(null);
+
+  // Previsualización State
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+
+  const handlePreview = async () => {
+    if (!certificadoId || isLoadingPreview) return;
+    setIsLoadingPreview(true);
+    try {
+      const res = await faregasCertificadosApi.obtenerPrevisualizacion(certificadoId);
+      if (res?.data?.html) {
+        setPreviewHtml(res.data.html);
+        setIsPreviewOpen(true);
+      }
+    } catch (e: any) {
+      if (e.message === 'FORMATO_PREVIEW_PENDIENTE' || e.message?.includes('pendiente')) {
+        Swal.fire({
+          title: 'Formato Pendiente',
+          text: 'El formato oficial de previsualización para esta modalidad aún está pendiente.',
+          icon: 'info',
+          confirmButtonColor: '#052a79'
+        });
+      } else {
+        Swal.fire('Error', e.message || 'No se pudo obtener la previsualización', 'error');
+      }
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   const validar = async () => {
     if (!certificadoId) return;
@@ -177,28 +207,40 @@ export function VerificacionStep({
           </div>
         </div>
         
-        {isValidating ? (
-           <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 font-medium">
-             <Loader2 className="w-5 h-5 animate-spin" />
-             Validando información del certificado...
-           </div>
-        ) : validacionResult?.valido ? (
-          <button 
-            onClick={handleEmitir}
-            disabled={isEmitting}
-            className={`${isEmitting ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'} text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 uppercase tracking-wide`}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePreview}
+            disabled={isLoadingPreview}
+            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-3 rounded-xl transition flex items-center gap-2 text-xs tracking-wider uppercase shadow-md hover:-translate-y-0.5"
           >
-            {isEmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-            {isEmitting ? 'EMITIENDO...' : 'EMITIR CERTIFICADO'}
+            {isLoadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+            {isLoadingPreview ? 'CARGANDO...' : 'PREVISUALIZAR CERTIFICADO'}
           </button>
-        ) : (
-          <button 
-            onClick={validar}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 text-sm"
-          >
-            <AlertCircle className="w-4 h-4" /> Volver a Validar
-          </button>
-        )}
+
+          {isValidating ? (
+             <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 font-medium">
+               <Loader2 className="w-5 h-5 animate-spin" />
+               Validando información del certificado...
+             </div>
+          ) : validacionResult?.valido ? (
+            <button 
+              onClick={handleEmitir}
+              disabled={isEmitting}
+              className={`${isEmitting ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'} text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 uppercase tracking-wide`}
+            >
+              {isEmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+              {isEmitting ? 'EMITIENDO...' : 'EMITIR CERTIFICADO'}
+            </button>
+          ) : (
+            <button 
+              onClick={validar}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 text-sm"
+            >
+              <AlertCircle className="w-4 h-4" /> Volver a Validar
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ERRORES DE VALIDACIÓN */}
@@ -277,7 +319,7 @@ export function VerificacionStep({
               3. Especificaciones {tipoCertificado}
             </h4>
             
-            {tipoCertificado === 'GLP' && (
+            {tipoCertificado === 'GLP_ANUAL' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-y-3 text-sm">
                   <div className="text-slate-500 font-semibold">Propietario:</div>
@@ -293,7 +335,7 @@ export function VerificacionStep({
               </div>
             )}
 
-            {tipoCertificado === 'GNV' && (
+            {tipoCertificado === 'GNV_ANUAL' && (
               <div className="grid grid-cols-2 gap-y-3 text-sm">
                 <div className="text-slate-500 font-semibold">Vigencia Hasta:</div>
                 <div className="font-bold text-slate-800 uppercase">{formGnv.fechaVigencia || '-'}</div>
@@ -362,6 +404,47 @@ export function VerificacionStep({
         </div>
 
       </div>
+
+      {/* MODAL DE PREVISUALIZACIÓN */}
+      {isPreviewOpen && previewHtml && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+            <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-amber-400" />
+                <h3 className="font-bold text-sm uppercase tracking-wider">Previsualización de Certificado (Borrador)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-4 flex-1 bg-slate-100 overflow-hidden">
+              <iframe
+                srcDoc={previewHtml}
+                className="w-full h-[72vh] border border-slate-300 rounded-xl bg-white shadow-inner"
+                title="Previsualización de Certificado FAREGAS"
+              />
+            </div>
+            <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <span className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                ⚠️ Documento sin validez legal. El número definitivo se asigna únicamente al emitir.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-6 py-2 rounded-lg text-xs transition"
+              >
+                Cerrar Previsualización
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -26,8 +26,8 @@ export function VehiculoStep({
   tipoCertificado,
   formVehiculo,
   setFormVehiculo,
-  formPropietario,
-  setFormPropietario,
+  formPropietario: _formPropietario,
+  setFormPropietario: _setFormPropietario,
   formGlp,
   setFormGlp,
   formGnv,
@@ -203,7 +203,11 @@ export function VehiculoStep({
       {/* 2. SECCIÓN DINÁMICA SEGÚN CERTIFICADO */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h4 className="text-lg font-bold text-[#052a79] uppercase tracking-wider mb-6 border-b pb-2">
-          B. INFORMACIÓN ESPECÍFICA: {tipoCertificado || 'NO SELECCIONADO'}
+          B. INFORMACIÓN ESPECÍFICA:{' '}
+          {tipoCertificado === 'GNV_ANUAL' ? 'GNV'
+            : tipoCertificado === 'GLP_ANUAL' ? 'GLP'
+            : tipoCertificado === 'CONFORMIDAD' ? 'CONFORMIDAD'
+            : tipoCertificado || 'NO SELECCIONADO'}
         </h4>
 
         {/* --- DATOS GLP --- */}
@@ -211,6 +215,14 @@ export function VehiculoStep({
           <div className="space-y-6">
             
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD <span className="text-red-500">*</span></label>
+                <select name="modalidad" value={formGlp.modalidad || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
+                  <option value="">-- SELECCIONAR --</option>
+                  <option value="INICIAL">INICIAL</option>
+                  <option value="ANUAL">ANUAL</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO (Opcional)</label>
                 <select name="tallerAutorizadoId" value={formGlp.tallerAutorizadoId || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
@@ -282,6 +294,14 @@ export function VehiculoStep({
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD <span className="text-red-500">*</span></label>
+                <select name="modalidad" value={formGnv.modalidad || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
+                  <option value="">-- SELECCIONAR --</option>
+                  <option value="INICIAL">INICIAL</option>
+                  <option value="ANUAL">ANUAL</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO (Opcional)</label>
                 <select name="tallerAutorizadoId" value={formGnv.tallerAutorizadoId || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
                   <option value="">-- SELECCIONAR --</option>
@@ -294,6 +314,19 @@ export function VehiculoStep({
                 <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA</label>
                 <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
               </div>
+              {formGnv.modalidad === 'INICIAL' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">N° CHIP <span className="text-red-500">*</span> <span className="font-normal text-slate-400">(alfanumérico, máx 15)</span></label>
+                  <input
+                    name="numeroChip"
+                    value={formGnv.numeroChip || ''}
+                    onChange={e => setFormGnv((prev: any) => ({ ...prev, numeroChip: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) }))}
+                    maxLength={15}
+                    className="w-full p-2 border-2 border-amber-300 rounded-lg text-slate-800 font-semibold focus:border-amber-500 focus:ring-0 uppercase transition-colors"
+                    placeholder="EJ: ABC12345"
+                  />
+                </div>
+              )}
             </div>
 
             <div>

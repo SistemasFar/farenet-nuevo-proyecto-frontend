@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Box, FileText, CheckCircle } from 'lucide-react';
-import type { TipoCertificadoFaregas } from '@/types/faregas';
+import { useEffect, useState } from 'react';
+import { Box, CheckCircle } from 'lucide-react';
 import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
 
 interface CajaStepProps {

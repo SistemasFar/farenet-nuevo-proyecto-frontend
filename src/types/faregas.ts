@@ -1,4 +1,4 @@
-export type TipoCertificadoFaregas = 'GLP' | 'GNV' | 'CONFORMIDAD' | null;
+export type TipoCertificadoFaregas = 'GNV_ANUAL' | 'GLP_ANUAL' | 'CONFORMIDAD' | null;
 
 export interface CertificadoGlpData {
   tallerConversion: string;

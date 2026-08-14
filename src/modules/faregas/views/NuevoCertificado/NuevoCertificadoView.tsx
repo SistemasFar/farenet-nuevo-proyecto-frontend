@@ -6,39 +6,17 @@ import { maestrosApi, inspeccionesApi } from '@/services/api';
 import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
-import { CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Search } from 'lucide-react';
+import { CheckCircle2, FileText, User, CreditCard, ArrowLeft, Search } from 'lucide-react';
 import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
 import type { TipoCertificadoFaregas } from '@/types/faregas';
-// TipoCertificadoStep ya no se utiliza en FAREGAS, usamos CajaStep como Datos Iniciales
-import { PropietarioStep } from './components/NuevoCertificado/PropietarioStep';
-import { DatosGlpStep } from './components/NuevoCertificado/glp/DatosGlpStep';
-import { ComponentesGlpStep } from './components/NuevoCertificado/glp/ComponentesGlpStep';
-import { InspeccionGnvStep } from './components/NuevoCertificado/gnv/InspeccionGnvStep';
-import { TipoConformidadStep } from './components/NuevoCertificado/conformidad/TipoConformidadStep';
-import { CaracteristicasFinalesStep } from './components/NuevoCertificado/conformidad/CaracteristicasFinalesStep';
-import { EmisionStep } from './components/NuevoCertificado/EmisionStep';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 
-const customSelectStyles = {
-  control: (base: any, state: any) => ({
-    ...base,
-    borderRadius: '0.5rem',
-    borderColor: state.isFocused ? '#f59e0b' : '#cbd5e1',
-    boxShadow: state.isFocused ? '0 0 0 2px rgba(253, 230, 138, 0.5)' : 'none',
-    '&:hover': { borderColor: state.isFocused ? '#f59e0b' : '#cbd5e1' },
-    minHeight: '38px',
-    fontSize: '0.75rem',
-    fontWeight: '600'
-  }),
-  option: (base: any) => ({ ...base, fontSize: '0.75rem' }),
-  menu: (base: any) => ({ ...base, zIndex: 50 }),
-  menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
-};
+
 
 
 
@@ -102,9 +80,6 @@ export function NuevoCertificadoView() {
 
   const [isConsultado, setIsConsultado] = useState(false);
   
-  
-  
-
   // Estados de vehiculo y facturacion (comunes)
   const [showAnularModal, setShowAnularModal] = useState(false);
   const [showCamposVaciosModal, setShowCamposVaciosModal] = useState(false);
@@ -115,7 +90,7 @@ export function NuevoCertificadoView() {
   const [precioTotal, setPrecioTotal] = useState<number>(0);
 
   const [documentoPago, setDocumentoPago] = useState<string>('');
-  
+
   // Form State (Caja)
   const [formCaja, setFormCaja] = useState<FormCajaState>({
     tipoPlaca: '',
@@ -147,8 +122,6 @@ export function NuevoCertificadoView() {
   const [editingPagoIndex, setEditingPagoIndex] = useState<number | null>(null);
 
   // Form State (Vehículo)
-    // Nuevos estados FAREGAS
-  // El tipoCertificado ahora vive en formCaja.tipoCertificado
   const [formPropietario, setFormPropietario] = useState<any>({});
   const [formGlp, setFormGlp] = useState<any>({});
   const [formGnv, setFormGnv] = useState<any>({});
@@ -194,7 +167,6 @@ export function NuevoCertificadoView() {
     ];
   }, []);
 
-  
   const validarVerificacion = () => {
     return formVerificacion.tipoInspeccion !== '' &&
       formVerificacion.tipoCertificado !== '' &&
@@ -409,6 +381,10 @@ export function NuevoCertificadoView() {
     setFormCaja((prev: any) => ({ ...prev, [name]: value }));
   };
 
+
+
+
+
   
 
   const irSiguientePaso = async () => {
@@ -427,6 +403,33 @@ export function NuevoCertificadoView() {
         Swal.fire('Error', e.message || 'No se pudo crear el borrador', 'error');
       }
     } else if (currentStepIndex < STEPS.length - 1) {
+      // Guardar datos específicos al salir del paso vehiculo
+      if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
+        try {
+          if (formCaja.tipoCertificado === 'GNV_ANUAL') {
+            await faregasCertificadosApi.guardarGnv(certificadoId, {
+              tallerAutorizadoId: formGnv.tallerAutorizadoId || null,
+              vigenciaHasta: formGnv.fechaVigencia || formGnv.vigencia_hasta || null,
+              modalidad: formGnv.modalidad || null,
+              numeroChip: formGnv.numeroChip || formGnv.numero_chip || null,
+            });
+            if (formGnv.verificaciones?.length > 0) {
+              await faregasCertificadosApi.guardarVerificacionesGnv(certificadoId, {
+                verificaciones: formGnv.verificaciones
+              });
+            }
+          } else if (formCaja.tipoCertificado === 'GLP_ANUAL') {
+            await faregasCertificadosApi.guardarGlp(certificadoId, {
+              tallerAutorizadoId: formGlp.tallerAutorizadoId || null,
+              vigenciaHasta: formGlp.fechaVigencia || formGlp.vigencia_hasta || null,
+              expedienteTecnico: formGlp.expedienteTecnico || null,
+              modalidad: formGlp.modalidad || null,
+            });
+          }
+        } catch (e: any) {
+          console.warn("[FAREGAS] Guardado parcial al avanzar paso vehiculo:", e.message);
+        }
+      }
       setCurrentStepIndex(currentStepIndex + 1);
     }
   };

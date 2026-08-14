@@ -93,5 +93,6 @@ export const faregasCertificadosApi = {
   obtenerGlp: (id: number) => fetchWithToken(`/certificados/borradores/${id}/glp`),
   obtenerConformidad: (id: number) => fetchWithToken(`/certificados/borradores/${id}/conformidad`),
   validarEmision: (id: number) => fetchWithToken(`/certificados/borradores/${id}/validar-emision`),
-  emitirCertificado: (id: number) => fetchWithToken(`/certificados/borradores/${id}/emitir`, { method: 'POST' })
+  emitirCertificado: (id: number) => fetchWithToken(`/certificados/borradores/${id}/emitir`, { method: 'POST' }),
+  obtenerPrevisualizacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/previsualizacion`)
 };
