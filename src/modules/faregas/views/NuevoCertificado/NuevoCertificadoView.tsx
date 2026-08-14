@@ -3,6 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from 'react';
 import { maestrosApi, inspeccionesApi } from '@/services/api';
+import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
 import { CheckCircle2, FileText, User, CreditCard, Box, ArrowLeft, Search } from 'lucide-react';
@@ -90,8 +91,8 @@ export interface FormVerificacionState {
 export function NuevoCertificadoView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
-  const { nroInspeccion } = useParams<{ nroInspeccion: string }>();
-  const inspeccionIdToResume = nroInspeccion || null;
+  const { id } = useParams<{ id?: string }>();
+  const [certificadoId, setCertificadoId] = useState<number | undefined>(id ? parseInt(id, 10) : undefined);
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
@@ -114,8 +115,7 @@ export function NuevoCertificadoView() {
   const [precioTotal, setPrecioTotal] = useState<number>(0);
 
   const [documentoPago, setDocumentoPago] = useState<string>('');
-  const [nrodocumentoinspeccion, setNrodocumentoinspeccion] = useState<string>('');
-
+  
   // Form State (Caja)
   const [formCaja, setFormCaja] = useState<FormCajaState>({
     tipoPlaca: '',
@@ -154,6 +154,10 @@ export function NuevoCertificadoView() {
   const [formGnv, setFormGnv] = useState<any>({});
   const [formConformidad, setFormConformidad] = useState<any>({});
   
+  const [titulares, setTitulares] = useState<any[]>([]);
+  const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
+  const [talleres, setTalleres] = useState<any[]>([]);
+  const [isEmitido, setIsEmitido] = useState(false);
   const [isVehiculoValid, setIsVehiculoValid] = useState(false);
   const [vehiculoTab, setVehiculoTab] = useState<'DATOS' | 'SOAT'>('DATOS');
   const [formVehiculo, setFormVehiculo] = useState<FormVehiculoState>({
@@ -214,72 +218,57 @@ export function NuevoCertificadoView() {
 
 
   useEffect(() => {
-    const initNroInspeccion = async () => {
+    const cargarBorrador = async () => {
+      if (!certificadoId) return;
       try {
-        if (inspeccionIdToResume && inspeccionIdToResume !== 'nueva') {
-          const res = await inspeccionesApi.obtenerProceso(inspeccionIdToResume);
-          if (res) {
-            if (res.data.inspeccionestado_key === 'CON' || Number(res.data.posicion) === 5) {
-              Swal.fire({
-                icon: 'info',
-                title: 'Inspección en línea',
-                text: 'Esta inspección ya ha sido enviada a la línea de inspección.',
-                confirmButtonText: 'Ir a Línea'
-              }).then((result) => {
-                if (result.isConfirmed) {
-                  if (inspeccionIdToResume) {
-                    navigate(`/linea/${inspeccionIdToResume}`);
-                  } else {
-                    navigate('/faregas/inicio');
-                  }
-                }
-              });
-              return;
-            }
-
-            setNrodocumentoinspeccion(inspeccionIdToResume);
-            if (res.data.formCaja) {
-              setFormCaja(res.data.formCaja);
-              
-            }
-            if (res.data.formVehiculo) setFormVehiculo(res.data.formVehiculo);
-            if (res.data.formFacturacion) setFormFacturacion(res.data.formFacturacion);
-            if (res.data.formVerificacion) setFormVerificacion(res.data.formVerificacion);
-            if (res.data.pagosAgregados) setPagosAgregados(res.data.pagosAgregados);
-            if (res.data.documentoPago) setDocumentoPago(res.data.documentoPago);
-            if (res.data.precioSubtotal !== undefined) setPrecioSubtotal(Number(res.data.precioSubtotal));
-            if (res.data.descuento !== undefined) setDescuento(Number(res.data.descuento));
-            if (res.data.precioTotal !== undefined) {
-              console.log("[DEBUG] Hidratando precioTotal con: ", res.data.precioTotal);
-              setPrecioTotal(Number(res.data.precioTotal));
-            }
-
-            if (res.data.isConsultado !== undefined) setIsConsultado(res.data.isConsultado);
-            if (res.data.puedeModificarFlujo1 !== undefined) 
-
-            if (res.data.posicion !== undefined && res.data.posicion !== null) {
-              const pos = Number(res.data.posicion);
-              
-              setCurrentStepIndex(pos);
-            }
+        setLoading(true);
+        const res = await faregasCertificadosApi.obtenerBorradorCompleto(certificadoId);
+        if (res?.data) {
+          // Hidratar estado del borrador
+          if (res.data.tipoCertificadoClave) setFormCaja(prev => ({...prev, tipoCertificado: res.data.tipoCertificadoClave}));
+          
+          if (res.data.vehiculo) {
+             setFormVehiculo(prev => ({
+                ...prev,
+                placaNueva: res.data.vehiculo.placa || '',
+                marca: res.data.vehiculo.marca || '',
+                modelo: res.data.vehiculo.modelo || '',
+                carroceria: res.data.vehiculo.carroceria || '',
+                color: res.data.vehiculo.color || '',
+                clase: res.data.vehiculo.clase || '',
+                combustible: res.data.vehiculo.combustible || '',
+                nroSerie: res.data.vehiculo.serie || '',
+                nroMotor: res.data.vehiculo.motor || '',
+                anioFabricacion: res.data.vehiculo.anoFabricacion?.toString() || '',
+                nroAsientos: res.data.vehiculo.asientos?.toString() || '',
+                nroCilindros: res.data.vehiculo.cilindros?.toString() || '',
+                nroEjes: res.data.vehiculo.ejes?.toString() || '',
+                nroRuedas: res.data.vehiculo.ruedas?.toString() || '',
+                nroPasajeros: res.data.vehiculo.pasajeros?.toString() || '',
+                pesoSeco: res.data.vehiculo.pesoSeco?.toString() || '',
+                pesoBruto: res.data.vehiculo.pesoBruto?.toString() || '',
+                cargaUtil: res.data.vehiculo.cargaUtil?.toString() || '',
+                longitud: res.data.vehiculo.longitud?.toString() || '',
+                altura: res.data.vehiculo.altura?.toString() || '',
+                ancho: res.data.vehiculo.ancho?.toString() || ''
+             }));
           }
-        } else if (!nrodocumentoinspeccion && plantaSeleccionada) {
-          console.log('FRONTEND DEBUG: Llamando a generarNroInspeccion con planta:', plantaSeleccionada);
-          const res = await inspeccionesApi.generarNroInspeccion(plantaSeleccionada);
-          console.log('FRONTEND DEBUG: Respuesta generarNroInspeccion:', res);
-          if (res?.nrodocumentoinspeccion) {
-            setNrodocumentoinspeccion(res.nrodocumentoinspeccion);
-          } else {
-            alert("DEBUG INFO: El API respondió pero no trajo nrodocumentoinspeccion. Respuesta: " + JSON.stringify(res));
-          }
+          if (res.data.titulares) setTitulares(res.data.titulares);
+          
+          if (res.data.gnv) setFormGnv(res.data.gnv);
+          if (res.data.glp) setFormGlp(res.data.glp);
+          if (res.data.conformidad) setFormConformidad(res.data.conformidad);
+
+          console.log("[DEBUG] Borrador FAREGAS recuperado con éxito:", res.data.id);
         }
-      } catch (e: any) {
-        console.error('Error al generar NRO', e);
-        alert("DEBUG INFO: Hubo un error al generar el NRO: " + (e.message || ''));
+      } catch (error) {
+        console.error("Error al cargar borrador FAREGAS:", error);
+      } finally {
+        setLoading(false);
       }
     };
-    initNroInspeccion();
-  }, [plantaSeleccionada, nrodocumentoinspeccion, inspeccionIdToResume]);
+    cargarBorrador();
+  }, [certificadoId]);
 
   const cargarMaestros = async () => {
     try {
@@ -422,8 +411,22 @@ export function NuevoCertificadoView() {
 
   
 
-    const irSiguientePaso = () => {
-    if (currentStepIndex < STEPS.length - 1) {
+  const irSiguientePaso = async () => {
+    if (currentStepIndex === 0 && !certificadoId) {
+      try {
+        const res = await faregasCertificadosApi.crearBorrador({
+          tipoCertificadoClave: formCaja.tipoCertificado
+        });
+        if (res?.data?.id) {
+          setCertificadoId(res.data.id);
+          console.log("[DEBUG] Borrador FAREGAS creado con ID:", res.data.id);
+          setCurrentStepIndex(currentStepIndex + 1);
+        }
+      } catch (e: any) {
+        console.error("Error al crear borrador FAREGAS", e);
+        Swal.fire('Error', e.message || 'No se pudo crear el borrador', 'error');
+      }
+    } else if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(currentStepIndex + 1);
     }
   };
@@ -663,6 +666,10 @@ export function NuevoCertificadoView() {
             setFormGnv={setFormGnv}
             formConformidad={formConformidad}
             setFormConformidad={setFormConformidad}
+            titulares={titulares}
+            setTitulares={setTitulares}
+            catalogoVerificaciones={catalogoVerificaciones}
+            talleres={talleres}
           />
         )}
         {STEPS[currentStepIndex].id === 'pago' && (
@@ -684,6 +691,8 @@ export function NuevoCertificadoView() {
         )}
         {STEPS[currentStepIndex].id === 'verificacion' && (
           <VerificacionStep
+            certificadoId={certificadoId}
+            onEmisionExitosa={() => setIsEmitido(true)}
             tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
             formCaja={formCaja}
             formVehiculo={formVehiculo}
@@ -699,7 +708,7 @@ export function NuevoCertificadoView() {
 
       {/* FOOTER ACTIONS */}
       <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
-        {currentStepIndex > 0 ? (
+        {currentStepIndex > 0 && !isEmitido ? (
           <button
             type="button"
             onClick={irPasoAnterior}
@@ -712,13 +721,15 @@ export function NuevoCertificadoView() {
         <div className="flex flex-col items-end gap-1.5">
           {currentStepIndex === STEPS.length - 1 ? (
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={irSiguientePaso}
-                className="bg-gold-3d hover:-translate-y-0.5 rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm"
-              >
-                FINALIZAR
-              </button>
+              {!isEmitido && (
+                <button
+                  type="button"
+                  onClick={irSiguientePaso}
+                  className="bg-gold-3d hover:-translate-y-0.5 rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm"
+                >
+                  FINALIZAR
+                </button>
+              )}
             </div>
           ) : (
             <button

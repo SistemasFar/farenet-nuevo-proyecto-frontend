@@ -1,5 +1,8 @@
-import React from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import type { TipoCertificadoFaregas } from '@/types/faregas';
+import { TitularesList, type TitularState } from './TitularesList';
+import React, { useEffect } from 'react';
 
 interface VehiculoStepProps {
   tipoCertificado: TipoCertificadoFaregas;
@@ -13,6 +16,10 @@ interface VehiculoStepProps {
   setFormGnv: (data: any) => void;
   formConformidad: any;
   setFormConformidad: (data: any) => void;
+  titulares: TitularState[];
+  setTitulares: React.Dispatch<React.SetStateAction<TitularState[]>>;
+  catalogoVerificaciones?: any;
+  talleres?: any[];
 }
 
 export function VehiculoStep({
@@ -26,14 +33,47 @@ export function VehiculoStep({
   formGnv,
   setFormGnv,
   formConformidad,
-  setFormConformidad
+  setFormConformidad,
+  titulares,
+  setTitulares,
+  catalogoVerificaciones,
+  talleres
 }: VehiculoStepProps) {
+  
+  // Initialize verificaciones based on catalog
+  useEffect(() => {
+    if (tipoCertificado === 'GNV_ANUAL' && catalogoVerificaciones?.GNV_ANUAL && (!formGnv.verificaciones || formGnv.verificaciones.length === 0)) {
+      setFormGnv((prev: any) => ({
+        ...prev,
+        verificaciones: catalogoVerificaciones.GNV_ANUAL.map((v: any) => ({
+          codigo: v.codigo,
+          orden: v.orden,
+          descripcion: v.descripcion,
+          cumple: null,
+          observacion: ''
+        }))
+      }));
+    }
+    if (tipoCertificado === 'GLP_ANUAL' && catalogoVerificaciones?.GLP_ANUAL && (!formGlp.verificaciones || formGlp.verificaciones.length === 0)) {
+      setFormGlp((prev: any) => ({
+        ...prev,
+        verificaciones: catalogoVerificaciones.GLP_ANUAL.map((v: any) => ({
+          codigo: v.codigo,
+          orden: v.orden,
+          descripcion: v.descripcion,
+          cumple: null,
+          observacion: ''
+        })),
+        componentes: [
+          { componente: 'CILINDRO', marca: '', modelo: '', capacidad: '', anioFabricacion: '', numeroSerie: '' },
+          { componente: 'REGULADOR', marca: '', modelo: '', capacidad: '', anioFabricacion: '', numeroSerie: '' }
+        ]
+      }));
+    }
+  }, [tipoCertificado, catalogoVerificaciones]);
+
   const handleVehiculo = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormVehiculo((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
-  };
-
-  const handlePropietario = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormPropietario((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
 
   const handleGlp = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -46,6 +86,24 @@ export function VehiculoStep({
 
   const handleConformidad = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormConformidad((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
+  };
+
+  const handleVerificacionGnv = (idx: number, campo: string, valor: any) => {
+    const nv = [...(formGnv.verificaciones || [])];
+    nv[idx] = { ...nv[idx], [campo]: valor };
+    setFormGnv((prev: any) => ({ ...prev, verificaciones: nv }));
+  };
+
+  const handleVerificacionGlp = (idx: number, campo: string, valor: any) => {
+    const nv = [...(formGlp.verificaciones || [])];
+    nv[idx] = { ...nv[idx], [campo]: valor };
+    setFormGlp((prev: any) => ({ ...prev, verificaciones: nv }));
+  };
+
+  const handleComponenteGlp = (idx: number, campo: string, valor: any) => {
+    const nc = [...(formGlp.componentes || [])];
+    nc[idx] = { ...nc[idx], [campo]: valor.toUpperCase() };
+    setFormGlp((prev: any) => ({ ...prev, componentes: nc }));
   };
 
   return (
@@ -74,12 +132,20 @@ export function VehiculoStep({
             <input name="anioFabricacion" value={formVehiculo.anioFabricacion || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">VIN / CHASIS</label>
-            <input name="nroSerie" value={formVehiculo.nroSerie || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">AÑO MODELO</label>
+            <input name="anioModelo" value={formVehiculo.anioModelo || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">VIN</label>
+            <input name="vin" value={formVehiculo.vin || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">SERIE CHASIS</label>
+            <input name="serieChasis" value={formVehiculo.serieChasis || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">N° MOTOR</label>
-            <input name="nroMotor" value={formVehiculo.nroMotor || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+            <input name="numeroMotor" value={formVehiculo.numeroMotor || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">COMBUSTIBLE</label>
@@ -90,22 +156,48 @@ export function VehiculoStep({
             <input name="color" value={formVehiculo.color || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">CILINDROS / CILINDRADA</label>
-            <input name="nroCilindros" value={formVehiculo.nroCilindros || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">NÚMERO CILINDROS</label>
+            <input name="numeroCilindros" value={formVehiculo.numeroCilindros || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">CILINDRADA</label>
+            <input name="cilindrada" value={formVehiculo.cilindrada || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">EJES / RUEDAS</label>
-            <input name="nroEjes" value={formVehiculo.nroEjes || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+            <div className="flex gap-2">
+                <input name="numeroEjes" value={formVehiculo.numeroEjes || ''} onChange={handleVehiculo} className="w-1/2 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Ejes" />
+                <input name="numeroRuedas" value={formVehiculo.numeroRuedas || ''} onChange={handleVehiculo} className="w-1/2 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Ruedas" />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">ASIENTOS / PASAJEROS</label>
-            <input name="nroAsientos" value={formVehiculo.nroAsientos || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+            <div className="flex gap-2">
+                <input name="numeroAsientos" value={formVehiculo.numeroAsientos || ''} onChange={handleVehiculo} className="w-1/2 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Asientos" />
+                <input name="numeroPasajeros" value={formVehiculo.numeroPasajeros || ''} onChange={handleVehiculo} className="w-1/2 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Pasajeros" />
+            </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">PESO NETO / BRUTO</label>
-            <input name="pesoNeto" value={formVehiculo.pesoNeto || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">PESO NETO / BRUTO / UTIL</label>
+            <div className="flex gap-2">
+              <input name="pesoNeto" value={formVehiculo.pesoNeto || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Neto" />
+              <input name="pesoBruto" value={formVehiculo.pesoBruto || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Bruto" />
+              <input name="cargaUtil" value={formVehiculo.cargaUtil || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Util" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">POTENCIA</label>
+            <input name="potencia" value={formVehiculo.potencia || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">FÓRMULA RODANTE</label>
+            <input name="formulaRodante" value={formVehiculo.formulaRodante || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
         </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <TitularesList titulares={titulares} setTitulares={setTitulares} />
       </div>
 
       {/* 2. SECCIÓN DINÁMICA SEGÚN CERTIFICADO */}
@@ -115,17 +207,28 @@ export function VehiculoStep({
         </h4>
 
         {/* --- DATOS GLP --- */}
-        {tipoCertificado === 'GLP' && (
+        {tipoCertificado === 'GLP_ANUAL' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">PROPIETARIO DEL VEHÍCULO</label>
-                <input name="nombre" value={formPropietario.nombre || ''} onChange={handlePropietario} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Nombre completo" />
+                <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO (Opcional)</label>
+                <select name="tallerAutorizadoId" value={formGlp.tallerAutorizadoId || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
+                  <option value="">-- SELECCIONAR --</option>
+                  {talleres?.map(t => (
+                    <option key={t.id} value={t.id}>{t.nombre}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">DIRECCIÓN PROPIETARIO</label>
-                <input name="direccion" value={formPropietario.direccion || ''} onChange={handlePropietario} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Dirección" />
+                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA</label>
+                <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
               </div>
+            </div>
+
+            <div>
+               <label className="block text-xs font-bold text-slate-500 mb-1">EXPEDIENTE TÉCNICO</label>
+               <input name="expedienteTecnico" value={formGlp.expedienteTecnico || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
@@ -137,73 +240,55 @@ export function VehiculoStep({
                 <div>Año</div>
                 <div>N° Serie</div>
               </div>
-              {/* Cilindro */}
-              <div className="grid grid-cols-5 gap-2 mb-2">
-                <div className="font-bold pt-2">CILINDRO</div>
-                <input name="cilindroMarca" value={formGlp.cilindroMarca || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-                <input name="cilindroModelo" value={formGlp.cilindroModelo || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-                <input name="cilindroAnio" value={formGlp.cilindroAnio || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-                <input name="cilindroSerie" value={formGlp.cilindroSerie || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-              </div>
-              {/* Regulador */}
-              <div className="grid grid-cols-5 gap-2">
-                <div className="font-bold pt-2">REGULADOR</div>
-                <input name="reguladorMarca" value={formGlp.reguladorMarca || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-                <input name="reguladorModelo" value={formGlp.reguladorModelo || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-                <div className="text-center text-slate-400 pt-2">-</div>
-                <input name="reguladorSerie" value={formGlp.reguladorSerie || ''} onChange={handleGlp} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-              </div>
+              {formGlp.componentes?.map((comp: any, idx: number) => (
+                <div key={idx} className="grid grid-cols-5 gap-2 mb-2">
+                  <div className="font-bold pt-2">{comp.componente}</div>
+                  <input value={comp.marca || ''} onChange={e => handleComponenteGlp(idx, 'marca', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Marca" />
+                  <input value={comp.modelo || ''} onChange={e => handleComponenteGlp(idx, 'modelo', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Modelo" />
+                  {comp.componente === 'REGULADOR' ? <div className="text-center text-slate-400 pt-2">-</div> : <input value={comp.anioFabricacion || ''} onChange={e => handleComponenteGlp(idx, 'anioFabricacion', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Año" />}
+                  <input value={comp.numeroSerie || ''} onChange={e => handleComponenteGlp(idx, 'numeroSerie', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="N° Serie" />
+                </div>
+              ))}
             </div>
 
             <div>
               <h5 className="font-bold text-slate-700 mb-3">VERIFICACIONES DE SEGURIDAD GLP</h5>
-              <div className="space-y-2">
-                {['Instalación segura', 'Ventilación adecuada', 'Ausencia de fugas', 'Cierre hermético'].map(item => (
-                  <div key={item} className="flex items-center gap-2">
-                    <input type="checkbox" className="w-4 h-4" />
-                    <span className="text-sm">{item}</span>
+              <div className="space-y-3">
+                {formGlp.verificaciones?.map((verif: any, idx: number) => (
+                  <div key={idx} className={`flex flex-col gap-2 bg-slate-50 p-3 rounded border ${verif.cumple === null ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'}`}>
+                    <p className="text-sm font-semibold text-slate-800">{verif.codigo}) {verif.descripcion}</p>
+                    <div className="flex items-center gap-6 mt-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name={`glp-verif-${idx}`} checked={verif.cumple === true} onChange={() => handleVerificacionGlp(idx, 'cumple', true)} className="w-4 h-4 text-[#052a79]" />
+                        <span className="text-xs font-bold text-slate-700">CUMPLE</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name={`glp-verif-${idx}`} checked={verif.cumple === false} onChange={() => handleVerificacionGlp(idx, 'cumple', false)} className="w-4 h-4 text-red-600" />
+                        <span className="text-xs font-bold text-red-600">NO CUMPLE</span>
+                      </label>
+                    </div>
+                    {verif.cumple === false && (
+                      <input value={verif.observacion || ''} onChange={e => handleVerificacionGlp(idx, 'observacion', e.target.value)} className="w-full p-2 border-2 border-red-300 rounded-md text-slate-800 text-xs mt-2" placeholder="Indicar observación obligatoria..." />
+                    )}
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">FECHA EMISIÓN</label>
-                <input type="date" name="fechaEmision" value={formGlp.fechaEmision || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA</label>
-                <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">OBSERVACIONES</label>
-              <input name="observaciones" value={formGlp.observaciones || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
             </div>
           </div>
         )}
 
         {/* --- DATOS GNV --- */}
-        {tipoCertificado === 'GNV' && (
+        {tipoCertificado === 'GNV_ANUAL' && (
           <div className="space-y-6">
-            <div>
-              <h5 className="font-bold text-slate-700 mb-3">VERIFICACIONES DE INSPECCIÓN ANUAL GNV</h5>
-              <div className="grid grid-cols-2 gap-2">
-                {['Equipo completo registrado', 'Ausencia de fugas', 'Cilindro sin deterioro', 'Sistema conforme a PEC', 'Tuberías alta/baja presión', 'Controles del tablero'].map(item => (
-                  <div key={item} className="flex items-center gap-2">
-                    <input type="checkbox" className="w-4 h-4" />
-                    <span className="text-sm">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">FECHA EMISIÓN</label>
-                <input type="date" name="fechaEmision" value={formGnv.fechaEmision || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO (Opcional)</label>
+                <select name="tallerAutorizadoId" value={formGnv.tallerAutorizadoId || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
+                  <option value="">-- SELECCIONAR --</option>
+                  {talleres?.map(t => (
+                    <option key={t.id} value={t.id}>{t.nombre}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA</label>
@@ -212,8 +297,27 @@ export function VehiculoStep({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">OBSERVACIONES</label>
-              <input name="observaciones" value={formGnv.observaciones || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              <h5 className="font-bold text-slate-700 mb-3">VERIFICACIONES DE INSPECCIÓN ANUAL GNV</h5>
+              <div className="space-y-3">
+                 {formGnv.verificaciones?.map((verif: any, idx: number) => (
+                  <div key={idx} className={`flex flex-col gap-2 bg-slate-50 p-3 rounded border ${verif.cumple === null ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'}`}>
+                    <p className="text-sm font-semibold text-slate-800">{verif.codigo}) {verif.descripcion}</p>
+                    <div className="flex items-center gap-6 mt-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name={`gnv-verif-${idx}`} checked={verif.cumple === true} onChange={() => handleVerificacionGnv(idx, 'cumple', true)} className="w-4 h-4 text-[#052a79]" />
+                        <span className="text-xs font-bold text-slate-700">CUMPLE</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name={`gnv-verif-${idx}`} checked={verif.cumple === false} onChange={() => handleVerificacionGnv(idx, 'cumple', false)} className="w-4 h-4 text-red-600" />
+                        <span className="text-xs font-bold text-red-600">NO CUMPLE</span>
+                      </label>
+                    </div>
+                    {verif.cumple === false && (
+                      <input value={verif.observacion || ''} onChange={e => handleVerificacionGnv(idx, 'observacion', e.target.value)} className="w-full p-2 border-2 border-red-300 rounded-md text-slate-800 text-xs mt-2" placeholder="Indicar observación obligatoria..." />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -231,16 +335,9 @@ export function VehiculoStep({
                   <option value="FABRICACION">FABRICACIÓN</option>
                 </select>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">RAZÓN SOCIAL / PERSONA NATURAL</label>
-                <input name="razonSocial" value={formConformidad.razonSocial || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">DIRECCIÓN</label>
-                <input name="direccion" value={formConformidad.direccion || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TRÁMITE</label>
+                <input name="tipoTramite" value={formConformidad.tipoTramite || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
               </div>
             </div>
 
@@ -248,12 +345,20 @@ export function VehiculoStep({
               <h5 className="font-bold text-slate-700 mb-3">CARACTERÍSTICAS REGISTRABLES Y MOTIVO</h5>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">MOTIVO / CARACTERÍSTICA A CERTIFICAR</label>
-                  <input name="motivo" value={formConformidad.motivo || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="EJ: RECTIFICACIÓN DE NÚMERO DE EJES" />
+                  <label className="block text-xs font-bold text-slate-500 mb-1">CARACTERÍSTICA A CERTIFICAR</label>
+                  <input name="caracteristicaRegistrable" value={formConformidad.caracteristicaRegistrable || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="EJ: NÚMERO DE EJES" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">MOTIVO</label>
+                  <input name="motivo" value={formConformidad.motivo || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="EJ: RECTIFICACIÓN" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">USO ORIGINAL DEL VEHÍCULO</label>
+                  <input name="usoOriginalVehiculo" value={formConformidad.usoOriginalVehiculo || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">DESCRIPCIÓN / OBSERVACIONES COMPLEMENTARIAS</label>
-                  <input name="observaciones" value={formConformidad.observaciones || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                  <input name="descripcion" value={formConformidad.descripcion || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
                 </div>
               </div>
             </div>

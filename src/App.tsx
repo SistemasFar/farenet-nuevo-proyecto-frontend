@@ -484,7 +484,7 @@ export default function App() {
                 ) : (
                   <FaregasMainLayout
                     user={faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || 'null')}
-                    permisos={faregasUser?.permisos || JSON.parse(sessionStorage.getItem('faregasUser') || '{}').permisos || []}
+                    permisos={(faregasUser as any)?.permisos || (JSON.parse(sessionStorage.getItem('faregasUser') || 'null') || {})?.permisos || []}
                     plantaSeleccionada={faregasPlanta || JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null')}
                     plantasDisponibles={faregasPlantasDisponibles.length > 0 ? faregasPlantasDisponibles : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]')}
                     onCambiarPlanta={handleCambiarPlantaFaregas}
@@ -495,6 +495,7 @@ export default function App() {
             >
               <Route path="inicio" element={<FaregasInicioView />} />
               <Route path="certificados/nuevo" element={<FaregasNuevoCertificadoView />} />
+              <Route path="certificados/:id/continuar" element={<FaregasNuevoCertificadoView />} />
               <Route 
                 path="usuarios" 
                 element={

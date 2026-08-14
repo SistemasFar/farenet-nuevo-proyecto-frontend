@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
+import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
 import { operacionApi } from '@/services/api';
-
 const SOCKET_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '')
   : 'http://127.0.0.1:3000';
@@ -76,7 +76,7 @@ function BadgeEstado({ value }: { value?: string | null }) {
 export function InicioView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
-  const [inspecciones, setInspecciones] = useState<InspeccionPanel[]>([]);
+  const [borradores, setBorradores] = useState<any[]>([]);
   const [lineasDisponibles, setLineasDisponibles] = useState<{ key: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -119,7 +119,7 @@ export function InicioView() {
 
     if (filtrosActuales.fechaInicio > filtrosActuales.fechaFin) {
       setError('La fecha desde no puede ser mayor que la fecha hasta.');
-      setInspecciones([]);
+      setBorradores([]);
       setTotal(0);
       setTotalPages(1);
       return;
@@ -129,9 +129,9 @@ export function InicioView() {
       setLoading(true);
       setError('');
 
-      // FAREGAS: No cargamos inspecciones de Farenet.
+      // FAREGAS: No cargamos borradores de Farenet.
       // Se mostrará la tabla vacía hasta que se conecte el nuevo API de Faregas.
-      setInspecciones([]);
+      setBorradores([]);
       setTotal(0);
       setPage(1);
       setPageSize(pageSizeConsulta);
@@ -140,7 +140,7 @@ export function InicioView() {
       setError(
         err instanceof Error
           ? err.message
-          : 'Error al cargar inspecciones.'
+          : 'Error al cargar borradores.'
       );
     } finally {
       setLoading(false);
@@ -173,7 +173,7 @@ export function InicioView() {
 
     socket.on('inspeccionActualizada', (payload: any) => {
       if (payload && payload.planta_key === plantaSeleccionada) {
-        console.log('🔄 Actualizando inspecciones por WebSocket:', payload);
+        console.log('🔄 Actualizando borradores por WebSocket:', payload);
         cargarInspecciones(page, pageSize);
       }
     });
@@ -257,7 +257,7 @@ export function InicioView() {
               Panel principal de operación ({total})
             </h3>
             <p className="text-xs text-slate-400 mt-1">
-              Inspecciones registradas por sede activa.
+              Borradores registrados por sede activa.
             </p>
           </div>
 
@@ -427,24 +427,24 @@ export function InicioView() {
                     colSpan={12}
                     className="px-4 py-8 text-center text-slate-500 font-medium"
                   >
-                    Cargando inspecciones...
+                    Cargando borradores...
                   </td>
                 </tr>
               )}
 
-              {!loading && inspecciones.length === 0 && (
+              {!loading && borradores.length === 0 && (
                 <tr>
                   <td
                     colSpan={12}
                     className="px-4 py-8 text-center text-slate-400"
                   >
-                    No hay inspecciones registradas para el día actual.
+                    No hay borradores registradas para el día actual.
                   </td>
                 </tr>
               )}
 
               {!loading &&
-                inspecciones.map((ins, idx) => {
+                borradores.map((ins, idx) => {
                   const posicion = Number(ins.posicion || 0);
                   const etapa = ins.etapa || ins.estadoActual || 'SIN ESTADO';
                   const puedeContinuar = ins.puedeContinuarFlujo1 === true;
@@ -518,7 +518,7 @@ export function InicioView() {
                           {puedeContinuar && !debeAbrirFlujo2 ? (
                             <button
                               type="button"
-                              onClick={() => navigate(`/inspecciones/${ins.numeroInspeccion}/continuar`)}
+                              onClick={() => navigate(`/borradores/${ins.numeroInspeccion}/continuar`)}
                               className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                             >
                               Continuar
