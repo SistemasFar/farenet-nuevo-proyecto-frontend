@@ -196,6 +196,16 @@ export function VerificacionStep({
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
+      {(!facturacion || facturacion.estado !== 'ACEPTADO' || !facturacion.aceptadaSunat) && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm mb-6 flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0" />
+          <div>
+            <h4 className="font-bold text-amber-800">Facturación pendiente o no aceptada</h4>
+            <p className="text-sm text-amber-700">Puedes revisar la previsualización del certificado, pero no podrás emitirlo hasta completar la facturación en SUNAT.</p>
+          </div>
+        </div>
+      )}
+
       {/* HEADER DINÁMICO */}
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-4">
         <div className="flex items-center gap-3">

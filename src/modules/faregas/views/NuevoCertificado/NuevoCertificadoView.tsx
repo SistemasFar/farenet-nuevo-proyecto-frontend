@@ -805,14 +805,8 @@ export function NuevoCertificadoView() {
           setIsSavingStep(false);
         }
       } else if (STEPS[currentStepIndex].id === 'facturacion') {
-        if (!formFacturacion.tipoDocFac || !formFacturacion.nroDocFac || !formFacturacion.razonSocialFac || !formFacturacion.direccionFac) {
-          mostrarErroresPaso(['Complete y guarde los datos fiscales antes de continuar.']);
-          return;
-        }
-        if (facturacion?.estado !== 'ACEPTADO' || facturacion.aceptadaSunat !== true) {
-          mostrarErroresPaso(['El comprobante debe ser emitido y aceptado por Nubefact/SUNAT antes de continuar.']);
-          return;
-        }
+        // BYPASS: Se permite avanzar a VERIFICACION/EMISION para PREVISUALIZAR,
+        // independientemente de si facturación está pendiente o sin llenar.
       }
       const siguiente = currentStepIndex + 1;
       setFurthestStepIndex(prev => Math.max(prev, siguiente));

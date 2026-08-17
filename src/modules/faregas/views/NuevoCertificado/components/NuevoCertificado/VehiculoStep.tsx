@@ -375,8 +375,20 @@ export function VehiculoStep({
               )}
             </div>
 
+            <div className="mt-4">
+              <label className="block text-xs font-bold text-slate-500 mb-1">OBSERVACIONES GNV (Opcional) <span className="font-normal text-slate-400">({formGnv.observaciones?.length || 0}/250)</span></label>
+              <input
+                name="observaciones"
+                value={formGnv.observaciones || ''}
+                onChange={handleGnv}
+                maxLength={250}
+                className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors"
+                placeholder="EJ: NINGUNA"
+              />
+            </div>
+
             <div>
-              <h5 className="font-bold text-slate-700 mb-3">VERIFICACIONES DE INSPECCIÓN ANUAL GNV</h5>
+              <h5 className="font-bold text-slate-700 mb-3 mt-6">VERIFICACIONES DE INSPECCIÓN ANUAL GNV</h5>
               <div className="space-y-3">
                  {formGnv.verificaciones?.map((verif: any, idx: number) => (
                   <div key={idx} className={`flex flex-col gap-2 bg-slate-50 p-3 rounded border ${verif.cumple === null ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'}`}>
@@ -425,7 +437,7 @@ export function VehiculoStep({
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">CARACTERÍSTICA A CERTIFICAR</label>
-                  <input name="caracteristicaRegistrable" value={formConformidad.caracteristicaRegistrable || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="EJ: NÚMERO DE EJES" />
+                  <input name="caracteristicaRegistrable" value={formConformidad.caracteristicaRegistrable || ''} onChange={handleConformidad} maxLength={300} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="EJ: NÚMERO DE EJES" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">MOTIVO</label>
