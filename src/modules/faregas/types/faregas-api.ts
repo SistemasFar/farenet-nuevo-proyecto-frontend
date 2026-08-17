@@ -1,0 +1,140 @@
+type NullableText = string | null;
+type NullableNumberInput = number | string | null;
+
+export interface CrearClienteFaregasRequest {
+  tipoDocumento: string;
+  nroDocumento: string;
+  nombreRazonSocial: string;
+  direccion?: string;
+  telefono?: string;
+  correo?: string;
+}
+
+export interface CrearBorradorFaregasRequest {
+  tipoCertificadoClave: string;
+  clienteId?: string;
+  observaciones?: string;
+}
+
+export interface ActualizarBorradorFaregasRequest {
+  clienteId?: string;
+  observaciones?: string;
+}
+
+export interface VehiculoBorradorFaregasRequest {
+  placa?: NullableText;
+  categoria?: NullableText;
+  clase?: NullableText;
+  marca?: NullableText;
+  modelo?: NullableText;
+  version?: NullableText;
+  anioFabricacion?: NullableNumberInput;
+  anioModelo?: NullableNumberInput;
+  vin?: NullableText;
+  serieChasis?: NullableText;
+  numeroMotor?: NullableText;
+  combustible?: NullableText;
+  color?: NullableText;
+  carroceria?: NullableText;
+  numeroCilindros?: NullableNumberInput;
+  cilindrada?: NullableNumberInput;
+  numeroEjes?: NullableNumberInput;
+  numeroRuedas?: NullableNumberInput;
+  numeroAsientos?: NullableNumberInput;
+  numeroPasajeros?: NullableNumberInput;
+  longitud?: NullableNumberInput;
+  ancho?: NullableNumberInput;
+  alto?: NullableNumberInput;
+  pesoNeto?: NullableNumberInput;
+  pesoBruto?: NullableNumberInput;
+  cargaUtil?: NullableNumberInput;
+  potencia?: NullableNumberInput;
+  formulaRodante?: NullableText;
+}
+
+export interface CrearTitularFaregasRequest {
+  clienteId?: string | number | null;
+  orden: number;
+  tipoDocumento?: NullableText;
+  nroDocumento?: NullableText;
+  nombreRazonSocial: string;
+  direccion?: NullableText;
+}
+
+export type ActualizarTitularFaregasRequest = Partial<CrearTitularFaregasRequest>;
+
+export interface VerificacionFaregasRequest {
+  codigo: string;
+  orden: number;
+  descripcion?: NullableText;
+  cumple: boolean | null;
+  observacion?: NullableText;
+}
+
+export interface GuardarGnvFaregasRequest {
+  tallerAutorizadoId?: number | string | null;
+  vigenciaHasta?: NullableText;
+  modalidad?: NullableText;
+  numeroChip?: NullableText;
+}
+
+export interface GuardarVerificacionesFaregasRequest {
+  verificaciones: VerificacionFaregasRequest[];
+}
+
+export interface ComponenteGlpFaregasRequest {
+  orden: number;
+  componente: string;
+  marca?: NullableText;
+  modelo?: NullableText;
+  capacidadLitros?: NullableNumberInput;
+  mesFabricacion?: NullableNumberInput;
+  anioFabricacion?: NullableNumberInput;
+  numeroSerie?: NullableText;
+}
+
+export interface GuardarGlpFaregasRequest {
+  tallerAutorizadoId?: number | string | null;
+  expedienteTecnico?: NullableText;
+  vigenciaHasta?: NullableText;
+  modalidad?: NullableText;
+}
+
+export interface GuardarComponentesGlpFaregasRequest {
+  componentes: ComponenteGlpFaregasRequest[];
+}
+
+export interface GuardarConformidadFaregasRequest {
+  tipoConformidad?: 'MODIFICACION' | 'MONTAJE' | 'FABRICACION' | null;
+  tipoTramite?: NullableText;
+  caracteristicaRegistrable?: NullableText;
+  motivo?: NullableText;
+  descripcion?: NullableText;
+  usoOriginalVehiculo?: NullableText;
+}
+
+interface UsuarioFaregasBaseRequest {
+  username: string;
+  perfil_id: string | null;
+  estado: boolean | 'true' | 'false';
+  sedes: string[];
+}
+
+export interface CrearUsuarioFaregasRequest extends UsuarioFaregasBaseRequest {
+  password: string;
+}
+
+export type ActualizarUsuarioFaregasRequest = UsuarioFaregasBaseRequest;
+
+interface PerfilFaregasBaseRequest {
+  nombre: string;
+  visible: boolean | 'true' | 'false';
+  sedes: string[];
+  permisos: string[];
+}
+
+export interface CrearPerfilFaregasRequest extends PerfilFaregasBaseRequest {
+  clave: string;
+}
+
+export type ActualizarPerfilFaregasRequest = PerfilFaregasBaseRequest;

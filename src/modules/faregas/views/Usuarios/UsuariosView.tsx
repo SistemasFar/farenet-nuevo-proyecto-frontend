@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { faregasUsuariosApi } from '../../../../services/faregas/faregas-usuarios.api';
+import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 
 export function UsuariosView() {
   const [activeTab, setActiveTab] = useState<'usuarios' | 'perfiles'>('usuarios');

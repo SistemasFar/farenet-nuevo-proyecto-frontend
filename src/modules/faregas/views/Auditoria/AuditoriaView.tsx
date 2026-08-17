@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { faregasAuditoriaApi, type AuditoriaAccesoFaregas } from '../../../../services/faregas/faregas-auditoria.api';
+import { faregasAuditoriaApi, type AuditoriaAccesoFaregas } from '../../services/faregas-auditoria.api';
 
 export function AuditoriaView() {
     const [registros, setRegistros] = useState<AuditoriaAccesoFaregas[]>([]);

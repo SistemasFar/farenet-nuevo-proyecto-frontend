@@ -1,8 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Eye, X } from 'lucide-react';
-import type { TipoCertificadoFaregas } from '@/types/faregas';
-import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
+import type { TipoCertificadoFaregas } from '../../../../types/faregas';
+import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
 import Swal from 'sweetalert2';
 
 interface VerificacionStepProps {

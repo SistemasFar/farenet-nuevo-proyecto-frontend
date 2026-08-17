@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
+import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 import { operacionApi } from '@/services/api';
 const SOCKET_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '')

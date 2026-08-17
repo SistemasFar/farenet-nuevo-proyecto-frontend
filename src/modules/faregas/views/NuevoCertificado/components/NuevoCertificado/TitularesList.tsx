@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search, Plus, Trash2 } from 'lucide-react';
-import { faregasClientesApi } from '@/services/faregas/faregas-clientes.api';
+import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
 import Swal from 'sweetalert2';
 
 export interface TitularState {

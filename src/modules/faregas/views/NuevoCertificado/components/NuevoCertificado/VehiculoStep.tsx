@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import type { TipoCertificadoFaregas } from '@/types/faregas';
+import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { TitularesList, type TitularState } from './TitularesList';
 import React, { useEffect } from 'react';
 

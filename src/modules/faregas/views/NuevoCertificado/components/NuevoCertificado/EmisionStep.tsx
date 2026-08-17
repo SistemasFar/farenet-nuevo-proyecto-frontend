@@ -1,5 +1,5 @@
 import { CheckCircle } from 'lucide-react';
-import type { TipoCertificadoFaregas } from '@/types/faregas';
+import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 
 interface EmisionStepProps {
   tipoCertificado: TipoCertificadoFaregas;

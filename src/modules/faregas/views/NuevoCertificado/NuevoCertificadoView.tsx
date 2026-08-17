@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect } from 'react';
 import { maestrosApi, inspeccionesApi } from '@/services/api';
-import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
+import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
 import { CheckCircle2, FileText, User, CreditCard, ArrowLeft, Search } from 'lucide-react';
@@ -12,7 +12,7 @@ import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
-import type { TipoCertificadoFaregas } from '@/types/faregas';
+import type { TipoCertificadoFaregas } from '../../types/faregas';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 

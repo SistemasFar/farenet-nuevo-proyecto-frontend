@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Box, CheckCircle } from 'lucide-react';
-import { faregasCertificadosApi } from '@/services/faregas/faregas-certificados.api';
+import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
 
 interface CajaStepProps {
   formCaja: any;
