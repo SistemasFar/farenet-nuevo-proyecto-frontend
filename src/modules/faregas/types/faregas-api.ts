@@ -19,6 +19,55 @@ export interface CrearBorradorFaregasRequest {
 export interface ActualizarBorradorFaregasRequest {
   clienteId?: string;
   observaciones?: string;
+  tipoCertificadoClave?: string;
+}
+
+export interface PagoFaregasRequest {
+  tipo: 'EFECTIVO' | 'TARJETA' | 'BANCO';
+  importe: number | string;
+  tarjetaKey?: NullableText;
+  nroOperacion?: NullableText;
+  digitosTarjeta?: NullableText;
+  cuentaCorrienteKey?: NullableText;
+  entidadFinancieraKey?: NullableText;
+  fechaDeposito?: NullableText;
+}
+
+export interface GuardarPagosFaregasRequest {
+  importeTotal: number | string;
+  pagos: PagoFaregasRequest[];
+}
+
+export interface GuardarFacturacionFaregasRequest {
+  tipoComprobante: 'BOLETA' | 'FACTURA' | string;
+  nroDocumento: string;
+  nombreRazonSocial: string;
+  direccion: string;
+  email?: NullableText;
+  telefono?: NullableText;
+}
+
+export interface FacturacionFaregas {
+  id: number;
+  certificadoId: number;
+  tipoComprobante: 'BOLETA' | 'FACTURA';
+  tipoDocumentoCliente: 'DNI' | 'RUC';
+  nroDocumento: string;
+  nombreRazonSocial: string;
+  direccion: string;
+  email: NullableText;
+  telefono: NullableText;
+  baseImponible: number;
+  igv: number;
+  importeTotal: number;
+  estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR';
+  nroComprobante: NullableText;
+  aceptadaSunat: boolean | null;
+  sunatDescription: NullableText;
+  enlacePdf: NullableText;
+  enlaceXml: NullableText;
+  enlaceCdr: NullableText;
+  intentos: number;
 }
 
 export interface VehiculoBorradorFaregasRequest {

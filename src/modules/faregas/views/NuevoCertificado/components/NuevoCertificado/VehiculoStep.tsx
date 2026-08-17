@@ -6,6 +6,7 @@ import React, { useEffect } from 'react';
 
 interface VehiculoStepProps {
   tipoCertificado: TipoCertificadoFaregas;
+  modalidadCertificado: '' | 'INICIAL' | 'ANUAL';
   formVehiculo: any;
   setFormVehiculo: (data: any) => void;
   formPropietario: any;
@@ -18,12 +19,15 @@ interface VehiculoStepProps {
   setFormConformidad: (data: any) => void;
   titulares: TitularState[];
   setTitulares: React.Dispatch<React.SetStateAction<TitularState[]>>;
+  onRemoveTitular?: (titular: TitularState) => Promise<void>;
   catalogoVerificaciones?: any;
   talleres?: any[];
+  vehiculoOrigen?: 'FARENET' | 'BORRADOR' | 'MANUAL';
 }
 
 export function VehiculoStep({
   tipoCertificado,
+  modalidadCertificado,
   formVehiculo,
   setFormVehiculo,
   formPropietario: _formPropietario,
@@ -36,8 +40,10 @@ export function VehiculoStep({
   setFormConformidad,
   titulares,
   setTitulares,
+  onRemoveTitular,
   catalogoVerificaciones,
-  talleres
+  talleres,
+  vehiculoOrigen = 'MANUAL'
 }: VehiculoStepProps) {
   
   // Initialize verificaciones based on catalog
@@ -54,20 +60,22 @@ export function VehiculoStep({
         }))
       }));
     }
-    if (tipoCertificado === 'GLP_ANUAL' && catalogoVerificaciones?.GLP_ANUAL && (!formGlp.verificaciones || formGlp.verificaciones.length === 0)) {
+    const faltanVerificacionesGlp = !formGlp.verificaciones || formGlp.verificaciones.length === 0;
+    const faltanComponentesGlp = !formGlp.componentes || formGlp.componentes.length === 0;
+    if (tipoCertificado === 'GLP_ANUAL' && catalogoVerificaciones?.GLP_ANUAL && (faltanVerificacionesGlp || faltanComponentesGlp)) {
       setFormGlp((prev: any) => ({
         ...prev,
-        verificaciones: catalogoVerificaciones.GLP_ANUAL.map((v: any) => ({
+        verificaciones: faltanVerificacionesGlp ? catalogoVerificaciones.GLP_ANUAL.map((v: any) => ({
           codigo: v.codigo,
           orden: v.orden,
           descripcion: v.descripcion,
           cumple: null,
           observacion: ''
-        })),
-        componentes: [
-          { componente: 'CILINDRO', marca: '', modelo: '', capacidad: '', anioFabricacion: '', numeroSerie: '' },
-          { componente: 'REGULADOR', marca: '', modelo: '', capacidad: '', anioFabricacion: '', numeroSerie: '' }
-        ]
+        })) : prev.verificaciones,
+        componentes: faltanComponentesGlp ? [
+          { orden: 1, componente: 'CILINDRO', marca: '', modelo: '', capacidadLitros: '', mesFabricacion: '', anioFabricacion: '', numeroSerie: '' },
+          { orden: 2, componente: 'REGULADOR', marca: '', modelo: '', capacidadLitros: '', mesFabricacion: '', anioFabricacion: '', numeroSerie: '' }
+        ] : prev.componentes
       }));
     }
   }, [tipoCertificado, catalogoVerificaciones]);
@@ -114,6 +122,11 @@ export function VehiculoStep({
         <h4 className="text-lg font-bold text-slate-800 uppercase tracking-wider mb-6 border-b pb-2">
           A. DATOS GENERALES DEL VEHÍCULO
         </h4>
+        <div className="mb-4 flex justify-end">
+          <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black text-[#052a79]">
+            ORIGEN: {vehiculoOrigen}{vehiculoOrigen === 'FARENET' ? ' (EDITABLE)' : ''}
+          </span>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">MARCA</label>
@@ -156,6 +169,14 @@ export function VehiculoStep({
             <input name="color" value={formVehiculo.color || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
           <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">CLASE VEHICULAR</label>
+            <input name="clase" value={formVehiculo.clase || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">CARROCERÍA</label>
+            <input name="carroceria" value={formVehiculo.carroceria || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+          </div>
+          <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">NÚMERO CILINDROS</label>
             <input name="numeroCilindros" value={formVehiculo.numeroCilindros || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
@@ -190,14 +211,27 @@ export function VehiculoStep({
             <input name="potencia" value={formVehiculo.potencia || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
           <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">LARGO / ANCHO / ALTO (M)</label>
+            <div className="flex gap-2">
+              <input name="longitud" value={formVehiculo.longitud || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Largo" />
+              <input name="ancho" value={formVehiculo.ancho || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Ancho" />
+              <input name="alto" value={formVehiculo.alto || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Alto" />
+            </div>
+          </div>
+          <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">FÓRMULA RODANTE</label>
             <input name="formulaRodante" value={formVehiculo.formulaRodante || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
           </div>
         </div>
+        {vehiculoOrigen === 'FARENET' && (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+            Farenet no almacena versión, año modelo, cilindrada, potencia ni fórmula rodante en su ficha vehicular. Estos campos deben completarse y validarse con la tarjeta de propiedad.
+          </p>
+        )}
       </div>
 
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <TitularesList titulares={titulares} setTitulares={setTitulares} />
+        <TitularesList titulares={titulares} setTitulares={setTitulares} onRemoveTitular={onRemoveTitular} />
       </div>
 
       {/* 2. SECCIÓN DINÁMICA SEGÚN CERTIFICADO */}
@@ -216,15 +250,14 @@ export function VehiculoStep({
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD <span className="text-red-500">*</span></label>
-                <select name="modalidad" value={formGlp.modalidad || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
-                  <option value="">-- SELECCIONAR --</option>
-                  <option value="INICIAL">INICIAL</option>
-                  <option value="ANUAL">ANUAL</option>
-                </select>
+                <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD</label>
+                <div className="flex min-h-[42px] items-center justify-between rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-2">
+                  <span className="font-black text-[#052a79]">{modalidadCertificado || 'NO DEFINIDA'}</span>
+                  <span className="text-[10px] font-bold uppercase text-blue-500">Seleccionada en datos iniciales</span>
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO (Opcional)</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO <span className="text-red-500">*</span></label>
                 <select name="tallerAutorizadoId" value={formGlp.tallerAutorizadoId || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
                   <option value="">-- SELECCIONAR --</option>
                   {talleres?.map(t => (
@@ -233,31 +266,45 @@ export function VehiculoStep({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA <span className="text-red-500">*</span></label>
                 <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
               </div>
             </div>
 
             <div>
-               <label className="block text-xs font-bold text-slate-500 mb-1">EXPEDIENTE TÉCNICO</label>
+               <label className="block text-xs font-bold text-slate-500 mb-1">EXPEDIENTE TÉCNICO <span className="text-red-500">*</span></label>
                <input name="expedienteTecnico" value={formGlp.expedienteTecnico || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
               <h5 className="font-bold text-slate-700 mb-3">COMPONENTES INSTALADOS GLP</h5>
-              <div className="grid grid-cols-5 gap-2 text-xs font-bold text-slate-500 uppercase mb-2">
+              <div className="grid grid-cols-7 gap-2 text-xs font-bold text-slate-500 uppercase mb-2">
                 <div>Componente</div>
                 <div>Marca</div>
-                <div>Modelo/Cap.</div>
+                <div>Modelo</div>
+                <div>Cap. (L)</div>
+                <div>Mes</div>
                 <div>Año</div>
                 <div>N° Serie</div>
               </div>
               {formGlp.componentes?.map((comp: any, idx: number) => (
-                <div key={idx} className="grid grid-cols-5 gap-2 mb-2">
+                <div key={idx} className="grid grid-cols-7 gap-2 mb-2">
                   <div className="font-bold pt-2">{comp.componente}</div>
                   <input value={comp.marca || ''} onChange={e => handleComponenteGlp(idx, 'marca', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Marca" />
                   <input value={comp.modelo || ''} onChange={e => handleComponenteGlp(idx, 'modelo', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Modelo" />
-                  {comp.componente === 'REGULADOR' ? <div className="text-center text-slate-400 pt-2">-</div> : <input value={comp.anioFabricacion || ''} onChange={e => handleComponenteGlp(idx, 'anioFabricacion', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Año" />}
+                  {comp.componente === 'REGULADOR' ? (
+                    <>
+                      <div className="text-center text-slate-400 pt-2">-</div>
+                      <div className="text-center text-slate-400 pt-2">-</div>
+                      <div className="text-center text-slate-400 pt-2">-</div>
+                    </>
+                  ) : (
+                    <>
+                      <input value={comp.capacidadLitros || ''} onChange={e => handleComponenteGlp(idx, 'capacidadLitros', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0" placeholder="Litros" />
+                      <input value={comp.mesFabricacion || ''} onChange={e => handleComponenteGlp(idx, 'mesFabricacion', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0" placeholder="Mes" />
+                      <input value={comp.anioFabricacion || ''} onChange={e => handleComponenteGlp(idx, 'anioFabricacion', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Año" />
+                    </>
+                  )}
                   <input value={comp.numeroSerie || ''} onChange={e => handleComponenteGlp(idx, 'numeroSerie', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded-md text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="N° Serie" />
                 </div>
               ))}
@@ -294,15 +341,14 @@ export function VehiculoStep({
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD <span className="text-red-500">*</span></label>
-                <select name="modalidad" value={formGnv.modalidad || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
-                  <option value="">-- SELECCIONAR --</option>
-                  <option value="INICIAL">INICIAL</option>
-                  <option value="ANUAL">ANUAL</option>
-                </select>
+                <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD</label>
+                <div className="flex min-h-[42px] items-center justify-between rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-2">
+                  <span className="font-black text-[#052a79]">{modalidadCertificado || 'NO DEFINIDA'}</span>
+                  <span className="text-[10px] font-bold uppercase text-blue-500">Seleccionada en datos iniciales</span>
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO (Opcional)</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO <span className="text-red-500">*</span></label>
                 <select name="tallerAutorizadoId" value={formGnv.tallerAutorizadoId || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
                   <option value="">-- SELECCIONAR --</option>
                   {talleres?.map(t => (
@@ -311,10 +357,10 @@ export function VehiculoStep({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA <span className="text-red-500">*</span></label>
                 <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
               </div>
-              {formGnv.modalidad === 'INICIAL' && (
+              {modalidadCertificado === 'INICIAL' && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">N° CHIP <span className="text-red-500">*</span> <span className="font-normal text-slate-400">(alfanumérico, máx 15)</span></label>
                   <input

@@ -4,17 +4,21 @@
 import React, { useState, useEffect } from 'react';
 import { maestrosApi, inspeccionesApi } from '@/services/api';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
+import { faregasClientesApi } from '../../services/faregas-clientes.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
-import { CheckCircle2, FileText, User, CreditCard, ArrowLeft, Search } from 'lucide-react';
+import { CheckCircle2, FileText, User, CreditCard, ArrowLeft, Search, Loader2, Save } from 'lucide-react';
 import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
+import type { TitularState } from './components/NuevoCertificado/TitularesList';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
 import type { TipoCertificadoFaregas } from '../../types/faregas';
+import type { FacturacionFaregas } from '../../types/faregas-api';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
+import { validarDatosIniciales, validarExpedienteTecnico } from './faregas-wizard.validation';
 
 
 
@@ -27,6 +31,7 @@ export interface FormCajaState {
   categoria: string;
   tipoInspeccion: string;
   tipoCertificado: string;
+  modalidadCertificado: '' | 'INICIAL' | 'ANUAL';
   tipoAutorizacion: string;
   descuentoObj?: { source_table: string; source_id: string; isCuponidad?: boolean; documentoBusqueda?: string; uuid?: string };
   nrodocumentoreinspeccion?: string;
@@ -45,10 +50,13 @@ export interface FormPagoState {
 }
 
 export interface FormVehiculoState {
-  clase: string; marca: string; modelo: string; carroceria: string; marcaCarroceria: string; placaNueva: string;
-  anioFabricacion: string; combustible: string; nroSerie: string; nroMotor: string; color: string;
-  nroAsientos: string; nroPasajeros: string; nroPisos: string; longitud: string; ancho: string; altura: string;
-  pesoNeto?: string; pesoSeco?: string; pesoBruto: string; cargaUtil: string; nroCilindros: string; nroRuedas: string; nroEjes: string;
+  clase: string; marca: string; modelo: string; version: string; carroceria: string; marcaCarroceria: string; placaNueva: string;
+  anioFabricacion: string; anioModelo: string; vin: string; combustible: string; serieChasis: string; numeroMotor: string; color: string;
+  numeroAsientos: string; numeroPasajeros: string; nroPisos: string; longitud: string; ancho: string; alto: string;
+  pesoNeto: string; pesoBruto: string; cargaUtil: string; numeroCilindros: string; cilindrada: string;
+  numeroRuedas: string; numeroEjes: string; potencia: string;
+  nroSerie?: string; nroMotor?: string; nroAsientos?: string; nroPasajeros?: string; altura?: string;
+  pesoSeco?: string; nroCilindros?: string; nroRuedas?: string; nroEjes?: string;
   formulaRodante?: string; nroPuertas: string; nroTubosEscape?: string; kilometraje: string; salidasEmergencia?: string;
   fechaEmisionSoat?: string; fechaVencimientoSoat?: string; aseguradora?: string; poliza?: string; useMtcParams?: boolean;
 }
@@ -66,6 +74,62 @@ export interface FormVerificacionState {
   linea?: string;
 }
 
+const textValue = (value: unknown) => value === null || value === undefined ? '' : String(value);
+
+const mapVehiculoBorrador = (vehiculo: any): Partial<FormVehiculoState> => ({
+  placaNueva: textValue(vehiculo.placa),
+  clase: textValue(vehiculo.clase),
+  marca: textValue(vehiculo.marca),
+  modelo: textValue(vehiculo.modelo),
+  version: textValue(vehiculo.version),
+  anioFabricacion: textValue(vehiculo.anio_fabricacion ?? vehiculo.anioFabricacion),
+  anioModelo: textValue(vehiculo.anio_modelo ?? vehiculo.anioModelo),
+  vin: textValue(vehiculo.vin),
+  serieChasis: textValue(vehiculo.serie_chasis ?? vehiculo.serieChasis),
+  numeroMotor: textValue(vehiculo.numero_motor ?? vehiculo.numeroMotor),
+  combustible: textValue(vehiculo.combustible),
+  color: textValue(vehiculo.color),
+  carroceria: textValue(vehiculo.carroceria),
+  marcaCarroceria: textValue(vehiculo.marca_carroceria ?? vehiculo.marcaCarroceria),
+  numeroCilindros: textValue(vehiculo.numero_cilindros ?? vehiculo.numeroCilindros),
+  cilindrada: textValue(vehiculo.cilindrada),
+  numeroEjes: textValue(vehiculo.numero_ejes ?? vehiculo.numeroEjes),
+  numeroRuedas: textValue(vehiculo.numero_ruedas ?? vehiculo.numeroRuedas),
+  numeroAsientos: textValue(vehiculo.numero_asientos ?? vehiculo.numeroAsientos),
+  numeroPasajeros: textValue(vehiculo.numero_pasajeros ?? vehiculo.numeroPasajeros),
+  longitud: textValue(vehiculo.longitud),
+  ancho: textValue(vehiculo.ancho),
+  alto: textValue(vehiculo.alto),
+  pesoNeto: textValue(vehiculo.peso_neto ?? vehiculo.pesoNeto),
+  pesoBruto: textValue(vehiculo.peso_bruto ?? vehiculo.pesoBruto),
+  cargaUtil: textValue(vehiculo.carga_util ?? vehiculo.cargaUtil),
+  potencia: textValue(vehiculo.potencia),
+  formulaRodante: textValue(vehiculo.formula_rodante ?? vehiculo.formulaRodante),
+  kilometraje: textValue(vehiculo.kilometraje),
+  nroPuertas: textValue(vehiculo.nro_puertas ?? vehiculo.nroPuertas),
+  nroPisos: textValue(vehiculo.nro_pisos ?? vehiculo.nroPisos),
+  salidasEmergencia: textValue(vehiculo.salidas_emergencia ?? vehiculo.salidasEmergencia),
+});
+
+const mapTitularBorrador = (titular: any): TitularState => ({
+  _uuid: crypto.randomUUID(),
+  titularId: titular.id ? Number(titular.id) : null,
+  orden: Number(titular.orden),
+  clienteId: titular.cliente_id ? Number(titular.cliente_id) : null,
+  tipoDocumento: textValue(titular.tipo_documento ?? titular.tipoDocumento) || 'DNI',
+  nroDocumento: textValue(titular.nro_documento ?? titular.nroDocumento),
+  nombreRazonSocial: textValue(titular.nombre_razon_social ?? titular.nombreRazonSocial),
+  direccion: textValue(titular.direccion),
+});
+
+const mapVerificacionBorrador = (verificacion: any) => ({
+  codigo: textValue(verificacion.codigo),
+  orden: Number(verificacion.orden),
+  descripcion: textValue(verificacion.descripcion),
+  cumple: verificacion.cumple === null || verificacion.cumple === undefined ? null : Boolean(verificacion.cumple),
+  observacion: textValue(verificacion.observacion),
+});
+
 export function NuevoCertificadoView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
@@ -73,6 +137,9 @@ export function NuevoCertificadoView() {
   const [certificadoId, setCertificadoId] = useState<number | undefined>(id ? parseInt(id, 10) : undefined);
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [furthestStepIndex, setFurthestStepIndex] = useState(0);
+  const [isSavingStep, setIsSavingStep] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
   const [maestrosVehiculo, setMaestrosVehiculo] = useState<MaestrosVehiculoResponse['data'] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,6 +166,7 @@ export function NuevoCertificadoView() {
     categoria: '',
     tipoInspeccion: '',
     tipoCertificado: '',
+    modalidadCertificado: '',
     tipoAutorizacion: ''
   });
 
@@ -127,17 +195,18 @@ export function NuevoCertificadoView() {
   const [formGnv, setFormGnv] = useState<any>({});
   const [formConformidad, setFormConformidad] = useState<any>({});
   
-  const [titulares, setTitulares] = useState<any[]>([]);
+  const [titulares, setTitulares] = useState<TitularState[]>([]);
   const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
   const [talleres, setTalleres] = useState<any[]>([]);
   const [isEmitido, setIsEmitido] = useState(false);
   const [isVehiculoValid, setIsVehiculoValid] = useState(false);
-  const [vehiculoTab, setVehiculoTab] = useState<'DATOS' | 'SOAT'>('DATOS');
+  const [vehiculoOrigen, setVehiculoOrigen] = useState<'FARENET' | 'BORRADOR' | 'MANUAL'>('MANUAL');
+  const [expedienteError, setExpedienteError] = useState('');
   const [formVehiculo, setFormVehiculo] = useState<FormVehiculoState>({
-    clase: '', marca: '', modelo: '', carroceria: '', marcaCarroceria: '', placaNueva: '',
-    anioFabricacion: '', combustible: '', nroSerie: '', nroMotor: '', color: '',
-    nroAsientos: '', nroPasajeros: '', nroPisos: '', longitud: '', ancho: '', altura: '',
-    nroEjes: '', nroRuedas: '', nroCilindros: '', pesoSeco: '', cargaUtil: '', pesoBruto: '',
+    clase: '', marca: '', modelo: '', version: '', carroceria: '', marcaCarroceria: '', placaNueva: '',
+    anioFabricacion: '', anioModelo: '', vin: '', combustible: '', serieChasis: '', numeroMotor: '', color: '',
+    numeroAsientos: '', numeroPasajeros: '', nroPisos: '', longitud: '', ancho: '', alto: '',
+    numeroEjes: '', numeroRuedas: '', numeroCilindros: '', cilindrada: '', pesoNeto: '', cargaUtil: '', pesoBruto: '', potencia: '',
     nroPuertas: '', salidasEmergencia: '', kilometraje: ''
   });
 
@@ -148,6 +217,7 @@ export function NuevoCertificadoView() {
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
     emailFac: '', telefonoFac: ''
   });
+  const [facturacion, setFacturacion] = useState<FacturacionFaregas | null>(null);
 
   // Form State (Verificación)
   const [formVerificacion, setFormVerificacion] = useState<FormVerificacionState>({
@@ -174,6 +244,17 @@ export function NuevoCertificadoView() {
       formVerificacion.linea !== '';
   };
 
+  const mostrarErroresPaso = (errores: string[]) => {
+    if (errores.length === 0) return false;
+    Swal.fire({
+      icon: 'warning',
+      title: 'Complete este paso',
+      html: `<div style="text-align:left"><ul>${errores.map(error => `<li style="margin-bottom:6px">• ${error}</li>`).join('')}</ul></div>`,
+      confirmButtonColor: '#052a79',
+    });
+    return true;
+  };
+
   const getCategoriaName = () => {
     if (!maestros || !formCaja.categoria) return '';
     const cat = maestros.categorias.find(c => c.key === formCaja.categoria);
@@ -187,6 +268,10 @@ export function NuevoCertificadoView() {
     };
   }, []);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentStepIndex]);
+
 
 
   useEffect(() => {
@@ -197,39 +282,94 @@ export function NuevoCertificadoView() {
         const res = await faregasCertificadosApi.obtenerBorradorCompleto(certificadoId);
         if (res?.data) {
           // Hidratar estado del borrador
-          if (res.data.tipoCertificadoClave) setFormCaja(prev => ({...prev, tipoCertificado: res.data.tipoCertificadoClave}));
+          if (res.data.tipo?.clave) {
+            setFormCaja(prev => ({
+              ...prev,
+              tipoCertificado: res.data.tipo.clave,
+              placa: res.data.vehiculo?.placa || prev.placa,
+              categoria: res.data.vehiculo?.categoria || prev.categoria,
+            }));
+          }
           
           if (res.data.vehiculo) {
-             setFormVehiculo(prev => ({
-                ...prev,
-                placaNueva: res.data.vehiculo.placa || '',
-                marca: res.data.vehiculo.marca || '',
-                modelo: res.data.vehiculo.modelo || '',
-                carroceria: res.data.vehiculo.carroceria || '',
-                color: res.data.vehiculo.color || '',
-                clase: res.data.vehiculo.clase || '',
-                combustible: res.data.vehiculo.combustible || '',
-                nroSerie: res.data.vehiculo.serie || '',
-                nroMotor: res.data.vehiculo.motor || '',
-                anioFabricacion: res.data.vehiculo.anoFabricacion?.toString() || '',
-                nroAsientos: res.data.vehiculo.asientos?.toString() || '',
-                nroCilindros: res.data.vehiculo.cilindros?.toString() || '',
-                nroEjes: res.data.vehiculo.ejes?.toString() || '',
-                nroRuedas: res.data.vehiculo.ruedas?.toString() || '',
-                nroPasajeros: res.data.vehiculo.pasajeros?.toString() || '',
-                pesoSeco: res.data.vehiculo.pesoSeco?.toString() || '',
-                pesoBruto: res.data.vehiculo.pesoBruto?.toString() || '',
-                cargaUtil: res.data.vehiculo.cargaUtil?.toString() || '',
-                longitud: res.data.vehiculo.longitud?.toString() || '',
-                altura: res.data.vehiculo.altura?.toString() || '',
-                ancho: res.data.vehiculo.ancho?.toString() || ''
-             }));
+             setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(res.data.vehiculo) }));
+             setVehiculoOrigen('BORRADOR');
+             setCurrentStepIndex(1);
+             setFurthestStepIndex(1);
           }
-          if (res.data.titulares) setTitulares(res.data.titulares);
-          
-          if (res.data.gnv) setFormGnv(res.data.gnv);
-          if (res.data.glp) setFormGlp(res.data.glp);
-          if (res.data.conformidad) setFormConformidad(res.data.conformidad);
+          if (res.data.titulares) setTitulares(res.data.titulares.map(mapTitularBorrador));
+
+          const pagosDetalle = await faregasCertificadosApi.obtenerPagos(certificadoId);
+          if (pagosDetalle.data?.importeTotal) {
+            setPrecioTotal(Number(pagosDetalle.data.importeTotal));
+            setPrecioSubtotal(Number(pagosDetalle.data.importeTotal));
+          }
+          if (pagosDetalle.data?.orden) {
+            setPrecioTotal(Number(pagosDetalle.data.orden.importe_total));
+            setPrecioSubtotal(Number(pagosDetalle.data.orden.importe_total));
+          }
+          setPagosAgregados((pagosDetalle.data?.pagos || []).map((pago: any) => ({
+            id: pago.id,
+            tipo: String(pago.tipoContadoKey || '').toUpperCase(),
+            importe: Number(pago.importe).toFixed(2),
+            tarjetaKey: pago.tarjetaKey || '',
+            nroOperacion: pago.nroOperacionBanco || pago.nroOperacionTarjeta || '',
+            digitosTarjeta: pago.digitosTarjeta || '',
+            cuentaCorrienteKey: pago.cuentaCorrienteKey || '',
+            entidadFinancieraKey: pago.entidadFinancieraKey || '',
+            fechaDeposito: textValue(pago.fechdeposito).slice(0, 10),
+          })));
+
+          if (res.data.tipo?.clave === 'GNV_ANUAL') {
+            const detalle = await faregasCertificadosApi.obtenerGnv(certificadoId);
+            const gnv = detalle.data?.gnv;
+            if (gnv) {
+              setFormCaja(prev => ({ ...prev, modalidadCertificado: gnv.modalidad || '' }));
+              setFormGnv({
+                tallerAutorizadoId: gnv.taller_autorizado_id || '',
+                fechaVigencia: textValue(gnv.vigencia_hasta).slice(0, 10),
+                modalidad: gnv.modalidad || '',
+                numeroChip: gnv.numero_chip || '',
+                verificaciones: (detalle.data?.verificaciones || []).map(mapVerificacionBorrador),
+              });
+            }
+          } else if (res.data.tipo?.clave === 'GLP_ANUAL') {
+            const detalle = await faregasCertificadosApi.obtenerGlp(certificadoId);
+            const glp = detalle.data?.glp;
+            if (glp) {
+              setFormCaja(prev => ({ ...prev, modalidadCertificado: glp.modalidad || '' }));
+              setFormGlp({
+                tallerAutorizadoId: glp.taller_autorizado_id || '',
+                fechaVigencia: textValue(glp.vigencia_hasta).slice(0, 10),
+                expedienteTecnico: glp.expediente_tecnico || '',
+                modalidad: glp.modalidad || '',
+                componentes: (detalle.data?.componentes || []).map((componente: any) => ({
+                  orden: Number(componente.orden),
+                  componente: componente.componente,
+                  marca: componente.marca || '',
+                  modelo: componente.modelo || '',
+                  capacidadLitros: textValue(componente.capacidad_litros),
+                  mesFabricacion: textValue(componente.mes_fabricacion),
+                  anioFabricacion: textValue(componente.anio_fabricacion),
+                  numeroSerie: componente.numero_serie || '',
+                })),
+                verificaciones: (detalle.data?.verificaciones || []).map(mapVerificacionBorrador),
+              });
+            }
+          } else if (res.data.tipo?.clave === 'CONFORMIDAD') {
+            const detalle = await faregasCertificadosApi.obtenerConformidad(certificadoId);
+            const conformidad = detalle.data?.conformidad;
+            if (conformidad) {
+              setFormConformidad({
+                tipoConformidad: conformidad.tipo_conformidad || '',
+                tipoTramite: conformidad.tipo_tramite || '',
+                caracteristicaRegistrable: conformidad.caracteristica_registrable || '',
+                motivo: conformidad.motivo || '',
+                descripcion: conformidad.descripcion || '',
+                usoOriginalVehiculo: conformidad.uso_original_vehiculo || '',
+              });
+            }
+          }
 
           console.log("[DEBUG] Borrador FAREGAS recuperado con éxito:", res.data.id);
         }
@@ -269,10 +409,19 @@ export function NuevoCertificadoView() {
   const cargarMaestrosVehiculo = async () => {
     try {
       setLoading(true);
-      const res = await maestrosApi.obtenerMaestrosVehiculoAsync();
-      setMaestrosVehiculo(res.data);
+      setExpedienteError('');
+      const [maestrosResponse, verificacionesResponse, talleresResponse] = await Promise.all([
+        maestrosApi.obtenerMaestrosVehiculoAsync(),
+        faregasCertificadosApi.obtenerCatalogoVerificaciones(),
+        faregasCertificadosApi.obtenerTalleres(),
+      ]);
+      setMaestrosVehiculo(maestrosResponse.data);
+      setCatalogoVerificaciones(verificacionesResponse.data ?? verificacionesResponse);
+      setTalleres(talleresResponse.data ?? []);
     } catch (err: any) {
-      setError(err.message || 'Error cargando maestros de vehículo');
+      const message = err.message || 'No se pudieron cargar los catálogos del expediente técnico';
+      setExpedienteError(message);
+      Swal.fire('Error de carga', message, 'error');
     } finally {
       setLoading(false);
     }
@@ -281,10 +430,10 @@ export function NuevoCertificadoView() {
   useEffect(() => {
     if (currentStepIndex === 0 && !maestros) {
       cargarMaestros();
-    } else if (currentStepIndex === 1 && !maestrosPago) {
-      cargarMaestrosPago();
-    } else if (currentStepIndex === 2 && !maestrosVehiculo) {
+    } else if (currentStepIndex === 1 && !maestrosVehiculo) {
       cargarMaestrosVehiculo();
+    } else if (currentStepIndex === 2 && !maestrosPago) {
+      cargarMaestrosPago();
     }
   }, [currentStepIndex, maestros, maestrosPago, maestrosVehiculo]);
 
@@ -311,27 +460,15 @@ export function NuevoCertificadoView() {
       }
 
       if (e.key === 'ArrowRight') {
-        if (currentStepIndex === 2) {
-          if (vehiculoTab === 'DATOS') {
-            setVehiculoTab('SOAT');
-            return;
-          }
-        }
         irSiguientePaso();
       } else if (e.key === 'ArrowLeft') {
-        if (currentStepIndex === 2) {
-          if (vehiculoTab === 'SOAT') {
-            setVehiculoTab('DATOS');
-            return;
-          }
-        }
         irPasoAnterior();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStepIndex, vehiculoTab, formCaja, formVehiculo, formFacturacion, isVehiculoValid, isFacturacionValid, pagosAgregados]);
+  }, [currentStepIndex, formCaja, formVehiculo, formFacturacion, isVehiculoValid, isFacturacionValid, pagosAgregados, isSavingStep]);
 
   // Sincronizar Marca con Marca Carrocería
 
@@ -387,61 +524,329 @@ export function NuevoCertificadoView() {
 
   
 
-  const irSiguientePaso = async () => {
-    if (currentStepIndex === 0 && !certificadoId) {
-      try {
-        const res = await faregasCertificadosApi.crearBorrador({
-          tipoCertificadoClave: formCaja.tipoCertificado
+  const consultarVehiculoFarenet = async () => {
+    if (!formCaja.placa.trim()) return;
+    try {
+      const response = await faregasCertificadosApi.obtenerVehiculo(formCaja.placa.trim());
+      if (response?.data) {
+        const placaEncontrada = textValue(response.data.placa) || formCaja.placa.trim().toUpperCase();
+        const categoriaEncontrada = textValue(response.data.categoriaKey ?? response.data.categoria);
+        setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(response.data), placaNueva: placaEncontrada }));
+        setFormCaja((prev: any) => ({
+          ...prev,
+          placa: placaEncontrada,
+          categoria: categoriaEncontrada || prev.categoria,
+        }));
+        setVehiculoOrigen('FARENET');
+        Swal.fire({
+          icon: 'success',
+          title: 'Vehículo encontrado',
+          text: 'Los datos se autocompletaron desde Farenet y pueden editarse.',
+          timer: 1800,
+          showConfirmButton: false,
         });
-        if (res?.data?.id) {
-          setCertificadoId(res.data.id);
-          console.log("[DEBUG] Borrador FAREGAS creado con ID:", res.data.id);
-          setCurrentStepIndex(currentStepIndex + 1);
+      }
+    } catch (e: any) {
+      setVehiculoOrigen('MANUAL');
+      if (e.status !== 404) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Consulta no disponible',
+          text: 'El borrador fue creado. Puede completar los datos del vehículo manualmente.',
+        });
+      }
+    }
+  };
+
+  const asegurarClienteFaregas = async (titular: TitularState) => {
+    if (titular.clienteId) return titular.clienteId;
+    if (!titular.tipoDocumento || !titular.nroDocumento) return null;
+
+    try {
+      const response = await faregasClientesApi.crearCliente({
+        tipoDocumento: titular.tipoDocumento,
+        nroDocumento: titular.nroDocumento,
+        nombreRazonSocial: titular.nombreRazonSocial,
+        direccion: titular.direccion,
+      });
+      return Number(response.data.id);
+    } catch (e: any) {
+      if (e.status !== 409) throw e;
+      const existente = await faregasClientesApi.autocompletarPersona(titular.tipoDocumento, titular.nroDocumento);
+      if (existente?.data?.origen === 'FAREGAS' && existente.data.id) return Number(existente.data.id);
+      throw e;
+    }
+  };
+
+  const guardarTitularesBorrador = async (idBorrador: number) => {
+    const incompleto = titulares.find(t => !t.nombreRazonSocial.trim());
+    if (incompleto) throw new Error(`Complete el nombre o razón social del titular de orden ${incompleto.orden}.`);
+
+    const guardados: TitularState[] = [];
+    for (const titular of titulares) {
+      const clienteId = await asegurarClienteFaregas(titular);
+      const data = {
+        clienteId,
+        orden: titular.orden,
+        tipoDocumento: titular.tipoDocumento || null,
+        nroDocumento: titular.nroDocumento || null,
+        nombreRazonSocial: titular.nombreRazonSocial.trim(),
+        direccion: titular.direccion || null,
+      };
+
+      if (titular.titularId) {
+        await faregasCertificadosApi.actualizarTitular(idBorrador, titular.titularId, data);
+        const actualizado = { ...titular, clienteId };
+        guardados.push(actualizado);
+        setTitulares(prev => prev.map(item => item._uuid === titular._uuid ? actualizado : item));
+      } else {
+        const response = await faregasCertificadosApi.crearTitular(idBorrador, data);
+        const creado = { ...titular, clienteId, titularId: Number(response.data.id) };
+        guardados.push(creado);
+        setTitulares(prev => prev.map(item => item._uuid === titular._uuid ? creado : item));
+      }
+    }
+    setTitulares(guardados);
+  };
+
+  const guardarExpedienteTecnico = async (idBorrador: number) => {
+    await faregasCertificadosApi.guardarVehiculoBorrador(idBorrador, {
+      placa: formCaja.placa || formVehiculo.placaNueva || null,
+      categoria: formCaja.categoria || null,
+      clase: formVehiculo.clase || null,
+      marca: formVehiculo.marca || null,
+      modelo: formVehiculo.modelo || null,
+      version: formVehiculo.version || null,
+      anioFabricacion: formVehiculo.anioFabricacion || null,
+      anioModelo: formVehiculo.anioModelo || null,
+      vin: formVehiculo.vin || null,
+      serieChasis: formVehiculo.serieChasis || null,
+      numeroMotor: formVehiculo.numeroMotor || null,
+      combustible: formVehiculo.combustible || null,
+      color: formVehiculo.color || null,
+      carroceria: formVehiculo.carroceria || null,
+      numeroCilindros: formVehiculo.numeroCilindros || null,
+      cilindrada: formVehiculo.cilindrada || null,
+      numeroEjes: formVehiculo.numeroEjes || null,
+      numeroRuedas: formVehiculo.numeroRuedas || null,
+      numeroAsientos: formVehiculo.numeroAsientos || null,
+      numeroPasajeros: formVehiculo.numeroPasajeros || null,
+      longitud: formVehiculo.longitud || null,
+      ancho: formVehiculo.ancho || null,
+      alto: formVehiculo.alto || null,
+      pesoNeto: formVehiculo.pesoNeto || null,
+      pesoBruto: formVehiculo.pesoBruto || null,
+      cargaUtil: formVehiculo.cargaUtil || null,
+      potencia: formVehiculo.potencia || null,
+      formulaRodante: formVehiculo.formulaRodante || null,
+    });
+    await guardarTitularesBorrador(idBorrador);
+  };
+
+  const guardarPasoVehiculo = async (idBorrador: number) => {
+    await guardarExpedienteTecnico(idBorrador);
+    if (formCaja.tipoCertificado === 'GNV_ANUAL') {
+      await faregasCertificadosApi.guardarGnv(idBorrador, {
+        tallerAutorizadoId: formGnv.tallerAutorizadoId || null,
+        vigenciaHasta: formGnv.fechaVigencia || formGnv.vigencia_hasta || null,
+        modalidad: formCaja.modalidadCertificado || null,
+        numeroChip: formGnv.numeroChip || formGnv.numero_chip || null,
+      });
+      if (formGnv.verificaciones?.length > 0) {
+        await faregasCertificadosApi.guardarVerificacionesGnv(idBorrador, {
+          verificaciones: formGnv.verificaciones,
+        });
+      }
+    } else if (formCaja.tipoCertificado === 'GLP_ANUAL') {
+      await faregasCertificadosApi.guardarGlp(idBorrador, {
+        tallerAutorizadoId: formGlp.tallerAutorizadoId || null,
+        vigenciaHasta: formGlp.fechaVigencia || formGlp.vigencia_hasta || null,
+        expedienteTecnico: formGlp.expedienteTecnico || null,
+        modalidad: formCaja.modalidadCertificado || null,
+      });
+      await faregasCertificadosApi.guardarComponentesGlp(idBorrador, {
+        componentes: (formGlp.componentes || []).map((componente: any, index: number) => ({
+          orden: componente.orden || index + 1,
+          componente: componente.componente,
+          marca: componente.marca || null,
+          modelo: componente.modelo || null,
+          capacidadLitros: componente.capacidadLitros || null,
+          mesFabricacion: componente.mesFabricacion || null,
+          anioFabricacion: componente.anioFabricacion || null,
+          numeroSerie: componente.numeroSerie || null,
+        })),
+      });
+      if (formGlp.verificaciones?.length > 0) {
+        await faregasCertificadosApi.guardarVerificacionesGlp(idBorrador, {
+          verificaciones: formGlp.verificaciones,
+        });
+      }
+    } else if (formCaja.tipoCertificado === 'CONFORMIDAD') {
+      await faregasCertificadosApi.guardarConformidad(idBorrador, {
+        tipoConformidad: formConformidad.tipoConformidad || null,
+        tipoTramite: formConformidad.tipoTramite || null,
+        caracteristicaRegistrable: formConformidad.caracteristicaRegistrable || null,
+        motivo: formConformidad.motivo || null,
+        descripcion: formConformidad.descripcion || null,
+        usoOriginalVehiculo: formConformidad.usoOriginalVehiculo || null,
+      });
+    }
+    setLastSavedAt(new Date());
+  };
+
+  const guardarPasoPagos = async (idBorrador: number) => {
+    const response = await faregasCertificadosApi.guardarPagos(idBorrador, {
+      importeTotal: precioTotal,
+      pagos: pagosAgregados.map(pago => ({
+        tipo: pago.tipo,
+        importe: pago.importe,
+        tarjetaKey: pago.tarjetaKey || null,
+        nroOperacion: pago.nroOperacion || null,
+        digitosTarjeta: pago.digitosTarjeta || null,
+        cuentaCorrienteKey: pago.cuentaCorrienteKey || null,
+        entidadFinancieraKey: pago.entidadFinancieraKey || null,
+        fechaDeposito: pago.fechaDeposito || null,
+      })),
+    });
+    const pagosGuardados = response.data?.pagos || [];
+    setPagosAgregados(pagosGuardados.map((pago: any) => ({
+      id: pago.id,
+      tipo: String(pago.tipoContadoKey || '').toUpperCase(),
+      importe: Number(pago.importe).toFixed(2),
+      tarjetaKey: pago.tarjetaKey || '',
+      nroOperacion: pago.nroOperacionBanco || pago.nroOperacionTarjeta || '',
+      digitosTarjeta: pago.digitosTarjeta || '',
+      cuentaCorrienteKey: pago.cuentaCorrienteKey || '',
+      entidadFinancieraKey: pago.entidadFinancieraKey || '',
+      fechaDeposito: textValue(pago.fechdeposito).slice(0, 10),
+    })));
+    setLastSavedAt(new Date());
+  };
+
+  const eliminarTitularBorrador = async (titular: TitularState) => {
+    if (!certificadoId || !titular.titularId) return;
+    try {
+      await faregasCertificadosApi.eliminarTitular(certificadoId, titular.titularId);
+      setTitulares(prev => prev.filter(item => item._uuid !== titular._uuid));
+    } catch (e: any) {
+      Swal.fire('No se pudo eliminar', e.message || 'Ocurrió un error al eliminar el titular.', 'error');
+    }
+  };
+
+  const irSiguientePaso = async () => {
+    if (isSavingStep) return;
+    if (currentStepIndex === 0) {
+      if (mostrarErroresPaso(validarDatosIniciales(formCaja))) return;
+      setIsSavingStep(true);
+      try {
+        let idBorrador = certificadoId;
+        if (!idBorrador) {
+          const res = await faregasCertificadosApi.crearBorrador({ tipoCertificadoClave: formCaja.tipoCertificado });
+          idBorrador = Number(res?.data?.id);
+          if (!idBorrador) throw new Error('El servidor no devolvió el identificador del borrador.');
+          setCertificadoId(idBorrador);
+        } else {
+          await faregasCertificadosApi.actualizarBorrador(idBorrador, { tipoCertificadoClave: formCaja.tipoCertificado });
         }
+        if (formCaja.tipoCertificado === 'GLP_ANUAL') {
+          setFormGlp((prev: any) => ({ ...prev, modalidad: formCaja.modalidadCertificado }));
+        } else if (formCaja.tipoCertificado === 'GNV_ANUAL') {
+          setFormGnv((prev: any) => ({ ...prev, modalidad: formCaja.modalidadCertificado }));
+        }
+        await consultarVehiculoFarenet();
+        const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
+        if (tarifaResponse.data?.importeTotal) {
+          setPrecioTotal(Number(tarifaResponse.data.importeTotal));
+          setPrecioSubtotal(Number(tarifaResponse.data.importeTotal));
+        }
+        setLastSavedAt(new Date());
+        setFurthestStepIndex(prev => Math.max(prev, 1));
+        setCurrentStepIndex(1);
       } catch (e: any) {
-        console.error("Error al crear borrador FAREGAS", e);
         Swal.fire('Error', e.message || 'No se pudo crear el borrador', 'error');
+      } finally {
+        setIsSavingStep(false);
       }
     } else if (currentStepIndex < STEPS.length - 1) {
-      // Guardar datos específicos al salir del paso vehiculo
       if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
+        const errores = validarExpedienteTecnico({
+          tipoCertificado: formCaja.tipoCertificado as TipoCertificadoFaregas,
+          modalidad: formCaja.modalidadCertificado,
+          caja: formCaja,
+          vehiculo: formVehiculo,
+          titulares,
+          gnv: formGnv,
+          glp: formGlp,
+          conformidad: formConformidad,
+        });
+        if (mostrarErroresPaso(errores)) return;
+        setIsSavingStep(true);
         try {
-          if (formCaja.tipoCertificado === 'GNV_ANUAL') {
-            await faregasCertificadosApi.guardarGnv(certificadoId, {
-              tallerAutorizadoId: formGnv.tallerAutorizadoId || null,
-              vigenciaHasta: formGnv.fechaVigencia || formGnv.vigencia_hasta || null,
-              modalidad: formGnv.modalidad || null,
-              numeroChip: formGnv.numeroChip || formGnv.numero_chip || null,
-            });
-            if (formGnv.verificaciones?.length > 0) {
-              await faregasCertificadosApi.guardarVerificacionesGnv(certificadoId, {
-                verificaciones: formGnv.verificaciones
-              });
-            }
-          } else if (formCaja.tipoCertificado === 'GLP_ANUAL') {
-            await faregasCertificadosApi.guardarGlp(certificadoId, {
-              tallerAutorizadoId: formGlp.tallerAutorizadoId || null,
-              vigenciaHasta: formGlp.fechaVigencia || formGlp.vigencia_hasta || null,
-              expedienteTecnico: formGlp.expedienteTecnico || null,
-              modalidad: formGlp.modalidad || null,
-            });
-          }
+          await guardarPasoVehiculo(certificadoId);
         } catch (e: any) {
-          console.warn("[FAREGAS] Guardado parcial al avanzar paso vehiculo:", e.message);
+          Swal.fire('No se pudo guardar', e.message || 'Revise los datos del expediente técnico.', 'error');
+          return;
+        } finally {
+          setIsSavingStep(false);
+        }
+      } else if (STEPS[currentStepIndex].id === 'pago' && certificadoId) {
+        const totalPagado = pagosAgregados.reduce((total, pago) => total + Number(pago.importe || 0), 0);
+        if (Math.abs(totalPagado - precioTotal) > 0.009) {
+          mostrarErroresPaso([`El pago debe completar S/ ${precioTotal.toFixed(2)}. Saldo pendiente: S/ ${Math.max(0, precioTotal - totalPagado).toFixed(2)}.`]);
+          return;
+        }
+        setIsSavingStep(true);
+        try {
+          await guardarPasoPagos(certificadoId);
+        } catch (e: any) {
+          Swal.fire('No se pudo guardar el pago', e.message || 'Revise los medios de pago.', 'error');
+          return;
+        } finally {
+          setIsSavingStep(false);
+        }
+      } else if (STEPS[currentStepIndex].id === 'facturacion') {
+        if (!formFacturacion.tipoDocFac || !formFacturacion.nroDocFac || !formFacturacion.razonSocialFac || !formFacturacion.direccionFac) {
+          mostrarErroresPaso(['Complete y guarde los datos fiscales antes de continuar.']);
+          return;
+        }
+        if (facturacion?.estado !== 'ACEPTADO' || facturacion.aceptadaSunat !== true) {
+          mostrarErroresPaso(['El comprobante debe ser emitido y aceptado por Nubefact/SUNAT antes de continuar.']);
+          return;
         }
       }
-      setCurrentStepIndex(currentStepIndex + 1);
+      const siguiente = currentStepIndex + 1;
+      setFurthestStepIndex(prev => Math.max(prev, siguiente));
+      setCurrentStepIndex(siguiente);
     }
   };
 
-  
-
-
-    const irPasoAnterior = () => {
-    if (currentStepIndex > 0) {
-      setCurrentStepIndex(currentStepIndex - 1);
+  const irAtrasOStep = async (destino: number) => {
+    if (isSavingStep || destino < 0 || destino >= currentStepIndex || destino > furthestStepIndex) return;
+    if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
+      setIsSavingStep(true);
+      try {
+        await guardarPasoVehiculo(certificadoId);
+      } catch (e: any) {
+        Swal.fire('No se pudo guardar', e.message || 'No se cambió de paso para evitar perder información.', 'error');
+        return;
+      } finally {
+        setIsSavingStep(false);
+      }
+    } else if (STEPS[currentStepIndex].id === 'pago' && certificadoId) {
+      setIsSavingStep(true);
+      try {
+        await guardarPasoPagos(certificadoId);
+      } catch (e: any) {
+        Swal.fire('No se pudo guardar', e.message || 'No se cambió de paso para evitar perder los pagos.', 'error');
+        return;
+      } finally {
+        setIsSavingStep(false);
+      }
     }
+    setCurrentStepIndex(destino);
   };
+
+  const irPasoAnterior = () => irAtrasOStep(currentStepIndex - 1);
 
   const montoPendiente = Math.max(0, precioTotal - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
 
@@ -472,7 +877,7 @@ export function NuevoCertificadoView() {
 
   // Efecto para auto-llenar pagos de Cortesía u otros que dejan el total en 0
   useEffect(() => {
-    if (currentStepIndex === 1 && maestrosPago && formCaja.descuentoObj) {
+    if (currentStepIndex === 2 && maestrosPago && formCaja.descuentoObj) {
 
       // Si el monto pendiente es 0 (ej. Cortesía, 100% descuento)
       if (montoPendiente === 0) {
@@ -485,7 +890,7 @@ export function NuevoCertificadoView() {
       } else {
         setDisablePagoTabs(false);
       }
-    } else if (currentStepIndex === 1) {
+    } else if (currentStepIndex === 2) {
       // En caso de que se haya quitado el descuento
       if (montoPendiente > 0) {
         setDisablePagoTabs(false);
@@ -614,6 +1019,14 @@ export function NuevoCertificadoView() {
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
             Nuevo Certificado
           </h2>
+          {certificadoId && (
+            <div className="ml-auto flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-sm">
+              {isSavingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#052a79]" /> : <Save className="h-3.5 w-3.5 text-green-600" />}
+              <span>BORRADOR #{certificadoId}</span>
+              <span className="text-slate-300">|</span>
+              <span>{isSavingStep ? 'GUARDANDO…' : lastSavedAt ? `GUARDADO ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'CARGADO'}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between relative">
@@ -630,7 +1043,14 @@ export function NuevoCertificadoView() {
             const isCompleted = index < currentStepIndex;
 
             return (
-              <div key={step.id} className="flex flex-col items-center gap-2 bg-[#f4f9ff] px-2">
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => irAtrasOStep(index)}
+                disabled={index >= currentStepIndex || isSavingStep}
+                className={`flex flex-col items-center gap-2 bg-[#f4f9ff] px-2 ${index < currentStepIndex && !isSavingStep ? 'cursor-pointer' : 'cursor-default'}`}
+                title={index < currentStepIndex ? `Volver a ${step.label}` : index === currentStepIndex ? 'Paso actual' : 'Complete el paso anterior'}
+              >
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
                     isCompleted ? 'bg-gold-3d shadow-sm border-none' :
@@ -642,7 +1062,7 @@ export function NuevoCertificadoView() {
                 <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
                   {step.label}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -657,23 +1077,34 @@ export function NuevoCertificadoView() {
           />
         )}
         {STEPS[currentStepIndex].id === 'vehiculo' && (
-          <VehiculoStep
-            tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
-            formVehiculo={formVehiculo}
-            setFormVehiculo={setFormVehiculo}
-            formPropietario={formPropietario}
-            setFormPropietario={setFormPropietario}
-            formGlp={formGlp}
-            setFormGlp={setFormGlp}
-            formGnv={formGnv}
-            setFormGnv={setFormGnv}
-            formConformidad={formConformidad}
-            setFormConformidad={setFormConformidad}
-            titulares={titulares}
-            setTitulares={setTitulares}
-            catalogoVerificaciones={catalogoVerificaciones}
-            talleres={talleres}
-          />
+          <>
+            {expedienteError && (
+              <div role="alert" className="mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                <span>{expedienteError}</span>
+                <button type="button" onClick={cargarMaestrosVehiculo} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-black text-white">REINTENTAR</button>
+              </div>
+            )}
+            <VehiculoStep
+              tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
+              modalidadCertificado={formCaja.modalidadCertificado}
+              formVehiculo={formVehiculo}
+              setFormVehiculo={setFormVehiculo}
+              formPropietario={formPropietario}
+              setFormPropietario={setFormPropietario}
+              formGlp={formGlp}
+              setFormGlp={setFormGlp}
+              formGnv={formGnv}
+              setFormGnv={setFormGnv}
+              formConformidad={formConformidad}
+              setFormConformidad={setFormConformidad}
+              titulares={titulares}
+              setTitulares={setTitulares}
+              onRemoveTitular={eliminarTitularBorrador}
+              catalogoVerificaciones={catalogoVerificaciones}
+              talleres={talleres}
+              vehiculoOrigen={vehiculoOrigen}
+            />
+          </>
         )}
         {STEPS[currentStepIndex].id === 'pago' && (
           <PagoStep
@@ -684,12 +1115,17 @@ export function NuevoCertificadoView() {
             pagosAgregados={pagosAgregados}
             handleAgregarPago={handleAgregarPago}
             eliminarPago={eliminarPago}
+            totalPagar={precioTotal}
+            maestrosPago={maestrosPago}
           />
         )}
         {STEPS[currentStepIndex].id === 'facturacion' && (
           <FacturacionStep
+            certificadoId={certificadoId}
             formFacturacion={formFacturacion}
             setFormFacturacion={setFormFacturacion}
+            facturacion={facturacion}
+            onFacturacionChange={setFacturacion}
           />
         )}
         {STEPS[currentStepIndex].id === 'verificacion' && (
@@ -705,6 +1141,7 @@ export function NuevoCertificadoView() {
             formConformidad={formConformidad}
             pagosAgregados={pagosAgregados}
             formFacturacion={formFacturacion}
+            facturacion={facturacion}
           />
         )}
       </div>
@@ -715,37 +1152,30 @@ export function NuevoCertificadoView() {
           <button
             type="button"
             onClick={irPasoAnterior}
+            disabled={isSavingStep}
             className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
           >
-            Atrás
+            {isSavingStep ? 'Guardando…' : 'Atrás'}
           </button>
         ) : <div></div>}
 
         <div className="flex flex-col items-end gap-1.5">
           {currentStepIndex === STEPS.length - 1 ? (
-            <div className="flex gap-3">
-              {!isEmitido && (
-                <button
-                  type="button"
-                  onClick={irSiguientePaso}
-                  className="bg-gold-3d hover:-translate-y-0.5 rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm"
-                >
-                  FINALIZAR
-                </button>
-              )}
-            </div>
+            !isEmitido ? <span className="text-xs font-semibold text-slate-500">Revise la validación y emita desde el panel superior.</span> : <span className="text-xs font-bold text-green-700">Certificado emitido.</span>
           ) : (
             <button
               type="button"
               onClick={irSiguientePaso}
-              disabled={currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || !formCaja.categoria)}
+              disabled={isSavingStep || (currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || !formCaja.categoria || (formCaja.tipoCertificado !== 'CONFORMIDAD' && !formCaja.modalidadCertificado)))}
               className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                ${(currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || !formCaja.categoria))
+                ${(isSavingStep || (currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || !formCaja.categoria || (formCaja.tipoCertificado !== 'CONFORMIDAD' && !formCaja.modalidadCertificado))))
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-gold-3d hover:-translate-y-0.5'
                 }`}
             >
-              Siguiente Paso
+              {isSavingStep ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Guardando…</span>
+              ) : 'Siguiente Paso'}
             </button>
           )}
         </div>

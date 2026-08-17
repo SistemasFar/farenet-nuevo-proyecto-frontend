@@ -533,7 +533,7 @@ export const operacionApi = {
 
 export const inspeccionesApi = {
   buscarInfoDuplicado: async (placa: string, plantaKey?: string) => {
-    const url = plantaKey 
+    const url = plantaKey
       ? `${BASE_URL}/inspecciones/buscar-info-duplicado/${placa}?plantaKey=${plantaKey}`
       : `${BASE_URL}/inspecciones/buscar-info-duplicado/${placa}`;
     const response = await fetchWithTimeout(url);

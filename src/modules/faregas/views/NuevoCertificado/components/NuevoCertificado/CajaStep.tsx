@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { Box, CheckCircle } from 'lucide-react';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
+import type { FormCajaState } from '../../NuevoCertificadoView';
 
 interface CajaStepProps {
-  formCaja: any;
-  setFormCaja: (data: any) => void;
+  formCaja: FormCajaState;
+  setFormCaja: Dispatch<SetStateAction<FormCajaState>>;
 }
 
 export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
@@ -14,14 +15,14 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
     faregasCertificadosApi.obtenerTipos()
       .then(res => {
         if (res.ok && res.data) {
-          setTiposDisponibles(res.data.map((t: any) => t.clave));
+          setTiposDisponibles(res.data.map((t: { clave: string }) => t.clave));
         }
       })
       .catch(err => console.error('Error al obtener tipos de certificado', err));
   }, []);
 
-  const handleSelectTipo = (tipo: string) => {
-    setFormCaja((prev: any) => ({ ...prev, tipoCertificado: tipo }));
+  const handleSelectTipo = (tipo: string, modalidad?: 'INICIAL' | 'ANUAL') => {
+    setFormCaja(prev => ({ ...prev, tipoCertificado: tipo, modalidadCertificado: modalidad || '' }));
   };
 
   return (
@@ -31,12 +32,11 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card GLP */}
           <div
-            onClick={() => tiposDisponibles.includes('GLP_ANUAL') && handleSelectTipo('GLP_ANUAL')}
             className={`rounded-2xl p-6 border-2 transition-all duration-300 relative overflow-hidden ${
               !tiposDisponibles.includes('GLP_ANUAL') ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200' :
               formCaja.tipoCertificado === 'GLP_ANUAL'
-                ? 'cursor-pointer border-[#052a79] bg-[#052a79]/5 shadow-md scale-[1.02]'
-                : 'cursor-pointer border-slate-200 bg-white hover:border-[#052a79]/30 hover:bg-slate-50'
+                ? 'border-[#052a79] bg-[#052a79]/5 shadow-md scale-[1.02]'
+                : 'border-slate-200 bg-white hover:border-[#052a79]/30 hover:bg-slate-50'
             }`}
           >
             {formCaja.tipoCertificado === 'GLP_ANUAL' && (
@@ -46,6 +46,19 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
             )}
             <Box className={`w-10 h-10 mb-4 ${formCaja.tipoCertificado === 'GLP_ANUAL' ? 'text-[#052a79]' : 'text-slate-400'}`} />
             <h5 className="font-bold text-slate-800 text-lg mb-2">GLP</h5>
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              {(['INICIAL', 'ANUAL'] as const).map(modalidad => (
+                <button
+                  key={modalidad}
+                  type="button"
+                  disabled={!tiposDisponibles.includes('GLP_ANUAL')}
+                  onClick={() => handleSelectTipo('GLP_ANUAL', modalidad)}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-black transition ${formCaja.tipoCertificado === 'GLP_ANUAL' && formCaja.modalidadCertificado === modalidad ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]'}`}
+                >
+                  {modalidad}
+                </button>
+              ))}
+            </div>
             <p className="text-sm text-slate-500 leading-relaxed">
               Certificación relacionada con el sistema de combustión a Gas Licuado de Petróleo.
             </p>
@@ -53,12 +66,11 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
 
           {/* Card GNV */}
           <div
-            onClick={() => tiposDisponibles.includes('GNV_ANUAL') && handleSelectTipo('GNV_ANUAL')}
             className={`rounded-2xl p-6 border-2 transition-all duration-300 relative overflow-hidden ${
               !tiposDisponibles.includes('GNV_ANUAL') ? 'opacity-50 cursor-not-allowed bg-slate-50 border-slate-200' :
               formCaja.tipoCertificado === 'GNV_ANUAL'
-                ? 'cursor-pointer border-[#052a79] bg-[#052a79]/5 shadow-md scale-[1.02]'
-                : 'cursor-pointer border-slate-200 bg-white hover:border-[#052a79]/30 hover:bg-slate-50'
+                ? 'border-[#052a79] bg-[#052a79]/5 shadow-md scale-[1.02]'
+                : 'border-slate-200 bg-white hover:border-[#052a79]/30 hover:bg-slate-50'
             }`}
           >
             {formCaja.tipoCertificado === 'GNV_ANUAL' && (
@@ -68,8 +80,21 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
             )}
             <Box className={`w-10 h-10 mb-4 ${formCaja.tipoCertificado === 'GNV_ANUAL' ? 'text-[#052a79]' : 'text-slate-400'}`} />
             <h5 className="font-bold text-slate-800 text-lg mb-2">GNV</h5>
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              {(['INICIAL', 'ANUAL'] as const).map(modalidad => (
+                <button
+                  key={modalidad}
+                  type="button"
+                  disabled={!tiposDisponibles.includes('GNV_ANUAL')}
+                  onClick={() => handleSelectTipo('GNV_ANUAL', modalidad)}
+                  className={`rounded-lg border-2 px-3 py-2 text-xs font-black transition ${formCaja.tipoCertificado === 'GNV_ANUAL' && formCaja.modalidadCertificado === modalidad ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]'}`}
+                >
+                  {modalidad}
+                </button>
+              ))}
+            </div>
             <p className="text-sm text-slate-500 leading-relaxed">
-              Inspección anual del sistema de Gas Natural Vehicular.
+              Certificación inicial o anual del sistema de Gas Natural Vehicular.
             </p>
           </div>
 
@@ -109,7 +134,7 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
               className="w-full h-[42px] px-4 rounded-xl border-2 border-slate-200 bg-white text-slate-800 font-bold focus:border-[#f59e0b] focus:ring-0 transition-colors uppercase"
               placeholder="EJ: ABC-123"
               value={formCaja.placa || ''}
-              onChange={(e) => setFormCaja((prev: any) => ({ ...prev, placa: e.target.value.trim().toUpperCase() }))}
+              onChange={(e) => setFormCaja(prev => ({ ...prev, placa: e.target.value.trim().toUpperCase() }))}
               maxLength={7}
             />
           </div>
@@ -121,7 +146,7 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
             <select
               className="w-full h-[42px] px-4 rounded-xl border-2 border-slate-200 bg-white text-slate-800 font-bold focus:border-[#f59e0b] focus:ring-0 transition-colors"
               value={formCaja.categoria || ''}
-              onChange={(e) => setFormCaja((prev: any) => ({ ...prev, categoria: e.target.value }))}
+              onChange={(e) => setFormCaja(prev => ({ ...prev, categoria: e.target.value }))}
             >
               <option value="">-- Seleccionar --</option>
               <option value="M1">M1</option>
@@ -145,7 +170,7 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <span className="block text-xs text-blue-600 font-semibold mb-1">Tipo de Expediente</span>
-              <span className="font-bold text-slate-800 text-lg">{formCaja.tipoCertificado === 'GLP_ANUAL' ? 'GLP' : formCaja.tipoCertificado === 'GNV_ANUAL' ? 'GNV' : 'CONFORMIDAD'}</span>
+              <span className="font-bold text-slate-800 text-lg">{formCaja.tipoCertificado === 'GLP_ANUAL' ? `GLP - ${formCaja.modalidadCertificado}` : formCaja.tipoCertificado === 'GNV_ANUAL' ? `GNV - ${formCaja.modalidadCertificado}` : 'CONFORMIDAD'}</span>
             </div>
             <div>
               <span className="block text-xs text-blue-600 font-semibold mb-1">Placa a Certificar</span>

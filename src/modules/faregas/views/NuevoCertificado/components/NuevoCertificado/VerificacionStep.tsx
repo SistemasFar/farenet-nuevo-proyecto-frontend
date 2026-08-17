@@ -4,6 +4,7 @@ import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Eye, X } from 
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
 import Swal from 'sweetalert2';
+import type { FacturacionFaregas } from '../../../../types/faregas-api';
 
 interface VerificacionStepProps {
   certificadoId?: number;
@@ -17,6 +18,7 @@ interface VerificacionStepProps {
   formConformidad: any;
   pagosAgregados: any[];
   formFacturacion: any;
+  facturacion: FacturacionFaregas | null;
 }
 
 export function VerificacionStep({
@@ -30,7 +32,8 @@ export function VerificacionStep({
   formGnv,
   formConformidad,
   pagosAgregados,
-  formFacturacion
+  formFacturacion,
+  facturacion
 }: VerificacionStepProps) {
 
   const totalPagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
@@ -288,6 +291,12 @@ export function VerificacionStep({
             <div className="grid grid-cols-2 gap-y-3 text-sm">
               <div className="text-slate-500 font-semibold">Tipo:</div>
               <div className="font-bold text-slate-800 uppercase">{tipoCertificado}</div>
+              {tipoCertificado !== 'CONFORMIDAD' && (
+                <>
+                  <div className="text-slate-500 font-semibold">Modalidad:</div>
+                  <div className="font-bold text-slate-800 uppercase">{formGlp.modalidad || formGnv.modalidad || formCaja.modalidadCertificado || '-'}</div>
+                </>
+              )}
               <div className="text-slate-500 font-semibold">Placa:</div>
               <div className="font-bold text-[#052a79] text-lg uppercase">{formCaja.placa}</div>
               <div className="text-slate-500 font-semibold">Categoría:</div>
@@ -305,9 +314,9 @@ export function VerificacionStep({
               <div className="text-slate-500 font-semibold">Modelo:</div>
               <div className="font-bold text-slate-800 uppercase">{formVehiculo.modelo || '-'}</div>
               <div className="text-slate-500 font-semibold">VIN:</div>
-              <div className="font-bold text-slate-800 uppercase">{formVehiculo.nroSerie || '-'}</div>
+              <div className="font-bold text-slate-800 uppercase">{formVehiculo.vin || formVehiculo.serieChasis || '-'}</div>
               <div className="text-slate-500 font-semibold">N° Motor:</div>
-              <div className="font-bold text-slate-800 uppercase">{formVehiculo.nroMotor || '-'}</div>
+              <div className="font-bold text-slate-800 uppercase">{formVehiculo.numeroMotor || '-'}</div>
               <div className="text-slate-500 font-semibold">Combustible:</div>
               <div className="font-bold text-slate-800 uppercase">{formVehiculo.combustible || '-'}</div>
             </div>
@@ -329,8 +338,11 @@ export function VerificacionStep({
                 </div>
                 <div className="text-xs bg-white p-3 rounded border border-blue-100">
                   <div className="font-bold text-slate-700 mb-1">Componentes:</div>
-                  <div className="text-slate-600">CILINDRO: {formGlp.cilindroMarca || '-'} | SERIE: {formGlp.cilindroSerie || '-'}</div>
-                  <div className="text-slate-600">REGULADOR: {formGlp.reguladorMarca || '-'} | SERIE: {formGlp.reguladorSerie || '-'}</div>
+                  {(formGlp.componentes || []).map((componente: any) => (
+                    <div key={componente.componente} className="text-slate-600">
+                      {componente.componente}: {componente.marca || '-'} | MODELO: {componente.modelo || '-'} | SERIE: {componente.numeroSerie || '-'}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -367,7 +379,9 @@ export function VerificacionStep({
             <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 pb-2 border-b">4. Facturación</h4>
             <div className="grid grid-cols-2 gap-y-3 text-sm">
               <div className="text-slate-500 font-semibold">Comprobante:</div>
-              <div className="font-bold text-slate-800 uppercase">{formFacturacion.tipoDocFac || '-'}</div>
+              <div className="font-bold text-slate-800 uppercase">{facturacion?.nroComprobante || formFacturacion.tipoDocFac || '-'}</div>
+              <div className="text-slate-500 font-semibold">Estado SUNAT:</div>
+              <div className="font-bold text-green-700 uppercase">{facturacion?.estado || '-'}</div>
               <div className="text-slate-500 font-semibold">DNI/RUC:</div>
               <div className="font-bold text-slate-800 uppercase">{formFacturacion.nroDocFac || '-'}</div>
               <div className="text-slate-500 font-semibold">Cliente:</div>

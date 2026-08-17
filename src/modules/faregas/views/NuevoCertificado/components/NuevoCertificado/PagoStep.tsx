@@ -9,6 +9,8 @@ interface PagoStepProps {
   pagosAgregados: any[];
   handleAgregarPago: () => void;
   eliminarPago: (index: number) => void;
+  totalPagar: number;
+  maestrosPago?: any;
 }
 
 export function PagoStep({
@@ -18,12 +20,20 @@ export function PagoStep({
   setFormPago,
   pagosAgregados,
   handleAgregarPago,
-  eliminarPago
+  eliminarPago,
+  totalPagar,
+  maestrosPago,
 }: PagoStepProps) {
 
-  const totalMock = 150.00; // Tarifa simulada para diseño
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
-  const pendiente = totalMock - pagado;
+  const pendiente = totalPagar - pagado;
+  const cuentasFiltradas = (maestrosPago?.cuentasCorrientes || []).filter((cuenta: any) =>
+    !formPago.entidadFinancieraKey || cuenta.entidadfinanciera_key === formPago.entidadFinancieraKey
+  );
+  const tarjetaSeleccionada = (maestrosPago?.tarjetas || []).find((tarjeta: any) => tarjeta.key === formPago.tarjetaKey);
+  const tarjetaSinDigitos = ['CUPONIDAD', 'PAGO WEB', 'YAPE', 'PLIN'].some(tipo =>
+    String(tarjetaSeleccionada?.nombre || '').toUpperCase().includes(tipo)
+  );
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormPago((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
@@ -43,7 +53,7 @@ export function PagoStep({
         <div>
           <h3 className="text-xl font-bold text-slate-800">Pago</h3>
           <p className="text-sm text-slate-500">
-            Registro de los medios de pago para este expediente. (Prototipo visual)
+            Registre uno o varios medios de pago. La información se guarda en el borrador Faregas.
           </p>
         </div>
       </div>
@@ -89,15 +99,43 @@ export function PagoStep({
                     <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TARJETA</label>
                     <select name="tarjetaKey" value={formPago.tarjetaKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
                       <option value="">-- SELECCIONAR --</option>
-                      <option value="VISA">VISA</option>
-                      <option value="MASTERCARD">MASTERCARD</option>
-                      <option value="YAPE">YAPE</option>
-                      <option value="PLIN">PLIN</option>
+                      {(maestrosPago?.tarjetas || []).map((tarjeta: any) => (
+                        <option key={tarjeta.key} value={tarjeta.key}>{tarjeta.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {!tarjetaSinDigitos && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">ÚLTIMOS 4 DÍGITOS</label>
+                      <input type="text" name="digitosTarjeta" value={formPago.digitosTarjeta || ''} onChange={handleInput} maxLength={4} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0" placeholder="****" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {pagoTab === 'BANCO' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">ENTIDAD FINANCIERA</label>
+                    <select name="entidadFinancieraKey" value={formPago.entidadFinancieraKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
+                      <option value="">-- SELECCIONAR --</option>
+                      {(maestrosPago?.entidadesFinancieras || []).map((entidad: any) => (
+                        <option key={entidad.key} value={entidad.key}>{entidad.nombre}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">ÚLTIMOS 4 DÍGITOS</label>
-                    <input type="text" name="digitosTarjeta" value={formPago.digitosTarjeta || ''} onChange={handleInput} maxLength={4} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0" placeholder="****" />
+                    <label className="block text-xs font-bold text-slate-500 mb-1">CUENTA CORRIENTE</label>
+                    <select name="cuentaCorrienteKey" value={formPago.cuentaCorrienteKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
+                      <option value="">-- SELECCIONAR --</option>
+                      {cuentasFiltradas.map((cuenta: any) => (
+                        <option key={cuenta.key} value={cuenta.key}>{cuenta.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">FECHA DEPÓSITO</label>
+                    <input type="date" name="fechaDeposito" max={new Date().toISOString().slice(0, 10)} value={formPago.fechaDeposito || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold focus:border-[#f59e0b] focus:ring-0" />
                   </div>
                 </div>
               )}
@@ -145,7 +183,7 @@ export function PagoStep({
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-semibold">Total a pagar:</span>
-                <span className="text-slate-800 font-black text-xl">S/ {totalMock.toFixed(2)}</span>
+                <span className="text-slate-800 font-black text-xl">S/ {totalPagar.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-semibold">Pagado:</span>
@@ -160,7 +198,7 @@ export function PagoStep({
               </div>
             </div>
             {pendiente > 0 ? (
-              <p className="text-xs text-red-500 font-bold text-center mt-6 uppercase">La tarifa es demostrativa</p>
+              <p className="text-xs text-red-500 font-bold text-center mt-6 uppercase">Debe completar el saldo para continuar</p>
             ) : (
               <div className="mt-6 bg-green-100 text-green-700 text-xs font-bold p-3 rounded-lg text-center uppercase border border-green-200">
                 Monto Completo

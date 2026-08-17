@@ -6,15 +6,17 @@ import type {
   CrearTitularFaregasRequest,
   GuardarComponentesGlpFaregasRequest,
   GuardarConformidadFaregasRequest,
+  GuardarFacturacionFaregasRequest,
   GuardarGlpFaregasRequest,
   GuardarGnvFaregasRequest,
+  GuardarPagosFaregasRequest,
   GuardarVerificacionesFaregasRequest,
   VehiculoBorradorFaregasRequest,
 } from '../types/faregas-api';
 
 export const faregasCertificadosApi = {
   obtenerTipos: () => fetchWithToken('/certificados/tipos'),
-  obtenerVehiculo: (placa: string) => fetchWithToken(`/clientes/vehiculo/${placa}`),
+  obtenerVehiculo: (placa: string) => fetchWithToken(`/clientes/vehiculo/${encodeURIComponent(placa)}`),
   obtenerBorradores: (page = 1, pageSize = 10) => fetchWithToken(`/certificados/borradores?page=${page}&pageSize=${pageSize}`),
   crearBorrador: (data: CrearBorradorFaregasRequest) => fetchWithToken('/certificados/borradores', {
     method: 'POST',
@@ -69,6 +71,19 @@ export const faregasCertificadosApi = {
   obtenerGnv: (id: number) => fetchWithToken(`/certificados/borradores/${id}/gnv`),
   obtenerGlp: (id: number) => fetchWithToken(`/certificados/borradores/${id}/glp`),
   obtenerConformidad: (id: number) => fetchWithToken(`/certificados/borradores/${id}/conformidad`),
+  obtenerPagos: (id: number) => fetchWithToken(`/certificados/borradores/${id}/pagos`),
+  guardarPagos: (id: number, data: GuardarPagosFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/pagos`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  obtenerFacturacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion`),
+  guardarFacturacion: (id: number, data: GuardarFacturacionFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/facturacion`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  emitirFacturacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/emitir`, {
+    method: 'POST'
+  }),
   validarEmision: (id: number) => fetchWithToken(`/certificados/borradores/${id}/validar-emision`),
   emitirCertificado: (id: number) => fetchWithToken(`/certificados/borradores/${id}/emitir`, { method: 'POST' }),
   obtenerPrevisualizacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/previsualizacion`)

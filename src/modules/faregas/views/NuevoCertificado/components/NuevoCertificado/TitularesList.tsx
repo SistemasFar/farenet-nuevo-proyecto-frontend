@@ -17,9 +17,10 @@ export interface TitularState {
 interface TitularesListProps {
   titulares: TitularState[];
   setTitulares: React.Dispatch<React.SetStateAction<TitularState[]>>;
+  onRemoveTitular?: (titular: TitularState) => Promise<void>;
 }
 
-export function TitularesList({ titulares, setTitulares }: TitularesListProps) {
+export function TitularesList({ titulares, setTitulares, onRemoveTitular }: TitularesListProps) {
   
   const handleAdd = () => {
     const nextOrden = titulares.length > 0 ? Math.max(...titulares.map(t => t.orden)) + 1 : 1;
@@ -67,8 +68,9 @@ export function TitularesList({ titulares, setTitulares }: TitularesListProps) {
           showConfirmButton: false
         });
       }
-    } catch (e: any) {
-      if (e.status === 404) {
+    } catch (e: unknown) {
+      const status = e instanceof Error && 'status' in e ? (e as Error & { status?: number }).status : undefined;
+      if (status === 404) {
         Swal.fire({
           icon: 'info',
           title: 'No encontrado',
@@ -86,7 +88,8 @@ export function TitularesList({ titulares, setTitulares }: TitularesListProps) {
     }
   };
 
-  const handleRemove = (uuid: string, titularId: number | null) => {
+  const handleRemove = (titular: TitularState) => {
+    const { _uuid: uuid, titularId } = titular;
     if (titularId) {
       Swal.fire({
         title: '¿Eliminar titular?',
@@ -97,7 +100,7 @@ export function TitularesList({ titulares, setTitulares }: TitularesListProps) {
         cancelButtonText: 'Cancelar'
       }).then((result) => {
         if (result.isConfirmed) {
-          document.dispatchEvent(new CustomEvent('eliminarTitularBackend', { detail: { uuid, titularId } }));
+          if (onRemoveTitular) void onRemoveTitular(titular);
         }
       });
     } else {
@@ -120,7 +123,7 @@ export function TitularesList({ titulares, setTitulares }: TitularesListProps) {
             <span className="text-xs font-bold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
               {t.titularId ? 'GUARDADO' : 'NUEVO'} | ORDEN {t.orden}
             </span>
-            <button type="button" onClick={() => handleRemove(t._uuid, t.titularId)} className="text-red-500 hover:bg-red-100 p-1.5 rounded-lg transition-colors" title="Eliminar titular">
+            <button type="button" onClick={() => handleRemove(t)} className="text-red-500 hover:bg-red-100 p-1.5 rounded-lg transition-colors" title="Eliminar titular">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
