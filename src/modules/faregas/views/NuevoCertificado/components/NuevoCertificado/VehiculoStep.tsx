@@ -433,6 +433,24 @@ export function VehiculoStep({
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <h5 className="font-bold text-slate-700 mb-3">SELECCIÓN DE RECUADROS (Opcional)</h5>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="marcaModificacion" checked={!!formConformidad.marcaModificacion} onChange={(e) => setFormConformidad((prev: any) => ({ ...prev, marcaModificacion: e.target.checked }))} className="w-4 h-4 text-[#052a79]" />
+                  <span className="text-xs font-bold text-slate-700 uppercase">Marcar Modificación</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="marcaMontaje" checked={!!formConformidad.marcaMontaje} onChange={(e) => setFormConformidad((prev: any) => ({ ...prev, marcaMontaje: e.target.checked }))} className="w-4 h-4 text-[#052a79]" />
+                  <span className="text-xs font-bold text-slate-700 uppercase">Marcar Montaje</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="marcaFabricacion" checked={!!formConformidad.marcaFabricacion} onChange={(e) => setFormConformidad((prev: any) => ({ ...prev, marcaFabricacion: e.target.checked }))} className="w-4 h-4 text-[#052a79]" />
+                  <span className="text-xs font-bold text-slate-700 uppercase">Marcar Fabricación</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
               <h5 className="font-bold text-slate-700 mb-3">CARACTERÍSTICAS REGISTRABLES Y MOTIVO</h5>
               <div className="space-y-4">
                 <div>

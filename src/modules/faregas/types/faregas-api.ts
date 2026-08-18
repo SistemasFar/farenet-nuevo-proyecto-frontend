@@ -160,6 +160,9 @@ export interface GuardarConformidadFaregasRequest {
   motivo?: NullableText;
   descripcion?: NullableText;
   usoOriginalVehiculo?: NullableText;
+  marcaModificacion?: boolean;
+  marcaMontaje?: boolean;
+  marcaFabricacion?: boolean;
 }
 
 interface UsuarioFaregasBaseRequest {
