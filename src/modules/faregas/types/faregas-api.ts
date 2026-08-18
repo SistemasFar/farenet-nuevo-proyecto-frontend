@@ -147,6 +147,9 @@ export interface GuardarGlpFaregasRequest {
   expedienteTecnico?: NullableText;
   vigenciaHasta?: NullableText;
   modalidad?: NullableText;
+  combustiblePosterior?: NullableText;
+  pesoNetoPosterior?: NullableNumberInput;
+  cargaUtilPosterior?: NullableNumberInput;
 }
 
 export interface GuardarComponentesGlpFaregasRequest {

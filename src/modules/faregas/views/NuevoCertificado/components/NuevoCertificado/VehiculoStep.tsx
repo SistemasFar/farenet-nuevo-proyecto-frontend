@@ -23,6 +23,7 @@ interface VehiculoStepProps {
   catalogoVerificaciones?: any;
   talleres?: any[];
   vehiculoOrigen?: 'FARENET' | 'BORRADOR' | 'MANUAL';
+  maestrosVehiculo?: any;
 }
 
 export function VehiculoStep({
@@ -43,7 +44,8 @@ export function VehiculoStep({
   onRemoveTitular,
   catalogoVerificaciones,
   talleres,
-  vehiculoOrigen = 'MANUAL'
+  vehiculoOrigen = 'MANUAL',
+  maestrosVehiculo
 }: VehiculoStepProps) {
   
   // Initialize verificaciones based on catalog
@@ -275,6 +277,45 @@ export function VehiculoStep({
                <label className="block text-xs font-bold text-slate-500 mb-1">EXPEDIENTE TÉCNICO <span className="text-red-500">*</span></label>
                <input name="expedienteTecnico" value={formGlp.expedienteTecnico || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
             </div>
+
+            {modalidadCertificado === 'INICIAL' && (
+              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <h5 className="font-bold text-slate-700 mb-3">CARACTERÍSTICAS ANTES Y DESPUÉS DE LA CONVERSIÓN</h5>
+                <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                  <div className="grid grid-cols-3 bg-slate-100 text-xs font-bold text-slate-600 uppercase border-b border-slate-200 p-3">
+                    <div>CARACTERÍSTICA</div>
+                    <div>ANTES</div>
+                    <div>DESPUÉS</div>
+                  </div>
+                  <div className="grid grid-cols-3 border-b border-slate-100 p-3 items-center">
+                    <div className="text-xs font-bold text-slate-600">Combustible</div>
+                    <div>
+                      <select name="combustible" value={formVehiculo.combustible || ''} onChange={handleVehiculo} className="w-64 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
+                        <option value="">-- SELECCIONAR --</option>
+                        {maestrosVehiculo?.combustibles?.map((c: any) => (
+                          <option key={c.key} value={c.nombre}>{c.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="text-sm font-black text-[#052a79]">BI-COMBUSTIBLE GLP</div>
+                  </div>
+                  <div className="grid grid-cols-3 border-b border-slate-100 p-3 items-center">
+                    <div className="text-xs font-bold text-slate-600">Peso neto (Kg.)</div>
+                    <div className="text-sm font-semibold text-slate-500">{formVehiculo.pesoNeto || '-'}</div>
+                    <div>
+                      <input type="number" step="0.01" name="pesoNetoPosterior" value={formGlp.pesoNetoPosterior || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Nuevo peso neto" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 p-3 items-center">
+                    <div className="text-xs font-bold text-slate-600">Carga útil (Kg.)</div>
+                    <div className="text-sm font-semibold text-slate-500">{formVehiculo.cargaUtil || '-'}</div>
+                    <div>
+                      <input type="number" step="0.01" name="cargaUtilPosterior" value={formGlp.cargaUtilPosterior || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" placeholder="Nueva carga útil" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
               <h5 className="font-bold text-slate-700 mb-3">COMPONENTES INSTALADOS GLP</h5>

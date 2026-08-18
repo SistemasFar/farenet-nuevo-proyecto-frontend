@@ -343,6 +343,9 @@ export function NuevoCertificadoView() {
                 fechaVigencia: textValue(glp.vigencia_hasta).slice(0, 10),
                 expedienteTecnico: glp.expediente_tecnico || '',
                 modalidad: glp.modalidad || '',
+                combustiblePosterior: glp.combustible_posterior || '',
+                pesoNetoPosterior: glp.peso_neto_posterior || '',
+                cargaUtilPosterior: glp.carga_util_posterior || '',
                 componentes: (detalle.data?.componentes || []).map((componente: any) => ({
                   orden: Number(componente.orden),
                   componente: componente.componente,
@@ -663,6 +666,9 @@ export function NuevoCertificadoView() {
         vigenciaHasta: formGlp.fechaVigencia || formGlp.vigencia_hasta || null,
         expedienteTecnico: formGlp.expedienteTecnico || null,
         modalidad: formCaja.modalidadCertificado || null,
+        combustiblePosterior: formCaja.modalidadCertificado === 'INICIAL' ? 'BI-COMBUSTIBLE GLP' : null,
+        pesoNetoPosterior: formCaja.modalidadCertificado === 'INICIAL' ? (formGlp.pesoNetoPosterior || null) : null,
+        cargaUtilPosterior: formCaja.modalidadCertificado === 'INICIAL' ? (formGlp.cargaUtilPosterior || null) : null,
       });
       await faregasCertificadosApi.guardarComponentesGlp(idBorrador, {
         componentes: (formGlp.componentes || []).map((componente: any, index: number) => ({
@@ -1097,6 +1103,7 @@ export function NuevoCertificadoView() {
               catalogoVerificaciones={catalogoVerificaciones}
               talleres={talleres}
               vehiculoOrigen={vehiculoOrigen}
+              maestrosVehiculo={maestrosVehiculo}
             />
           </>
         )}
