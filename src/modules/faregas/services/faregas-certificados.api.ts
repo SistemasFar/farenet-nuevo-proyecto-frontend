@@ -51,6 +51,10 @@ export const faregasCertificadosApi = {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
+  guardarComponentesGnv: (id: number, data: any) => fetchWithToken(`/certificados/borradores/${id}/gnv/componentes`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
   guardarGlp: (id: number, data: GuardarGlpFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/glp`, {
     method: 'PUT',
     body: JSON.stringify(data)

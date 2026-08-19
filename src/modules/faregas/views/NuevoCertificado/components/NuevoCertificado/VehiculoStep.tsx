@@ -80,7 +80,18 @@ export function VehiculoStep({
         ] : prev.componentes
       }));
     }
-  }, [tipoCertificado, catalogoVerificaciones]);
+
+    const faltanComponentesGnv = !formGnv.componentes || formGnv.componentes.length === 0;
+    if (tipoCertificado === 'GNV_ANUAL' && modalidadCertificado === 'INICIAL' && faltanComponentesGnv) {
+      setFormGnv((prev: any) => ({
+        ...prev,
+        componentes: [
+          { orden: 1, componente: 'REDUCTOR', marca: '', modelo: '', capacidadLitros: '', mesFabricacion: '', anioFabricacion: '', numeroSerie: '' },
+          { orden: 2, componente: 'CILINDRO', marca: '', modelo: '', capacidadLitros: '', mesFabricacion: '', anioFabricacion: '', numeroSerie: '' }
+        ]
+      }));
+    }
+  }, [tipoCertificado, modalidadCertificado, catalogoVerificaciones]);
 
   const handleVehiculo = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormVehiculo((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
@@ -111,9 +122,19 @@ export function VehiculoStep({
   };
 
   const handleComponenteGlp = (idx: number, campo: string, valor: any) => {
-    const nc = [...(formGlp.componentes || [])];
-    nc[idx] = { ...nc[idx], [campo]: valor.toUpperCase() };
-    setFormGlp((prev: any) => ({ ...prev, componentes: nc }));
+    setFormGlp((prev: any) => {
+      const nc = [...(prev.componentes || [])];
+      nc[idx] = { ...nc[idx], [campo]: typeof valor === 'string' ? valor.toUpperCase() : valor };
+      return { ...prev, componentes: nc };
+    });
+  };
+
+  const handleComponenteGnv = (idx: number, campo: string, valor: any) => {
+    setFormGnv((prev: any) => {
+      const nc = [...(prev.componentes || [])];
+      nc[idx] = { ...nc[idx], [campo]: typeof valor === 'string' ? valor.toUpperCase() : valor };
+      return { ...prev, componentes: nc };
+    });
   };
 
   return (
@@ -413,8 +434,7 @@ export function VehiculoStep({
                     placeholder="EJ: ABC12345"
                   />
                 </div>
-              )}
-            </div>
+              )}            </div>
 
             <div className="mt-4">
               <label className="block text-xs font-bold text-slate-500 mb-1">OBSERVACIONES GNV (Opcional) <span className="font-normal text-slate-400">({formGnv.observaciones?.length || 0}/250)</span></label>
@@ -427,6 +447,158 @@ export function VehiculoStep({
                 placeholder="EJ: NINGUNA"
               />
             </div>
+
+            {modalidadCertificado === 'INICIAL' && (
+              <>
+                {/* CARACTERÍSTICAS DE CONVERSIÓN GNV */}
+                <div className="mt-8">
+                  <h5 className="font-bold text-[#052a79] mb-3 border-b border-blue-100 pb-2">CARACTERÍSTICAS DE CONVERSIÓN GNV</h5>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-600">
+                        <tr>
+                          <th className="p-3 font-bold">Característica</th>
+                          <th className="p-3 font-bold border-l border-slate-200 bg-slate-100">Antes (Original)</th>
+                          <th className="p-3 font-bold border-l border-slate-200 bg-amber-50 text-amber-800">Después (Conversión)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-slate-200">
+                          <td className="p-3 font-semibold text-slate-800">COMBUSTIBLE</td>
+                          <td className="p-3 border-l border-slate-200 bg-slate-50">
+                            <select
+                              name="combustible"
+                              value={formVehiculo.combustible || ''}
+                              onChange={handleVehiculo}
+                              className="w-64 p-1.5 border-2 border-slate-300 rounded bg-white text-slate-700 font-bold focus:border-[#f59e0b] focus:ring-0 text-xs"
+                            >
+                              <option value="">-- SELECCIONAR --</option>
+                              {maestrosVehiculo?.combustibles?.map((c: any) => (
+                                <option key={c.id} value={c.nombre}>{c.nombre}</option>
+                              ))}
+                              {!maestrosVehiculo?.combustibles && (
+                                <>
+                                  <option value="GASOLINA">GASOLINA</option>
+                                  <option value="DIESEL">DIESEL</option>
+                                  <option value="PETROLEO">PETROLEO</option>
+                                </>
+                              )}
+                            </select>
+                          </td>
+                          <td className="p-3 border-l border-slate-200 bg-amber-50/30">
+                            <select
+                              name="combustiblePosterior"
+                              value={formGnv.combustiblePosterior || ''}
+                              onChange={handleGnv}
+                              className="w-full p-1.5 border-2 border-amber-300 rounded text-slate-800 font-bold focus:border-amber-500 focus:ring-0 text-xs"
+                            >
+                              <option value="">-- SELECCIONAR --</option>
+                              <option value="BI - COMBUSTIBLE GNV">BI - COMBUSTIBLE GNV</option>
+                              <option value="DUAL GNV">DUAL GNV</option>
+                            </select>
+                          </td>
+                        </tr>
+                        <tr className="border-t border-slate-200">
+                          <td className="p-3 font-semibold text-slate-800">PESO NETO (Kg.)</td>
+                          <td className="p-3 border-l border-slate-200 bg-slate-50">
+                            <input value={formVehiculo.pesoNeto || ''} readOnly className="w-32 p-1.5 border border-slate-200 rounded bg-slate-100 text-slate-500 text-xs uppercase" title="Modificar en la sección de Vehículo" />
+                          </td>
+                          <td className="p-3 border-l border-slate-200 bg-amber-50/30">
+                            <input
+                              name="pesoNetoPosterior"
+                              value={formGnv.pesoNetoPosterior || ''}
+                              onChange={handleGnv}
+                              className="w-32 p-1.5 border-2 border-amber-300 rounded text-slate-800 font-bold focus:border-amber-500 focus:ring-0 text-xs"
+                              placeholder="Ej. 1453"
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* COMPONENTES INSTALADOS GNV */}
+                <div className="mt-8">
+                  <h5 className="font-bold text-[#052a79] mb-3 border-b border-blue-100 pb-2">COMPONENTES INSTALADOS GNV</h5>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-600">
+                        <tr>
+                          <th className="p-2 font-bold w-12 text-center">N°</th>
+                          <th className="p-2 font-bold w-32">COMPONENTE</th>
+                          <th className="p-2 font-bold w-[20%]">MARCA</th>
+                          <th className="p-2 font-bold w-[20%]">N° DE SERIE</th>
+                          <th className="p-2 font-bold w-[20%]">CAP. (Lts)</th>
+                          <th className="p-2 font-bold w-[20%]">FECHA FAB. (MM/AA)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formGnv.componentes?.map((comp: any, idx: number) => (
+                          <tr key={idx} className="border-t border-slate-200 hover:bg-slate-50 transition-colors">
+                            <td className="p-2 text-center font-bold text-slate-400">{comp.orden}</td>
+                            <td className="p-2 font-bold text-slate-700">{comp.componente}</td>
+                            <td className="p-2">
+                              <input value={comp.marca || ''} onChange={e => handleComponenteGnv(idx, 'marca', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded uppercase font-semibold focus:border-[#f59e0b] focus:ring-0" placeholder="Marca" />
+                            </td>
+                            <td className="p-2">
+                              <input value={comp.numeroSerie || ''} onChange={e => handleComponenteGnv(idx, 'numeroSerie', e.target.value)} className="w-full p-1.5 border-2 border-slate-200 rounded uppercase font-semibold focus:border-[#f59e0b] focus:ring-0" placeholder="N° Serie" />
+                            </td>
+                            <td className="p-2">
+                              {comp.capacidadLitros !== 'NO APLICA' && comp.capacidadLitros !== undefined && comp.capacidadLitros !== '' ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    value={comp.capacidadLitros.trim()}
+                                    onChange={e => handleComponenteGnv(idx, 'capacidadLitros', e.target.value)}
+                                    className="w-full p-1.5 border-2 border-amber-300 rounded uppercase font-bold text-slate-800 focus:border-amber-500 focus:ring-0 text-xs"
+                                    placeholder="Lts"
+                                  />
+                                  <button type="button" onClick={() => handleComponenteGnv(idx, 'capacidadLitros', '')} className="text-red-500 font-bold px-1 text-lg leading-none" title="Volver a seleccionar">×</button>
+                                </div>
+                              ) : (
+                                <select
+                                  value={comp.capacidadLitros || ''}
+                                  onChange={e => {
+                                    if (e.target.value === 'ESPECIFICAR') {
+                                      handleComponenteGnv(idx, 'capacidadLitros', ' '); 
+                                    } else {
+                                      handleComponenteGnv(idx, 'capacidadLitros', e.target.value);
+                                    }
+                                  }}
+                                  className="w-full p-1.5 border-2 border-amber-300 rounded text-slate-800 font-bold focus:border-amber-500 focus:ring-0 text-[10px] uppercase"
+                                >
+                                  <option value="">-- SELECCIONAR --</option>
+                                  <option value="NO APLICA">NO APLICA</option>
+                                  <option value="ESPECIFICAR">COMPLETAR...</option>
+                                </select>
+                              )}
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="month"
+                                value={comp.anioFabricacion && comp.mesFabricacion ? `${comp.anioFabricacion}-${String(comp.mesFabricacion).padStart(2, '0')}` : ''}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  if (val) {
+                                    const [year, month] = val.split('-');
+                                    handleComponenteGnv(idx, 'anioFabricacion', year);
+                                    handleComponenteGnv(idx, 'mesFabricacion', month);
+                                  } else {
+                                    handleComponenteGnv(idx, 'anioFabricacion', '');
+                                    handleComponenteGnv(idx, 'mesFabricacion', '');
+                                  }
+                                }}
+                                className="w-full p-1.5 border-2 border-slate-200 rounded text-center font-semibold focus:border-[#f59e0b] focus:ring-0"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div>
               <h5 className="font-bold text-slate-700 mb-3 mt-6">VERIFICACIONES DE INSPECCIÓN ANUAL GNV</h5>

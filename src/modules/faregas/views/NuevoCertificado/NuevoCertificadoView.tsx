@@ -654,7 +654,17 @@ export function NuevoCertificadoView() {
         vigenciaHasta: formGnv.fechaVigencia || formGnv.vigencia_hasta || null,
         modalidad: formCaja.modalidadCertificado || null,
         numeroChip: formGnv.numeroChip || formGnv.numero_chip || null,
+        combustiblePosterior: formCaja.modalidadCertificado === 'INICIAL' ? 'BI - COMBUSTIBLE GNV' : null,
+        pesoNetoPosterior: formCaja.modalidadCertificado === 'INICIAL' ? (formGnv.pesoNetoPosterior || null) : null,
+        cargaUtilPosterior: formCaja.modalidadCertificado === 'INICIAL' ? (formGnv.cargaUtilPosterior || null) : null,
       });
+      if (formGnv.componentes?.length > 0) {
+        await faregasCertificadosApi.guardarComponentesGnv(idBorrador, {
+          componentes: formGnv.componentes.map((c: any, i: number) => ({
+            ...c, orden: i + 1
+          }))
+        });
+      }
       if (formGnv.verificaciones?.length > 0) {
         await faregasCertificadosApi.guardarVerificacionesGnv(idBorrador, {
           verificaciones: formGnv.verificaciones,
