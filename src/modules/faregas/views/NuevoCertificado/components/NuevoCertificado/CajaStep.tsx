@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { Box, CheckCircle } from 'lucide-react';
+import { CheckCircle, Flame, Leaf, FileCheck } from 'lucide-react';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
 import type { FormCajaState } from '../../NuevoCertificadoView';
 
@@ -44,7 +44,7 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
                 <CheckCircle className="w-6 h-6 text-[#052a79]" />
               </div>
             )}
-            <Box className={`w-10 h-10 mb-4 ${formCaja.tipoCertificado === 'GLP_ANUAL' ? 'text-[#052a79]' : 'text-slate-400'}`} />
+            <Flame className={`w-10 h-10 mb-4 ${formCaja.tipoCertificado === 'GLP_ANUAL' ? 'text-[#052a79]' : 'text-slate-400'}`} />
             <h5 className="font-bold text-slate-800 text-lg mb-2">GLP</h5>
             <div className="mb-4 grid grid-cols-2 gap-2">
               {(['INICIAL', 'ANUAL'] as const).map(modalidad => (
@@ -78,7 +78,7 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
                 <CheckCircle className="w-6 h-6 text-[#052a79]" />
               </div>
             )}
-            <Box className={`w-10 h-10 mb-4 ${formCaja.tipoCertificado === 'GNV_ANUAL' ? 'text-[#052a79]' : 'text-slate-400'}`} />
+            <Leaf className={`w-10 h-10 mb-4 ${formCaja.tipoCertificado === 'GNV_ANUAL' ? 'text-[#052a79]' : 'text-slate-400'}`} />
             <h5 className="font-bold text-slate-800 text-lg mb-2">GNV</h5>
             <div className="mb-4 grid grid-cols-2 gap-2">
               {(['INICIAL', 'ANUAL'] as const).map(modalidad => (
@@ -113,7 +113,7 @@ export function CajaStep({ formCaja, setFormCaja }: CajaStepProps) {
                 <CheckCircle className="w-6 h-6 text-[#052a79]" />
               </div>
             )}
-            <Box className={`w-10 h-10 mb-4 ${formCaja.tipoCertificado === 'CONFORMIDAD' ? 'text-[#052a79]' : 'text-slate-400'}`} />
+            <FileCheck className={`w-10 h-10 mb-4 ${formCaja.tipoCertificado === 'CONFORMIDAD' ? 'text-[#052a79]' : 'text-slate-400'}`} />
             <h5 className="font-bold text-slate-800 text-lg mb-2">CONFORMIDAD</h5>
             <p className="text-sm text-slate-500 leading-relaxed">
               Certificación de características registrables, modificación, montaje o fabricación.

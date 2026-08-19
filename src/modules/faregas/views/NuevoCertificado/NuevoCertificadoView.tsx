@@ -320,6 +320,26 @@ export function NuevoCertificadoView() {
             fechaDeposito: textValue(pago.fechdeposito).slice(0, 10),
           })));
 
+          try {
+            const facturacionRes = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
+            const fac = facturacionRes.data?.facturacion;
+            if (fac) {
+              setFormFacturacion(prev => ({
+                ...prev,
+                tipoComprobante: fac.tipoComprobante || 'BOLETA',
+                tipoDocumento: fac.tipoDocumentoCliente || 'DNI',
+                numeroDocumento: fac.nroDocumento || '',
+                razonSocial: fac.nombreRazonSocial || '',
+                direccion: fac.direccion || '',
+                email: fac.email || '',
+                telefono: fac.telefono || ''
+              }));
+              setFacturacion(fac);
+            }
+          } catch (e) {
+            console.log('Borrador sin facturacion guardada');
+          }
+
           if (res.data.tipo?.clave === 'GNV_ANUAL') {
             const detalle = await faregasCertificadosApi.obtenerGnv(certificadoId);
             const gnv = detalle.data?.gnv;
@@ -821,8 +841,28 @@ export function NuevoCertificadoView() {
           setIsSavingStep(false);
         }
       } else if (STEPS[currentStepIndex].id === 'facturacion') {
-        // BYPASS: Se permite avanzar a VERIFICACION/EMISION para PREVISUALIZAR,
-        // independientemente de si facturación está pendiente o sin llenar.
+        const tieneDatosFacturacion = Boolean(formFacturacion.nroDocumento?.trim() || formFacturacion.nombreRazonSocial?.trim() || formFacturacion.direccion?.trim());
+        if (tieneDatosFacturacion) {
+          setIsSavingStep(true);
+          try {
+            await faregasCertificadosApi.guardarFacturacion(certificadoId, formFacturacion);
+          } catch (e: any) {
+            const res = await Swal.fire({
+              title: 'Facturación Incompleta',
+              text: (e.message || 'Los datos de facturación no son válidos.') + '\n\n¿Desea omitir el guardado y avanzar a la previsualización?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonText: 'Sí, avanzar sin guardar',
+              cancelButtonText: 'No, corregir datos',
+            });
+            if (!res.isConfirmed) {
+              setIsSavingStep(false);
+              return; // Si no guarda, no avanza.
+            }
+          } finally {
+            setIsSavingStep(false);
+          }
+        }
       }
       const siguiente = currentStepIndex + 1;
       setFurthestStepIndex(prev => Math.max(prev, siguiente));
@@ -851,6 +891,29 @@ export function NuevoCertificadoView() {
         return;
       } finally {
         setIsSavingStep(false);
+      }
+    } else if (STEPS[currentStepIndex].id === 'facturacion' && certificadoId) {
+      const tieneDatosFacturacion = Boolean(formFacturacion.nroDocumento?.trim() || formFacturacion.nombreRazonSocial?.trim() || formFacturacion.direccion?.trim());
+      if (tieneDatosFacturacion) {
+        setIsSavingStep(true);
+        try {
+          await faregasCertificadosApi.guardarFacturacion(certificadoId, formFacturacion);
+        } catch (e: any) {
+          const res = await Swal.fire({
+            title: 'Facturación Incompleta',
+            text: (e.message || 'Los datos de facturación no son válidos.') + '\n\n¿Desea omitir el guardado y cambiar de paso?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, cambiar sin guardar',
+            cancelButtonText: 'No, corregir datos',
+          });
+          if (!res.isConfirmed) {
+            setIsSavingStep(false);
+            return;
+          }
+        } finally {
+          setIsSavingStep(false);
+        }
       }
     }
     setCurrentStepIndex(destino);
