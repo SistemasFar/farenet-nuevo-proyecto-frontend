@@ -19,7 +19,7 @@ export interface CrearBorradorFaregasRequest {
 export interface ActualizarBorradorFaregasRequest {
   clienteId?: string;
   observaciones?: string;
-  tipoCertificadoClave?: string;
+  tarifaCodigo?: string;
 }
 
 export interface PagoFaregasRequest {

@@ -21,6 +21,7 @@ import { InicioView as FaregasInicioView } from './modules/faregas/views/Inicio/
 import { NuevoCertificadoView as FaregasNuevoCertificadoView } from './modules/faregas/views/NuevoCertificado/NuevoCertificadoView';
 import { UsuariosView as FaregasUsuariosView } from './modules/faregas/views/Usuarios/UsuariosView';
 import { AuditoriaView as FaregasAuditoriaView } from './modules/faregas/views/Auditoria/AuditoriaView';
+import { FaregasConfiguracionView } from './modules/faregas/views/Configuracion/FaregasConfiguracionView';
 
 import { useEmpresa } from './context/EmpresaContext';
 
@@ -46,6 +47,50 @@ export default function App() {
   const { empresasDisponibles, establecerEmpresasDisponibles, limpiarEmpresa, empresaSeleccionada } = useEmpresa();
 
   const isFaregas = empresaSeleccionada?.nombre?.toUpperCase().includes('FAREGAS');
+
+  useEffect(() => {
+    const handleUpdate = (e: any) => {
+      const { key, activo, nombre } = e.detail;
+      setFaregasPlantasDisponibles(prev => {
+        let next = prev.length > 0 ? [...prev] : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]');
+        if (!activo) {
+          next = next.filter(p => p.key !== key);
+        } else {
+          if (!next.find(p => p.key === key)) {
+            next.push({ key, nombre });
+            next.sort((a, b) => a.nombre.localeCompare(b.nombre));
+          }
+        }
+        sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(next));
+        return next;
+      });
+    };
+    window.addEventListener('updatePlantasDisponibles', handleUpdate);
+    return () => window.removeEventListener('updatePlantasDisponibles', handleUpdate);
+  }, []);
+
+
+  useEffect(() => {
+    const handleUpdate = (e: any) => {
+      const { key, activo, nombre } = e.detail;
+      setFaregasPlantasDisponibles(prev => {
+        let next = prev.length > 0 ? [...prev] : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]');
+        if (!activo) {
+          next = next.filter(p => p.key !== key);
+        } else {
+          if (!next.find(p => p.key === key)) {
+            next.push({ key, nombre });
+            next.sort((a, b) => a.nombre.localeCompare(b.nombre));
+          }
+        }
+        sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(next));
+        return next;
+      });
+    };
+    window.addEventListener('updatePlantasDisponibles', handleUpdate);
+    return () => window.removeEventListener('updatePlantasDisponibles', handleUpdate);
+  }, []);
+
 
   const limpiarSesionFrontend = () => {
     sessionStorage.clear();
@@ -524,6 +569,7 @@ export default function App() {
                   })()
                 } 
               />
+              <Route path="configuracion" element={<FaregasConfiguracionView />} />
               <Route path="*" element={<NotFoundView />} />
             </Route>
           </Routes>

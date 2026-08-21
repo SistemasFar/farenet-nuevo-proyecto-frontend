@@ -26,7 +26,7 @@ const agregarFaltantes = (
 export const validarDatosIniciales = (caja: Record<string, any>) => {
   const errores: string[] = [];
   agregarFaltantes(errores, caja, [
-    ['tipoCertificado', 'el tipo de certificado'],
+    ['tarifaCodigo', 'el servicio'],
     ['placa', 'la placa'],
     ['categoria', 'la categoría vehicular'],
   ]);

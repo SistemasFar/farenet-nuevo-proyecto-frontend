@@ -32,6 +32,7 @@ export interface FormCajaState {
   tipoInspeccion: string;
   tipoCertificado: string;
   modalidadCertificado: '' | 'INICIAL' | 'ANUAL';
+  tarifaCodigo: string;
   tipoAutorizacion: string;
   descuentoObj?: { source_table: string; source_id: string; isCuponidad?: boolean; documentoBusqueda?: string; uuid?: string };
   nrodocumentoreinspeccion?: string;
@@ -777,12 +778,12 @@ export function NuevoCertificadoView() {
       try {
         let idBorrador = certificadoId;
         if (!idBorrador) {
-          const res = await faregasCertificadosApi.crearBorrador({ tipoCertificadoClave: formCaja.tipoCertificado });
+          const res = await faregasCertificadosApi.crearBorrador({ tarifaCodigo: formCaja.tarifaCodigo, observaciones: '' });
           idBorrador = Number(res?.data?.id);
           if (!idBorrador) throw new Error('El servidor no devolvió el identificador del borrador.');
           setCertificadoId(idBorrador);
         } else {
-          await faregasCertificadosApi.actualizarBorrador(idBorrador, { tipoCertificadoClave: formCaja.tipoCertificado });
+          await faregasCertificadosApi.actualizarBorrador(idBorrador, { tarifaCodigo: formCaja.tarifaCodigo });
         }
         if (formCaja.tipoCertificado === 'GLP_ANUAL') {
           setFormGlp((prev: any) => ({ ...prev, modalidad: formCaja.modalidadCertificado }));

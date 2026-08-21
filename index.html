@@ -2,6 +2,22 @@
 <html lang="en">
 
 <head>
+
+<script>
+window.addEventListener('error', function(event) {
+  fetch('http://localhost:3333/log-error', {
+    method: 'POST',
+    body: event.error ? event.error.stack : event.message
+  }).catch(()=>console.log('could not send'));
+});
+window.addEventListener('unhandledrejection', function(event) {
+  fetch('http://localhost:3333/log-error', {
+    method: 'POST',
+    body: event.reason ? event.reason.stack : 'promise rejection'
+  }).catch(()=>console.log('could not send'));
+});
+</script>
+
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
