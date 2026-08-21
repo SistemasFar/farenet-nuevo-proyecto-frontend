@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 import { operacionApi } from '@/services/api';
 const SOCKET_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '')
   : 'http://127.0.0.1:3000';
-import type { InspeccionPanel } from '@/types/operacion';
 
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';

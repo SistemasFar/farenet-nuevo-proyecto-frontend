@@ -1,5 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000/api';
-const getAuthHeaders = () => {
+const getAuthHeaders = (): Record<string, string> => {
   const token = sessionStorage.getItem('faregasAccessToken')?.trim();
   if (!token || token === 'null' || token === 'undefined') return {};
   return { Authorization: `Bearer ${token}` };
@@ -67,6 +67,27 @@ export const faregasConfigApi = {
 
   cambiarEstadoSede: async (key: string, activo: boolean): Promise<void> => {
     const response = await api.put(`/api/faregas/config/sedes/${key}/estado`, { activo });
+    return response;
+  },
+
+  // Servicios
+  getServicios: async (): Promise<any[]> => {
+    const response = await api.get('/api/faregas/config/servicios');
+    return response.servicios || response;
+  },
+
+  crearServicio: async (servicio: any): Promise<void> => {
+    const response = await api.post('/api/faregas/config/servicios', servicio);
+    return response;
+  },
+
+  editarServicio: async (id: number, servicio: any): Promise<void> => {
+    const response = await api.put(`/api/faregas/config/servicios/${id}`, servicio);
+    return response;
+  },
+
+  cambiarEstadoServicio: async (id: number, activo: boolean): Promise<void> => {
+    const response = await api.put(`/api/faregas/config/servicios/${id}/estado`, { activo });
     return response;
   }
 };

@@ -168,7 +168,8 @@ export function NuevoCertificadoView() {
     tipoInspeccion: '',
     tipoCertificado: '',
     modalidadCertificado: '',
-    tipoAutorizacion: ''
+    tipoAutorizacion: '',
+    tarifaCodigo: ''
   });
 
   // Pago State
@@ -675,9 +676,6 @@ export function NuevoCertificadoView() {
         vigenciaHasta: formGnv.fechaVigencia || formGnv.vigencia_hasta || null,
         modalidad: formCaja.modalidadCertificado || null,
         numeroChip: formGnv.numeroChip || formGnv.numero_chip || null,
-        combustiblePosterior: formCaja.modalidadCertificado === 'INICIAL' ? 'BI - COMBUSTIBLE GNV' : null,
-        pesoNetoPosterior: formCaja.modalidadCertificado === 'INICIAL' ? (formGnv.pesoNetoPosterior || null) : null,
-        cargaUtilPosterior: formCaja.modalidadCertificado === 'INICIAL' ? (formGnv.cargaUtilPosterior || null) : null,
       });
       if (formGnv.componentes?.length > 0) {
         await faregasCertificadosApi.guardarComponentesGnv(idBorrador, {
@@ -778,7 +776,7 @@ export function NuevoCertificadoView() {
       try {
         let idBorrador = certificadoId;
         if (!idBorrador) {
-          const res = await faregasCertificadosApi.crearBorrador({ tarifaCodigo: formCaja.tarifaCodigo, observaciones: '' });
+          const res = await faregasCertificadosApi.crearBorrador({ tipoCertificadoClave: formCaja.tipoCertificado, tarifaCodigo: formCaja.tarifaCodigo, observaciones: '' });
           idBorrador = Number(res?.data?.id);
           if (!idBorrador) throw new Error('El servidor no devolvió el identificador del borrador.');
           setCertificadoId(idBorrador);
@@ -842,11 +840,20 @@ export function NuevoCertificadoView() {
           setIsSavingStep(false);
         }
       } else if (STEPS[currentStepIndex].id === 'facturacion') {
-        const tieneDatosFacturacion = Boolean(formFacturacion.nroDocumento?.trim() || formFacturacion.nombreRazonSocial?.trim() || formFacturacion.direccion?.trim());
+        const tieneDatosFacturacion = Boolean(formFacturacion.nroDocFac?.trim() || formFacturacion.razonSocialFac?.trim() || formFacturacion.direccionFac?.trim());
         if (tieneDatosFacturacion) {
+          if (!certificadoId) throw new Error('No existe certificado');
           setIsSavingStep(true);
           try {
-            await faregasCertificadosApi.guardarFacturacion(certificadoId, formFacturacion);
+            const payloadFact = {
+              tipoComprobante: formFacturacion.tipoDocFac || 'BOLETA',
+              nroDocumento: formFacturacion.nroDocFac,
+              nombreRazonSocial: formFacturacion.razonSocialFac,
+              direccion: formFacturacion.direccionFac,
+              email: formFacturacion.emailFac || null,
+              telefono: formFacturacion.telefonoFac || null,
+            };
+            await faregasCertificadosApi.guardarFacturacion(certificadoId, payloadFact);
           } catch (e: any) {
             const res = await Swal.fire({
               title: 'Facturación Incompleta',
@@ -894,11 +901,19 @@ export function NuevoCertificadoView() {
         setIsSavingStep(false);
       }
     } else if (STEPS[currentStepIndex].id === 'facturacion' && certificadoId) {
-      const tieneDatosFacturacion = Boolean(formFacturacion.nroDocumento?.trim() || formFacturacion.nombreRazonSocial?.trim() || formFacturacion.direccion?.trim());
+      const tieneDatosFacturacion = Boolean(formFacturacion.nroDocFac?.trim() || formFacturacion.razonSocialFac?.trim() || formFacturacion.direccionFac?.trim());
       if (tieneDatosFacturacion) {
         setIsSavingStep(true);
         try {
-          await faregasCertificadosApi.guardarFacturacion(certificadoId, formFacturacion);
+          const payloadFact = {
+            tipoComprobante: formFacturacion.tipoDocFac || 'BOLETA',
+            nroDocumento: formFacturacion.nroDocFac,
+            nombreRazonSocial: formFacturacion.razonSocialFac,
+            direccion: formFacturacion.direccionFac,
+            email: formFacturacion.emailFac || null,
+            telefono: formFacturacion.telefonoFac || null,
+          };
+          await faregasCertificadosApi.guardarFacturacion(certificadoId, payloadFact);
         } catch (e: any) {
           const res = await Swal.fire({
             title: 'Facturación Incompleta',

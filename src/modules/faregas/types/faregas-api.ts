@@ -14,6 +14,7 @@ export interface CrearBorradorFaregasRequest {
   tipoCertificadoClave: string;
   clienteId?: string;
   observaciones?: string;
+  tarifaCodigo?: string;
 }
 
 export interface ActualizarBorradorFaregasRequest {
@@ -193,3 +194,14 @@ export interface CrearPerfilFaregasRequest extends PerfilFaregasBaseRequest {
 }
 
 export type ActualizarPerfilFaregasRequest = PerfilFaregasBaseRequest;
+
+export interface TarifaFaregas {
+  codigo: string;
+  familia: string;
+  nombre: string;
+  tipo_certificado_clave: string;
+  modalidad: string | null;
+  precio: number;
+  orden: number;
+  activo?: boolean;
+}

@@ -9,7 +9,7 @@ export function FaregasConfiguracionView() {
   const [activeTab, setActiveTab] = useState<ConfigTab>('SEDES');
   
   
-  let fUser = {};
+  let fUser: any = {};
   try {
     const stored = sessionStorage.getItem('faregasUser');
     if (stored && stored !== 'undefined') fUser = JSON.parse(stored);
@@ -34,7 +34,12 @@ export function FaregasConfiguracionView() {
   return (
     <div className="space-y-4">
       <div className="w-full">
-        <h1 className="text-xl font-bold text-gray-800 mb-6">Configuración</h1>
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-gray-800">Configuración</h1>
+          <p className="text-sm text-gray-500">
+              Administración general de sedes, catálogo de servicios, tarifas y configuraciones base.
+          </p>
+        </div>
 
         <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden mb-6">
           <div className="flex border-b border-slate-200">
