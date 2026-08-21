@@ -167,22 +167,27 @@ export function UsuariosView() {
   const mostrandoFin = Math.min(page * limit, totalRegistros);
 
   return (
-    <div className="flex flex-col h-full gap-4 w-full pb-8">
+    <div className="space-y-4 pb-8">
       {/* Header */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <h1 className="text-xl font-bold text-[#052a79]">Administración de Usuarios FAREGAS</h1>
-        <div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
+      <div className="flex justify-between items-start sm:items-center flex-col sm:flex-row gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">Administración de Usuarios FAREGAS</h1>
+          <p className="text-sm text-gray-500">
+              Administración de cuentas, perfiles y asignaciones de planta.
+          </p>
+        </div>
+        <div className="flex gap-2 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
           <button
             onClick={() => { setActiveTab('usuarios'); setPage(1); setSearchQuery(''); }}
-            className={`px-4 py-1.5 rounded-md font-semibold text-xs uppercase tracking-wider transition-colors ${activeTab === 'usuarios' ? 'bg-white shadow-sm text-blue-800' : 'text-slate-500 hover:bg-slate-200'}`}
+            className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${activeTab === 'usuarios' ? 'bg-[#052A79] text-white' : 'text-gray-500 hover:bg-gray-50'}`}
           >
-            USUARIOS
+            Usuarios
           </button>
           <button
             onClick={() => { setActiveTab('perfiles'); setPage(1); setSearchQuery(''); }}
-            className={`px-4 py-1.5 rounded-md font-semibold text-xs uppercase tracking-wider transition-colors ${activeTab === 'perfiles' ? 'bg-white shadow-sm text-blue-800' : 'text-slate-500 hover:bg-slate-200'}`}
+            className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${activeTab === 'perfiles' ? 'bg-[#052A79] text-white' : 'text-gray-500 hover:bg-gray-50'}`}
           >
-            PERFILES
+            Perfiles
           </button>
         </div>
       </div>
@@ -194,46 +199,47 @@ export function UsuariosView() {
       )}
 
       {/* Search Bar */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200">
-        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Buscar</label>
-        <div className="flex gap-2">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <input 
             type="text" 
             placeholder={activeTab === 'usuarios' ? "Buscar por usuario o perfil..." : "Buscar por clave o nombre..."} 
-            className="flex-1 border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-[#052a79]"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79] md:col-span-2"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
           />
-          <button className="bg-[#052a79] text-white px-8 py-2 rounded font-semibold text-sm hover:bg-blue-900 transition-colors shadow-sm">
-            Buscar
-          </button>
-          <button 
-            onClick={() => { setSearchQuery(''); setPage(1); }} 
-            className="bg-slate-100 text-slate-600 px-8 py-2 rounded font-semibold text-sm border border-slate-200 hover:bg-slate-200 transition-colors"
-          >
-            Limpiar
-          </button>
+          <div className="flex gap-2 md:col-span-2">
+            <button className="rounded-lg bg-[#052A79] px-6 py-2 text-sm font-semibold text-white">
+              Buscar
+            </button>
+            <button 
+              onClick={() => { setSearchQuery(''); setPage(1); }} 
+              className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Limpiar
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200 flex flex-col justify-center">
-          <span className="text-[10px] font-bold text-slate-500 uppercase">Total Registros</span>
-          <span className="text-xl font-bold text-slate-800">{totalRegistros}</span>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col justify-center">
+          <span className="text-xs font-semibold uppercase text-gray-500">Total Registros</span>
+          <span className="text-lg font-bold text-gray-800">{totalRegistros}</span>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200 flex flex-col justify-center">
-          <span className="text-[10px] font-bold text-slate-500 uppercase">Página Actual</span>
-          <span className="text-xl font-bold text-slate-800">{page} / {totalPages}</span>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col justify-center">
+          <span className="text-xs font-semibold uppercase text-gray-500">Página Actual</span>
+          <span className="text-lg font-bold text-gray-800">{page} / {totalPages}</span>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200 flex flex-col justify-center">
-          <span className="text-[10px] font-bold text-slate-500 uppercase">Mostrando</span>
-          <span className="text-xl font-bold text-slate-800">{mostrandoInicio}-{mostrandoFin}</span>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col justify-center">
+          <span className="text-xs font-semibold uppercase text-gray-500">Mostrando</span>
+          <span className="text-lg font-bold text-gray-800">{mostrandoInicio}-{mostrandoFin}</span>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-slate-200 flex flex-col justify-center">
-          <span className="text-[10px] font-bold text-slate-500 uppercase mb-1">Registros por página</span>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col justify-center">
+          <span className="mb-1 text-xs font-semibold uppercase text-gray-500">Registros por página</span>
           <select 
-            className="border border-slate-300 rounded p-1 text-sm focus:outline-none font-semibold text-slate-700 bg-white"
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#052A79]"
             value={limit}
             onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
           >
@@ -246,77 +252,84 @@ export function UsuariosView() {
       </div>
 
       {/* Table Section */}
-      <div className="flex justify-end">
-        {activeTab === 'usuarios' && (
-            <button onClick={() => handleOpenUsuario()} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-blue-700 shadow-sm">
-              + Crear Usuario
-            </button>
-        )}
-        {activeTab === 'perfiles' && (
-            <button onClick={() => {
-                setModalMode('crear');
-                setFormData({ clave: '', nombre: '', visible: true, sedes: [], permisos: [] });
-                setShowModal(true);
-            }} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-blue-700 shadow-sm">
-              + Crear Perfil
-            </button>
-        )}
-      </div>
-
-      <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm flex flex-col">
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <span className="font-semibold text-gray-700">
+            {activeTab === 'usuarios' ? 'Usuarios registrados' : 'Perfiles registrados'}
+          </span>
+          {activeTab === 'usuarios' ? (
+              <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
+                + Crear Usuario
+              </button>
+          ) : (
+              <button onClick={() => {
+                  setModalMode('crear');
+                  setFormData({ clave: '', nombre: '', visible: true, sedes: [], permisos: [] });
+                  setShowModal(true);
+              }} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
+                + Crear Perfil
+              </button>
+          )}
+        </div>
 
         <div className="overflow-x-auto flex-1">
           {loading ? (
-            <div className="flex justify-center items-center h-32 text-slate-500">Cargando...</div>
+            <div className="flex justify-center items-center h-32 text-gray-500 text-sm">Cargando...</div>
           ) : (
-            <table className="w-full text-left min-w-[800px] border-collapse">
-              <thead className="bg-[#003399] text-white font-bold text-[10px] uppercase tracking-wider">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 {activeTab === 'usuarios' ? (
                   <tr>
-                    <th className="px-4 py-3 whitespace-nowrap rounded-tl-xl">Usuario</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Perfil</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Estado</th>
+                    <th className="px-4 py-3">Usuario</th>
+                    <th className="px-4 py-3">Perfil</th>
+                    <th className="px-4 py-3">Estado</th>
                     <th className="px-4 py-3">Sedes</th>
-                    <th className="px-4 py-3 whitespace-nowrap rounded-tr-xl">Acción</th>
+                    <th className="px-4 py-3">Acción</th>
                   </tr>
                 ) : (
                   <tr>
-                    <th className="px-4 py-3 whitespace-nowrap rounded-tl-xl">Clave</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Nombre</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Visible</th>
-                    <th className="px-4 py-3 whitespace-nowrap">Usuarios Asignados</th>
-                    <th className="px-4 py-3 whitespace-nowrap rounded-tr-xl">Acción</th>
+                    <th className="px-4 py-3">Clave</th>
+                    <th className="px-4 py-3">Nombre</th>
+                    <th className="px-4 py-3">Visible</th>
+                    <th className="px-4 py-3">Usuarios Asignados</th>
+                    <th className="px-4 py-3">Acción</th>
                   </tr>
                 )}
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700 text-xs">
+              <tbody className="divide-y divide-gray-100">
                 {paginatedData.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-slate-500">No hay registros para mostrar.</td>
+                    <td colSpan={5} className="text-center py-6 text-gray-500">No hay registros para mostrar.</td>
                   </tr>
                 ) : activeTab === 'usuarios' ? (
                   paginatedData.map((u: any) => (
-                    <tr key={u.username} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-semibold text-slate-900">{u.username}</td>
+                    <tr key={u.username} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-semibold text-gray-900">{u.username}</td>
                       <td className="px-4 py-3">{u.perfil_id}</td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${u.estado ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {u.estado ? 'ACTIVO' : 'INACTIVO'}
-                        </span>
+                        {u.estado ? (
+                          <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
+                            Activo
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
+                            Inactivo
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         {u.perfil_id === 'SISTEMAS' ? (
-                          <span className="text-[10px] font-bold text-slate-500">TODAS LAS SEDES</span>
+                          <span className="text-xs font-semibold text-gray-500">Todas las sedes</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
                             {u.sedes?.map((s:any) => (
-                              <span key={s.key} className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] font-semibold text-slate-600">{s.nombre}</span>
+                              <span key={s.key} className="rounded-full bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-600">{s.nombre}</span>
                             ))}
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-3 flex gap-4">
-                        <button onClick={() => handleOpenUsuario(u)} className="text-[#052a79] font-bold hover:underline">
+                        <button onClick={() => handleOpenUsuario(u)} className="text-[#052A79] font-bold hover:underline">
                           Editar
                         </button>
                         {u.username !== currentUsername && (
@@ -329,11 +342,21 @@ export function UsuariosView() {
                   ))
                 ) : (
                   paginatedData.map((p: any) => (
-                    <tr key={p.clave} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-semibold text-slate-900">{p.clave}</td>
+                    <tr key={p.clave} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-semibold text-gray-900">{p.clave}</td>
                       <td className="px-4 py-3">{p.nombre}</td>
-                      <td className="px-4 py-3">{p.visible ? 'Sí' : 'No'}</td>
-                      <td className="px-4 py-3">{p.num_usuarios}</td>
+                      <td className="px-4 py-3">
+                        {p.visible ? (
+                          <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
+                            Sí
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
+                            No
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-700">{p.num_usuarios}</td>
                       <td className="px-4 py-3 flex gap-4">
                         <button onClick={() => {
                           setModalMode('editar');
@@ -345,7 +368,7 @@ export function UsuariosView() {
                             permisos: p.permisos || []
                           });
                           setShowModal(true);
-                        }} className="text-[#052a79] font-bold hover:underline">
+                        }} className="text-[#052A79] font-bold hover:underline">
                           Editar
                         </button>
                         {p.clave !== 'SISTEMAS' && (
@@ -372,21 +395,21 @@ export function UsuariosView() {
         </div>
 
         {/* Footer Pagination */}
-        <div className="bg-white p-3 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-500">
+        <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm text-gray-500">
           <span>Mostrando {mostrandoInicio} a {mostrandoFin} de {totalRegistros} registros.</span>
           <div className="flex items-center gap-2">
             <button 
               disabled={page === 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
-              className="px-3 py-1 border border-slate-200 rounded font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg border border-gray-300 px-3 py-1 font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Anterior
             </button>
-            <span className="font-medium text-slate-600">Página {page} de {totalPages}</span>
+            <span className="font-medium text-gray-600">Página {page} de {totalPages}</span>
             <button 
               disabled={page === totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              className="px-3 py-1 border border-slate-200 rounded font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg border border-gray-300 px-3 py-1 font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Siguiente
             </button>
@@ -481,13 +504,16 @@ export function UsuariosView() {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {plantas.filter(p => (perfiles.find(pf => pf.clave === formData.perfil_id)?.sedes || []).includes(p.key)).map(p => (
-                        <label key={p.key} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 cursor-pointer hover:bg-slate-100">
+                        <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${!p.activo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
                           <input type="checkbox" 
-                            className="h-4 w-4 text-[#052a79]"
+                            className="h-4 w-4 text-[#052A79]"
                             checked={(formData.sedes || []).includes(p.key)}
                             onChange={() => toggleSede(p.key)}
+                            disabled={!p.activo}
                           />
-                          <span className="font-medium text-slate-700">{p.nombre}</span>
+                          <span className="font-medium text-slate-700">
+                            {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
+                          </span>
                         </label>
                       ))}
                     </div>
@@ -519,13 +545,16 @@ export function UsuariosView() {
                     <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {plantas.map(p => (
-                        <label key={p.key} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 cursor-pointer hover:bg-slate-100">
+                        <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${!p.activo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
                           <input type="checkbox" 
-                            className="h-4 w-4 text-[#052a79]"
+                            className="h-4 w-4 text-[#052A79]"
                             checked={(formData.sedes || []).includes(p.key)}
                             onChange={() => toggleSede(p.key)}
+                            disabled={!p.activo}
                           />
-                          <span className="font-medium text-slate-700">{p.nombre}</span>
+                          <span className="font-medium text-slate-700">
+                            {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
+                          </span>
                         </label>
                       ))}
                     </div>
