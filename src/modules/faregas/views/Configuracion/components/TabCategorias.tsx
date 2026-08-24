@@ -3,6 +3,7 @@ import {
   faregasConfigApi,
   type CategoriaServicio
 } from '../../../services/faregas-config.api';
+import { exportarExcel } from '../../../utils/exportar-excel';
 
 const categoriaVacia = (): Partial<CategoriaServicio> => ({
   codigo: '',
@@ -95,12 +96,34 @@ export default function TabCategorias() {
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
           <span className="font-semibold text-gray-700">Administración de Categorías</span>
-          <button
-            onClick={() => { setMode('CREATE'); setActual(categoriaVacia()); setShowModal(true); }}
-            className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white"
-          >
-            + Nueva Categoría
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={loading || filtradas.length === 0}
+              onClick={() => exportarExcel('faregas_categorias', 'Categorías', [
+                { key: 'codigo', header: 'CÓDIGO', width: 24 },
+                { key: 'nombre', header: 'NOMBRE', width: 28 },
+                { key: 'descripcion', header: 'DESCRIPCIÓN', width: 60 },
+                { key: 'orden', header: 'ORDEN', width: 12 },
+                { key: 'estado', header: 'ESTADO', width: 14 }
+              ], filtradas.map((categoria) => ({
+                codigo: categoria.codigo,
+                nombre: categoria.nombre,
+                descripcion: categoria.descripcion || '',
+                orden: categoria.orden,
+                estado: categoria.activo ? 'ACTIVA' : 'INACTIVA'
+              })))}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ↓ Exportar Excel
+            </button>
+            <button
+              onClick={() => { setMode('CREATE'); setActual(categoriaVacia()); setShowModal(true); }}
+              className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white"
+            >
+              + Nueva Categoría
+            </button>
+          </div>
         </div>
 
         {loading ? <div className="py-10 text-center">Cargando categorías...</div>

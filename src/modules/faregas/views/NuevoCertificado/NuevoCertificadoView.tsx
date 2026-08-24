@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/immutability */
 import React, { useState, useEffect } from 'react';
 import { maestrosApi, inspeccionesApi } from '@/services/api';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
@@ -15,7 +16,7 @@ import type { TitularState } from './components/NuevoCertificado/TitularesList';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
 import type { TipoCertificadoFaregas } from '../../types/faregas';
-import type { FacturacionFaregas } from '../../types/faregas-api';
+import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { validarDatosIniciales, validarExpedienteTecnico } from './faregas-wizard.validation';
@@ -140,8 +141,12 @@ export function NuevoCertificadoView() {
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [furthestStepIndex, setFurthestStepIndex] = useState(0);
+  const [minimumEditableStepIndex, setMinimumEditableStepIndex] = useState(0);
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState('');
+  const creatingDraftRef = React.useRef(false);
+  const autosaveQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
   const [maestrosVehiculo, setMaestrosVehiculo] = useState<MaestrosVehiculoResponse['data'] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -257,6 +262,18 @@ export function NuevoCertificadoView() {
     ];
   }, []);
 
+  const indicePaso = (paso?: string) => ({
+    DATOS_INICIALES: 0,
+    VEHICULO: 1,
+    PAGO: 2,
+    FACTURACION: 3,
+    VERIFICACION_EMISION: 4,
+  }[paso || ''] ?? 0);
+
+  const persistirPaso = async (idBorrador: number, paso: PasoBorradorFaregas) => {
+    await faregasCertificadosApi.actualizarPasoBorrador(idBorrador, paso);
+  };
+
   const validarVerificacion = () => {
     return formVerificacion.tipoInspeccion !== '' &&
       formVerificacion.tipoCertificado !== '' &&
@@ -306,6 +323,9 @@ export function NuevoCertificadoView() {
             setFormCaja(prev => ({
               ...prev,
               tipoCertificado: res.data.tipo.clave,
+              tarifaCodigo: res.data.tarifaCodigo || prev.tarifaCodigo,
+              servicioCodigo: res.data.servicio?.codigo || prev.servicioCodigo,
+              modalidadCertificado: res.data.servicio?.modalidad || prev.modalidadCertificado,
               placa: res.data.vehiculo?.placa || prev.placa,
               categoria: res.data.vehiculo?.categoria || prev.categoria,
             }));
@@ -314,8 +334,6 @@ export function NuevoCertificadoView() {
           if (res.data.vehiculo) {
              setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(res.data.vehiculo) }));
              setVehiculoOrigen('BORRADOR');
-             setCurrentStepIndex(1);
-             setFurthestStepIndex(1);
           }
           if (res.data.titulares) setTitulares(res.data.titulares.map(mapTitularBorrador));
 
@@ -414,7 +432,12 @@ export function NuevoCertificadoView() {
             }
           }
 
-          console.log("[DEBUG] Borrador FAREGAS recuperado con éxito:", res.data.id);
+          const pasoRecuperado = indicePaso(res.data.pasoActual);
+          setCurrentStepIndex(pasoRecuperado);
+          setFurthestStepIndex(pasoRecuperado);
+          setMinimumEditableStepIndex(pasoRecuperado >= 3 ? 3 : 0);
+          setLastSavedAt(res.data.fechaActualizacion ? new Date(res.data.fechaActualizacion) : new Date());
+          setSaveError('');
         }
       } catch (error) {
         console.error("Error al cargar borrador FAREGAS:", error);
@@ -424,6 +447,37 @@ export function NuevoCertificadoView() {
     };
     cargarBorrador();
   }, [certificadoId]);
+
+  // El borrador nace cuando Datos Iniciales ya es válido, nunca al entrar vacío.
+  useEffect(() => {
+    if (loading || certificadoId || creatingDraftRef.current || validarDatosIniciales(formCaja).length > 0) return;
+    const timer = window.setTimeout(async () => {
+      creatingDraftRef.current = true;
+      setIsSavingStep(true);
+      setSaveError('');
+      try {
+        const response = await faregasCertificadosApi.crearBorrador({
+          tipoCertificadoClave: formCaja.tipoCertificado,
+          tarifaCodigo: formCaja.tarifaCodigo,
+          placa: formCaja.placa,
+          categoria: formCaja.categoria,
+          observaciones: '',
+        });
+        const nuevoId = Number(response?.data?.id);
+        if (!nuevoId) throw new Error('El servidor no devolvió el identificador del borrador.');
+        setCertificadoId(nuevoId);
+        setLastSavedAt(new Date());
+        setFurthestStepIndex(1);
+        navigate(`/faregas/certificados/${nuevoId}/continuar`, { replace: true });
+      } catch (e: any) {
+        setSaveError(e.message || 'No se pudo crear el borrador.');
+      } finally {
+        creatingDraftRef.current = false;
+        setIsSavingStep(false);
+      }
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [formCaja, certificadoId, loading, navigate]);
 
   const cargarMaestros = async () => {
     try {
@@ -776,6 +830,45 @@ export function NuevoCertificadoView() {
     setLastSavedAt(new Date());
   };
 
+  const encolarAutosave = (guardar: () => Promise<void>) => {
+    autosaveQueueRef.current = autosaveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        setIsSavingStep(true);
+        setSaveError('');
+        try {
+          await guardar();
+          setLastSavedAt(new Date());
+        } catch (e: any) {
+          setSaveError(e.message || 'No se pudieron sincronizar los cambios.');
+          throw e;
+        } finally {
+          setIsSavingStep(false);
+        }
+      });
+    return autosaveQueueRef.current;
+  };
+
+  // Autosave por bloques, serializado y con debounce para no guardar por tecla.
+  useEffect(() => {
+    if (!certificadoId || loading || currentStepIndex !== 1) return;
+    const timer = window.setTimeout(() => {
+      void encolarAutosave(() => guardarPasoVehiculo(certificadoId)).catch(() => undefined);
+    }, 1500);
+    return () => window.clearTimeout(timer);
+    // Los objetos representan el bloque completo que se está editando.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [certificadoId, loading, currentStepIndex, formVehiculo, formGlp, formGnv, formConformidad, titulares]);
+
+  useEffect(() => {
+    if (!certificadoId || loading || currentStepIndex !== 2 || precioTotal <= 0) return;
+    const timer = window.setTimeout(() => {
+      void encolarAutosave(() => guardarPasoPagos(certificadoId)).catch(() => undefined);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [certificadoId, loading, currentStepIndex, pagosAgregados, precioTotal]);
+
   const eliminarTitularBorrador = async (titular: TitularState) => {
     if (!certificadoId || !titular.titularId) return;
     try {
@@ -794,12 +887,22 @@ export function NuevoCertificadoView() {
       try {
         let idBorrador = certificadoId;
         if (!idBorrador) {
-          const res = await faregasCertificadosApi.crearBorrador({ tipoCertificadoClave: formCaja.tipoCertificado, tarifaCodigo: formCaja.tarifaCodigo, observaciones: '' });
+          const res = await faregasCertificadosApi.crearBorrador({
+            tipoCertificadoClave: formCaja.tipoCertificado,
+            tarifaCodigo: formCaja.tarifaCodigo,
+            placa: formCaja.placa,
+            categoria: formCaja.categoria,
+            observaciones: ''
+          });
           idBorrador = Number(res?.data?.id);
           if (!idBorrador) throw new Error('El servidor no devolvió el identificador del borrador.');
           setCertificadoId(idBorrador);
         } else {
           await faregasCertificadosApi.actualizarBorrador(idBorrador, { tarifaCodigo: formCaja.tarifaCodigo });
+          await faregasCertificadosApi.guardarVehiculoBorrador(idBorrador, {
+            placa: formCaja.placa,
+            categoria: formCaja.categoria,
+          });
         }
         if (formCaja.tipoCertificado === 'GLP_ANUAL') {
           setFormGlp((prev: any) => ({ ...prev, modalidad: formCaja.modalidadCertificado }));
@@ -813,6 +916,7 @@ export function NuevoCertificadoView() {
           setPrecioSubtotal(Number(tarifaResponse.data.importeTotal));
         }
         setLastSavedAt(new Date());
+        await persistirPaso(idBorrador, 'VEHICULO');
         setFurthestStepIndex(prev => Math.max(prev, 1));
         setCurrentStepIndex(1);
       } catch (e: any) {
@@ -836,6 +940,7 @@ export function NuevoCertificadoView() {
         setIsSavingStep(true);
         try {
           await guardarPasoVehiculo(certificadoId);
+          await persistirPaso(certificadoId, 'PAGO');
         } catch (e: any) {
           Swal.fire('No se pudo guardar', e.message || 'Revise los datos del expediente técnico.', 'error');
           return;
@@ -851,6 +956,8 @@ export function NuevoCertificadoView() {
         setIsSavingStep(true);
         try {
           await guardarPasoPagos(certificadoId);
+          await persistirPaso(certificadoId, 'FACTURACION');
+          setMinimumEditableStepIndex(3);
         } catch (e: any) {
           Swal.fire('No se pudo guardar el pago', e.message || 'Revise los medios de pago.', 'error');
           return;
@@ -889,6 +996,7 @@ export function NuevoCertificadoView() {
             setIsSavingStep(false);
           }
         }
+        if (certificadoId) await persistirPaso(certificadoId, 'VERIFICACION_EMISION');
       }
       const siguiente = currentStepIndex + 1;
       setFurthestStepIndex(prev => Math.max(prev, siguiente));
@@ -897,7 +1005,7 @@ export function NuevoCertificadoView() {
   };
 
   const irAtrasOStep = async (destino: number) => {
-    if (isSavingStep || destino < 0 || destino >= currentStepIndex || destino > furthestStepIndex) return;
+    if (isSavingStep || destino < minimumEditableStepIndex || destino >= currentStepIndex || destino > furthestStepIndex) return;
     if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
       setIsSavingStep(true);
       try {
@@ -1101,6 +1209,42 @@ export function NuevoCertificadoView() {
     setPagosAgregados(nuevosPagos);
   };
 
+  const salirAlInicio = async () => {
+    if (!certificadoId) {
+      navigate('/faregas/inicio');
+      return;
+    }
+    setIsSavingStep(true);
+    setSaveError('');
+    try {
+      await autosaveQueueRef.current.catch(() => undefined);
+      if (currentStepIndex === 0) {
+        await faregasCertificadosApi.actualizarBorrador(certificadoId, { tarifaCodigo: formCaja.tarifaCodigo });
+        await faregasCertificadosApi.guardarVehiculoBorrador(certificadoId, { placa: formCaja.placa, categoria: formCaja.categoria });
+      } else if (currentStepIndex === 1) {
+        await guardarPasoVehiculo(certificadoId);
+      } else if (currentStepIndex === 2 && precioTotal > 0) {
+        await guardarPasoPagos(certificadoId);
+      }
+      setLastSavedAt(new Date());
+      navigate('/faregas/inicio');
+    } catch (e: any) {
+      setSaveError(e.message || 'No se pudieron guardar los cambios pendientes.');
+      Swal.fire('No se pudo salir', 'Los cambios pendientes no se guardaron. Reintente antes de abandonar el borrador.', 'error');
+    } finally {
+      setIsSavingStep(false);
+    }
+  };
+
+  useEffect(() => {
+    const advertirSalida = (event: BeforeUnloadEvent) => {
+      if (!isSavingStep && !saveError) return;
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', advertirSalida);
+    return () => window.removeEventListener('beforeunload', advertirSalida);
+  }, [isSavingStep, saveError]);
+
   if (loading && currentStepIndex === 0) {
     return <div className="p-8 text-center text-slate-500">Cargando opciones...</div>;
   }
@@ -1117,7 +1261,7 @@ export function NuevoCertificadoView() {
         <div className="flex items-center gap-3 mb-6">
           <button
             type="button"
-            onClick={() => navigate('/faregas/inicio')}
+            onClick={salirAlInicio}
             className="p-1.5 text-slate-400 hover:text-[#052a79] hover:bg-slate-100 rounded-full transition"
             title="Volver"
           >
@@ -1128,10 +1272,10 @@ export function NuevoCertificadoView() {
           </h2>
           {certificadoId && (
             <div className="ml-auto flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-sm">
-              {isSavingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#052a79]" /> : <Save className="h-3.5 w-3.5 text-green-600" />}
+              {isSavingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#052a79]" /> : <Save className={`h-3.5 w-3.5 ${saveError ? 'text-red-600' : 'text-green-600'}`} />}
               <span>BORRADOR #{certificadoId}</span>
               <span className="text-slate-300">|</span>
-              <span>{isSavingStep ? 'GUARDANDO…' : lastSavedAt ? `GUARDADO ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'CARGADO'}</span>
+              <span className={saveError ? 'text-red-600' : ''}>{isSavingStep ? 'GUARDANDO…' : saveError ? 'ERROR AL GUARDAR' : lastSavedAt ? `GUARDADO ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'CARGADO'}</span>
             </div>
           )}
         </div>
@@ -1154,9 +1298,9 @@ export function NuevoCertificadoView() {
                 key={step.id}
                 type="button"
                 onClick={() => irAtrasOStep(index)}
-                disabled={index >= currentStepIndex || isSavingStep}
-                className={`flex flex-col items-center gap-2 bg-[#f4f9ff] px-2 ${index < currentStepIndex && !isSavingStep ? 'cursor-pointer' : 'cursor-default'}`}
-                title={index < currentStepIndex ? `Volver a ${step.label}` : index === currentStepIndex ? 'Paso actual' : 'Complete el paso anterior'}
+                disabled={index >= currentStepIndex || index < minimumEditableStepIndex || isSavingStep}
+                className={`flex flex-col items-center gap-2 bg-[#f4f9ff] px-2 ${index < currentStepIndex && index >= minimumEditableStepIndex && !isSavingStep ? 'cursor-pointer' : 'cursor-default'}`}
+                title={index < minimumEditableStepIndex ? 'Este paso ya no es editable porque el pago fue confirmado' : index < currentStepIndex ? `Volver a ${step.label}` : index === currentStepIndex ? 'Paso actual' : 'Complete el paso anterior'}
               >
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :

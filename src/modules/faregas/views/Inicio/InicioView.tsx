@@ -1,26 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
-import { operacionApi } from '@/services/api';
-const SOCKET_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace('/api', '')
-  : 'http://127.0.0.1:3000';
+import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 
-interface FiltrosPanel {
-  fechaInicio: string;
-  fechaFin: string;
-  placa: string;
-  estado: string;
-  numeroInspeccion: string;
-  cliente: string;
-  lineaKey: string;
-}
+interface FiltrosPanel { busqueda: string; lineaKey: string; }
 
-const obtenerFechaActual = (): string => {
-  return new Date().toISOString().split('T')[0];
-};
+interface BorradorPanel {
+  id: number;
+  fechaCreacion?: string;
+  fechaActualizacion?: string;
+  placa?: string;
+  clienteDocumento?: string;
+  clienteNombre?: string;
+  conceptoVehicular?: string;
+  pasoActual?: string;
+  estado?: string;
+  estadoPago?: string;
+  estadoFacturacion?: string;
+}
 
 const normalizarTexto = (valor?: string | null): string => {
   if (!valor || valor.trim() === '') return '-';
@@ -71,11 +69,24 @@ function BadgeEstado({ value }: { value?: string | null }) {
   );
 }
 
+const PASO_PANEL: Record<string, string> = {
+  DATOS_INICIALES: 'Datos iniciales',
+  VEHICULO: 'Vehículo y datos técnicos',
+  PAGO: 'Pago pendiente',
+  FACTURACION: 'Facturación pendiente',
+  VERIFICACION_EMISION: 'Verificación / emisión',
+};
+
+const formatearFecha = (valor?: string) => {
+  if (!valor) return '-';
+  const fecha = new Date(valor);
+  return Number.isNaN(fecha.getTime()) ? valor : fecha.toLocaleString('es-PE');
+};
+
 export function InicioView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
-  const [borradores, setBorradores] = useState<any[]>([]);
-  const [lineasDisponibles, setLineasDisponibles] = useState<{ key: string; nombre: string }[]>([]);
+  const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -84,15 +95,7 @@ export function InicioView() {
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [filtros, setFiltros] = useState<FiltrosPanel>({
-    fechaInicio: obtenerFechaActual(),
-    fechaFin: obtenerFechaActual(),
-    placa: '',
-    estado: 'PROCESO',
-    numeroInspeccion: '',
-    cliente: '',
-    lineaKey: 'TODOS'
-  });
+  const [filtros, setFiltros] = useState<FiltrosPanel>({ busqueda: '', lineaKey: 'TODOS' });
   const filtrosRef = useRef(filtros);
 
   useEffect(() => {
@@ -106,20 +109,9 @@ export function InicioView() {
 
   const cargarInspecciones = async (
     _paginaConsulta = page,
-    pageSizeConsulta = pageSize,
-    _autoAdjust = true
+    pageSizeConsulta = pageSize
   ) => {
     if (!puedeConsultar) {
-      return;
-    }
-
-    const filtrosActuales = filtrosRef.current;
-
-    if (filtrosActuales.fechaInicio > filtrosActuales.fechaFin) {
-      setError('La fecha desde no puede ser mayor que la fecha hasta.');
-      setBorradores([]);
-      setTotal(0);
-      setTotalPages(1);
       return;
     }
 
@@ -127,13 +119,16 @@ export function InicioView() {
       setLoading(true);
       setError('');
 
-      // FAREGAS: No cargamos borradores de Farenet.
-      // Se mostrará la tabla vacía hasta que se conecte el nuevo API de Faregas.
-      setBorradores([]);
-      setTotal(0);
-      setPage(1);
+      const response = await faregasCertificadosApi.obtenerBorradores(
+        _paginaConsulta,
+        pageSizeConsulta,
+        filtrosRef.current.busqueda
+      );
+      setBorradores(response.data || []);
+      setTotal(Number(response.total || 0));
+      setPage(Number(response.page || _paginaConsulta));
       setPageSize(pageSizeConsulta);
-      setTotalPages(1);
+      setTotalPages(Math.max(1, Number(response.totalPages || 1)));
     } catch (err) {
       setError(
         err instanceof Error
@@ -146,42 +141,10 @@ export function InicioView() {
   };
 
   useEffect(() => {
-    setFiltros(prev => {
-      const nextFiltros = { ...prev, lineaKey: 'TODOS' };
-      filtrosRef.current = nextFiltros;
-      return nextFiltros;
-    });
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarInspecciones(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantaSeleccionada]);
-  useEffect(() => {
-    if (plantaSeleccionada) {
-      operacionApi.listarLineasAsync(plantaSeleccionada)
-        .then(setLineasDisponibles)
-        .catch(console.error);
-    }
-  }, [plantaSeleccionada]);
-
-  useEffect(() => {
-    if (!puedeConsultar) return;
-
-    const socket = io(SOCKET_URL, {
-      withCredentials: true
-    });
-
-    socket.on('inspeccionActualizada', (payload: any) => {
-      if (payload && payload.planta_key === plantaSeleccionada) {
-        console.log('🔄 Actualizando borradores por WebSocket:', payload);
-        cargarInspecciones(page, pageSize);
-      }
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [puedeConsultar, plantaSeleccionada, page, pageSize]);
-
   const handleFiltroChange = (
     field: keyof FiltrosPanel,
     value: string
@@ -198,17 +161,9 @@ export function InicioView() {
   };
 
   const limpiarFiltros = () => {
-    const hoy = obtenerFechaActual();
-
-    setFiltros({
-      fechaInicio: hoy,
-      fechaFin: hoy,
-      placa: '',
-      estado: '',
-      numeroInspeccion: '',
-      cliente: '',
-      lineaKey: ''
-    });
+    const limpios = { busqueda: '', lineaKey: 'TODOS' };
+    setFiltros(limpios);
+    filtrosRef.current = limpios;
 
     setPage(1);
 
@@ -220,7 +175,7 @@ export function InicioView() {
   const cambiarPageSize = (nuevoPageSize: number) => {
     setPageSize(nuevoPageSize);
     setPage(1);
-    cargarInspecciones(1, nuevoPageSize, false);
+    cargarInspecciones(1, nuevoPageSize);
   };
 
   const irPaginaAnterior = () => {
@@ -245,142 +200,121 @@ export function InicioView() {
   const registroFin = Math.min(page * pageSize, total);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-8">
+      <div>
+        <h1 className="text-xl font-bold text-gray-800">Panel principal de operación</h1>
+        <p className="text-sm text-gray-500">Nuevos registros de certificados</p>
+      </div>
 
-
-      <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-100 gap-4">
-          <div>
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">
-              Panel principal de operación ({total})
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              Borradores registrados por sede activa.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/faregas/certificados/nuevo')}
-              className="px-3 py-1.5 bg-[#052a79] text-white rounded text-xs font-semibold hover:bg-blue-900 transition"
-            >
-              + Nuevo Certificado
-            </button>
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Buscar
-            </label>
-
-            <input
-              type="text"
-              value={filtros.cliente}
-              onChange={(e) =>
-                handleFiltroChange('cliente', e.target.value)
-              }
-              placeholder="Buscar por placa, DNI, RUC o nombre del cliente"
-              className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none focus:border-slate-400"
-            />
-          </div>
-
-          <div className="flex items-end">
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <input
+            type="text"
+            value={filtros.busqueda}
+            onChange={(e) => handleFiltroChange('busqueda', e.target.value)}
+            placeholder="Buscar por placa, DNI, RUC o nombre del cliente"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79] md:col-span-2"
+          />
+          <div className="flex gap-2 md:col-span-2">
             <button
               type="button"
               onClick={aplicarFiltros}
               disabled={loading || !puedeConsultar}
-              className="h-[34px] min-w-[140px] rounded bg-[#052a79] px-4 text-xs font-semibold text-white transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-[#052A79] px-6 py-2 text-sm font-semibold text-white transition hover:bg-blue-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Buscar
             </button>
-          </div>
-
-          <div className="flex items-end">
             <button
               type="button"
               onClick={limpiarFiltros}
               disabled={loading}
-              className="h-[34px] min-w-[90px] rounded bg-slate-100 px-4 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 disabled:opacity-50"
+              className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               Limpiar
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
-              Total registros
-            </p>
-            <p className="text-xl font-bold text-slate-700">{total}</p>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
-              Página actual
-            </p>
-            <p className="text-xl font-bold text-slate-700">
-              {page} / {totalPages || 1}
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
-              Mostrando
-            </p>
-            <p className="text-xl font-bold text-slate-700">
-              {registroInicio}-{registroFin}
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
-              Registros por página
-            </p>
-            <select
-              value={pageSize}
-              onChange={(e) => cambiarPageSize(Number(e.target.value))}
-              disabled={loading}
-              className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
-              Línea
-            </p>
-            <select
-              value={filtros.lineaKey}
-              onChange={(e) => handleFiltroChange('lineaKey', e.target.value)}
-              disabled={loading}
-              className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-slate-400"
-            >
-              <option value="TODOS">Todas las líneas</option>
-              {lineasDisponibles.map((l) => (
-                <option key={l.key} value={l.key}>
-                  {l.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-gray-500">
+            Total registros
+          </p>
+          <p className="text-lg font-bold text-gray-800">{total}</p>
         </div>
 
-        {error && (
-          <div className="mt-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-700">
-            {error}
-          </div>
-        )}
+        <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-gray-500">
+            Página actual
+          </p>
+          <p className="text-lg font-bold text-gray-800">
+            {page} / {totalPages || 1}
+          </p>
+        </div>
 
-        <div className="mt-6 overflow-hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-gray-500">
+            Mostrando
+          </p>
+          <p className="text-lg font-bold text-gray-800">
+            {registroInicio}-{registroFin}
+          </p>
+        </div>
+
+        <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="mb-1 text-xs font-semibold uppercase text-gray-500">
+            Registros por página
+          </p>
+          <select
+            value={pageSize}
+            onChange={(e) => cambiarPageSize(Number(e.target.value))}
+            disabled={loading}
+            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#052A79]"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="mb-1 text-xs font-semibold uppercase text-gray-500">
+            Línea
+          </p>
+          <select
+            value={filtros.lineaKey}
+            onChange={(e) => handleFiltroChange('lineaKey', e.target.value)}
+            disabled={loading}
+            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#052A79]"
+          >
+            <option value="TODOS">Todas las líneas</option>
+          </select>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 shadow-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+          <span className="font-semibold text-gray-700">Borradores registrados</span>
+          <button
+            type="button"
+            onClick={() => navigate('/faregas/certificados/nuevo')}
+            className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900"
+          >
+            + Nuevo Certificado
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-x-auto">
           <table className="min-w-[1400px] w-full border-collapse text-sm">
-            <thead className="bg-[#0033a0] text-xs uppercase text-white font-semibold tracking-wider">
+            <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500">
               <tr>
                 <th className="px-4 py-3 text-left">
                   N° Inspección
@@ -418,7 +352,7 @@ export function InicioView() {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-gray-100">
               {loading && (
                 <tr>
                   <td
@@ -436,53 +370,25 @@ export function InicioView() {
                     colSpan={12}
                     className="px-4 py-8 text-center text-slate-400"
                   >
-                    No hay borradores registradas para el día actual.
+                    No hay borradores activos o pendientes para esta sede.
                   </td>
                 </tr>
               )}
 
               {!loading &&
-                borradores.map((ins, idx) => {
-                  const posicion = Number(ins.posicion || 0);
-                  const etapa = ins.etapa || ins.estadoActual || 'SIN ESTADO';
-                  const puedeContinuar = ins.puedeContinuarFlujo1 === true;
-                  const debeAbrirFlujo2 = ins.debeAbrirFlujo2 === true;
-                  // const puedeAnular = ins.puedeAnular === true;
-                  
-                  let claseFila = 'hover:bg-slate-50';
-                  let etapaBadgeClase = 'bg-slate-100 text-slate-700 border-slate-200';
-
-                  if (ins.colorGrupo === 'GRIS') {
-                    claseFila = 'bg-slate-50 hover:bg-slate-100';
-                    etapaBadgeClase = 'bg-slate-200 text-slate-800 border-slate-300';
-                  } else if (ins.colorGrupo === 'ROJO') {
-                    claseFila = 'bg-red-50 hover:bg-red-100';
-                    etapaBadgeClase = 'bg-red-200 text-red-800 border-red-300';
-                  } else if (ins.colorGrupo === 'AMARILLO') {
-                    claseFila = 'bg-yellow-50 hover:bg-yellow-100';
-                    etapaBadgeClase = 'bg-yellow-200 text-yellow-800 border-yellow-300';
-                  } else if (ins.colorGrupo === 'VERDE') {
-                    claseFila = 'bg-emerald-50 hover:bg-emerald-100';
-                    etapaBadgeClase = 'bg-emerald-200 text-emerald-800 border-emerald-300';
-                  }
-                  
-                  if (ins.estado === 'ANULADO') {
-                    claseFila = 'bg-slate-100/50 opacity-60';
-                  }
-
-                  const textoClase = 'text-slate-700';
-                  const labelClase = 'text-slate-500';
+                borradores.map((ins) => {
+                  const etapa = PASO_PANEL[ins.pasoActual || ''] || 'Datos iniciales';
 
                   return (
                     <tr
-                      key={`${ins.numeroInspeccion}-${idx}`}
-                      className={`transition-colors ${claseFila} ${textoClase}`}
+                      key={ins.id}
+                      className="text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <td className={`px-4 py-3 font-semibold whitespace-nowrap text-blue-700`}>
-                        {normalizarTexto(ins.numeroInspeccion)}
+                        BORRADOR #{ins.id}
                       </td>
-                      <td className={`px-4 py-3 whitespace-nowrap ${labelClase}`}>
-                        {normalizarTexto(ins.fechaHora)}
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500" title={ins.fechaActualizacion ? `Última actualización: ${formatearFecha(ins.fechaActualizacion)}` : undefined}>
+                        {formatearFecha(ins.fechaCreacion)}
                       </td>
                       <td className="px-4 py-3 font-bold whitespace-nowrap">
                         {normalizarTexto(ins.placa)}
@@ -497,43 +403,29 @@ export function InicioView() {
                         {normalizarTexto(ins.conceptoVehicular)}
                       </td>
                       <td className="px-4 py-3 font-mono text-left whitespace-nowrap">
-                        {normalizarTexto(ins.linea)}
+                        -
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide ${etapaBadgeClase}`}>
-                          {posicion}: {etapa}
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold tracking-wide text-amber-700">
+                          {etapa}
                         </span>
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <BadgeEstado value={ins.resultado} />
+                        <BadgeEstado value="Pendiente" />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <BadgeEstado value={ins.estadoCertificado} />
+                        <BadgeEstado value={ins.estado} />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center align-middle">
                         <div className="flex items-center justify-center gap-2 h-full">
-                          {puedeContinuar && !debeAbrirFlujo2 ? (
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/borradores/${ins.numeroInspeccion}/continuar`)}
-                              className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                            >
-                              Continuar
-                            </button>
-                          ) : null}
-
-
-
-                          {(!puedeContinuar || debeAbrirFlujo2) ? (
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/linea/${ins.numeroInspeccion}`)}
-                              className="w-full text-left flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                            >
-                              Ver
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/faregas/certificados/${ins.id}/continuar`)}
+                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-[#052A79] transition-colors hover:bg-gray-50"
+                          >
+                            Continuar
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -544,18 +436,18 @@ export function InicioView() {
           </table>
         </div>
 
-        <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 text-xs text-slate-500">
+        <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 text-xs text-gray-500 md:flex-row md:items-center md:justify-between">
           <div>
             Mostrando{' '}
-            <span className="font-semibold text-slate-700">
+            <span className="font-semibold text-gray-700">
               {registroInicio}
             </span>{' '}
             a{' '}
-            <span className="font-semibold text-slate-700">
+            <span className="font-semibold text-gray-700">
               {registroFin}
             </span>{' '}
             de{' '}
-            <span className="font-semibold text-slate-700">
+            <span className="font-semibold text-gray-700">
               {total}
             </span>{' '}
             registros.
@@ -566,12 +458,12 @@ export function InicioView() {
               type="button"
               onClick={irPaginaAnterior}
               disabled={loading || page <= 1}
-              className="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Anterior
             </button>
 
-            <span className="text-[11px] font-semibold text-slate-500">
+            <span className="text-[11px] font-semibold text-gray-500">
               Página {page} de {totalPages || 1}
             </span>
 
@@ -579,7 +471,7 @@ export function InicioView() {
               type="button"
               onClick={irPaginaSiguiente}
               disabled={loading || page >= totalPages}
-              className="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Siguiente
             </button>

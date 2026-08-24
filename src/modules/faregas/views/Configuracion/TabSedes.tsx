@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { faregasConfigApi, type Sede } from '../../services/faregas-config.api';
+import { exportarExcel } from '../../utils/exportar-excel';
 
 export default function TabSedes() {
   const [sedes, setSedes] = useState<Sede[]>([]);
@@ -68,16 +69,40 @@ export default function TabSedes() {
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <span className="font-semibold text-gray-700">Administración de Sedes</span>
-          <button
-            onClick={() => {
-              setModalMode('CREATE');
-              setCurrentSede({});
-              setShowModal(true);
-            }}
-            className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white transition-colors"
-          >
-            + Nueva Sede
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={loading || sedes.length === 0}
+              onClick={() => exportarExcel('faregas_sedes', 'Sedes', [
+                { key: 'codigo', header: 'CÓDIGO', width: 14 },
+                { key: 'nombre', header: 'NOMBRE', width: 24 },
+                { key: 'direccion', header: 'DIRECCIÓN', width: 60 },
+                { key: 'telefono', header: 'TELÉFONO', width: 22 },
+                { key: 'tarifas', header: 'TARIFAS', width: 12 },
+                { key: 'estado', header: 'ESTADO', width: 14 }
+              ], sedes.map((sede) => ({
+                codigo: sede.key,
+                nombre: sede.nombre,
+                direccion: sede.direccion || '',
+                telefono: sede.telefono || '',
+                tarifas: sede.total_tarifas || 0,
+                estado: sede.activo ? 'ACTIVA' : 'INACTIVA'
+              })))}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ↓ Exportar Excel
+            </button>
+            <button
+              onClick={() => {
+                setModalMode('CREATE');
+                setCurrentSede({});
+                setShowModal(true);
+              }}
+              className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white transition-colors"
+            >
+              + Nueva Sede
+            </button>
+          </div>
         </div>
 
         {loading ? (

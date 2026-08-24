@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import TabSedes from './TabSedes';
-import TabCertificadosBase from './components/TabCertificadosBase';
 import TabCatalogo from './components/TabCatalogo';
 import TabTarifas from './components/TabTarifas';
 import TabFacturacion from './components/TabFacturacion';
 
-type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION' | 'CERTIFICADOS_BASE';
+type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION';
 
 export function FaregasConfiguracionView() {
   const [activeTab, setActiveTab] = useState<ConfigTab>('SEDES');
@@ -34,7 +33,6 @@ export function FaregasConfiguracionView() {
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
   if (hasTarifas) tabs.push({ id: 'TARIFAS', label: 'TARIFAS' });
   if (hasSeries) tabs.push({ id: 'FACTURACION', label: 'FACTURACIÓN' });
-  tabs.push({ id: 'CERTIFICADOS_BASE', label: 'CERTIFICADOS BASE' });
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
     ? activeTab
     : tabs[0].id as ConfigTab;
@@ -71,7 +69,6 @@ export function FaregasConfiguracionView() {
             {tabVisible === 'CATALOGO' && hasCatalogo && (
               <TabCatalogo hasCategorias={hasCategorias} hasServicios={hasServicios} hasProductos={hasProductos} />
             )}
-            {tabVisible === 'CERTIFICADOS_BASE' && <TabCertificadosBase />}
             {tabVisible === 'TARIFAS' && hasTarifas && <TabTarifas />}
             {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion />}
           </div>

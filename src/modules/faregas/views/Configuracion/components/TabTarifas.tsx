@@ -6,6 +6,7 @@ import {
   type TarifaAdmin,
   type TarifaSede
 } from '../../../services/faregas-tarifas-admin.api';
+import { exportarExcel } from '../../../utils/exportar-excel';
 
 type ModalState = { modo: 'CREAR' | 'EDITAR'; tarifa?: TarifaAdmin } | null;
 
@@ -75,6 +76,25 @@ export default function TabTarifas() {
       <div className="flex-1"><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Buscar</label><input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Código o nombre de servicio" className="w-full rounded-lg border border-slate-300 p-2.5 text-sm focus:border-[#052A79] focus:outline-none" /></div>
       <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Categoría: Todas</option>{categorias.map(([codigo, nombre]) => <option key={codigo} value={codigo}>{nombre}</option>)}</select>
       <select value={estado} onChange={(e) => setEstado(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Estado: Todas</option><option value="1">Activas</option><option value="0">Inactivas</option></select>
+      <button type="button" disabled={loading || filtradas.length === 0} onClick={() => exportarExcel(`faregas_tarifas_${plantaKey}`, 'Tarifas', [
+        { key: 'sede', header: 'SEDE', width: 24 },
+        { key: 'codigo', header: 'CÓDIGO SERVICIO', width: 22 },
+        { key: 'servicio', header: 'SERVICIO', width: 42 },
+        { key: 'categoria', header: 'CATEGORÍA', width: 24 },
+        { key: 'precio', header: 'PRECIO', width: 14 },
+        { key: 'sku', header: 'SKU FACTURACIÓN', width: 22 },
+        { key: 'producto', header: 'PRODUCTO FACTURACIÓN', width: 50 },
+        { key: 'estado', header: 'ESTADO', width: 14 }
+      ], filtradas.map((tarifa) => ({
+        sede: tarifa.sede_nombre,
+        codigo: tarifa.servicio_codigo,
+        servicio: tarifa.servicio_nombre,
+        categoria: tarifa.categoria_nombre,
+        precio: tarifa.precio,
+        sku: tarifa.producto_sku || '',
+        producto: tarifa.producto_descripcion || '',
+        estado: tarifa.activo ? 'ACTIVA' : 'INACTIVA'
+      })))} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">↓ EXPORTAR EXCEL</button>
       <button disabled={!plantaKey} onClick={() => setModal({ modo: 'CREAR' })} className="rounded-lg bg-[#052A79] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">+ ASIGNAR SERVICIO</button>
     </div>
 

@@ -9,7 +9,7 @@ export function UsuariosView() {
   const [permisos, setPermisos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   // Search and Pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -56,7 +56,7 @@ export function UsuariosView() {
         username: usuario.username,
         perfil_id: usuario.perfil_id,
         estado: usuario.estado,
-        sedes: usuario.sedes ? usuario.sedes.map((s:any) => s.key) : [],
+        sedes: usuario.sedes ? usuario.sedes.map((s: any) => s.key) : [],
         password: '',
         confirmPassword: ''
       });
@@ -103,7 +103,7 @@ export function UsuariosView() {
       setError('Las contraseñas no coinciden');
       return;
     }
-    
+
     try {
       if (modalMode === 'crear') {
         if (!formData.password) {
@@ -127,7 +127,7 @@ export function UsuariosView() {
   const toggleSede = (key: string) => {
     const current = formData.sedes || [];
     if (current.includes(key)) {
-      setFormData({ ...formData, sedes: current.filter((s:string) => s !== key) });
+      setFormData({ ...formData, sedes: current.filter((s: string) => s !== key) });
     } else {
       setFormData({ ...formData, sedes: [...current, key] });
     }
@@ -136,19 +136,19 @@ export function UsuariosView() {
   const togglePermiso = (clave: string) => {
     const current = formData.permisos || [];
     if (current.includes(clave)) {
-      setFormData({ ...formData, permisos: current.filter((p:string) => p !== clave) });
+      setFormData({ ...formData, permisos: current.filter((p: string) => p !== clave) });
     } else {
       setFormData({ ...formData, permisos: [...current, clave] });
     }
   };
 
   // Filter Data
-  const filteredUsuarios = usuarios.filter(u => 
+  const filteredUsuarios = usuarios.filter(u =>
     u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.perfil_id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredPerfiles = perfiles.filter(p => 
+  const filteredPerfiles = perfiles.filter(p =>
     p.clave.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.nombre.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -156,7 +156,7 @@ export function UsuariosView() {
   const activeData = activeTab === 'usuarios' ? filteredUsuarios : filteredPerfiles;
   const totalRegistros = activeData.length;
   const totalPages = Math.ceil(totalRegistros / limit) || 1;
-  
+
   // Ensure page is within bounds after filtering
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -171,9 +171,9 @@ export function UsuariosView() {
       {/* Header */}
       <div className="flex justify-between items-start sm:items-center flex-col sm:flex-row gap-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Administración de Usuarios FAREGAS</h1>
+          <h1 className="text-xl font-bold text-gray-800">Administración de Usuarios Faregas</h1>
           <p className="text-sm text-gray-500">
-              Administración de cuentas, perfiles y asignaciones de planta.
+            Administración de cuentas, perfiles y asignaciones de planta.
           </p>
         </div>
         <div className="flex gap-2 rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
@@ -201,9 +201,9 @@ export function UsuariosView() {
       {/* Search Bar */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <input 
-            type="text" 
-            placeholder={activeTab === 'usuarios' ? "Buscar por usuario o perfil..." : "Buscar por clave o nombre..."} 
+          <input
+            type="text"
+            placeholder={activeTab === 'usuarios' ? "Buscar por usuario o perfil..." : "Buscar por clave o nombre..."}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79] md:col-span-2"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
@@ -212,8 +212,8 @@ export function UsuariosView() {
             <button className="rounded-lg bg-[#052A79] px-6 py-2 text-sm font-semibold text-white">
               Buscar
             </button>
-            <button 
-              onClick={() => { setSearchQuery(''); setPage(1); }} 
+            <button
+              onClick={() => { setSearchQuery(''); setPage(1); }}
               className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
             >
               Limpiar
@@ -238,7 +238,7 @@ export function UsuariosView() {
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col justify-center">
           <span className="mb-1 text-xs font-semibold uppercase text-gray-500">Registros por página</span>
-          <select 
+          <select
             className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#052A79]"
             value={limit}
             onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
@@ -258,17 +258,17 @@ export function UsuariosView() {
             {activeTab === 'usuarios' ? 'Usuarios registrados' : 'Perfiles registrados'}
           </span>
           {activeTab === 'usuarios' ? (
-              <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
-                + Crear Usuario
-              </button>
+            <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
+              + Crear Usuario
+            </button>
           ) : (
-              <button onClick={() => {
-                  setModalMode('crear');
-                  setFormData({ clave: '', nombre: '', visible: true, sedes: [], permisos: [] });
-                  setShowModal(true);
-              }} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
-                + Crear Perfil
-              </button>
+            <button onClick={() => {
+              setModalMode('crear');
+              setFormData({ clave: '', nombre: '', visible: true, sedes: [], permisos: [] });
+              setShowModal(true);
+            }} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
+              + Crear Perfil
+            </button>
           )}
         </div>
 
@@ -322,7 +322,7 @@ export function UsuariosView() {
                           <span className="text-xs font-semibold text-gray-500">Todas las sedes</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
-                            {u.sedes?.map((s:any) => (
+                            {u.sedes?.map((s: any) => (
                               <span key={s.key} className="rounded-full bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-600">{s.nombre}</span>
                             ))}
                           </div>
@@ -360,9 +360,9 @@ export function UsuariosView() {
                       <td className="px-4 py-3 flex gap-4">
                         <button onClick={() => {
                           setModalMode('editar');
-                          setFormData({ 
-                            clave: p.clave, 
-                            nombre: p.nombre, 
+                          setFormData({
+                            clave: p.clave,
+                            nombre: p.nombre,
                             visible: p.visible,
                             sedes: p.sedes || [],
                             permisos: p.permisos || []
@@ -398,7 +398,7 @@ export function UsuariosView() {
         <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm text-gray-500">
           <span>Mostrando {mostrandoInicio} a {mostrandoFin} de {totalRegistros} registros.</span>
           <div className="flex items-center gap-2">
-            <button 
+            <button
               disabled={page === 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
               className="rounded-lg border border-gray-300 px-3 py-1 font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -406,7 +406,7 @@ export function UsuariosView() {
               Anterior
             </button>
             <span className="font-medium text-gray-600">Página {page} de {totalPages}</span>
-            <button 
+            <button
               disabled={page === totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               className="rounded-lg border border-gray-300 px-3 py-1 font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -422,7 +422,7 @@ export function UsuariosView() {
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-200">
             <h2 className="text-xl font-bold mb-4 text-[#052a79]">
-              {activeTab === 'usuarios' 
+              {activeTab === 'usuarios'
                 ? (modalMode === 'crear' ? 'Crear Usuario' : 'Editar Usuario')
                 : (modalMode === 'crear' ? 'Crear Perfil' : 'Editar Perfil')
               }
@@ -444,109 +444,109 @@ export function UsuariosView() {
               {activeTab === 'usuarios' ? (
                 <>
                   <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Username</label>
-                  <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                    value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} disabled={modalMode === 'editar'} />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Perfil</label>
-                  <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                    value={formData.perfil_id} onChange={e => handlePerfilUsuarioChange(e.target.value)}>
-                    {perfiles.map(p => <option key={p.clave} value={p.clave}>{p.nombre}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nueva Contraseña {modalMode==='editar' && '(opcional)'}</label>
-                  <input type="password" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" 
-                    value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Confirmar Contraseña</label>
-                  <input type="password" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" 
-                    value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="estadoCheck" className="h-4 w-4 text-[#052a79]"
-                  disabled={modalMode === 'editar' && formData.username === currentUsername}
-                  checked={formData.estado} onChange={e => setFormData({...formData, estado: e.target.checked})} />
-                <label htmlFor="estadoCheck" className={`text-sm font-semibold ${modalMode === 'editar' && formData.username === currentUsername ? 'text-slate-400' : 'text-slate-700'}`}>Usuario Activo</label>
-              </div>
-
-              <div className="border-t pt-4">
-                {formData.perfil_id === 'SISTEMAS' ? (
-                  <>
-                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
-                    <div className="text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded p-3">
-                        TODAS LAS SEDES
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Username</label>
+                      <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                        value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} disabled={modalMode === 'editar'} />
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles para este Perfil</label>
-                    <div className="mb-2">
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input type="checkbox" 
-                            className="h-4 w-4 text-[#052a79]"
-                            checked={(formData.sedes || []).length === (perfiles.find(p => p.clave === formData.perfil_id)?.sedes || []).length && (formData.sedes || []).length > 0}
-                            onChange={(e) => {
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Perfil</label>
+                      <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
+                        value={formData.perfil_id} onChange={e => handlePerfilUsuarioChange(e.target.value)}>
+                        {perfiles.map(p => <option key={p.clave} value={p.clave}>{p.nombre}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nueva Contraseña {modalMode === 'editar' && '(opcional)'}</label>
+                      <input type="password" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
+                        value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Confirmar Contraseña</label>
+                      <input type="password" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
+                        value={formData.confirmPassword} onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="estadoCheck" className="h-4 w-4 text-[#052a79]"
+                      disabled={modalMode === 'editar' && formData.username === currentUsername}
+                      checked={formData.estado} onChange={e => setFormData({ ...formData, estado: e.target.checked })} />
+                    <label htmlFor="estadoCheck" className={`text-sm font-semibold ${modalMode === 'editar' && formData.username === currentUsername ? 'text-slate-400' : 'text-slate-700'}`}>Usuario Activo</label>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    {formData.perfil_id === 'SISTEMAS' ? (
+                      <>
+                        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
+                        <div className="text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded p-3">
+                          TODAS LAS SEDES
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles para este Perfil</label>
+                        <div className="mb-2">
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <input type="checkbox"
+                              className="h-4 w-4 text-[#052a79]"
+                              checked={(formData.sedes || []).length === (perfiles.find(p => p.clave === formData.perfil_id)?.sedes || []).length && (formData.sedes || []).length > 0}
+                              onChange={(e) => {
                                 const allowedSedes = perfiles.find(p => p.clave === formData.perfil_id)?.sedes || [];
                                 setFormData({ ...formData, sedes: e.target.checked ? allowedSedes : [] });
-                            }}
-                          />
-                          <span className="font-bold text-[#052a79]">Seleccionar todas</span>
-                        </label>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {plantas.filter(p => (perfiles.find(pf => pf.clave === formData.perfil_id)?.sedes || []).includes(p.key)).map(p => (
-                        <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${!p.activo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
-                          <input type="checkbox" 
-                            className="h-4 w-4 text-[#052A79]"
-                            checked={(formData.sedes || []).includes(p.key)}
-                            onChange={() => toggleSede(p.key)}
-                            disabled={!p.activo}
-                          />
-                          <span className="font-medium text-slate-700">
-                            {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              </>
+                              }}
+                            />
+                            <span className="font-bold text-[#052a79]">Seleccionar todas</span>
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {plantas.filter(p => (perfiles.find(pf => pf.clave === formData.perfil_id)?.sedes || []).includes(p.key)).map(p => (
+                            <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${!p.activo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
+                              <input type="checkbox"
+                                className="h-4 w-4 text-[#052A79]"
+                                checked={(formData.sedes || []).includes(p.key)}
+                                onChange={() => toggleSede(p.key)}
+                                disabled={!p.activo}
+                              />
+                              <span className="font-medium text-slate-700">
+                                {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Clave</label>
                       <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required disabled={modalMode === 'editar'}
-                        value={formData.clave || ''} onChange={e => setFormData({...formData, clave: e.target.value.toUpperCase()})} />
+                        value={formData.clave || ''} onChange={e => setFormData({ ...formData, clave: e.target.value.toUpperCase() })} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nombre</label>
                       <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                        value={formData.nombre || ''} onChange={e => setFormData({...formData, nombre: e.target.value})} />
+                        value={formData.nombre || ''} onChange={e => setFormData({ ...formData, nombre: e.target.value })} />
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <input type="checkbox" id="visibleCheck" className="h-4 w-4 text-[#052a79]"
-                      checked={formData.visible} onChange={e => setFormData({...formData, visible: e.target.checked})} />
+                      checked={formData.visible} onChange={e => setFormData({ ...formData, visible: e.target.checked })} />
                     <label htmlFor="visibleCheck" className="text-sm font-semibold text-slate-700">Perfil Visible</label>
                   </div>
-                  
+
                   <div className="border-t pt-4 mt-4">
                     <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {plantas.map(p => (
                         <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${!p.activo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
-                          <input type="checkbox" 
+                          <input type="checkbox"
                             className="h-4 w-4 text-[#052A79]"
                             checked={(formData.sedes || []).includes(p.key)}
                             onChange={() => toggleSede(p.key)}
@@ -565,7 +565,7 @@ export function UsuariosView() {
                     <div className="grid grid-cols-2 gap-2">
                       {permisos.map(p => (
                         <label key={p.clave} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 cursor-pointer hover:bg-slate-100">
-                          <input type="checkbox" 
+                          <input type="checkbox"
                             className="h-4 w-4 text-[#052a79]"
                             checked={(formData.permisos || []).includes(p.clave)}
                             onChange={() => togglePermiso(p.clave)}

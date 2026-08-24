@@ -1,92 +1,118 @@
-import { useState, useEffect } from 'react';
-import { faregasConfigApi } from '../../../services/faregas-config.api';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  faregasConfigApi,
+  type ServicioConfiguracionFaregas
+} from '../../../services/faregas-config.api';
+
+interface CertificadoBase {
+  id: string;
+  nombre: string;
+  claveTecnica: 'GNV_ANUAL' | 'GLP_ANUAL' | 'CONFORMIDAD';
+  modalidad: 'INICIAL' | 'ANUAL' | null;
+}
+
+const CERTIFICADOS_BASE: CertificadoBase[] = [
+  { id: 'GNV_INICIAL', nombre: 'GNV Inicial', claveTecnica: 'GNV_ANUAL', modalidad: 'INICIAL' },
+  { id: 'GNV_ANUAL', nombre: 'GNV Anual', claveTecnica: 'GNV_ANUAL', modalidad: 'ANUAL' },
+  { id: 'GLP_INICIAL', nombre: 'GLP Inicial', claveTecnica: 'GLP_ANUAL', modalidad: 'INICIAL' },
+  { id: 'GLP_ANUAL', nombre: 'GLP Anual', claveTecnica: 'GLP_ANUAL', modalidad: 'ANUAL' },
+  { id: 'CONFORMIDAD', nombre: 'Conformidad', claveTecnica: 'CONFORMIDAD', modalidad: null }
+];
 
 export default function TabCertificadosBase() {
-  const [servicios, setServicios] = useState<any[]>([]);
+  const [servicios, setServicios] = useState<ServicioConfiguracionFaregas[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const data = await faregasConfigApi.getServicios();
-        setServicios(data);
-      } catch (err: any) {
-        setError(err.message || 'Error al cargar certificados base');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
+    let cancelado = false;
+    void faregasConfigApi.getServicios()
+      .then((data) => {
+        if (!cancelado) setServicios(data);
+      })
+      .catch((err) => {
+        if (!cancelado) setError(err instanceof Error ? err.message : 'Error al cargar certificados base');
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
+    return () => { cancelado = true; };
   }, []);
 
-  // GNV_ANUAL + INICIAL
-  // GNV_ANUAL + ANUAL
-  // GLP_ANUAL + INICIAL
-  // GLP_ANUAL + ANUAL
-  // CONFORMIDAD
-  const countCert = (tipo: string, mod: string | null) => {
-    return servicios.filter(s => s.tipo_certificado_clave === tipo && s.modalidad === mod).length;
-  };
-
-  const certificados = [
-    { key: 'GNV_INICIAL', nombre: 'GNV Inicial', cuenta: countCert('GNV_ANUAL', 'INICIAL') },
-    { key: 'GNV_ANUAL', nombre: 'GNV Anual', cuenta: countCert('GNV_ANUAL', 'ANUAL') },
-    { key: 'GLP_INICIAL', nombre: 'GLP Inicial', cuenta: countCert('GLP_ANUAL', 'INICIAL') },
-    { key: 'GLP_ANUAL', nombre: 'GLP Anual', cuenta: countCert('GLP_ANUAL', 'ANUAL') },
-    { key: 'CONFORMIDAD', nombre: 'Conformidad', cuenta: countCert('CONFORMIDAD', null) },
-  ];
+  const certificados = useMemo(() => CERTIFICADOS_BASE.map((certificado) => ({
+    ...certificado,
+    servicios: servicios.filter((servicio) =>
+      servicio.requiere_certificado
+      && servicio.tipo_certificado_clave === certificado.claveTecnica
+      && servicio.modalidad === certificado.modalidad
+    )
+  })), [servicios]);
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-blue-50 text-blue-800 p-4 rounded-xl mb-6 text-sm">
-        <p className="font-semibold mb-1">Información sobre Certificados Base</p>
-        <p>Los certificados base son estructuras y formatos estándar obligatorios definidos en el sistema. Los servicios comerciales se vinculan a estos certificados para determinar qué formato se imprimirá al final de una inspección. No es posible editar ni eliminar los certificados base desde esta pantalla.</p>
+    <div className="space-y-5">
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        <p className="mb-1 font-semibold">Certificados base estructurales</p>
+        <p>
+          Estos cinco formatos son de solo lectura. Los servicios asociados se obtienen
+          automáticamente de la configuración actual de servicios Faregas.
+        </p>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 bg-gray-50">
-          <span className="font-semibold text-gray-700">Certificados Base Disponibles</span>
+      {loading ? (
+        <div className="rounded-xl border border-gray-200 bg-white py-12 text-center text-gray-500 shadow-sm">
+          Cargando certificados base...
         </div>
+      ) : error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 py-10 text-center text-red-600">
+          {error}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {certificados.map((certificado) => (
+            <article key={certificado.id} className="flex min-h-64 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-[#052A79]">{certificado.nombre}</h3>
+                  <p className="mt-1 text-xs text-gray-500">Formato oficial Faregas</p>
+                </div>
+                <span className="whitespace-nowrap rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-bold uppercase text-gray-600">
+                  Solo lectura
+                </span>
+              </div>
 
-        {loading ? (
-          <div className="text-center py-10">Cargando certificados...</div>
-        ) : error ? (
-          <div className="text-red-500 text-center py-10">{error}</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-white text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-4 py-3">Nombre del Certificado</th>
-                  <th className="px-4 py-3 text-center">Servicios Asociados</th>
-                  <th className="px-4 py-3 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {certificados.map((c) => (
-                  <tr key={c.key} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-semibold text-gray-800">{c.nombre}</td>
-                    <td className="px-4 py-3 text-center font-medium">
-                      {c.cuenta > 0 ? (
-                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-                          {c.cuenta} servicios
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">0 servicios</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="text-gray-400 italic text-xs">Solo Lectura</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 border-b border-gray-100 py-4 text-sm">
+                <dt className="font-semibold text-gray-500">Clave técnica:</dt>
+                <dd className="font-mono font-bold text-gray-800">{certificado.claveTecnica}</dd>
+                <dt className="font-semibold text-gray-500">Modalidad:</dt>
+                <dd className="font-bold text-gray-800">{certificado.modalidad || 'NO APLICA'}</dd>
+              </dl>
+
+              <div className="flex-1 pt-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h4 className="text-xs font-bold uppercase text-gray-500">Servicios asociados</h4>
+                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
+                    {certificado.servicios.length}
+                  </span>
+                </div>
+                {certificado.servicios.length === 0 ? (
+                  <p className="text-sm italic text-gray-400">Sin servicios asociados actualmente.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {certificado.servicios.map((servicio) => (
+                      <li key={servicio.id} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2">
+                        <span className="font-mono text-xs font-bold text-gray-700">{servicio.codigo}</span>
+                        {!servicio.activo && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">INACTIVO</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

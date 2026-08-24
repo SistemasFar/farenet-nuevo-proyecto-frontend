@@ -15,7 +15,11 @@ export interface CrearBorradorFaregasRequest {
   clienteId?: string;
   observaciones?: string;
   tarifaCodigo?: string;
+  placa?: NullableText;
+  categoria?: NullableText;
 }
+
+export type PasoBorradorFaregas = 'DATOS_INICIALES' | 'VEHICULO' | 'PAGO' | 'FACTURACION' | 'VERIFICACION_EMISION';
 
 export interface ActualizarBorradorFaregasRequest {
   clienteId?: string;

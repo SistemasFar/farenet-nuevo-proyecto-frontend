@@ -3,6 +3,7 @@ import {
   faregasProductosApi,
   type ProductoFacturacion
 } from '../../../services/faregas-productos.api';
+import { exportarExcel } from '../../../utils/exportar-excel';
 
 const productoVacio = (): Partial<ProductoFacturacion> => ({
   codigo_sku: '', descripcion: '', tipo_producto: 'Producto', categoria_dms: null,
@@ -98,7 +99,35 @@ export default function TabProductos() {
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
           <div><div className="font-semibold text-gray-700">Productos de Facturación</div><div className="text-xs text-slate-500">{filtrados.length} de {productos.length} productos</div></div>
-          <button onClick={() => { setMode('CREATE'); setActual(productoVacio()); setModal(true); }} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">+ Nuevo Producto</button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={loading || filtrados.length === 0}
+              onClick={() => exportarExcel('faregas_productos', 'Productos', [
+                { key: 'sku', header: 'SKU', width: 18 },
+                { key: 'descripcion', header: 'DESCRIPCIÓN', width: 60 },
+                { key: 'unidad', header: 'UNIDAD', width: 12 },
+                { key: 'igv', header: 'AFECTACIÓN IGV', width: 18 },
+                { key: 'cuenta', header: 'CUENTA POR COBRAR', width: 30 },
+                { key: 'precio', header: 'PRECIO REFERENCIA', width: 20 },
+                { key: 'venta', header: 'PARA VENTA', width: 14 },
+                { key: 'estado', header: 'ESTADO', width: 14 }
+              ], filtrados.map((producto) => ({
+                sku: producto.codigo_sku,
+                descripcion: producto.descripcion,
+                unidad: producto.unidad || '',
+                igv: producto.tipo_afectacion_igv || '',
+                cuenta: producto.cuenta_por_cobrar || '',
+                precio: producto.precio_referencia,
+                venta: producto.es_para_venta ? 'SÍ' : 'NO',
+                estado: producto.activo ? 'ACTIVO' : 'INACTIVO'
+              })))}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              ↓ Exportar Excel
+            </button>
+            <button onClick={() => { setMode('CREATE'); setActual(productoVacio()); setModal(true); }} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">+ Nuevo Producto</button>
+          </div>
         </div>
         {loading ? <div className="py-10 text-center">Cargando productos...</div>
           : error ? <div className="py-10 text-center text-red-500">{error}</div>

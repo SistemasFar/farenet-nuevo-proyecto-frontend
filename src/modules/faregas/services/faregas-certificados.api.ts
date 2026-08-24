@@ -11,13 +11,14 @@ import type {
   GuardarGnvFaregasRequest,
   GuardarPagosFaregasRequest,
   GuardarVerificacionesFaregasRequest,
+  PasoBorradorFaregas,
   VehiculoBorradorFaregasRequest,
 } from '../types/faregas-api';
 
 export const faregasCertificadosApi = {
   obtenerTipos: () => fetchWithToken('/certificados/tipos'),
   obtenerVehiculo: (placa: string) => fetchWithToken(`/clientes/vehiculo/${encodeURIComponent(placa)}`),
-  obtenerBorradores: (page = 1, pageSize = 10) => fetchWithToken(`/certificados/borradores?page=${page}&pageSize=${pageSize}`),
+  obtenerBorradores: (page = 1, pageSize = 10, search = '') => fetchWithToken(`/certificados/borradores?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}`),
   crearBorrador: (data: CrearBorradorFaregasRequest) => fetchWithToken('/certificados/borradores', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -25,6 +26,10 @@ export const faregasCertificadosApi = {
   actualizarBorrador: (id: number, data: ActualizarBorradorFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data)
+  }),
+  actualizarPasoBorrador: (id: number, pasoActual: PasoBorradorFaregas) => fetchWithToken(`/certificados/borradores/${id}/paso`, {
+    method: 'PATCH',
+    body: JSON.stringify({ pasoActual })
   }),
   guardarVehiculoBorrador: (id: number, data: VehiculoBorradorFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/vehiculo`, {
     method: 'PUT',
@@ -51,7 +56,7 @@ export const faregasCertificadosApi = {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
-  guardarComponentesGnv: (id: number, data: any) => fetchWithToken(`/certificados/borradores/${id}/gnv/componentes`, {
+  guardarComponentesGnv: (id: number, data: Record<string, unknown>) => fetchWithToken(`/certificados/borradores/${id}/gnv/componentes`, {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
