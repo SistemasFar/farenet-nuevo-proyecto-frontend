@@ -32,6 +32,7 @@ export interface FormCajaState {
   tipoInspeccion: string;
   tipoCertificado: string;
   modalidadCertificado: '' | 'INICIAL' | 'ANUAL';
+  servicioCodigo: string;
   tarifaCodigo: string;
   tipoAutorizacion: string;
   descuentoObj?: { source_table: string; source_id: string; isCuponidad?: boolean; documentoBusqueda?: string; uuid?: string };
@@ -133,7 +134,7 @@ const mapVerificacionBorrador = (verificacion: any) => ({
 
 export function NuevoCertificadoView() {
   const navigate = useNavigate();
-  const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
+  const { plantaKey: plantaSeleccionada, plantaNombre } = useOutletContext<MainLayoutContext>();
   const { id } = useParams<{ id?: string }>();
   const [certificadoId, setCertificadoId] = useState<number | undefined>(id ? parseInt(id, 10) : undefined);
 
@@ -168,6 +169,7 @@ export function NuevoCertificadoView() {
     tipoInspeccion: '',
     tipoCertificado: '',
     modalidadCertificado: '',
+    servicioCodigo: '',
     tipoAutorizacion: '',
     tarifaCodigo: ''
   });
@@ -228,6 +230,22 @@ export function NuevoCertificadoView() {
     tipoAutorizacion: '',
     linea: ''
   });
+
+  const plantaAnterior = React.useRef(plantaSeleccionada);
+  useEffect(() => {
+    if (plantaAnterior.current && plantaAnterior.current !== plantaSeleccionada) {
+      setFormCaja((actual) => ({
+        ...actual,
+        servicioCodigo: '',
+        tarifaCodigo: '',
+        tipoCertificado: '',
+        modalidadCertificado: '',
+      }));
+      setPrecioSubtotal(0);
+      setPrecioTotal(0);
+    }
+    plantaAnterior.current = plantaSeleccionada;
+  }, [plantaSeleccionada]);
 
   const STEPS = React.useMemo(() => {
     return [
@@ -1161,6 +1179,9 @@ export function NuevoCertificadoView() {
       <div className="p-8">
         {STEPS[currentStepIndex].id === 'datos_iniciales' && (
           <CajaStep
+            key={plantaSeleccionada}
+            plantaSeleccionada={plantaSeleccionada}
+            plantaNombre={plantaNombre}
             formCaja={formCaja}
             setFormCaja={setFormCaja}
           />

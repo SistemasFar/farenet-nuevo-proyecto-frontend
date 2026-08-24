@@ -1,35 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import TabSedes from './TabSedes';
-import TabServicios from './components/TabServicios';
 import TabCertificadosBase from './components/TabCertificadosBase';
+import TabCatalogo from './components/TabCatalogo';
+import TabTarifas from './components/TabTarifas';
+import TabFacturacion from './components/TabFacturacion';
 
-type ConfigTab = 'SEDES' | 'SERVICIOS' | 'TARIFAS' | 'CERTIFICADOS_BASE';
+type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION' | 'CERTIFICADOS_BASE';
 
 export function FaregasConfiguracionView() {
   const [activeTab, setActiveTab] = useState<ConfigTab>('SEDES');
   
   
-  let fUser: any = {};
+  let fUser: { permisos?: string[] } = {};
   try {
     const stored = sessionStorage.getItem('faregasUser');
     if (stored && stored !== 'undefined') fUser = JSON.parse(stored);
-  } catch(e) {}
+  } catch {
+    fUser = {};
+  }
 
   const permisos = fUser?.permisos || [];
 
   const hasSedes = permisos.includes('CONFIGURACION_SEDES');
   const hasServicios = permisos.includes('CONFIGURACION_SERVICIOS');
-
-  useEffect(() => {
-    if (!hasSedes && hasServicios) setActiveTab('SERVICIOS');
-    else if (!hasSedes && !hasServicios) setActiveTab('CERTIFICADOS_BASE');
-  }, [hasSedes, hasServicios]);
+  const hasCategorias = permisos.includes('CONFIGURACION_CATEGORIAS');
+  const hasProductos = permisos.includes('CONFIGURACION_PRODUCTOS');
+  const hasTarifas = permisos.includes('CONFIGURACION_TARIFAS');
+  const hasSeries = permisos.includes('CONFIGURACION_SERIES');
+  const hasCatalogo = hasCategorias || hasServicios || hasProductos;
 
   const tabs = [];
   if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES' });
-  if (hasServicios) tabs.push({ id: 'SERVICIOS', label: 'SERVICIOS' });
-  tabs.push({ id: 'TARIFAS', label: 'TARIFAS' }); // Will be protected later
+  if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
+  if (hasTarifas) tabs.push({ id: 'TARIFAS', label: 'TARIFAS' });
+  if (hasSeries) tabs.push({ id: 'FACTURACION', label: 'FACTURACIÓN' });
   tabs.push({ id: 'CERTIFICADOS_BASE', label: 'CERTIFICADOS BASE' });
+  const tabVisible = tabs.some((tab) => tab.id === activeTab)
+    ? activeTab
+    : tabs[0].id as ConfigTab;
 
   return (
     <div className="space-y-4">
@@ -48,7 +56,7 @@ export function FaregasConfiguracionView() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as ConfigTab)}
                 className={`flex-1 py-4 text-sm font-bold transition-colors ${
-                  activeTab === tab.id
+                  tabVisible === tab.id
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                 }`}
@@ -59,15 +67,13 @@ export function FaregasConfiguracionView() {
           </div>
 
           <div className="p-6">
-            {activeTab === 'SEDES' && hasSedes && <TabSedes />}
-            {activeTab === 'SERVICIOS' && hasServicios && <TabServicios />}
-            {activeTab === 'CERTIFICADOS_BASE' && <TabCertificadosBase />}
-            {activeTab === 'TARIFAS' && (
-              <div className="text-center py-12 text-slate-500">
-                <p className="text-lg font-semibold">Próximamente</p>
-                <p className="text-sm">Administración de Tarifas (En desarrollo)</p>
-              </div>
+            {tabVisible === 'SEDES' && hasSedes && <TabSedes />}
+            {tabVisible === 'CATALOGO' && hasCatalogo && (
+              <TabCatalogo hasCategorias={hasCategorias} hasServicios={hasServicios} hasProductos={hasProductos} />
             )}
+            {tabVisible === 'CERTIFICADOS_BASE' && <TabCertificadosBase />}
+            {tabVisible === 'TARIFAS' && hasTarifas && <TabTarifas />}
+            {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion />}
           </div>
         </div>
       </div>

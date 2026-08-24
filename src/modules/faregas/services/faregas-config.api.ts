@@ -49,6 +49,34 @@ export interface Sede {
   total_tarifas?: number;
 }
 
+export interface CategoriaServicio {
+  id: number;
+  codigo: string;
+  nombre: string;
+  descripcion?: string | null;
+  activo: boolean;
+  orden: number;
+}
+
+export type TipoFlujoServicioFaregas = 'CERTIFICACION' | 'SERVICIO_COMPLEMENTARIO';
+
+export interface ServicioConfiguracionFaregas {
+  id: number;
+  codigo: string;
+  nombre: string;
+  familia: string;
+  categoria_id: number;
+  categoria_codigo: string;
+  categoria_nombre: string;
+  tipo_flujo: TipoFlujoServicioFaregas;
+  requiere_certificado: boolean;
+  tipo_certificado_clave: string | null;
+  modalidad: 'INICIAL' | 'ANUAL' | null;
+  requiere_vehiculo: boolean;
+  activo: boolean;
+  orden: number;
+}
+
 export const faregasConfigApi = {
   obtenerSedes: async (): Promise<Sede[]> => {
     const response = await api.get('/api/faregas/config/sedes');
@@ -70,18 +98,35 @@ export const faregasConfigApi = {
     return response;
   },
 
+  obtenerCategorias: async (soloActivas = false): Promise<CategoriaServicio[]> => {
+    const response = await api.get(`/api/faregas/config/categorias${soloActivas ? '?activas=true' : ''}`);
+    return response.categorias || [];
+  },
+
+  crearCategoria: async (categoria: Partial<CategoriaServicio>): Promise<void> => {
+    return api.post('/api/faregas/config/categorias', categoria);
+  },
+
+  editarCategoria: async (id: number, categoria: Partial<CategoriaServicio>): Promise<void> => {
+    return api.put(`/api/faregas/config/categorias/${id}`, categoria);
+  },
+
+  cambiarEstadoCategoria: async (id: number, activo: boolean): Promise<void> => {
+    return api.put(`/api/faregas/config/categorias/${id}/estado`, { activo });
+  },
+
   // Servicios
-  getServicios: async (): Promise<any[]> => {
+  getServicios: async (): Promise<ServicioConfiguracionFaregas[]> => {
     const response = await api.get('/api/faregas/config/servicios');
     return response.servicios || response;
   },
 
-  crearServicio: async (servicio: any): Promise<void> => {
+  crearServicio: async (servicio: Partial<ServicioConfiguracionFaregas>): Promise<void> => {
     const response = await api.post('/api/faregas/config/servicios', servicio);
     return response;
   },
 
-  editarServicio: async (id: number, servicio: any): Promise<void> => {
+  editarServicio: async (id: number, servicio: Partial<ServicioConfiguracionFaregas>): Promise<void> => {
     const response = await api.put(`/api/faregas/config/servicios/${id}`, servicio);
     return response;
   },

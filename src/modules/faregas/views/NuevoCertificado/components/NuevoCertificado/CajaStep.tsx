@@ -1,219 +1,198 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
-import { CheckCircle, Flame, Leaf, FileCheck, AlertTriangle } from 'lucide-react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { AlertTriangle, CheckCircle, Search } from 'lucide-react';
 import { faregasTarifasApi } from '../../../../services/faregas-tarifas.api';
 import type { FormCajaState } from '../../NuevoCertificadoView';
-import type { TarifaFaregas } from '../../../../types/faregas-api';
+import type {
+  CatalogoFaregas,
+  CategoriaCatalogoFaregas,
+  ServicioCatalogoFaregas,
+} from '../../../../types/faregas-api';
 
 interface CajaStepProps {
-  plantaSeleccionada?: string;
+  plantaSeleccionada: string;
+  plantaNombre: string;
   formCaja: FormCajaState;
   setFormCaja: Dispatch<SetStateAction<FormCajaState>>;
 }
 
-export function CajaStep({ plantaSeleccionada, formCaja, setFormCaja }: CajaStepProps) {
-  const [tarifas, setTarifas] = useState<TarifaFaregas[]>([]);
+const normalizarBusqueda = (valor: string) => valor
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLocaleLowerCase('es-PE')
+  .trim();
+
+const contieneBusqueda = (
+  servicio: ServicioCatalogoFaregas,
+  categoria: CategoriaCatalogoFaregas,
+  busqueda: string,
+) => {
+  const termino = normalizarBusqueda(busqueda);
+  if (!termino) return true;
+  return normalizarBusqueda(`${servicio.nombre} ${servicio.codigo} ${categoria.nombre}`).includes(termino);
+};
+
+export function CajaStep({
+  plantaSeleccionada,
+  plantaNombre,
+  formCaja,
+  setFormCaja,
+}: CajaStepProps) {
+  const [catalogo, setCatalogo] = useState<CatalogoFaregas | null>(null);
+  const [categoriaActiva, setCategoriaActiva] = useState('TODOS');
+  const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reintento, setReintento] = useState(0);
 
   useEffect(() => {
-    faregasTarifasApi.obtenerTarifas()
-      .then(res => {
-        if (res && res.success) {
-          setTarifas(res.tarifas || []);
-        }
-      })
-      .catch(err => console.error('Error al obtener tarifas', err))
-      .finally(() => setLoading(false));
-  }, [plantaSeleccionada]);
+    let cancelado = false;
+    faregasTarifasApi.obtenerCatalogo()
+      .then((respuesta) => {
+        if (cancelado) return;
+        const nuevoCatalogo = respuesta.catalogo;
+        setCatalogo(nuevoCatalogo);
+        setError('');
 
-  const handleSelectTarifa = (tarifa: TarifaFaregas) => {
-    setFormCaja(prev => ({ 
-      ...prev, 
-      tarifaCodigo: tarifa.codigo,
-      tipoCertificado: tarifa.tipo_certificado_clave,
-      modalidadCertificado: tarifa.modalidad as 'INICIAL' | 'ANUAL' | '' || ''
+        setFormCaja((actual) => {
+          const seleccionSigueDisponible = nuevoCatalogo.categorias.some((categoria) =>
+            categoria.servicios.some((servicio) => servicio.tarifa.codigo === actual.tarifaCodigo));
+          if (!actual.tarifaCodigo || seleccionSigueDisponible) return actual;
+          return {
+            ...actual,
+            servicioCodigo: '',
+            tarifaCodigo: '',
+            tipoCertificado: '',
+            modalidadCertificado: '',
+          };
+        });
+      })
+      .catch((err: unknown) => {
+        if (cancelado) return;
+        setCatalogo(null);
+        setError(err instanceof Error ? err.message : 'No se pudo cargar el catálogo de servicios.');
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
+
+    return () => { cancelado = true; };
+  }, [reintento, setFormCaja]);
+
+  const servicios = useMemo(() => (catalogo?.categorias.flatMap((categoria) =>
+    categoria.servicios
+      .filter(() => categoriaActiva === 'TODOS' || categoria.codigo === categoriaActiva)
+      .filter((servicio) => contieneBusqueda(servicio, categoria, busqueda))
+      .map((servicio) => ({ servicio, categoria }))) ?? []), [busqueda, catalogo, categoriaActiva]);
+
+  const seleccion = useMemo(() => catalogo?.categorias
+    .flatMap((categoria) => categoria.servicios.map((servicio) => ({ categoria, servicio })))
+    .find(({ servicio }) => servicio.tarifa.codigo === formCaja.tarifaCodigo),
+  [catalogo, formCaja.tarifaCodigo]);
+
+  const seleccionarServicio = (servicio: ServicioCatalogoFaregas) => {
+    setFormCaja((actual) => ({
+      ...actual,
+      servicioCodigo: servicio.codigo,
+      tarifaCodigo: servicio.tarifa.codigo,
+      tipoCertificado: servicio.tipo_certificado_clave,
+      modalidadCertificado: servicio.modalidad ?? '',
     }));
   };
 
-  const tarifasGLP = tarifas.filter(t => t.familia === 'GLP').sort((a, b) => a.orden - b.orden);
-  const tarifasGNV = tarifas.filter(t => t.familia === 'GNV').sort((a, b) => a.orden - b.orden);
-  const tarifasCONFORMIDAD = tarifas.filter(t => t.familia === 'CONFORMIDAD').sort((a, b) => a.orden - b.orden);
-
-  const tarifaSeleccionadaObj = tarifas.find(t => t.codigo === formCaja.tarifaCodigo);
-
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="space-y-4">
-        <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">1. Tipo de Servicio</h4>
-        
-        {loading ? (
-          <div className="text-sm text-slate-500">Cargando tarifas...</div>
-        ) : tarifas.length === 0 ? (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-center text-red-700">
-            <AlertTriangle className="w-5 h-5 mr-2" />
-            <span className="font-bold">No existen tarifas configuradas para esta sede.</span>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Card GLP */}
-            {tarifasGLP.length > 0 && (
-              <div
-                className={`rounded-2xl p-6 border-2 transition-all duration-300 relative overflow-hidden ${
-                  tarifasGLP.some(t => t.codigo === formCaja.tarifaCodigo)
-                    ? 'border-[#052a79] bg-[#052a79]/5 shadow-md scale-[1.02]'
-                    : 'border-slate-200 bg-white hover:border-[#052a79]/30 hover:bg-slate-50'
-                }`}
-              >
-                {tarifasGLP.some(t => t.codigo === formCaja.tarifaCodigo) && (
-                  <div className="absolute top-4 right-4">
-                    <CheckCircle className="w-6 h-6 text-[#052a79]" />
-                  </div>
-                )}
-                <Flame className={`w-10 h-10 mb-4 ${tarifasGLP.some(t => t.codigo === formCaja.tarifaCodigo) ? 'text-[#052a79]' : 'text-slate-400'}`} />
-                <h5 className="font-bold text-slate-800 text-lg mb-4">GLP</h5>
-                <div className="flex flex-col gap-2">
-                  {tarifasGLP.map(tarifa => (
-                    <button
-                      key={tarifa.codigo}
-                      type="button"
-                      onClick={() => handleSelectTarifa(tarifa)}
-                      className={`rounded-lg border-2 px-3 py-2 text-sm font-bold flex justify-between items-center transition ${formCaja.tarifaCodigo === tarifa.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]'}`}
-                    >
-                      <span className="text-left">{tarifa.nombre}</span>
-                      <span>S/ {Number(tarifa.precio).toFixed(2)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+      <section className="space-y-4">
+        <div>
+          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-700">1. Selecciona el Servicio</h4>
+          <p className="mt-1 text-xs text-slate-500">Catálogo disponible para {catalogo?.sede.nombre || plantaNombre}.</p>
+        </div>
 
-            {/* Card GNV */}
-            {tarifasGNV.length > 0 && (
-              <div
-                className={`rounded-2xl p-6 border-2 transition-all duration-300 relative overflow-hidden ${
-                  tarifasGNV.some(t => t.codigo === formCaja.tarifaCodigo)
-                    ? 'border-[#052a79] bg-[#052a79]/5 shadow-md scale-[1.02]'
-                    : 'border-slate-200 bg-white hover:border-[#052a79]/30 hover:bg-slate-50'
-                }`}
-              >
-                {tarifasGNV.some(t => t.codigo === formCaja.tarifaCodigo) && (
-                  <div className="absolute top-4 right-4">
-                    <CheckCircle className="w-6 h-6 text-[#052a79]" />
-                  </div>
-                )}
-                <Leaf className={`w-10 h-10 mb-4 ${tarifasGNV.some(t => t.codigo === formCaja.tarifaCodigo) ? 'text-[#052a79]' : 'text-slate-400'}`} />
-                <h5 className="font-bold text-slate-800 text-lg mb-4">GNV</h5>
-                <div className="flex flex-col gap-2">
-                  {tarifasGNV.map(tarifa => (
-                    <button
-                      key={tarifa.codigo}
-                      type="button"
-                      onClick={() => handleSelectTarifa(tarifa)}
-                      className={`rounded-lg border-2 px-3 py-2 text-sm font-bold flex justify-between items-center transition ${formCaja.tarifaCodigo === tarifa.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]'}`}
-                    >
-                      <span className="text-left">{tarifa.nombre}</span>
-                      <span>S/ {Number(tarifa.precio).toFixed(2)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(event) => setBusqueda(event.target.value)}
+            placeholder="Buscar servicio..."
+            aria-label="Buscar servicio"
+            className="h-11 w-full rounded-xl border-2 border-slate-200 bg-white pl-12 pr-4 text-sm font-semibold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0"
+          />
+        </div>
 
-            {/* Card Conformidad */}
-            {tarifasCONFORMIDAD.length > 0 && (
-              <div
-                className={`rounded-2xl p-6 border-2 transition-all duration-300 relative overflow-hidden ${
-                  tarifasCONFORMIDAD.some(t => t.codigo === formCaja.tarifaCodigo)
-                    ? 'border-[#052a79] bg-[#052a79]/5 shadow-md scale-[1.02]'
-                    : 'border-slate-200 bg-white hover:border-[#052a79]/30 hover:bg-slate-50'
-                }`}
-              >
-                {tarifasCONFORMIDAD.some(t => t.codigo === formCaja.tarifaCodigo) && (
-                  <div className="absolute top-4 right-4">
-                    <CheckCircle className="w-6 h-6 text-[#052a79]" />
-                  </div>
-                )}
-                <FileCheck className={`w-10 h-10 mb-4 ${tarifasCONFORMIDAD.some(t => t.codigo === formCaja.tarifaCodigo) ? 'text-[#052a79]' : 'text-slate-400'}`} />
-                <h5 className="font-bold text-slate-800 text-lg mb-4">CONFORMIDAD</h5>
-                <div className="flex flex-col gap-2">
-                  {tarifasCONFORMIDAD.map(tarifa => (
-                    <button
-                      key={tarifa.codigo}
-                      type="button"
-                      onClick={() => handleSelectTarifa(tarifa)}
-                      className={`rounded-lg border-2 px-3 py-2 text-sm font-bold flex justify-between items-center transition ${formCaja.tarifaCodigo === tarifa.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]'}`}
-                    >
-                      <span className="text-left">{tarifa.nombre}</span>
-                      <span>S/ {Number(tarifa.precio).toFixed(2)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+        {catalogo && catalogo.categorias.length > 0 && (
+          <div className="flex flex-wrap gap-2" aria-label="Categorías de servicio">
+            <button type="button" onClick={() => setCategoriaActiva('TODOS')} className={`rounded-full border px-4 py-2 text-xs font-black transition ${categoriaActiva === 'TODOS' ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>TODOS</button>
+            {catalogo.categorias.map((categoria) => (
+              <button key={categoria.codigo} type="button" onClick={() => setCategoriaActiva(categoria.codigo)} className={`rounded-full border px-4 py-2 text-xs font-black uppercase transition ${categoriaActiva === categoria.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>{categoria.nombre}</button>
+            ))}
           </div>
         )}
-      </div>
 
-      <div className="space-y-4 pt-6 border-t border-slate-100">
-        <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">2. Datos Básicos</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Placa de Rodaje
-            </label>
-            <input
-              type="text"
-              className="w-full h-[42px] px-4 rounded-xl border-2 border-slate-200 bg-white text-slate-800 font-bold focus:border-[#f59e0b] focus:ring-0 transition-colors uppercase"
-              placeholder="EJ: ABC-123"
-              value={formCaja.placa || ''}
-              onChange={(e) => setFormCaja(prev => ({ ...prev, placa: e.target.value.trim().toUpperCase() }))}
-              maxLength={7}
-            />
+        {loading ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">Cargando servicios disponibles...</div>
+        ) : error ? (
+          <div role="alert" className="flex items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            <div className="flex items-center gap-2"><AlertTriangle className="h-5 w-5" /><span className="text-sm font-bold">{error}</span></div>
+            <button type="button" onClick={() => { setLoading(true); setReintento((actual) => actual + 1); }} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-black text-white">REINTENTAR</button>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Categoría Vehicular
-            </label>
-            <select
-              className="w-full h-[42px] px-4 rounded-xl border-2 border-slate-200 bg-white text-slate-800 font-bold focus:border-[#f59e0b] focus:ring-0 transition-colors"
-              value={formCaja.categoria || ''}
-              onChange={(e) => setFormCaja(prev => ({ ...prev, categoria: e.target.value }))}
-            >
-              <option value="">-- Seleccionar --</option>
-              <option value="M1">M1</option>
-              <option value="M2">M2</option>
-              <option value="M3">M3</option>
-              <option value="N1">N1</option>
-              <option value="N2">N2</option>
-              <option value="N3">N3</option>
-              <option value="O1">O1</option>
-              <option value="O2">O2</option>
-              <option value="O3">O3</option>
-              <option value="O4">O4</option>
-            </select>
+        ) : !catalogo || catalogo.categorias.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-10 text-center">
+            <p className="font-bold text-slate-700">No existen servicios configurados para esta sede.</p>
+            <p className="mt-1 text-sm text-slate-500">Solicite al administrador asignar una tarifa activa.</p>
           </div>
-        </div>
-      </div>
+        ) : servicios.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-600">No se encontraron servicios con los filtros seleccionados.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {servicios.map(({ servicio, categoria }) => {
+              const seleccionado = servicio.tarifa.codigo === formCaja.tarifaCodigo;
+              return (
+                <button key={servicio.id} type="button" onClick={() => seleccionarServicio(servicio)} aria-pressed={seleccionado} className={`relative min-h-44 rounded-2xl border-2 p-5 text-left transition-all duration-200 ${seleccionado ? 'border-[#052a79] bg-[#052a79]/5 shadow-md' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-[#052a79]/40 hover:shadow-sm'}`}>
+                  {seleccionado && <CheckCircle className="absolute right-4 top-4 h-6 w-6 text-[#052a79]" />}
+                  <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-[#052a79]">{categoria.nombre}</span>
+                  <h5 className="mt-5 pr-8 text-base font-black text-slate-800">{servicio.nombre}</h5>
+                  <div className="mt-6 flex items-end justify-between gap-3">
+                    <span className="text-[11px] font-semibold text-slate-400">{servicio.codigo}</span>
+                    <span className="text-xl font-black text-[#052a79]">S/ {servicio.tarifa.precio.toFixed(2)}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
-      {formCaja.tarifaCodigo && formCaja.placa && tarifaSeleccionadaObj && (
-        <div className="mt-8 p-6 bg-blue-50 rounded-2xl border border-blue-100">
-          <h4 className="text-sm font-bold text-[#052a79] uppercase tracking-wider mb-4">Resumen de Selección</h4>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <span className="block text-xs text-blue-600 font-semibold mb-1">Servicio Seleccionado</span>
-              <span className="font-bold text-slate-800 text-lg">{tarifaSeleccionadaObj.familia} - {tarifaSeleccionadaObj.nombre}</span>
+      {seleccion?.servicio.requiere_vehiculo && (
+        <section className="space-y-4 border-t border-slate-100 pt-6">
+          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-700">2. Datos Básicos</h4>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Placa de Rodaje</label>
+              <input type="text" className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() }))} maxLength={7} />
             </div>
-            <div>
-              <span className="block text-xs text-blue-600 font-semibold mb-1">Placa a Certificar</span>
-              <span className="font-bold text-slate-800 text-lg">{formCaja.placa}</span>
-            </div>
-            <div>
-              <span className="block text-xs text-blue-600 font-semibold mb-1">Categoría</span>
-              <span className="font-bold text-slate-800 text-lg">{formCaja.categoria || 'Pendiente'}</span>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Categoría Vehicular</label>
+              <select className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" value={formCaja.categoria} onChange={(event) => setFormCaja((actual) => ({ ...actual, categoria: event.target.value }))}>
+                <option value="">-- Seleccionar --</option>
+                {['M1', 'M2', 'M3', 'N1', 'N2', 'N3', 'O1', 'O2', 'O3', 'O4'].map((categoria) => <option key={categoria} value={categoria}>{categoria}</option>)}
+              </select>
             </div>
           </div>
-        </div>
+        </section>
       )}
+
+      {seleccion && (
+        <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+          <h4 className="mb-4 text-sm font-bold uppercase tracking-wider text-[#052a79]">Servicio Seleccionado</h4>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div><span className="block text-xs font-semibold text-blue-600">Servicio</span><span className="font-bold text-slate-800">{seleccion.servicio.nombre}</span></div>
+            <div><span className="block text-xs font-semibold text-blue-600">Categoría</span><span className="font-bold text-slate-800">{seleccion.categoria.nombre}</span></div>
+            <div><span className="block text-xs font-semibold text-blue-600">Sede</span><span className="font-bold text-slate-800">{catalogo?.sede.nombre || plantaNombre}</span></div>
+            <div><span className="block text-xs font-semibold text-blue-600">Precio</span><span className="text-lg font-black text-[#052a79]">S/ {seleccion.servicio.tarifa.precio.toFixed(2)}</span></div>
+          </div>
+        </section>
+      )}
+      <span className="sr-only">Sede activa: {plantaSeleccionada}</span>
     </div>
   );
 }

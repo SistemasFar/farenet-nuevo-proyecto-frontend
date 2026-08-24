@@ -195,13 +195,38 @@ export interface CrearPerfilFaregasRequest extends PerfilFaregasBaseRequest {
 
 export type ActualizarPerfilFaregasRequest = PerfilFaregasBaseRequest;
 
-export interface TarifaFaregas {
+export type ModalidadServicioFaregas = 'INICIAL' | 'ANUAL' | null;
+
+export interface TarifaCatalogoFaregas {
+  id: number;
   codigo: string;
-  familia: string;
-  nombre: string;
-  tipo_certificado_clave: string;
-  modalidad: string | null;
   precio: number;
+}
+
+export interface ServicioCatalogoFaregas {
+  id: number;
+  codigo: string;
+  nombre: string;
   orden: number;
-  activo?: boolean;
+  tipo_flujo: 'CERTIFICACION';
+  requiere_certificado: boolean;
+  requiere_vehiculo: boolean;
+  tipo_certificado_clave: string;
+  modalidad: ModalidadServicioFaregas;
+  tarifa: TarifaCatalogoFaregas;
+}
+
+export interface CategoriaCatalogoFaregas {
+  codigo: string;
+  nombre: string;
+  orden: number;
+  servicios: ServicioCatalogoFaregas[];
+}
+
+export interface CatalogoFaregas {
+  sede: {
+    key: string;
+    nombre: string;
+  };
+  categorias: CategoriaCatalogoFaregas[];
 }

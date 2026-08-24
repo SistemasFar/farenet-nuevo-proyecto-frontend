@@ -1,18 +1,30 @@
 import { useState, useEffect } from 'react';
-import { faregasConfigApi } from '../../../services/faregas-config.api';
+import {
+  faregasConfigApi,
+  type CategoriaServicio,
+  type ServicioConfiguracionFaregas,
+  type TipoFlujoServicioFaregas
+} from '../../../services/faregas-config.api';
 
 interface Props {
   mode: 'CREATE' | 'EDIT';
-  initialData: any;
+  initialData: Partial<ServicioConfiguracionFaregas>;
+  categorias: CategoriaServicio[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-export function ServicioModal({ mode, initialData, onClose, onSaved }: Props) {
-  const [formData, setFormData] = useState<any>({
+type FormularioServicio = Omit<Partial<ServicioConfiguracionFaregas>, 'categoria_id'> & {
+  categoria_id?: number | '';
+  certificado_base: string;
+};
+
+export function ServicioModal({ mode, initialData, categorias, onClose, onSaved }: Props) {
+  const [formData, setFormData] = useState<FormularioServicio>({
     codigo: '',
     nombre: '',
-    familia: 'GLP',
+    categoria_id: categorias[0]?.id || '',
+    tipo_flujo: 'CERTIFICACION',
     requiere_certificado: true,
     certificado_base: 'GNV_INICIAL',
     requiere_vehiculo: true,
@@ -36,7 +48,7 @@ export function ServicioModal({ mode, initialData, onClose, onSaved }: Props) {
       else if (tipo === 'GLP_ANUAL' && mod === 'ANUAL') combo = 'GLP_ANUAL';
       else if (tipo === 'CONFORMIDAD') combo = 'CONFORMIDAD';
       
-      setFormData((prev: any) => ({ ...prev, certificado_base: combo || 'GNV_INICIAL' }));
+      setFormData((prev) => ({ ...prev, certificado_base: combo || 'GNV_INICIAL' }));
     }
   }, [mode, initialData]);
 
@@ -47,6 +59,13 @@ export function ServicioModal({ mode, initialData, onClose, onSaved }: Props) {
     
     try {
       const payload = { ...formData };
+
+      if (payload.tipo_flujo === 'CERTIFICACION' && !payload.requiere_certificado) {
+        throw new Error('Una certificación debe generar uno de los cinco certificados base.');
+      }
+      if (payload.tipo_flujo === 'SERVICIO_COMPLEMENTARIO' && payload.requiere_certificado) {
+        throw new Error('Un servicio complementario no puede generar un certificado.');
+      }
       
       if (!payload.requiere_certificado) {
         payload.tipo_certificado_clave = null;
@@ -75,11 +94,17 @@ export function ServicioModal({ mode, initialData, onClose, onSaved }: Props) {
             break;
         }
       }
+
+      const servicio: Partial<ServicioConfiguracionFaregas> = {
+        ...payload,
+        categoria_id: Number(payload.categoria_id)
+      };
       
       if (mode === 'CREATE') {
-        await faregasConfigApi.crearServicio(payload);
+        await faregasConfigApi.crearServicio(servicio);
       } else {
-        await faregasConfigApi.editarServicio(formData.id, payload);
+        if (!formData.id) throw new Error('No se pudo identificar el servicio a editar.');
+        await faregasConfigApi.editarServicio(formData.id, servicio);
       }
       
       onSaved();
@@ -132,21 +157,35 @@ export function ServicioModal({ mode, initialData, onClose, onSaved }: Props) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Familia</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Tipo de flujo</label>
               <select
                 required
                 className="w-full border rounded-lg p-2 text-sm bg-white"
-                value={formData.familia}
-                onChange={(e) => setFormData({ ...formData, familia: e.target.value })}
+                value={formData.tipo_flujo}
+                onChange={(e) => setFormData({ ...formData, tipo_flujo: e.target.value as TipoFlujoServicioFaregas })}
               >
-                <option value="GLP">GLP</option>
-                <option value="GNV">GNV</option>
-                <option value="CONFORMIDAD">CONFORMIDAD</option>
-                <option value="OTROS">OTROS</option>
+                <option value="CERTIFICACION">Certificación</option>
+                <option value="SERVICIO_COMPLEMENTARIO">Servicio complementario</option>
+              </select>
+              <p className="mt-1 text-xs text-slate-500">Sólo las certificaciones pueden aparecer en Nuevo Certificado.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">Categoría</label>
+              <select
+                required
+                className="w-full border rounded-lg p-2 text-sm bg-white"
+                value={formData.categoria_id}
+                onChange={(e) => setFormData({ ...formData, categoria_id: Number(e.target.value) })}
+              >
+                <option value="">-- Seleccionar --</option>
+                {categorias.map((categoria) => (
+                  <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>
+                ))}
               </select>
             </div>
             
-            <div className="flex items-center gap-2 pt-6">
+            <div className="flex items-center gap-2 pt-2 md:col-start-2">
               <input
                 type="checkbox"
                 id="req_veh"

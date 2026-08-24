@@ -57,7 +57,7 @@ export default function TabCertificadosBase() {
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-white text-xs uppercase text-gray-500 border-b">
+              <thead className="border-b border-gray-200 bg-white text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-4 py-3">Nombre del Certificado</th>
                   <th className="px-4 py-3 text-center">Servicios Asociados</th>
