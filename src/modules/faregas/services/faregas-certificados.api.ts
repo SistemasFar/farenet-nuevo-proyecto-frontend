@@ -18,7 +18,16 @@ import type {
 export const faregasCertificadosApi = {
   obtenerTipos: () => fetchWithToken('/certificados/tipos'),
   obtenerVehiculo: (placa: string) => fetchWithToken(`/clientes/vehiculo/${encodeURIComponent(placa)}`),
-  obtenerBorradores: (page = 1, pageSize = 10, search = '') => fetchWithToken(`/certificados/borradores?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}`),
+  obtenerBorradores: (page = 1, pageSize = 10, search = '', fechaDesde = '', fechaHasta = '') => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      search,
+      fechaDesde,
+      fechaHasta,
+    });
+    return fetchWithToken(`/certificados/borradores?${params.toString()}`);
+  },
   crearBorrador: (data: CrearBorradorFaregasRequest) => fetchWithToken('/certificados/borradores', {
     method: 'POST',
     body: JSON.stringify(data)

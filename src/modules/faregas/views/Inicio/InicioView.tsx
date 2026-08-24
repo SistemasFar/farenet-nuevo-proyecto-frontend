@@ -4,7 +4,7 @@ import { faregasCertificadosApi } from '../../services/faregas-certificados.api'
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 
-interface FiltrosPanel { busqueda: string; lineaKey: string; }
+interface FiltrosPanel { busqueda: string; lineaKey: string; fechaDesde: string; fechaHasta: string; }
 
 interface BorradorPanel {
   id: number;
@@ -84,6 +84,17 @@ const formatearFecha = (valor?: string) => {
   return Number.isNaN(fecha.getTime()) ? valor : fecha.toLocaleString('es-PE');
 };
 
+const obtenerFechaLocal = () => {
+  const ahora = new Date();
+  const fechaLocal = new Date(ahora.getTime() - ahora.getTimezoneOffset() * 60_000);
+  return fechaLocal.toISOString().slice(0, 10);
+};
+
+const filtrosDelDia = (): FiltrosPanel => {
+  const hoy = obtenerFechaLocal();
+  return { busqueda: '', lineaKey: 'TODOS', fechaDesde: hoy, fechaHasta: hoy };
+};
+
 export function InicioView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
@@ -96,7 +107,7 @@ export function InicioView() {
   const [pageSize, setPageSize] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [filtros, setFiltros] = useState<FiltrosPanel>({ busqueda: '', lineaKey: 'TODOS' });
+  const [filtros, setFiltros] = useState<FiltrosPanel>(filtrosDelDia);
   const filtrosRef = useRef(filtros);
 
   useEffect(() => {
@@ -123,7 +134,9 @@ export function InicioView() {
       const response = await faregasCertificadosApi.obtenerBorradores(
         _paginaConsulta,
         pageSizeConsulta,
-        filtrosRef.current.busqueda
+        filtrosRef.current.busqueda,
+        filtrosRef.current.fechaDesde,
+        filtrosRef.current.fechaHasta
       );
       setBorradores(response.data || []);
       setTotal(Number(response.total || 0));
@@ -157,12 +170,20 @@ export function InicioView() {
   };
 
   const aplicarFiltros = () => {
+    if (!filtros.fechaDesde || !filtros.fechaHasta) {
+      setError('Debe seleccionar las fechas Desde y Hasta.');
+      return;
+    }
+    if (filtros.fechaDesde > filtros.fechaHasta) {
+      setError('La fecha Desde no puede ser posterior a la fecha Hasta.');
+      return;
+    }
     setPage(1);
     cargarInspecciones(1, pageSize);
   };
 
   const limpiarFiltros = () => {
-    const limpios = { busqueda: '', lineaKey: 'TODOS' };
+    const limpios = filtrosDelDia();
     setFiltros(limpios);
     filtrosRef.current = limpios;
 
@@ -208,7 +229,7 @@ export function InicioView() {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-6">
           <input
             type="text"
             value={filtros.busqueda}
@@ -216,6 +237,26 @@ export function InicioView() {
             placeholder="Buscar por placa, DNI, RUC o nombre del cliente"
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79] md:col-span-2"
           />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase text-gray-500">Desde</span>
+            <input
+              type="date"
+              value={filtros.fechaDesde}
+              max={filtros.fechaHasta || undefined}
+              onChange={(e) => handleFiltroChange('fechaDesde', e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79]"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold uppercase text-gray-500">Hasta</span>
+            <input
+              type="date"
+              value={filtros.fechaHasta}
+              min={filtros.fechaDesde || undefined}
+              onChange={(e) => handleFiltroChange('fechaHasta', e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79]"
+            />
+          </label>
           <div className="flex gap-2 md:col-span-2">
             <button
               type="button"
