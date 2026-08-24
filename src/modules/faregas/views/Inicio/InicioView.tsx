@@ -71,9 +71,10 @@ function BadgeEstado({ value }: { value?: string | null }) {
 
 const PASO_PANEL: Record<string, string> = {
   DATOS_INICIALES: 'Datos iniciales',
-  VEHICULO: 'Vehículo y datos técnicos',
   PAGO: 'Pago pendiente',
+  VEHICULO: 'Vehículo y datos técnicos',
   FACTURACION: 'Facturación pendiente',
+  PREVISUALIZACION: 'Previsualización del certificado',
   VERIFICACION_EMISION: 'Verificación / emisión',
 };
 

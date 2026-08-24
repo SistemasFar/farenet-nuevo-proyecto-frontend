@@ -8,13 +8,14 @@ import { faregasCertificadosApi } from '../../services/faregas-certificados.api'
 import { faregasClientesApi } from '../../services/faregas-clientes.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
-import { CheckCircle2, FileText, User, CreditCard, ArrowLeft, Search, Loader2, Save } from 'lucide-react';
+import { CheckCircle2, FileText, User, CreditCard, ArrowLeft, Search, Loader2, Save, Eye } from 'lucide-react';
 import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
+import { PrevisualizacionCertificadoStep } from './components/NuevoCertificado/PrevisualizacionCertificadoStep';
 import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
@@ -255,19 +256,21 @@ export function NuevoCertificadoView() {
   const STEPS = React.useMemo(() => {
     return [
       { id: 'datos_iniciales', label: 'Datos Iniciales', icon: FileText },
-      { id: 'vehiculo', label: 'Vehículo y Datos Técnicos', icon: Search },
       { id: 'pago', label: 'Pago', icon: CreditCard },
+      { id: 'vehiculo', label: 'Vehículo y Datos Técnicos', icon: Search },
       { id: 'facturacion', label: 'Facturación', icon: User },
+      { id: 'previsualizacion', label: 'Previsualización del Certificado', icon: Eye },
       { id: 'verificacion', label: 'Verificación / Emisión', icon: CheckCircle2 }
     ];
   }, []);
 
   const indicePaso = (paso?: string) => ({
     DATOS_INICIALES: 0,
-    VEHICULO: 1,
-    PAGO: 2,
+    PAGO: 1,
+    VEHICULO: 2,
     FACTURACION: 3,
-    VERIFICACION_EMISION: 4,
+    PREVISUALIZACION: 4,
+    VERIFICACION_EMISION: 5,
   }[paso || ''] ?? 0);
 
   const persistirPaso = async (idBorrador: number, paso: PasoBorradorFaregas) => {
@@ -527,10 +530,10 @@ export function NuevoCertificadoView() {
   useEffect(() => {
     if (currentStepIndex === 0 && !maestros) {
       cargarMaestros();
-    } else if (currentStepIndex === 1 && !maestrosVehiculo) {
-      cargarMaestrosVehiculo();
-    } else if (currentStepIndex === 2 && !maestrosPago) {
+    } else if (currentStepIndex === 1 && !maestrosPago) {
       cargarMaestrosPago();
+    } else if (currentStepIndex === 2 && !maestrosVehiculo) {
+      cargarMaestrosVehiculo();
     }
   }, [currentStepIndex, maestros, maestrosPago, maestrosVehiculo]);
 
@@ -851,7 +854,7 @@ export function NuevoCertificadoView() {
 
   // Autosave por bloques, serializado y con debounce para no guardar por tecla.
   useEffect(() => {
-    if (!certificadoId || loading || currentStepIndex !== 1) return;
+    if (!certificadoId || loading || currentStepIndex !== 2) return;
     const timer = window.setTimeout(() => {
       void encolarAutosave(() => guardarPasoVehiculo(certificadoId)).catch(() => undefined);
     }, 1500);
@@ -861,7 +864,7 @@ export function NuevoCertificadoView() {
   }, [certificadoId, loading, currentStepIndex, formVehiculo, formGlp, formGnv, formConformidad, titulares]);
 
   useEffect(() => {
-    if (!certificadoId || loading || currentStepIndex !== 2 || precioTotal <= 0) return;
+    if (!certificadoId || loading || currentStepIndex !== 1 || precioTotal <= 0) return;
     const timer = window.setTimeout(() => {
       void encolarAutosave(() => guardarPasoPagos(certificadoId)).catch(() => undefined);
     }, 1200);
@@ -916,7 +919,7 @@ export function NuevoCertificadoView() {
           setPrecioSubtotal(Number(tarifaResponse.data.importeTotal));
         }
         setLastSavedAt(new Date());
-        await persistirPaso(idBorrador, 'VEHICULO');
+        await persistirPaso(idBorrador, 'PAGO');
         setFurthestStepIndex(prev => Math.max(prev, 1));
         setCurrentStepIndex(1);
       } catch (e: any) {
@@ -940,7 +943,7 @@ export function NuevoCertificadoView() {
         setIsSavingStep(true);
         try {
           await guardarPasoVehiculo(certificadoId);
-          await persistirPaso(certificadoId, 'PAGO');
+          await persistirPaso(certificadoId, 'FACTURACION');
         } catch (e: any) {
           Swal.fire('No se pudo guardar', e.message || 'Revise los datos del expediente técnico.', 'error');
           return;
@@ -956,8 +959,8 @@ export function NuevoCertificadoView() {
         setIsSavingStep(true);
         try {
           await guardarPasoPagos(certificadoId);
-          await persistirPaso(certificadoId, 'FACTURACION');
-          setMinimumEditableStepIndex(3);
+          await persistirPaso(certificadoId, 'VEHICULO');
+          setMinimumEditableStepIndex(2);
         } catch (e: any) {
           Swal.fire('No se pudo guardar el pago', e.message || 'Revise los medios de pago.', 'error');
           return;
@@ -996,7 +999,9 @@ export function NuevoCertificadoView() {
             setIsSavingStep(false);
           }
         }
-        if (certificadoId) await persistirPaso(certificadoId, 'VERIFICACION_EMISION');
+        if (certificadoId) await persistirPaso(certificadoId, 'PREVISUALIZACION');
+      } else if (STEPS[currentStepIndex].id === 'previsualizacion' && certificadoId) {
+        await persistirPaso(certificadoId, 'VERIFICACION_EMISION');
       }
       const siguiente = currentStepIndex + 1;
       setFurthestStepIndex(prev => Math.max(prev, siguiente));
@@ -1092,7 +1097,7 @@ export function NuevoCertificadoView() {
 
   // Efecto para auto-llenar pagos de Cortesía u otros que dejan el total en 0
   useEffect(() => {
-    if (currentStepIndex === 2 && maestrosPago && formCaja.descuentoObj) {
+    if (currentStepIndex === 1 && maestrosPago && formCaja.descuentoObj) {
 
       // Si el monto pendiente es 0 (ej. Cortesía, 100% descuento)
       if (montoPendiente === 0) {
@@ -1105,7 +1110,7 @@ export function NuevoCertificadoView() {
       } else {
         setDisablePagoTabs(false);
       }
-    } else if (currentStepIndex === 2) {
+    } else if (currentStepIndex === 1) {
       // En caso de que se haya quitado el descuento
       if (montoPendiente > 0) {
         setDisablePagoTabs(false);
@@ -1221,10 +1226,10 @@ export function NuevoCertificadoView() {
       if (currentStepIndex === 0) {
         await faregasCertificadosApi.actualizarBorrador(certificadoId, { tarifaCodigo: formCaja.tarifaCodigo });
         await faregasCertificadosApi.guardarVehiculoBorrador(certificadoId, { placa: formCaja.placa, categoria: formCaja.categoria });
-      } else if (currentStepIndex === 1) {
-        await guardarPasoVehiculo(certificadoId);
-      } else if (currentStepIndex === 2 && precioTotal > 0) {
+      } else if (currentStepIndex === 1 && precioTotal > 0) {
         await guardarPasoPagos(certificadoId);
+      } else if (currentStepIndex === 2) {
+        await guardarPasoVehiculo(certificadoId);
       }
       setLastSavedAt(new Date());
       navigate('/faregas/inicio');
@@ -1382,6 +1387,9 @@ export function NuevoCertificadoView() {
             facturacion={facturacion}
             onFacturacionChange={setFacturacion}
           />
+        )}
+        {STEPS[currentStepIndex].id === 'previsualizacion' && (
+          <PrevisualizacionCertificadoStep certificadoId={certificadoId} />
         )}
         {STEPS[currentStepIndex].id === 'verificacion' && (
           <VerificacionStep

@@ -19,7 +19,7 @@ export interface CrearBorradorFaregasRequest {
   categoria?: NullableText;
 }
 
-export type PasoBorradorFaregas = 'DATOS_INICIALES' | 'VEHICULO' | 'PAGO' | 'FACTURACION' | 'VERIFICACION_EMISION';
+export type PasoBorradorFaregas = 'DATOS_INICIALES' | 'PAGO' | 'VEHICULO' | 'FACTURACION' | 'PREVISUALIZACION' | 'VERIFICACION_EMISION';
 
 export interface ActualizarBorradorFaregasRequest {
   clienteId?: string;
