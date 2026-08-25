@@ -3,8 +3,9 @@ import TabSedes from './TabSedes';
 import TabCatalogo from './components/TabCatalogo';
 import TabTarifas from './components/TabTarifas';
 import TabFacturacion from './components/TabFacturacion';
+import TabEmpresas from './components/TabEmpresas';
 
-type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION';
+type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION' | 'EMPRESAS';
 
 export function FaregasConfiguracionView() {
   const [activeTab, setActiveTab] = useState<ConfigTab>('SEDES');
@@ -26,6 +27,10 @@ export function FaregasConfiguracionView() {
   const hasProductos = permisos.includes('CONFIGURACION_PRODUCTOS');
   const hasTarifas = permisos.includes('CONFIGURACION_TARIFAS');
   const hasSeries = permisos.includes('CONFIGURACION_SERIES');
+  // La relación empresa-sede forma parte de la administración de sedes.
+  // El permiso específico permite separarla en perfiles futuros, mientras
+  // CONFIGURACION_SEDES conserva acceso para las sesiones actuales.
+  const hasEmpresas = permisos.includes('CONFIGURACION_EMPRESAS') || hasSedes;
   const hasCatalogo = hasCategorias || hasServicios || hasProductos;
 
   const tabs = [];
@@ -33,6 +38,7 @@ export function FaregasConfiguracionView() {
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
   if (hasTarifas) tabs.push({ id: 'TARIFAS', label: 'TARIFAS' });
   if (hasSeries) tabs.push({ id: 'FACTURACION', label: 'FACTURACIÓN' });
+  if (hasEmpresas) tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
     ? activeTab
     : tabs[0].id as ConfigTab;
@@ -71,6 +77,7 @@ export function FaregasConfiguracionView() {
             )}
             {tabVisible === 'TARIFAS' && hasTarifas && <TabTarifas />}
             {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion />}
+            {tabVisible === 'EMPRESAS' && hasEmpresas && <TabEmpresas />}
           </div>
         </div>
       </div>

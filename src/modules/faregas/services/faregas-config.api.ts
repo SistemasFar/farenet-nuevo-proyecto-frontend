@@ -14,7 +14,7 @@ const api = {
     }
     return res.json();
   },
-  post: async (path: string, body: any) => {
+  post: async (path: string, body: unknown) => {
     const res = await fetch(`${BASE_URL}${path.replace('/api', '')}`, {
       method: 'POST',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -26,7 +26,7 @@ const api = {
     }
     return res.json();
   },
-  put: async (path: string, body: any) => {
+  put: async (path: string, body: unknown) => {
     const res = await fetch(`${BASE_URL}${path.replace('/api', '')}`, {
       method: 'PUT',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -46,7 +46,20 @@ export interface Sede {
   direccion?: string;
   telefono?: string;
   activo: boolean;
+  empresa_key: string;
+  empresa_nombre: string;
   total_tarifas?: number;
+}
+
+export interface EmpresaFaregas {
+  key: string;
+  nombre: string;
+  ruc?: string | null;
+  direccion?: string | null;
+  telefono?: string | null;
+  cuenta_banco_nacion?: string | null;
+  activo: boolean;
+  total_sedes: number;
 }
 
 export interface CategoriaServicio {
@@ -78,6 +91,35 @@ export interface ServicioConfiguracionFaregas {
 }
 
 export const faregasConfigApi = {
+  obtenerEmpresas: async (): Promise<EmpresaFaregas[]> => {
+    const response = await api.get('/api/faregas/config/empresas');
+    return response.empresas || [];
+  },
+
+  obtenerSedesEmpresas: async (): Promise<Sede[]> => {
+    const response = await api.get('/api/faregas/config/empresas/sedes');
+    return response.sedes || [];
+  },
+
+  crearEmpresa: async (empresa: Partial<EmpresaFaregas>): Promise<void> => {
+    await api.post('/api/faregas/config/empresas', empresa);
+  },
+
+  editarEmpresa: async (key: string, empresa: Partial<EmpresaFaregas>): Promise<void> => {
+    await api.put(`/api/faregas/config/empresas/${encodeURIComponent(key)}`, empresa);
+  },
+
+  cambiarEstadoEmpresa: async (key: string, activo: boolean, empresaReemplazoKey?: string): Promise<void> => {
+    await api.put(`/api/faregas/config/empresas/${encodeURIComponent(key)}/estado`, {
+      activo,
+      empresa_reemplazo_key: empresaReemplazoKey || null
+    });
+  },
+
+  asignarEmpresaSede: async (sedeKey: string, empresaKey: string): Promise<void> => {
+    await api.put(`/api/faregas/config/sedes/${encodeURIComponent(sedeKey)}/empresa`, { empresa_key: empresaKey });
+  },
+
   obtenerSedes: async (): Promise<Sede[]> => {
     const response = await api.get('/api/faregas/config/sedes');
     return response.sedes;

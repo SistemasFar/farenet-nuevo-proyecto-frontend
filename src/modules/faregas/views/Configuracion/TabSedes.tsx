@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { faregasConfigApi, type Sede } from '../../services/faregas-config.api';
 import { exportarExcel } from '../../utils/exportar-excel';
 
+const mensajeError = (error: unknown, defecto: string) => error instanceof Error ? error.message : defecto;
+
 export default function TabSedes() {
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,15 +18,20 @@ export default function TabSedes() {
       setLoading(true);
       const data = await faregasConfigApi.obtenerSedes();
       setSedes(data);
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar sedes');
+    } catch (err: unknown) {
+      setError(mensajeError(err, 'Error al cargar sedes'));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSedes();
+    let cancelado = false;
+    void faregasConfigApi.obtenerSedes()
+      .then((data) => { if (!cancelado) { setSedes(data); setError(''); } })
+      .catch((err: unknown) => { if (!cancelado) setError(mensajeError(err, 'Error al cargar sedes')); })
+      .finally(() => { if (!cancelado) setLoading(false); });
+    return () => { cancelado = true; };
   }, []);
 
   const handleCreateSede = async (e: React.FormEvent) => {
@@ -33,8 +40,8 @@ export default function TabSedes() {
       await faregasConfigApi.crearSede(currentSede);
       setShowModal(false);
       loadSedes();
-    } catch (err: any) {
-      alert(err.message || 'Error al crear');
+    } catch (err: unknown) {
+      alert(mensajeError(err, 'Error al crear'));
     }
   };
 
@@ -45,8 +52,8 @@ export default function TabSedes() {
       await faregasConfigApi.editarSede(currentSede.key, currentSede);
       setShowModal(false);
       loadSedes();
-    } catch (err: any) {
-      alert(err.message || 'Error al editar');
+    } catch (err: unknown) {
+      alert(mensajeError(err, 'Error al editar'));
     }
   };
 
@@ -59,8 +66,8 @@ export default function TabSedes() {
         detail: { key, activo: !currentActivo, nombre: sedeObj?.nombre }
       }));
       loadSedes();
-    } catch (err: any) {
-      alert(err.message || 'Error al cambiar estado');
+    } catch (err: unknown) {
+      alert(mensajeError(err, 'Error al cambiar estado'));
     }
   };
 
@@ -78,6 +85,7 @@ export default function TabSedes() {
                 { key: 'nombre', header: 'NOMBRE', width: 24 },
                 { key: 'direccion', header: 'DIRECCIÓN', width: 60 },
                 { key: 'telefono', header: 'TELÉFONO', width: 22 },
+                { key: 'empresa', header: 'EMPRESA', width: 34 },
                 { key: 'tarifas', header: 'TARIFAS', width: 12 },
                 { key: 'estado', header: 'ESTADO', width: 14 }
               ], sedes.map((sede) => ({
@@ -85,6 +93,7 @@ export default function TabSedes() {
                 nombre: sede.nombre,
                 direccion: sede.direccion || '',
                 telefono: sede.telefono || '',
+                empresa: sede.empresa_nombre || '',
                 tarifas: sede.total_tarifas || 0,
                 estado: sede.activo ? 'ACTIVA' : 'INACTIVA'
               })))}
@@ -118,6 +127,7 @@ export default function TabSedes() {
                   <th className="px-4 py-3">Nombre</th>
                   <th className="px-4 py-3">Dirección</th>
                   <th className="px-4 py-3">Teléfono</th>
+                  <th className="px-4 py-3">Empresa</th>
                   <th className="px-4 py-3 text-center">Tarifas</th>
                   <th className="px-4 py-3 text-center">Estado</th>
                   <th className="px-4 py-3 text-center">Acciones</th>
@@ -130,6 +140,7 @@ export default function TabSedes() {
                     <td className="px-4 py-3 font-medium text-gray-800">{s.nombre}</td>
                     <td className="px-4 py-3 text-gray-600">{s.direccion || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{s.telefono || '-'}</td>
+                    <td className="px-4 py-3"><div className="font-medium text-gray-700">{s.empresa_nombre}</div><div className="font-mono text-xs text-gray-400">{s.empresa_key}</div></td>
                     <td className="px-4 py-3 text-center font-medium">{s.total_tarifas || 0}</td>
                     <td className="px-4 py-3 text-center">
                       {s.activo ? (

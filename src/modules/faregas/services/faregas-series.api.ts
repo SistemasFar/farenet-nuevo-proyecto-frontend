@@ -1,6 +1,12 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000/api';
 
-export type TipoComprobanteFaregas = 'FACTURA' | 'BOLETA';
+export type TipoComprobanteFaregas =
+  | 'FACTURA'
+  | 'BOLETA'
+  | 'NOTA_CREDITO_FACTURA'
+  | 'NOTA_CREDITO_BOLETA'
+  | 'NOTA_DEBITO_FACTURA'
+  | 'NOTA_DEBITO_BOLETA';
 
 export interface SerieSede {
   key: string;
