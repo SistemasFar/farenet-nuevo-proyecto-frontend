@@ -544,35 +544,47 @@ export function UsuariosView() {
                   <div className="border-t pt-4 mt-4">
                     <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {plantas.map(p => (
-                        <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${!p.activo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
-                          <input type="checkbox"
-                            className="h-4 w-4 text-[#052A79]"
-                            checked={(formData.sedes || []).includes(p.key)}
-                            onChange={() => toggleSede(p.key)}
-                            disabled={!p.activo}
-                          />
-                          <span className="font-medium text-slate-700">
-                            {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
-                          </span>
-                        </label>
-                      ))}
+                      {plantas.map(p => {
+                        const isSistemas = formData.clave === 'SISTEMAS';
+                        const isChecked = isSistemas || (formData.sedes || []).includes(p.key);
+                        const isDisabled = isSistemas || !p.activo;
+                        
+                        return (
+                          <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
+                            <input type="checkbox"
+                              className="h-4 w-4 text-[#052A79]"
+                              checked={isChecked}
+                              onChange={() => !isSistemas && toggleSede(p.key)}
+                              disabled={isDisabled}
+                            />
+                            <span className="font-medium text-slate-700">
+                              {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
 
                   <div className="border-t pt-4 mt-4">
                     <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Módulos / Menú</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {permisos.map(p => (
-                        <label key={p.clave} className="flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 cursor-pointer hover:bg-slate-100">
-                          <input type="checkbox"
-                            className="h-4 w-4 text-[#052a79]"
-                            checked={(formData.permisos || []).includes(p.clave)}
-                            onChange={() => togglePermiso(p.clave)}
-                          />
-                          <span className="font-medium text-slate-700">{p.nombre}</span>
-                        </label>
-                      ))}
+                      {permisos.map(p => {
+                        const isSistemas = formData.clave === 'SISTEMAS';
+                        const isChecked = isSistemas || (formData.permisos || []).includes(p.clave);
+                        
+                        return (
+                          <label key={p.clave} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${isSistemas ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
+                            <input type="checkbox"
+                              className="h-4 w-4 text-[#052a79]"
+                              checked={isChecked}
+                              onChange={() => !isSistemas && togglePermiso(p.clave)}
+                              disabled={isSistemas}
+                            />
+                            <span className="font-medium text-slate-700">{p.nombre}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 </>

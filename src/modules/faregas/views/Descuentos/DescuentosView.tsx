@@ -77,16 +77,71 @@ export function DescuentosView() {
     catch (e: unknown) { Swal.fire('No se pudo crear', e instanceof Error ? e.message : 'Error inesperado.', 'error'); }
   };
 
-  return <div className="space-y-5 descuentos-admin">
-    <style>{`.descuentos-admin .input{height:2.5rem;width:100%;border:1px solid #cbd5e1;border-radius:.5rem;padding:0 .75rem;font-size:.75rem;background:white;outline:none}.descuentos-admin .input:focus{border-color:#052a79;box-shadow:0 0 0 2px rgba(5,42,121,.08)}`}</style>
-    <div className="flex flex-wrap items-center justify-between gap-4"><div className="flex items-center gap-3"><div className="rounded-xl bg-[#052a79] p-3 text-white"><Tag /></div><div><h1 className="text-2xl font-black text-slate-800">Descuentos y Alianzas</h1><p className="text-sm text-slate-500">Campañas, códigos, vigencias y servicios aplicables.</p></div></div><button onClick={abrirNuevo} className="flex items-center gap-2 rounded-lg bg-[#052a79] px-5 py-3 text-xs font-black text-white"><Plus className="h-4 w-4" /> NUEVO DESCUENTO</button></div>
-    <div className="flex gap-3 rounded-xl border bg-white p-4"><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por código, nombre o empresa..." className="h-10 w-full rounded-lg border pl-10 pr-3 text-sm" /></div><select value={estado} onChange={e => setEstado(e.target.value)} className="rounded-lg border px-3 text-sm"><option value="TODOS">Todos</option><option value="ACTIVOS">Activos</option><option value="INACTIVOS">Inactivos</option><option value="VENCIDOS">Vencidos</option></select></div>
-    <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-      <div className="border-b px-4 py-3 font-bold">Descuentos registrados ({lista.length})</div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr><th className="p-3">Código / Nombre</th><th>Tipo</th><th>Empresa</th><th>Regla</th><th>Vigencia</th><th>Sede</th><th>Códigos de aplicación</th><th>Estado</th><th>Acciones</th></tr></thead>
-          <tbody>{loading ? <tr><td colSpan={9} className="p-12 text-center"><Loader2 className="mx-auto animate-spin" /></td></tr> : lista.length === 0 ? <tr><td colSpan={9} className="p-12 text-center text-slate-400">No hay descuentos registrados.</td></tr> : lista.map(d => <tr key={d.id} className="border-t"><td className="p-3"><b className="text-[#052a79]">{d.codigo}</b><div>{d.nombre}</div></td><td>{d.tipo}</td><td>{d.empresa_aliada_nombre || '-'}</td><td>{d.tipo_calculo === 'MONTO' ? 'S/ ' : ''}{Number(d.valor).toFixed(2)}{d.tipo_calculo === 'PORCENTAJE' ? '%' : ''}<div className="text-slate-400">{d.total_servicios} servicios enlazados</div></td><td>{fecha(d.fecha_inicio)} – {fecha(d.fecha_fin)}</td><td>{d.planta_nombre || 'Todas'}</td><td><button onClick={() => abrirCodigos(d.id)} className={`rounded-md px-2 py-1 font-bold ${Number(d.total_codigos) > 0 ? 'bg-blue-50 text-[#052a79]' : 'bg-amber-100 text-amber-800'}`}>{Number(d.total_codigos) > 0 ? `${d.total_codigos} códigos` : 'Vincular código'}</button><div className="mt-1 text-slate-400">{d.usos_realizados} usos</div></td><td><span className={`rounded-full px-2 py-1 font-bold ${d.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td><div className="flex items-center gap-3"><button onClick={() => abrirEditar(d.id)} className="flex items-center gap-1 font-bold text-[#052a79]"><Edit2 className="h-4 w-4" /> Editar</button><button onClick={() => abrirCodigos(d.id)} className="rounded-md bg-[#052a79] px-2 py-1 font-bold text-white">Códigos</button><button onClick={async()=>{await faregasDescuentosAdminApi.cambiarEstado(d.id,!d.activo);await cargar();}} className={d.activo?'font-bold text-red-600':'font-bold text-green-700'}>{d.activo?'Desactivar':'Activar'}</button></div></td></tr>)}</tbody>
+  return (
+    <div className="space-y-4 pb-8 descuentos-admin">
+      <style>{`.descuentos-admin .input{height:2.5rem;width:100%;border:1px solid #cbd5e1;border-radius:.5rem;padding:0 .75rem;font-size:.75rem;background:white;outline:none}.descuentos-admin .input:focus{border-color:#052A79;box-shadow:0 0 0 2px rgba(5,42,121,.08)}`}</style>
+      
+      {/* Header */}
+      <div className="flex justify-between items-start flex-col gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">Descuentos y Alianzas</h1>
+          <p className="text-sm text-gray-500">
+            Campañas, códigos, vigencias y servicios aplicables.
+          </p>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <input
+            type="text"
+            placeholder="Buscar por código, nombre o empresa..."
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79] md:col-span-2"
+            value={buscar}
+            onChange={e => setBuscar(e.target.value)}
+          />
+          <select 
+            value={estado} 
+            onChange={e => setEstado(e.target.value)} 
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79] md:col-span-1"
+          >
+            <option value="TODOS">Todos</option>
+            <option value="ACTIVOS">Activos</option>
+            <option value="INACTIVOS">Inactivos</option>
+            <option value="VENCIDOS">Vencidos</option>
+          </select>
+          <div className="flex gap-2 md:col-span-1">
+            <button className="rounded-lg bg-[#052A79] px-6 py-2 text-sm font-semibold text-white w-full md:w-auto">
+              Buscar
+            </button>
+            <button
+              onClick={() => { setBuscar(''); setEstado('TODOS'); }}
+              className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 w-full md:w-auto"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+      </div>
+
+
+
+      {/* Table Area */}
+      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-white">
+          <h2 className="font-semibold text-gray-800">Descuentos registrados</h2>
+          <button
+            onClick={abrirNuevo}
+            className="rounded-md bg-[#052A79] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-900 flex items-center gap-2"
+          >
+            + Crear Descuento
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Código / Nombre</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Empresa</th><th className="px-4 py-3">Regla</th><th className="px-4 py-3">Vigencia</th><th className="px-4 py-3">Sede</th><th className="px-4 py-3">Códigos de aplicación</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Acciones</th></tr></thead>
+          <tbody className="divide-y divide-gray-100">{loading ? <tr><td colSpan={9} className="p-12 text-center"><Loader2 className="mx-auto animate-spin" /></td></tr> : lista.length === 0 ? <tr><td colSpan={9} className="p-12 text-center text-slate-400">No hay descuentos registrados.</td></tr> : lista.map(d => <tr key={d.id} className="hover:bg-gray-50"><td className="px-4 py-3"><b className="text-[#052a79]">{d.codigo}</b><div>{d.nombre}</div></td><td className="px-4 py-3">{d.tipo}</td><td className="px-4 py-3">{d.empresa_aliada_nombre || '-'}</td><td className="px-4 py-3">{d.tipo_calculo === 'MONTO' ? 'S/ ' : ''}{Number(d.valor).toFixed(2)}{d.tipo_calculo === 'PORCENTAJE' ? '%' : ''}<div className="text-slate-400 text-xs">{d.total_servicios} servicios enlazados</div></td><td className="px-4 py-3">{fecha(d.fecha_inicio)} – {fecha(d.fecha_fin)}</td><td className="px-4 py-3">{d.planta_nombre || 'Todas'}</td><td className="px-4 py-3"><button onClick={() => abrirCodigos(d.id)} className={`rounded-md px-2 py-1 font-bold text-xs ${Number(d.total_codigos) > 0 ? 'bg-blue-50 text-[#052a79]' : 'bg-amber-100 text-amber-800'}`}>{Number(d.total_codigos) > 0 ? `${d.total_codigos} códigos` : 'Vincular código'}</button><div className="mt-1 text-slate-400 text-xs">{d.usos_realizados} usos</div></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 font-bold text-xs ${d.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td className="px-4 py-3"><div className="flex items-center gap-3"><button onClick={() => abrirEditar(d.id)} className="flex items-center gap-1 font-bold text-[#052a79]"><Edit2 className="h-4 w-4" /> Editar</button><button onClick={() => abrirCodigos(d.id)} className="rounded-md bg-[#052a79] px-2 py-1 font-bold text-white">Códigos</button><button onClick={async()=>{await faregasDescuentosAdminApi.cambiarEstado(d.id,!d.activo);await cargar();}} className={d.activo?'font-bold text-red-600':'font-bold text-green-700'}>{d.activo?'Desactivar':'Activar'}</button></div></td></tr>)}</tbody>
         </table>
       </div>
     </div>
@@ -118,7 +173,7 @@ export function DescuentosView() {
         <div className="overflow-x-auto p-4"><table className="w-full text-left text-xs"><thead className="bg-slate-50"><tr><th className="p-3">Código</th>{detalle.descuento.tipo === 'PLACA' && <th>Placa autorizada</th>}<th>Vigencia</th><th>Veces usadas / límite</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{detalle.codigos.length === 0 ? <tr><td colSpan={detalle.descuento.tipo === 'PLACA' ? 6 : 5} className="p-8 text-center font-semibold text-amber-700">Esta campaña todavía no puede utilizarse en Nuevo Certificado porque no tiene códigos vinculados.</td></tr> : detalle.codigos.map(c=><tr key={c.id} className="border-t"><td className="p-3 font-black text-[#052a79]">{c.codigo}</td>{detalle.descuento.tipo === 'PLACA' && <td>{c.placa||'Sin placa configurada'}</td>}<td>{c.fecha_inicio?`${fecha(c.fecha_inicio)} – ${fecha(c.fecha_fin)}`:'Campaña'}</td><td>{c.usos_realizados} de {c.max_usos}</td><td>{c.activo?'ACTIVO':'INACTIVO'}</td><td><button onClick={async()=>{await faregasDescuentosAdminApi.cambiarEstadoCodigo(c.id,!c.activo);await abrirCodigos(detalle.descuento.id);}} className={c.activo?'font-bold text-red-600':'font-bold text-green-700'}>{c.activo?'Desactivar':'Activar'}</button></td></tr>)}</tbody></table></div>
       </div>
     </div>}
-  </div>;
+  </div>);
 }
 
 function Campo({ titulo, children }: { titulo: string; children: ReactNode }) { return <label className="text-xs font-bold">{titulo.toUpperCase()}<div className="mt-1">{children}</div></label>; }
