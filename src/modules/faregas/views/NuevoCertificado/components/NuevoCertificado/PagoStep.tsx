@@ -10,6 +10,8 @@ interface PagoStepProps {
   handleAgregarPago: () => void;
   eliminarPago: (index: number) => void;
   totalPagar: number;
+  tarifaOriginal?: number;
+  descuento?: number;
   maestrosPago?: any;
 }
 
@@ -22,6 +24,8 @@ export function PagoStep({
   handleAgregarPago,
   eliminarPago,
   totalPagar,
+  tarifaOriginal = totalPagar,
+  descuento = 0,
   maestrosPago,
 }: PagoStepProps) {
 
@@ -181,6 +185,10 @@ export function PagoStep({
             <h4 className="font-bold text-[#052a79] mb-6 uppercase tracking-wider">Resumen de Cuenta</h4>
             
             <div className="space-y-4">
+              {descuento > 0 && <>
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">Tarifa original:</span><span className="font-bold text-slate-600">S/ {tarifaOriginal.toFixed(2)}</span></div>
+                <div className="flex justify-between items-center"><span className="text-emerald-700 font-semibold">Descuento aplicado:</span><span className="font-black text-emerald-700">- S/ {descuento.toFixed(2)}</span></div>
+              </>}
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-semibold">Total a pagar:</span>
                 <span className="text-slate-800 font-black text-xl">S/ {totalPagar.toFixed(2)}</span>

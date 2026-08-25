@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Tag, CheckCircle2, XCircle, Loader2, Info, User, Search } from 'lucide-react';
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useEffect, useRef } from 'react';
+import { Tag, CheckCircle2, XCircle, Loader2, User, Search } from 'lucide-react';
 import { consultarDescuento, aplicarDescuentoBorrador, quitarDescuentoBorrador, obtenerDescuentoBorrador } from '../../../../services/faregas-descuentos.api';
 import type { ConsultaDescuentoResult } from '../../../../services/faregas-descuentos.api';
 import Swal from 'sweetalert2';
@@ -15,6 +16,9 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
   const [loading, setLoading] = useState(false);
   const [resultadoConsulta, setResultadoConsulta] = useState<ConsultaDescuentoResult | null>(null);
   const [errorMensaje, setErrorMensaje] = useState<string | null>(null);
+  const [aplicado, setAplicado] = useState(false);
+  const onChangeRef = useRef(onDescuentoChange);
+  useEffect(() => { onChangeRef.current = onDescuentoChange; }, [onDescuentoChange]);
   
   // Si el componente está montado y tenemos un certificadoId, verificar si ya hay un borrador
   useEffect(() => {
@@ -27,7 +31,9 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
         if (cancelado) return;
         if (descuento) {
           setResultadoConsulta(descuento);
-          onDescuentoChange(descuento);
+          setCodigo(descuento.codigo);
+          setAplicado(true);
+          onChangeRef.current(descuento);
         }
       })
       .catch(err => console.error("Error al obtener borrador de descuento", err))
@@ -52,9 +58,10 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
     try {
       const res = await consultarDescuento(codigo.trim().toUpperCase(), certificadoId);
       setResultadoConsulta(res);
+      setAplicado(false);
       // No lo aplicamos todavía en DB, solo mostramos el resultado
-    } catch (error: any) {
-      setErrorMensaje(error.message || 'Error al consultar el descuento');
+    } catch (error: unknown) {
+      setErrorMensaje(error instanceof Error ? error.message : 'Error al consultar el descuento');
     } finally {
       setLoading(false);
     }
@@ -67,7 +74,8 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
     try {
       const res = await aplicarDescuentoBorrador(certificadoId, resultadoConsulta.codigo);
       setResultadoConsulta(res);
-      onDescuentoChange(res);
+      setAplicado(true);
+      onChangeRef.current(res);
       Swal.fire({
         icon: 'success',
         title: 'Descuento Aplicado',
@@ -75,9 +83,10 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
         timer: 2000,
         showConfirmButton: false
       });
-    } catch (error: any) {
-      Swal.fire('Error', error.message || 'No se pudo aplicar el descuento', 'error');
-      setErrorMensaje(error.message);
+    } catch (error: unknown) {
+      const mensaje = error instanceof Error ? error.message : 'No se pudo aplicar el descuento';
+      Swal.fire('Error', mensaje, 'error');
+      setErrorMensaje(mensaje);
     } finally {
       setLoading(false);
     }
@@ -90,10 +99,11 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
     try {
       await quitarDescuentoBorrador(certificadoId);
       setResultadoConsulta(null);
+      setAplicado(false);
       setCodigo('');
-      onDescuentoChange(null);
-    } catch (error: any) {
-      Swal.fire('Error', error.message || 'No se pudo quitar el descuento', 'error');
+      onChangeRef.current(null);
+    } catch (error: unknown) {
+      Swal.fire('Error', error instanceof Error ? error.message : 'No se pudo quitar el descuento', 'error');
     } finally {
       setLoading(false);
     }
@@ -107,7 +117,7 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
         </div>
         <div>
           <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">Descuentos y Convenios</h4>
-          <p className="text-xs font-semibold text-slate-500">Aplica códigos promocionales o alianzas corporativas</p>
+          <p className="text-xs font-semibold text-slate-500">Consulta uno de los códigos vinculados en Administración de Descuentos</p>
         </div>
       </div>
 
@@ -116,16 +126,16 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
           <input
             type="text"
             className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:bg-white focus:ring-0 placeholder:normal-case placeholder:font-medium disabled:opacity-50"
-            placeholder="Ingresa el código o DNI/RUC..."
+            placeholder="Ingresa el código de descuento..."
             value={codigo}
             onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-            disabled={disabled || loading || !!(resultadoConsulta && resultadoConsulta.importeFinal > 0 && !errorMensaje)} // Disable if already applied successfully
+            disabled={disabled || loading || aplicado}
           />
         </div>
         <button
           type="button"
           onClick={handleConsultar}
-          disabled={disabled || loading || !codigo.trim() || !!(resultadoConsulta && resultadoConsulta.importeFinal > 0 && !errorMensaje)}
+          disabled={disabled || loading || !codigo.trim() || aplicado}
           className="h-[42px] min-w-[140px] rounded-xl bg-[#052a79] px-6 font-bold text-white transition-all hover:bg-[#041c53] disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm shadow-[#052a79]/20"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
@@ -184,23 +194,8 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
               </div>
               
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleQuitar}
-                  disabled={loading}
-                  className="rounded-lg px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
-                >
-                  QUITAR
-                </button>
-                {/* Si aun no está aplicado (podemos verificarlo si la prop onDescuentoChange no fue llamada o por algún flag) */}
-                <button
-                  type="button"
-                  onClick={handleAplicar}
-                  disabled={loading}
-                  className="rounded-lg bg-[#052a79] px-6 py-2 text-xs font-black text-white hover:bg-[#041c53] shadow-md transition-colors"
-                >
-                  APLICAR
-                </button>
+                {aplicado ? <button type="button" onClick={handleQuitar} disabled={loading} className="rounded-lg px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">QUITAR</button>
+                  : <button type="button" onClick={handleAplicar} disabled={loading} className="rounded-lg bg-[#052a79] px-6 py-2 text-xs font-black text-white hover:bg-[#041c53] shadow-md transition-colors">APLICAR</button>}
               </div>
             </div>
           </div>

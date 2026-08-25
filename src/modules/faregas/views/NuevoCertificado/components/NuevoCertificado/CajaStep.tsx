@@ -17,6 +17,10 @@ interface CajaStepProps {
   formCaja: FormCajaState;
   setFormCaja: Dispatch<SetStateAction<FormCajaState>>;
   certificadoId?: number;
+  consultaRealizada: boolean;
+  consultando: boolean;
+  onConsultar: () => Promise<void>;
+  onInvalidarConsulta: () => void;
   onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
 }
 
@@ -42,6 +46,10 @@ export function CajaStep({
   formCaja,
   setFormCaja,
   certificadoId,
+  consultaRealizada,
+  consultando,
+  onConsultar,
+  onInvalidarConsulta,
   onDescuentoChange,
 }: CajaStepProps) {
   const [catalogo, setCatalogo] = useState<CatalogoFaregas | null>(null);
@@ -97,6 +105,7 @@ export function CajaStep({
   [catalogo, formCaja.tarifaCodigo]);
 
   const seleccionarServicio = (servicio: ServicioCatalogoFaregas) => {
+    onInvalidarConsulta();
     setFormCaja((actual) => ({
       ...actual,
       servicioCodigo: servicio.codigo,
@@ -175,11 +184,11 @@ export function CajaStep({
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Placa de Rodaje</label>
-              <input type="text" className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() }))} maxLength={7} />
+              <input type="text" className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => { onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() })); }} maxLength={7} />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Categoría Vehicular</label>
-              <select className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" value={formCaja.categoria} onChange={(event) => setFormCaja((actual) => ({ ...actual, categoria: event.target.value }))}>
+              <select className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" value={formCaja.categoria} onChange={(event) => { onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, categoria: event.target.value })); }}>
                 <option value="">-- Seleccionar --</option>
                 {['M1', 'M2', 'M3', 'N1', 'N2', 'N3', 'O1', 'O2', 'O3', 'O4'].map((categoria) => <option key={categoria} value={categoria}>{categoria}</option>)}
               </select>
@@ -189,6 +198,20 @@ export function CajaStep({
       )}
 
       {seleccion && (
+        <div className="flex justify-end border-t border-slate-100 pt-5">
+          <button
+            type="button"
+            onClick={() => void onConsultar()}
+            disabled={consultando || (seleccion.servicio.requiere_vehiculo && (!formCaja.placa || !formCaja.categoria))}
+            className="flex min-w-40 items-center justify-center gap-2 rounded-lg bg-[#052a79] px-6 py-3 text-xs font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            <Search className="h-4 w-4" />
+            {consultando ? 'CONSULTANDO…' : consultaRealizada ? 'CONSULTAR NUEVAMENTE' : 'CONSULTAR'}
+          </button>
+        </div>
+      )}
+
+      {seleccion && consultaRealizada && (
         <>
           <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
             <h4 className="mb-4 text-sm font-bold uppercase tracking-wider text-[#052a79]">Servicio Seleccionado</h4>

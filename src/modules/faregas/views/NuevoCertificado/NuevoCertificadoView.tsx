@@ -146,7 +146,6 @@ export function NuevoCertificadoView() {
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState('');
-  const creatingDraftRef = React.useRef(false);
   const autosaveQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
   const [maestrosVehiculo, setMaestrosVehiculo] = useState<MaestrosVehiculoResponse['data'] | null>(null);
@@ -439,6 +438,7 @@ export function NuevoCertificadoView() {
           setCurrentStepIndex(pasoRecuperado);
           setFurthestStepIndex(pasoRecuperado);
           setMinimumEditableStepIndex(pasoRecuperado >= 3 ? 3 : 0);
+          setIsConsultado(true);
           setLastSavedAt(res.data.fechaActualizacion ? new Date(res.data.fechaActualizacion) : new Date());
           setSaveError('');
         }
@@ -450,37 +450,6 @@ export function NuevoCertificadoView() {
     };
     cargarBorrador();
   }, [certificadoId]);
-
-  // El borrador nace cuando Datos Iniciales ya es válido, nunca al entrar vacío.
-  useEffect(() => {
-    if (loading || certificadoId || creatingDraftRef.current || validarDatosIniciales(formCaja).length > 0) return;
-    const timer = window.setTimeout(async () => {
-      creatingDraftRef.current = true;
-      setIsSavingStep(true);
-      setSaveError('');
-      try {
-        const response = await faregasCertificadosApi.crearBorrador({
-          tipoCertificadoClave: formCaja.tipoCertificado,
-          tarifaCodigo: formCaja.tarifaCodigo,
-          placa: formCaja.placa,
-          categoria: formCaja.categoria,
-          observaciones: '',
-        });
-        const nuevoId = Number(response?.data?.id);
-        if (!nuevoId) throw new Error('El servidor no devolvió el identificador del borrador.');
-        setCertificadoId(nuevoId);
-        setLastSavedAt(new Date());
-        setFurthestStepIndex(1);
-        navigate(`/faregas/certificados/${nuevoId}/continuar`, { replace: true });
-      } catch (e: any) {
-        setSaveError(e.message || 'No se pudo crear el borrador.');
-      } finally {
-        creatingDraftRef.current = false;
-        setIsSavingStep(false);
-      }
-    }, 900);
-    return () => window.clearTimeout(timer);
-  }, [formCaja, certificadoId, loading, navigate]);
 
   const cargarMaestros = async () => {
     try {
@@ -655,6 +624,53 @@ export function NuevoCertificadoView() {
           text: 'El borrador fue creado. Puede completar los datos del vehículo manualmente.',
         });
       }
+    }
+  };
+
+  const consultarDatosIniciales = async () => {
+    const errores = validarDatosIniciales(formCaja);
+    if (mostrarErroresPaso(errores)) return;
+
+    setIsSavingStep(true);
+    setSaveError('');
+    try {
+      let idBorrador = certificadoId;
+      if (!idBorrador) {
+        const response = await faregasCertificadosApi.crearBorrador({
+          tipoCertificadoClave: formCaja.tipoCertificado,
+          tarifaCodigo: formCaja.tarifaCodigo,
+          placa: formCaja.placa,
+          categoria: formCaja.categoria,
+          observaciones: '',
+        });
+        idBorrador = Number(response?.data?.id);
+        if (!idBorrador) throw new Error('El servidor no devolvió el identificador del borrador.');
+        setCertificadoId(idBorrador);
+        navigate(`/faregas/certificados/${idBorrador}/continuar`, { replace: true });
+      } else {
+        await faregasCertificadosApi.actualizarBorrador(idBorrador, { tarifaCodigo: formCaja.tarifaCodigo });
+        await faregasCertificadosApi.guardarVehiculoBorrador(idBorrador, {
+          placa: formCaja.placa,
+          categoria: formCaja.categoria,
+        });
+      }
+
+      await consultarVehiculoFarenet();
+      const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
+      if (tarifaResponse.data?.importeTotal) {
+        setPrecioTotal(Number(tarifaResponse.data.importeTotal));
+        setPrecioSubtotal(Number(tarifaResponse.data.importeTotal));
+      }
+      setCurrentStepIndex(0);
+      setFurthestStepIndex((actual) => Math.max(actual, 0));
+      setIsConsultado(true);
+      setLastSavedAt(new Date());
+    } catch (e: any) {
+      setIsConsultado(false);
+      setSaveError(e.message || 'No se pudieron consultar los datos iniciales.');
+      Swal.fire('No se pudo consultar', e.message || 'Revise los datos ingresados.', 'error');
+    } finally {
+      setIsSavingStep(false);
     }
   };
 
@@ -885,6 +901,10 @@ export function NuevoCertificadoView() {
   const irSiguientePaso = async () => {
     if (isSavingStep) return;
     if (currentStepIndex === 0) {
+      if (!isConsultado) {
+        Swal.fire('Consulta requerida', 'Primero presione Consultar para validar los datos iniciales.', 'info');
+        return;
+      }
       if (mostrarErroresPaso(validarDatosIniciales(formCaja))) return;
       setIsSavingStep(true);
       try {
@@ -912,7 +932,6 @@ export function NuevoCertificadoView() {
         } else if (formCaja.tipoCertificado === 'GNV_ANUAL') {
           setFormGnv((prev: any) => ({ ...prev, modalidad: formCaja.modalidadCertificado }));
         }
-        await consultarVehiculoFarenet();
         const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
         if (tarifaResponse.data?.importeTotal) {
           setPrecioTotal(Number(tarifaResponse.data.importeTotal));
@@ -1334,10 +1353,21 @@ export function NuevoCertificadoView() {
             formCaja={formCaja}
             setFormCaja={setFormCaja}
             certificadoId={certificadoId}
+            consultaRealizada={isConsultado}
+            consultando={isSavingStep}
+            onConsultar={consultarDatosIniciales}
+            onInvalidarConsulta={() => {
+              setIsConsultado(false);
+              setDescuento(0);
+              setPrecioTotal(precioSubtotal);
+            }}
             onDescuentoChange={(desc) => {
                if(desc) {
+                 setPrecioSubtotal(desc.tarifaOriginal);
+                 setDescuento(desc.importeDescuento);
                  setPrecioTotal(desc.importeFinal);
                } else {
+                 setDescuento(0);
                  setPrecioTotal(precioSubtotal);
                }
             }}
@@ -1384,6 +1414,8 @@ export function NuevoCertificadoView() {
             handleAgregarPago={handleAgregarPago}
             eliminarPago={eliminarPago}
             totalPagar={precioTotal}
+            tarifaOriginal={precioSubtotal}
+            descuento={descuento}
             maestrosPago={maestrosPago}
           />
         )}
@@ -1433,6 +1465,8 @@ export function NuevoCertificadoView() {
         <div className="flex flex-col items-end gap-1.5">
           {currentStepIndex === STEPS.length - 1 ? (
             !isEmitido ? <span className="text-xs font-semibold text-slate-500">Revise la validación y emita desde el panel superior.</span> : <span className="text-xs font-bold text-green-700">Certificado emitido.</span>
+          ) : currentStepIndex === 0 && !isConsultado ? (
+            <span className="text-xs font-semibold text-slate-500">Complete los datos y presione Consultar.</span>
           ) : (
             <button
               type="button"

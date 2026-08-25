@@ -1,4 +1,4 @@
-import { faregasFetch, faregasFetchWithStatus } from './faregas-http-client';
+import { faregasFetch } from './faregas-http-client';
 
 export interface ConsultaDescuentoResult {
   descuentoId: number;
@@ -14,6 +14,39 @@ export interface ConsultaDescuentoResult {
   importeFinal: number;
   fechaFin: string;
   usosDisponibles: number;
+}
+
+export interface DescuentoAdmin {
+  id: number;
+  codigo: string;
+  nombre: string;
+  tipo: 'ALIANZA' | 'CUPON' | 'PLACA';
+  empresa_aliada_ruc?: string;
+  empresa_aliada_nombre?: string;
+  tipo_calculo: 'MONTO' | 'PORCENTAJE';
+  valor: number;
+  fecha_inicio: string;
+  fecha_fin: string;
+  planta_key?: string;
+  planta_nombre?: string;
+  activo: boolean;
+  total_servicios: number;
+  total_codigos: number;
+  usos_realizados: number;
+}
+
+export interface DescuentoFormData {
+  codigo: string;
+  nombre: string;
+  tipo: string;
+  empresaAliadaRuc?: string;
+  empresaAliadaNombre?: string;
+  tipoCalculo: string;
+  valor: number | string;
+  fechaInicio: string;
+  fechaFin: string;
+  plantaKey?: string;
+  servicioIds: number[];
 }
 
 export const consultarDescuento = async (codigo: string, certificadoId: number): Promise<ConsultaDescuentoResult> => {
@@ -37,20 +70,16 @@ export const quitarDescuentoBorrador = async (certificadoId: number): Promise<vo
 };
 
 export const obtenerDescuentoBorrador = async (certificadoId: number): Promise<ConsultaDescuentoResult | null> => {
-  // Manejamos status para el caso 204 (No Content) que indica que no hay reserva
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/faregas/descuentos/borradores/${certificadoId}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${sessionStorage.getItem('faregasAccessToken')}`,
-    },
-  });
+  return faregasFetch(`/descuentos/borradores/${certificadoId}`);
+};
 
-  if (response.status === 204) return null;
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || 'Error al obtener descuento borrador');
-  }
-
-  return response.json();
+export const faregasDescuentosAdminApi = {
+  listar: (buscar = '', estado = 'TODOS') => faregasFetch(`/descuentos?${new URLSearchParams({ buscar, estado })}`),
+  maestros: () => faregasFetch('/descuentos/maestros'),
+  detalle: (id: number) => faregasFetch(`/descuentos/${id}`),
+  crear: (data: DescuentoFormData) => faregasFetch('/descuentos', { method: 'POST', body: JSON.stringify(data) }),
+  actualizar: (id: number, data: DescuentoFormData) => faregasFetch(`/descuentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  cambiarEstado: (id: number, activo: boolean) => faregasFetch(`/descuentos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
+  crearCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/codigos`, { method: 'POST', body: JSON.stringify(data) }),
+  cambiarEstadoCodigo: (id: number, activo: boolean) => faregasFetch(`/descuentos/codigos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
 };
