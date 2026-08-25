@@ -109,11 +109,8 @@ export const faregasConfigApi = {
     await api.put(`/api/faregas/config/empresas/${encodeURIComponent(key)}`, empresa);
   },
 
-  cambiarEstadoEmpresa: async (key: string, activo: boolean, empresaReemplazoKey?: string): Promise<void> => {
-    await api.put(`/api/faregas/config/empresas/${encodeURIComponent(key)}/estado`, {
-      activo,
-      empresa_reemplazo_key: empresaReemplazoKey || null
-    });
+  cambiarEstadoEmpresa: async (key: string, activo: boolean): Promise<void> => {
+    await api.put(`/api/faregas/config/empresas/${encodeURIComponent(key)}/estado`, { activo });
   },
 
   asignarEmpresaSede: async (sedeKey: string, empresaKey: string): Promise<void> => {

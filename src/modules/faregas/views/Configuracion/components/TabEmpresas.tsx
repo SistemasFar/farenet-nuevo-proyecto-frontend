@@ -14,7 +14,6 @@ export default function TabEmpresas() {
   const [error, setError] = useState('');
   const [editando, setEditando] = useState<EmpresaFaregas | null>(null);
   const [creando, setCreando] = useState(false);
-  const [desactivando, setDesactivando] = useState<EmpresaFaregas | null>(null);
 
   const cargar = async () => {
     try {
@@ -67,10 +66,6 @@ export default function TabEmpresas() {
   };
 
   const cambiarEstado = async (empresa: EmpresaFaregas) => {
-    if (empresa.activo && empresa.total_sedes > 0) {
-      setDesactivando(empresa);
-      return;
-    }
     const accion = empresa.activo ? 'desactivar' : 'activar';
     if (!confirm(`¿Deseas ${accion} la empresa ${empresa.nombre}?`)) return;
     try {
@@ -110,7 +105,6 @@ export default function TabEmpresas() {
 
     {editando && <EmpresaModal empresa={editando} onClose={() => setEditando(null)} onSaved={async () => { setEditando(null); await cargar(); }} />}
     {creando && <NuevaEmpresaModal onClose={() => setCreando(false)} onSaved={async () => { setCreando(false); await cargar(); }} />}
-    {desactivando && <DesactivarEmpresaModal empresa={desactivando} empresas={empresas} onClose={() => setDesactivando(null)} onSaved={async () => { setDesactivando(null); await cargar(); }} />}
   </div>;
 }
 
@@ -125,21 +119,6 @@ function NuevaEmpresaModal({ onClose, onSaved }: { onClose: () => void; onSaved:
     finally { setSaving(false); }
   };
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl"><h3 className="text-xl font-bold text-[#052A79]">Nueva Empresa</h3><p className="mb-5 text-sm text-slate-500">La empresa será propia de FAREGAS y se creará activa.</p><form onSubmit={guardar} className="space-y-4"><div className="grid gap-4 md:grid-cols-2"><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Código</label><input required maxLength={30} value={form.key} onChange={(event) => setForm({ ...form, key: event.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '') })} className="w-full rounded-lg border border-slate-300 p-2.5 font-mono font-bold" placeholder="EMPRESA_NUEVA" /></div><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">RUC</label><input inputMode="numeric" maxLength={11} value={form.ruc} onChange={(event) => setForm({ ...form, ruc: event.target.value.replace(/\D/g, '') })} className="w-full rounded-lg border border-slate-300 p-2.5 font-mono" /></div></div><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Razón social</label><input required value={form.nombre} onChange={(event) => setForm({ ...form, nombre: event.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5" /></div><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Dirección</label><input value={form.direccion} onChange={(event) => setForm({ ...form, direccion: event.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5" /></div><div className="grid gap-4 md:grid-cols-2"><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Teléfono</label><input value={form.telefono} onChange={(event) => setForm({ ...form, telefono: event.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5" /></div><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Cuenta Banco de la Nación</label><input value={form.cuenta_banco_nacion} onChange={(event) => setForm({ ...form, cuenta_banco_nacion: event.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 font-mono" /></div></div>{error && <div className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}<div className="flex justify-end gap-3 border-t pt-4"><button type="button" disabled={saving} onClick={onClose} className="rounded-lg px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button disabled={saving} className="rounded-lg bg-[#052A79] px-5 py-2 font-bold text-white disabled:opacity-50">{saving ? 'Creando...' : 'Crear Empresa'}</button></div></form></div></div>;
-}
-
-function DesactivarEmpresaModal({ empresa, empresas, onClose, onSaved }: { empresa: EmpresaFaregas; empresas: EmpresaFaregas[]; onClose: () => void; onSaved: () => Promise<void> }) {
-  const opciones = empresas.filter((item) => item.activo && item.key !== empresa.key);
-  const [reemplazo, setReemplazo] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const guardar = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!reemplazo) { setError('Debe seleccionar la empresa que recibirá las sedes.'); return; }
-    try { setSaving(true); setError(''); await faregasConfigApi.cambiarEstadoEmpresa(empresa.key, false, reemplazo); await onSaved(); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Error al desactivar empresa'); }
-    finally { setSaving(false); }
-  };
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl"><h3 className="text-xl font-bold text-red-700">Desactivar Empresa</h3><p className="mt-2 text-sm text-slate-600"><strong>{empresa.nombre}</strong> tiene {empresa.total_sedes} {empresa.total_sedes === 1 ? 'sede asignada' : 'sedes asignadas'}. Para desactivarla debes transferirlas a otra empresa activa.</p><form onSubmit={guardar} className="mt-5 space-y-4"><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Empresa que recibirá las sedes</label><select required value={reemplazo} onChange={(event) => setReemplazo(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white p-2.5"><option value="">-- Seleccionar empresa --</option>{opciones.map((item) => <option key={item.key} value={item.key}>{item.nombre}</option>)}</select></div><div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">La reasignación de las sedes y la desactivación se realizarán juntas. Si alguna operación falla, no se aplicará ningún cambio.</div>{error && <div className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}<div className="flex justify-end gap-3 border-t pt-4"><button type="button" disabled={saving} onClick={onClose} className="rounded-lg px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button disabled={saving || opciones.length === 0} className="rounded-lg bg-red-600 px-5 py-2 font-bold text-white disabled:opacity-50">{saving ? 'Procesando...' : 'Reasignar y Desactivar'}</button></div></form></div></div>;
 }
 
 function EmpresaModal({ empresa, onClose, onSaved }: { empresa: EmpresaFaregas; onClose: () => void; onSaved: () => Promise<void> }) {
