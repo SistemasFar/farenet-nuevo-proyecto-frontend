@@ -22,6 +22,7 @@ import { NuevoCertificadoView as FaregasNuevoCertificadoView } from './modules/f
 import { UsuariosView as FaregasUsuariosView } from './modules/faregas/views/Usuarios/UsuariosView';
 import { AuditoriaView as FaregasAuditoriaView } from './modules/faregas/views/Auditoria/AuditoriaView';
 import { FaregasConfiguracionView } from './modules/faregas/views/Configuracion/FaregasConfiguracionView';
+import { DescuentosView as FaregasDescuentosView } from './modules/faregas/views/Descuentos/DescuentosView';
 
 import { useEmpresa } from './context/EmpresaContext';
 
@@ -563,6 +564,21 @@ export default function App() {
                     const userPerms = fUser?.permisos || [];
                     return userPerms.includes('MENU_AUDITORIA') ? (
                       <FaregasAuditoriaView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                } 
+              />
+              <Route 
+                path="descuentos" 
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    const pId = String(fUser?.perfilId || fUser?.perfil_id || '').toLowerCase();
+                    return userPerms.includes('MENU_DESCUENTOS') || pId === 'sistemas' ? (
+                      <FaregasDescuentosView />
                     ) : (
                       <ForbiddenView />
                     );

@@ -254,6 +254,9 @@ export function Sidebar({
   let menuVisible = menuItems.filter((item) => {
     // Si estamos en Faregas, validamos contra los permisos reales del perfil
     if (isFaregas) {
+      if (item.key === 'descuentos') {
+        return permisos.includes('MENU_DESCUENTOS') || perfilId?.toLowerCase() === 'sistemas';
+      }
       if (item.key === 'usuarios') {
         return permisos.includes('MENU_USUARIOS');
       }
@@ -351,7 +354,7 @@ export function Sidebar({
           <ul className="flex flex-col gap-1.5">
             {menuVisible.map((item) => {
               const isActive = activeMenu === item.key;
-              const linkPath = isFaregas ? (item.key === 'usuarios' ? '/faregas/usuarios' : `/faregas${item.path}`) : item.path;
+              const linkPath = isFaregas ? (item.key === 'usuarios' ? '/faregas/usuarios' : item.key === 'descuentos' ? '/faregas/descuentos' : `/faregas${item.path}`) : item.path;
 
               return (
                 <li key={item.key}>

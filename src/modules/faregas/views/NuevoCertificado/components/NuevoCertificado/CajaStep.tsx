@@ -8,11 +8,16 @@ import type {
   ServicioCatalogoFaregas,
 } from '../../../../types/faregas-api';
 
+import type { ConsultaDescuentoResult } from '../../../../services/faregas-descuentos.api';
+import { ConsultaDescuento } from './ConsultaDescuento';
+
 interface CajaStepProps {
   plantaSeleccionada: string;
   plantaNombre: string;
   formCaja: FormCajaState;
   setFormCaja: Dispatch<SetStateAction<FormCajaState>>;
+  certificadoId?: number;
+  onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
 }
 
 const normalizarBusqueda = (valor: string) => valor
@@ -36,6 +41,8 @@ export function CajaStep({
   plantaNombre,
   formCaja,
   setFormCaja,
+  certificadoId,
+  onDescuentoChange,
 }: CajaStepProps) {
   const [catalogo, setCatalogo] = useState<CatalogoFaregas | null>(null);
   const [categoriaActiva, setCategoriaActiva] = useState('TODOS');
@@ -182,15 +189,22 @@ export function CajaStep({
       )}
 
       {seleccion && (
-        <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-          <h4 className="mb-4 text-sm font-bold uppercase tracking-wider text-[#052a79]">Servicio Seleccionado</h4>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div><span className="block text-xs font-semibold text-blue-600">Servicio</span><span className="font-bold text-slate-800">{seleccion.servicio.nombre}</span></div>
-            <div><span className="block text-xs font-semibold text-blue-600">Categoría</span><span className="font-bold text-slate-800">{seleccion.categoria.nombre}</span></div>
-            <div><span className="block text-xs font-semibold text-blue-600">Sede</span><span className="font-bold text-slate-800">{catalogo?.sede.nombre || plantaNombre}</span></div>
-            <div><span className="block text-xs font-semibold text-blue-600">Precio</span><span className="text-lg font-black text-[#052a79]">S/ {seleccion.servicio.tarifa.precio.toFixed(2)}</span></div>
-          </div>
-        </section>
+        <>
+          <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+            <h4 className="mb-4 text-sm font-bold uppercase tracking-wider text-[#052a79]">Servicio Seleccionado</h4>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div><span className="block text-xs font-semibold text-blue-600">Servicio</span><span className="font-bold text-slate-800">{seleccion.servicio.nombre}</span></div>
+              <div><span className="block text-xs font-semibold text-blue-600">Categoría</span><span className="font-bold text-slate-800">{seleccion.categoria.nombre}</span></div>
+              <div><span className="block text-xs font-semibold text-blue-600">Sede</span><span className="font-bold text-slate-800">{catalogo?.sede.nombre || plantaNombre}</span></div>
+              <div><span className="block text-xs font-semibold text-blue-600">Precio</span><span className="text-lg font-black text-[#052a79]">S/ {seleccion.servicio.tarifa.precio.toFixed(2)}</span></div>
+            </div>
+          </section>
+
+          <ConsultaDescuento
+            certificadoId={certificadoId}
+            onDescuentoChange={onDescuentoChange}
+          />
+        </>
       )}
       <span className="sr-only">Sede activa: {plantaSeleccionada}</span>
     </div>

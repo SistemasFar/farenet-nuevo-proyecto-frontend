@@ -1333,6 +1333,14 @@ export function NuevoCertificadoView() {
             plantaNombre={plantaNombre}
             formCaja={formCaja}
             setFormCaja={setFormCaja}
+            certificadoId={certificadoId}
+            onDescuentoChange={(desc) => {
+               if(desc) {
+                 setPrecioTotal(desc.importeFinal);
+               } else {
+                 setPrecioTotal(precioSubtotal);
+               }
+            }}
           />
         )}
         {STEPS[currentStepIndex].id === 'vehiculo' && (

@@ -63,7 +63,7 @@ export function MainLayout({
   else if (path.startsWith('/maestros/recibos')) activeMenu = 'recibos';
   else if (path.startsWith('/maestros/usuarios') || path.startsWith('/faregas/usuarios')) activeMenu = 'usuarios';
   else if (path.startsWith('/maestros/empresas')) activeMenu = 'empresas';
-  else if (path.startsWith('/maestros/descuentos')) activeMenu = 'descuentos';
+  else if (path.startsWith('/maestros/descuentos') || path.startsWith('/faregas/descuentos')) activeMenu = 'descuentos';
   else if (path.startsWith('/auditoria') || path.startsWith('/faregas/auditoria')) activeMenu = 'auditoria';
   else if (path.startsWith('/configuracion') || path.startsWith('/faregas/configuracion')) activeMenu = 'configuracion';
 
