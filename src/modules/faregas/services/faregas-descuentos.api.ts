@@ -7,8 +7,9 @@ export interface ConsultaDescuentoResult {
   nombre: string;
   tipo: 'ALIANZA' | 'CUPON' | 'PLACA';
   empresaAliada?: string;
-  tipoCalculo: 'MONTO' | 'PORCENTAJE';
+  tipoCalculo: 'FLAT' | 'MONTO' | 'PORCENTAJE';
   valor: number;
+  formaPago: 'CONTADO' | 'CREDITO';
   tarifaOriginal: number;
   importeDescuento: number;
   importeFinal: number;
@@ -23,12 +24,8 @@ export interface DescuentoAdmin {
   tipo: 'ALIANZA' | 'CUPON' | 'PLACA';
   empresa_aliada_ruc?: string;
   empresa_aliada_nombre?: string;
-  tipo_calculo: 'MONTO' | 'PORCENTAJE';
-  valor: number;
   fecha_inicio: string;
   fecha_fin: string;
-  planta_key?: string;
-  planta_nombre?: string;
   activo: boolean;
   total_servicios: number;
   total_codigos: number;
@@ -36,17 +33,12 @@ export interface DescuentoAdmin {
 }
 
 export interface DescuentoFormData {
-  codigo: string;
   nombre: string;
   tipo: string;
   empresaAliadaRuc?: string;
   empresaAliadaNombre?: string;
-  tipoCalculo: string;
-  valor: number | string;
   fechaInicio: string;
   fechaFin: string;
-  plantaKey?: string;
-  servicioIds: number[];
 }
 
 export const consultarDescuento = async (codigo: string, certificadoId: number): Promise<ConsultaDescuentoResult> => {
@@ -81,5 +73,6 @@ export const faregasDescuentosAdminApi = {
   actualizar: (id: number, data: DescuentoFormData) => faregasFetch(`/descuentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cambiarEstado: (id: number, activo: boolean) => faregasFetch(`/descuentos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
   crearCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/codigos`, { method: 'POST', body: JSON.stringify(data) }),
+  actualizarCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/codigos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cambiarEstadoCodigo: (id: number, activo: boolean) => faregasFetch(`/descuentos/codigos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
 };
