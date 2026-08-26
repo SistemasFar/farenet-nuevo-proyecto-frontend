@@ -153,7 +153,7 @@ export function NuevoCertificadoView() {
   const [error, setError] = useState('');
 
   const [isConsultado, setIsConsultado] = useState(false);
-  
+
   // Estados de vehiculo y facturacion (comunes)
   const [showAnularModal, setShowAnularModal] = useState(false);
   const [showCamposVaciosModal, setShowCamposVaciosModal] = useState(false);
@@ -203,7 +203,7 @@ export function NuevoCertificadoView() {
   const [formGlp, setFormGlp] = useState<any>({});
   const [formGnv, setFormGnv] = useState<any>({});
   const [formConformidad, setFormConformidad] = useState<any>({});
-  
+
   const [titulares, setTitulares] = useState<TitularState[]>([]);
   const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
   const [talleres, setTalleres] = useState<any[]>([]);
@@ -332,10 +332,10 @@ export function NuevoCertificadoView() {
               categoria: res.data.vehiculo?.categoria || prev.categoria,
             }));
           }
-          
+
           if (res.data.vehiculo) {
-             setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(res.data.vehiculo) }));
-             setVehiculoOrigen('BORRADOR');
+            setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(res.data.vehiculo) }));
+            setVehiculoOrigen('BORRADOR');
           }
           if (res.data.titulares) setTitulares(res.data.titulares.map(mapTitularBorrador));
 
@@ -591,7 +591,7 @@ export function NuevoCertificadoView() {
 
 
 
-  
+
 
   const consultarVehiculoFarenet = async () => {
     if (!formCaja.placa.trim()) return;
@@ -1362,14 +1362,14 @@ export function NuevoCertificadoView() {
               setPrecioTotal(precioSubtotal);
             }}
             onDescuentoChange={(desc) => {
-               if(desc) {
-                 setPrecioSubtotal(desc.tarifaOriginal);
-                 setDescuento(desc.importeDescuento);
-                 setPrecioTotal(desc.importeFinal);
-               } else {
-                 setDescuento(0);
-                 setPrecioTotal(precioSubtotal);
-               }
+              if (desc) {
+                setPrecioSubtotal(desc.tarifaOriginal);
+                setDescuento(desc.importeDescuento);
+                setPrecioTotal(desc.importeFinal);
+              } else {
+                setDescuento(0);
+                setPrecioTotal(precioSubtotal);
+              }
             }}
           />
         )}

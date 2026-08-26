@@ -29,6 +29,7 @@ export interface DescuentoAdmin {
   activo: boolean;
   total_servicios: number;
   total_codigos: number;
+  nombres_codigos?: string;
   usos_realizados: number;
 }
 
@@ -63,6 +64,12 @@ export const quitarDescuentoBorrador = async (certificadoId: number): Promise<vo
 
 export const obtenerDescuentoBorrador = async (certificadoId: number): Promise<ConsultaDescuentoResult | null> => {
   return faregasFetch(`/descuentos/borradores/${certificadoId}`);
+};
+
+export const autoAplicarDescuentoPlaca = async (certificadoId: number): Promise<ConsultaDescuentoResult | null> => {
+  return faregasFetch(`/descuentos/borradores/${certificadoId}/auto-placa`, {
+    method: 'POST',
+  });
 };
 
 export const faregasDescuentosAdminApi = {

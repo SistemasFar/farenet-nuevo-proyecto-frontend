@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef } from 'react';
 import { Tag, CheckCircle2, XCircle, Loader2, User, Search } from 'lucide-react';
-import { consultarDescuento, aplicarDescuentoBorrador, quitarDescuentoBorrador, obtenerDescuentoBorrador } from '../../../../services/faregas-descuentos.api';
+import { consultarDescuento, aplicarDescuentoBorrador, quitarDescuentoBorrador, obtenerDescuentoBorrador, autoAplicarDescuentoPlaca } from '../../../../services/faregas-descuentos.api';
 import type { ConsultaDescuentoResult } from '../../../../services/faregas-descuentos.api';
 import Swal from 'sweetalert2';
 
@@ -27,13 +27,33 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
     
     setLoading(true);
     obtenerDescuentoBorrador(certificadoId)
-      .then(descuento => {
+      .then(async (descuento) => {
         if (cancelado) return;
         if (descuento) {
           setResultadoConsulta(descuento);
           setCodigo(descuento.codigo);
           setAplicado(true);
           onChangeRef.current(descuento);
+        } else {
+          try {
+            const auto = await autoAplicarDescuentoPlaca(certificadoId);
+            if (cancelado) return;
+            if (auto) {
+              setResultadoConsulta(auto);
+              setCodigo(auto.codigo);
+              setAplicado(true);
+              onChangeRef.current(auto);
+              Swal.fire({
+                icon: 'success',
+                title: 'Descuento Automático',
+                text: `Se auto-aplicó el código ${auto.codigo} por coincidencia de placa.`,
+                timer: 3000,
+                showConfirmButton: false
+              });
+            }
+          } catch (e) {
+            console.error("Error al auto-aplicar descuento por placa", e);
+          }
         }
       })
       .catch(err => console.error("Error al obtener borrador de descuento", err))
