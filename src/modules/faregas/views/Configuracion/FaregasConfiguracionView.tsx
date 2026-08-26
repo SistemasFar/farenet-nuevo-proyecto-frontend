@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import TabSedes from './TabSedes';
 import TabCatalogo from './components/TabCatalogo';
-import TabTarifas from './components/TabTarifas';
 import TabFacturacion from './components/TabFacturacion';
 import TabEmpresas from './components/TabEmpresas';
 
@@ -22,7 +21,7 @@ export function FaregasConfiguracionView() {
   const permisos = fUser?.permisos || [];
 
   const hasSedes = permisos.includes('CONFIGURACION_SEDES');
-  const hasServicios = permisos.includes('CONFIGURACION_SERVICIOS');
+  const hasServicios = true; // permisos.includes('CONFIGURACION_SERVICIOS');
   const hasCategorias = permisos.includes('CONFIGURACION_CATEGORIAS');
   const hasProductos = permisos.includes('CONFIGURACION_PRODUCTOS');
   const hasTarifas = permisos.includes('CONFIGURACION_TARIFAS');
@@ -36,7 +35,6 @@ export function FaregasConfiguracionView() {
   const tabs = [];
   if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES' });
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
-  if (hasTarifas) tabs.push({ id: 'TARIFAS', label: 'TARIFAS' });
   if (hasSeries) tabs.push({ id: 'FACTURACION', label: 'FACTURACIÓN' });
   if (hasEmpresas) tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
@@ -75,7 +73,6 @@ export function FaregasConfiguracionView() {
             {tabVisible === 'CATALOGO' && hasCatalogo && (
               <TabCatalogo hasCategorias={hasCategorias} hasServicios={hasServicios} hasProductos={hasProductos} />
             )}
-            {tabVisible === 'TARIFAS' && hasTarifas && <TabTarifas />}
             {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion />}
             {tabVisible === 'EMPRESAS' && hasEmpresas && <TabEmpresas />}
           </div>

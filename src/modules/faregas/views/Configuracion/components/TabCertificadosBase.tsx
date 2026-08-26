@@ -3,6 +3,7 @@ import {
   faregasConfigApi,
   type ServicioConfiguracionFaregas
 } from '../../../services/faregas-config.api';
+import { AsignarSedesModal } from './AsignarSedesModal';
 
 interface CertificadoBase {
   id: string;
@@ -21,22 +22,33 @@ const CERTIFICADOS_BASE: CertificadoBase[] = [
 
 export default function TabCertificadosBase() {
   const [servicios, setServicios] = useState<ServicioConfiguracionFaregas[]>([]);
+  const [sedesAsignadas, setSedesAsignadas] = useState<Record<number, { key: string; nombre: string; tarifa_id: number; precio: number; producto_facturacion_id: number | null; activo: boolean }[]>>({});
+  const [todasLasSedes, setTodasLasSedes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  const [selectedServicio, setSelectedServicio] = useState<{ id: number; nombre: string } | null>(null);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [dataServicios, dataSedes, sedesDisponibles] = await Promise.all([
+        faregasConfigApi.getServicios(),
+        faregasConfigApi.obtenerSedesPorServicio().catch(() => ({})),
+        faregasConfigApi.obtenerSedes().catch(() => [])
+      ]);
+      setServicios(dataServicios);
+      setSedesAsignadas(dataSedes);
+      setTodasLasSedes(sedesDisponibles.filter(s => s.activo));
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar certificados base');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelado = false;
-    void faregasConfigApi.getServicios()
-      .then((data) => {
-        if (!cancelado) setServicios(data);
-      })
-      .catch((err) => {
-        if (!cancelado) setError(err instanceof Error ? err.message : 'Error al cargar certificados base');
-      })
-      .finally(() => {
-        if (!cancelado) setLoading(false);
-      });
-    return () => { cancelado = true; };
+    loadData();
   }, []);
 
   const certificados = useMemo(() => CERTIFICADOS_BASE.map((certificado) => ({
@@ -49,7 +61,7 @@ export default function TabCertificadosBase() {
   })), [servicios]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 relative">
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
         <p className="mb-1 font-semibold">Certificados base estructurales</p>
         <p>
@@ -98,20 +110,58 @@ export default function TabCertificadosBase() {
                   <p className="text-sm italic text-gray-400">Sin servicios asociados actualmente.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {certificado.servicios.map((servicio) => (
-                      <li key={servicio.id} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2">
-                        <span className="font-mono text-xs font-bold text-gray-700">{servicio.codigo}</span>
-                        {!servicio.activo && (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">INACTIVO</span>
-                        )}
-                      </li>
-                    ))}
+                    {certificado.servicios.map((servicio) => {
+                      const sedes = (sedesAsignadas[servicio.id] || []).filter(s => s.activo);
+                      return (
+                        <li key={servicio.id} className="flex flex-col gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-mono text-xs font-bold text-gray-700">{servicio.codigo}</span>
+                            <div className="flex items-center gap-2">
+                              {!servicio.activo && (
+                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">INACTIVO</span>
+                              )}
+                              <button
+                                onClick={() => setSelectedServicio({ id: servicio.id, nombre: servicio.codigo })}
+                                className="text-[10px] font-bold bg-[#052A79] text-white px-2 py-1 rounded hover:bg-blue-800 transition-colors"
+                              >
+                                Asignar Sedes
+                              </button>
+                            </div>
+                          </div>
+                          {sedes.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {sedes.map(sede => (
+                                <span key={sede.key} className="rounded border border-blue-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 shadow-sm">
+                                  {sede.nombre}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] italic text-gray-400">Sin sedes asignadas</div>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
             </article>
           ))}
         </div>
+      )}
+
+      {selectedServicio && (
+        <AsignarSedesModal
+          servicioId={selectedServicio.id}
+          servicioNombre={selectedServicio.nombre}
+          sedesDisponibles={todasLasSedes}
+          tarifasAsignadas={sedesAsignadas[selectedServicio.id] || []}
+          onClose={() => setSelectedServicio(null)}
+          onSaved={() => {
+            setSelectedServicio(null);
+            loadData();
+          }}
+        />
       )}
     </div>
   );

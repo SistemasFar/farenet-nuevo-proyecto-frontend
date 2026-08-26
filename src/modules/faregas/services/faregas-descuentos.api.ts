@@ -79,6 +79,7 @@ export const faregasDescuentosAdminApi = {
   crear: (data: DescuentoFormData) => faregasFetch('/descuentos', { method: 'POST', body: JSON.stringify(data) }),
   actualizar: (id: number, data: DescuentoFormData) => faregasFetch(`/descuentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cambiarEstado: (id: number, activo: boolean) => faregasFetch(`/descuentos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
+  guardarReglas: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/reglas`, { method: 'PUT', body: JSON.stringify(data) }),
   crearCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/codigos`, { method: 'POST', body: JSON.stringify(data) }),
   actualizarCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/codigos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cambiarEstadoCodigo: (id: number, activo: boolean) => faregasFetch(`/descuentos/codigos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),

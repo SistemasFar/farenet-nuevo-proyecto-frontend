@@ -160,9 +160,9 @@ export const faregasConfigApi = {
     return response.servicios || response;
   },
 
-  crearServicio: async (servicio: Partial<ServicioConfiguracionFaregas>): Promise<void> => {
+  crearServicio: async (servicio: Partial<ServicioConfiguracionFaregas>): Promise<number> => {
     const response = await api.post('/api/faregas/config/servicios', servicio);
-    return response;
+    return response.servicio_id;
   },
 
   editarServicio: async (id: number, servicio: Partial<ServicioConfiguracionFaregas>): Promise<void> => {
@@ -173,5 +173,19 @@ export const faregasConfigApi = {
   cambiarEstadoServicio: async (id: number, activo: boolean): Promise<void> => {
     const response = await api.put(`/api/faregas/config/servicios/${id}/estado`, { activo });
     return response;
+  },
+
+  obtenerSedesPorServicio: async (): Promise<Record<number, SedeTarifaAsignada[]>> => {
+    const response = await api.get('/api/faregas/config/servicios/sedes');
+    return response.sedesPorServicio || {};
   }
 };
+
+export interface SedeTarifaAsignada {
+  key: string;
+  nombre: string;
+  tarifa_id: number;
+  precio: number;
+  producto_facturacion_id: number | null;
+  activo: boolean;
+}

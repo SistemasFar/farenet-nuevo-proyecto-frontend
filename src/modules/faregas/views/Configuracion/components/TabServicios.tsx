@@ -5,6 +5,8 @@ import { ServicioModal } from './ServicioModal';
 export default function TabServicios() {
   const [servicios, setServicios] = useState<ServicioConfiguracionFaregas[]>([]);
   const [categorias, setCategorias] = useState<CategoriaServicio[]>([]);
+  const [sedes, setSedes] = useState<any[]>([]);
+  const [sedesAsignadas, setSedesAsignadas] = useState<Record<number, any[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -20,12 +22,16 @@ export default function TabServicios() {
   const loadServicios = async () => {
     try {
       setLoading(true);
-      const [data, categoriasData] = await Promise.all([
+      const [data, categoriasData, sedesData, sedesAsignadasData] = await Promise.all([
         faregasConfigApi.getServicios(),
-        faregasConfigApi.obtenerCategorias(true)
+        faregasConfigApi.obtenerCategorias(true),
+        faregasConfigApi.obtenerSedes(),
+        faregasConfigApi.obtenerSedesPorServicio().catch(() => ({}))
       ]);
       setServicios(data);
       setCategorias(categoriasData);
+      setSedes(sedesData.filter(s => s.activo));
+      setSedesAsignadas(sedesAsignadasData);
     } catch (err: any) {
       setError(err.message || 'Error al cargar servicios');
     } finally {
@@ -201,6 +207,8 @@ export default function TabServicios() {
           mode={modalMode} 
           initialData={currentServicio} 
           categorias={categorias}
+          sedesDisponibles={sedes}
+          tarifasAsignadas={currentServicio.id ? (sedesAsignadas[currentServicio.id] || []) : []}
           onClose={() => setShowModal(false)}
           onSaved={loadServicios}
         />

@@ -3,13 +3,17 @@ import {
   faregasConfigApi,
   type CategoriaServicio,
   type ServicioConfiguracionFaregas,
-  type TipoFlujoServicioFaregas
+  type TipoFlujoServicioFaregas,
+  type SedeTarifaAsignada
 } from '../../../services/faregas-config.api';
+import { faregasTarifasAdminApi } from '../../../services/faregas-tarifas-admin.api';
 
 interface Props {
   mode: 'CREATE' | 'EDIT';
   initialData: Partial<ServicioConfiguracionFaregas>;
   categorias: CategoriaServicio[];
+  sedesDisponibles: any[];
+  tarifasAsignadas: SedeTarifaAsignada[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -19,7 +23,7 @@ type FormularioServicio = Omit<Partial<ServicioConfiguracionFaregas>, 'categoria
   certificado_base: string;
 };
 
-export function ServicioModal({ mode, initialData, categorias, onClose, onSaved }: Props) {
+export function ServicioModal({ mode, initialData, categorias, sedesDisponibles, tarifasAsignadas, onClose, onSaved }: Props) {
   const [formData, setFormData] = useState<FormularioServicio>({
     codigo: '',
     nombre: '',
@@ -35,6 +39,23 @@ export function ServicioModal({ mode, initialData, categorias, onClose, onSaved 
   
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const [sedesState, setSedesState] = useState<Record<string, { selected: boolean, precio: string, sku: string, tarifa_id?: number, original_activo?: boolean }>>({});
+
+  useEffect(() => {
+    const initialState: Record<string, { selected: boolean, precio: string, sku: string, tarifa_id?: number, original_activo?: boolean }> = {};
+    sedesDisponibles.forEach(sede => {
+      const tarifa = tarifasAsignadas.find(t => t.key === sede.key);
+      initialState[sede.key] = {
+        selected: tarifa ? tarifa.activo : false,
+        precio: tarifa ? tarifa.precio.toString() : '0',
+        sku: tarifa?.producto_facturacion_id ? tarifa.producto_facturacion_id.toString() : '',
+        tarifa_id: tarifa?.tarifa_id,
+        original_activo: tarifa?.activo
+      };
+    });
+    setSedesState(initialState);
+  }, [sedesDisponibles, tarifasAsignadas]);
 
   // En inicialización, mapear DB -> Combo si es modo EDIT
   useEffect(() => {
@@ -100,12 +121,48 @@ export function ServicioModal({ mode, initialData, categorias, onClose, onSaved 
         categoria_id: Number(payload.categoria_id)
       };
       
+      let targetId = formData.id;
       if (mode === 'CREATE') {
-        await faregasConfigApi.crearServicio(servicio);
+        targetId = await faregasConfigApi.crearServicio(servicio);
       } else {
-        if (!formData.id) throw new Error('No se pudo identificar el servicio a editar.');
-        await faregasConfigApi.editarServicio(formData.id, servicio);
+        if (!targetId) throw new Error('No se pudo identificar el servicio a editar.');
+        await faregasConfigApi.editarServicio(targetId, servicio);
       }
+      
+      const promesasTarifas = [];
+      for (const sede of sedesDisponibles) {
+        const key = sede.key;
+        const state = sedesState[key];
+        if (!state) continue;
+
+        if (state.selected) {
+           if (state.tarifa_id) {
+               promesasTarifas.push(
+                  faregasTarifasAdminApi.editar(state.tarifa_id, {
+                      precio: Number(state.precio) || 0,
+                      producto_facturacion_id: state.sku ? Number(state.sku) : null,
+                      activo: true
+                  })
+               );
+           } else {
+               promesasTarifas.push(
+                  faregasTarifasAdminApi.crear({
+                      planta_key: key,
+                      servicio_id: targetId!,
+                      precio: Number(state.precio) || 0,
+                      producto_facturacion_id: state.sku ? Number(state.sku) : null,
+                      activo: true
+                  })
+               );
+           }
+        } else {
+           if (state.tarifa_id && state.original_activo !== false) {
+               promesasTarifas.push(faregasTarifasAdminApi.cambiarEstado(state.tarifa_id, false));
+           }
+        }
+      }
+
+      await Promise.all(promesasTarifas);
       
       onSaved();
       onClose();
@@ -254,6 +311,56 @@ export function ServicioModal({ mode, initialData, categorias, onClose, onSaved 
                 onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
               />
               <label htmlFor="activo" className="text-sm font-semibold text-slate-700 cursor-pointer">Servicio Activo</label>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h4 className="text-sm font-bold text-[#052A79] mb-3">Disponibilidad en Sedes (Tarifas)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6 max-h-60 overflow-y-auto pr-2">
+              {sedesDisponibles.map(sede => {
+                const state = sedesState[sede.key];
+                if (!state) return null;
+                return (
+                  <div key={sede.key} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${state.selected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 text-[#052A79] shrink-0"
+                      checked={state.selected}
+                      onChange={(e) => setSedesState(prev => ({
+                        ...prev,
+                        [sede.key]: { ...state, selected: e.target.checked }
+                      }))}
+                    />
+                    <div className="flex-1 min-w-0 flex flex-col gap-2">
+                      <span className="text-sm font-bold text-gray-700 truncate block leading-tight">{sede.nombre}</span>
+                      {state.selected && (
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            required={state.selected}
+                            placeholder="Precio (S/)"
+                            className="w-1/2 border border-blue-200 rounded p-1.5 text-xs focus:outline-none focus:border-blue-500"
+                            value={state.precio}
+                            onChange={(e) => setSedesState(prev => ({ ...prev, [sede.key]: { ...state, precio: e.target.value } }))}
+                          />
+                          <input
+                            type="number"
+                            placeholder="SKU ID (Opcional)"
+                            className="w-1/2 border border-blue-200 rounded p-1.5 text-xs focus:outline-none focus:border-blue-500"
+                            value={state.sku}
+                            onChange={(e) => setSedesState(prev => ({ ...prev, [sede.key]: { ...state, sku: e.target.value } }))}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {sedesDisponibles.length === 0 && (
+                <div className="text-sm text-gray-500 italic col-span-2">No hay sedes disponibles.</div>
+              )}
             </div>
           </div>
 
