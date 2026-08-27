@@ -1,11 +1,13 @@
 import { faregasFetch } from './faregas-http-client';
 
+export type TipoCampana = 'CAMPANA' | 'ALIANZA' | 'CONVENIO' | 'PROMOCION';
+
 export interface ConsultaDescuentoResult {
   descuentoId: number;
   descuentoClienteId: number;
   codigo: string;
   nombre: string;
-  tipo: 'ALIANZA' | 'CUPON' | 'PLACA';
+  tipo: TipoCampana;
   empresaAliada?: string;
   tipoCalculo: 'FLAT' | 'MONTO' | 'PORCENTAJE';
   valor: number;
@@ -21,9 +23,10 @@ export interface DescuentoAdmin {
   id: number;
   codigo: string;
   nombre: string;
-  tipo: 'ALIANZA' | 'CUPON' | 'PLACA';
+  tipo: TipoCampana;
   empresa_aliada_ruc?: string;
   empresa_aliada_nombre?: string;
+  ejecutivo?: string;
   fecha_inicio: string;
   fecha_fin: string;
   activo: boolean;
@@ -35,9 +38,10 @@ export interface DescuentoAdmin {
 
 export interface DescuentoFormData {
   nombre: string;
-  tipo: string;
+  tipo: TipoCampana;
   empresaAliadaRuc?: string;
   empresaAliadaNombre?: string;
+  ejecutivo?: string;
   fechaInicio: string;
   fechaFin: string;
 }
