@@ -3,6 +3,16 @@
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { TitularesList, type TitularState } from './TitularesList';
 import React, { useEffect } from 'react';
+import {
+  formatVIN,
+  formatAlfanumerico,
+  formatFormulaRodante,
+  formatEntero,
+  formatDecimal,
+  formatAlfanumericoConEspacios,
+  formatMes,
+  formatAnio
+} from '../../../../utils/vehiculo-formatters';
 
 interface VehiculoStepProps {
   tipoCertificado: TipoCertificadoFaregas;
@@ -94,19 +104,70 @@ export function VehiculoStep({
   }, [tipoCertificado, modalidadCertificado, catalogoVerificaciones]);
 
   const handleVehiculo = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormVehiculo((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
+    const { name, value } = e.target;
+    let finalValue = value.toUpperCase();
+    
+    switch (name) {
+      case 'vin': finalValue = formatVIN(finalValue); break;
+      case 'serieChasis':
+      case 'numeroMotor':
+        finalValue = formatAlfanumerico(finalValue, 30); break;
+      case 'formulaRodante': finalValue = formatFormulaRodante(finalValue); break;
+      case 'numeroCilindros':
+      case 'numeroEjes':
+      case 'numeroRuedas':
+      case 'numeroAsientos':
+      case 'numeroPasajeros':
+        finalValue = formatEntero(finalValue, 4); break;
+      case 'anioFabricacion':
+      case 'anioModelo':
+        finalValue = formatAnio(finalValue); break;
+      case 'cilindrada':
+        finalValue = formatEntero(finalValue, 5); break;
+      case 'pesoNeto':
+      case 'pesoBruto':
+      case 'cargaUtil':
+      case 'potencia':
+        finalValue = formatDecimal(finalValue, 6, 2); break;
+      case 'longitud':
+      case 'ancho':
+      case 'alto':
+        finalValue = formatDecimal(finalValue, 2, 2); break;
+    }
+    setFormVehiculo((prev: any) => ({ ...prev, [name]: finalValue }));
   };
 
   const handleGlp = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormGlp((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
+    const { name, value } = e.target;
+    let finalValue = value.toUpperCase();
+    if (['pesoNetoPosterior', 'cargaUtilPosterior'].includes(name)) {
+      finalValue = formatDecimal(finalValue, 6, 2);
+    }
+    setFormGlp((prev: any) => ({ ...prev, [name]: finalValue }));
   };
 
   const handleGnv = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormGnv((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
+    const { name, value } = e.target;
+    let finalValue = value.toUpperCase();
+    if (name === 'numeroChip') {
+      finalValue = formatAlfanumerico(finalValue, 15);
+    } else if (name === 'pesoNetoPosterior') {
+      finalValue = formatDecimal(finalValue, 6, 2);
+    }
+    setFormGnv((prev: any) => ({ ...prev, [name]: finalValue }));
   };
 
   const handleConformidad = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormConformidad((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
+    const { name, value } = e.target;
+    let finalValue = value.toUpperCase();
+    if (name === 'caracteristicaRegistrable') {
+       finalValue = formatAlfanumericoConEspacios(finalValue, 300);
+    } else if (['motivo', 'usoOriginalVehiculo'].includes(name)) {
+       finalValue = formatAlfanumericoConEspacios(finalValue, 100);
+    } else if (name === 'descripcion') {
+       finalValue = formatAlfanumericoConEspacios(finalValue, 500);
+    }
+    setFormConformidad((prev: any) => ({ ...prev, [name]: finalValue }));
   };
 
   const handleVerificacionGnv = (idx: number, campo: string, valor: any) => {
@@ -124,7 +185,19 @@ export function VehiculoStep({
   const handleComponenteGlp = (idx: number, campo: string, valor: any) => {
     setFormGlp((prev: any) => {
       const nc = [...(prev.componentes || [])];
-      nc[idx] = { ...nc[idx], [campo]: typeof valor === 'string' ? valor.toUpperCase() : valor };
+      let finalValue = typeof valor === 'string' ? valor.toUpperCase() : valor;
+      if (typeof finalValue === 'string') {
+        if (['marca', 'modelo', 'numeroSerie'].includes(campo)) {
+          finalValue = formatAlfanumerico(finalValue, 30);
+        } else if (campo === 'capacidadLitros') {
+          finalValue = formatDecimal(finalValue, 5, 2);
+        } else if (campo === 'mesFabricacion') {
+          finalValue = formatMes(finalValue);
+        } else if (campo === 'anioFabricacion') {
+          finalValue = formatAnio(finalValue);
+        }
+      }
+      nc[idx] = { ...nc[idx], [campo]: finalValue };
       return { ...prev, componentes: nc };
     });
   };
@@ -132,7 +205,15 @@ export function VehiculoStep({
   const handleComponenteGnv = (idx: number, campo: string, valor: any) => {
     setFormGnv((prev: any) => {
       const nc = [...(prev.componentes || [])];
-      nc[idx] = { ...nc[idx], [campo]: typeof valor === 'string' ? valor.toUpperCase() : valor };
+      let finalValue = typeof valor === 'string' ? valor.toUpperCase() : valor;
+      if (typeof finalValue === 'string') {
+        if (['marca', 'numeroSerie'].includes(campo)) {
+          finalValue = formatAlfanumerico(finalValue, 30);
+        } else if (campo === 'capacidadLitros' && finalValue !== 'NO APLICA' && finalValue !== ' ' && finalValue !== 'ESPECIFICAR') {
+          finalValue = formatDecimal(finalValue, 5, 2);
+        }
+      }
+      nc[idx] = { ...nc[idx], [campo]: finalValue };
       return { ...prev, componentes: nc };
     });
   };
@@ -644,22 +725,12 @@ export function VehiculoStep({
                 <input name="tipoTramite" value={formConformidad.tipoTramite || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
               </div>
             </div>
-
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
               <h5 className="font-bold text-slate-700 mb-3">SELECCIÓN DE RECUADROS (Opcional)</h5>
               <div className="flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" name="marcaModificacion" checked={!!formConformidad.marcaModificacion} onChange={(e) => setFormConformidad((prev: any) => ({ ...prev, marcaModificacion: e.target.checked }))} className="w-4 h-4 text-[#052a79]" />
-                  <span className="text-xs font-bold text-slate-700 uppercase">Marcar Modificación</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" name="marcaMontaje" checked={!!formConformidad.marcaMontaje} onChange={(e) => setFormConformidad((prev: any) => ({ ...prev, marcaMontaje: e.target.checked }))} className="w-4 h-4 text-[#052a79]" />
-                  <span className="text-xs font-bold text-slate-700 uppercase">Marcar Montaje</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" name="marcaFabricacion" checked={!!formConformidad.marcaFabricacion} onChange={(e) => setFormConformidad((prev: any) => ({ ...prev, marcaFabricacion: e.target.checked }))} className="w-4 h-4 text-[#052a79]" />
-                  <span className="text-xs font-bold text-slate-700 uppercase">Marcar Fabricación</span>
-                </label>
+                <span className="text-xs font-bold text-slate-700 uppercase">Marcar Modificación</span>
+                <span className="text-xs font-bold text-slate-700 uppercase">Marcar Montaje</span>
+                <span className="text-xs font-bold text-slate-700 uppercase">Marcar Fabricación</span>
               </div>
             </div>
 

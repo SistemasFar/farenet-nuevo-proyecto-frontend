@@ -16,6 +16,24 @@ import type {
 } from '../types/faregas-api';
 
 export const faregasCertificadosApi = {
+  obtenerCorrelativos: (plantaKey?: string, tipo?: string) => {
+    const params = new URLSearchParams();
+    if (plantaKey) params.append('plantaKey', plantaKey);
+    if (tipo) params.append('tipo', tipo);
+    return fetchWithToken(`/certificados/correlativos?${params.toString()}`);
+  },
+  obtenerRangoActivo: (plantaKey: string, tipo: string) => fetchWithToken(`/certificados/correlativos/${plantaKey}/${tipo}`),
+  crearRangoCorrelativo: (data: { plantaKey: string; tipoCertificadoClave: string; nroInicio: number; nroMaximo: number }) => fetchWithToken('/certificados/correlativos', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  actualizarRangoCorrelativo: (id: number, data: { nroInicio: number; nroMaximo: number }) => fetchWithToken(`/certificados/correlativos/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  }),
+  cerrarRangoCorrelativo: (id: number) => fetchWithToken(`/certificados/correlativos/${id}/cerrar`, {
+    method: 'PATCH'
+  }),
   obtenerTipos: () => fetchWithToken('/certificados/tipos'),
   obtenerVehiculo: (placa: string) => fetchWithToken(`/clientes/vehiculo/${encodeURIComponent(placa)}`),
   obtenerBorradores: (page = 1, pageSize = 10, search = '', fechaDesde = '', fechaHasta = '') => {

@@ -85,6 +85,7 @@ export default function TabSedes() {
                 { key: 'nombre', header: 'NOMBRE', width: 24 },
                 { key: 'direccion', header: 'DIRECCIÓN', width: 60 },
                 { key: 'telefono', header: 'TELÉFONO', width: 22 },
+                { key: 'correo', header: 'CORREO', width: 30 },
                 { key: 'empresa', header: 'EMPRESA', width: 34 },
                 { key: 'tarifas', header: 'TARIFAS', width: 12 },
                 { key: 'estado', header: 'ESTADO', width: 14 }
@@ -93,6 +94,7 @@ export default function TabSedes() {
                 nombre: sede.nombre,
                 direccion: sede.direccion || '',
                 telefono: sede.telefono || '',
+                correo: sede.correo || '',
                 empresa: sede.empresa_nombre || '',
                 tarifas: sede.total_tarifas || 0,
                 estado: sede.activo ? 'ACTIVA' : 'INACTIVA'
@@ -127,6 +129,7 @@ export default function TabSedes() {
                   <th className="px-4 py-3">Nombre</th>
                   <th className="px-4 py-3">Dirección</th>
                   <th className="px-4 py-3">Teléfono</th>
+                  <th className="px-4 py-3">Correo</th>
                   <th className="px-4 py-3">Empresa</th>
                   <th className="px-4 py-3 text-center">Tarifas</th>
                   <th className="px-4 py-3 text-center">Estado</th>
@@ -140,6 +143,7 @@ export default function TabSedes() {
                     <td className="px-4 py-3 font-medium text-gray-800">{s.nombre}</td>
                     <td className="px-4 py-3 text-gray-600">{s.direccion || '-'}</td>
                     <td className="px-4 py-3 text-gray-600">{s.telefono || '-'}</td>
+                    <td className="px-4 py-3 text-gray-600 truncate max-w-[120px]" title={s.correo || ''}>{s.correo || '-'}</td>
                     <td className="px-4 py-3"><div className="font-medium text-gray-700">{s.empresa_nombre}</div><div className="font-mono text-xs text-gray-400">{s.empresa_key}</div></td>
                     <td className="px-4 py-3 text-center font-medium">{s.total_tarifas || 0}</td>
                     <td className="px-4 py-3 text-center">
@@ -228,6 +232,15 @@ export default function TabSedes() {
                     className="w-full border rounded-lg p-2"
                     value={currentSede.telefono || ''}
                     onChange={(e) => setCurrentSede({ ...currentSede, telefono: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Correo</label>
+                  <input
+                    type="email"
+                    className="w-full border rounded-lg p-2"
+                    value={currentSede.correo || ''}
+                    onChange={(e) => setCurrentSede({ ...currentSede, correo: e.target.value })}
                   />
                 </div>
               </div>

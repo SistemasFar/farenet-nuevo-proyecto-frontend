@@ -131,6 +131,30 @@ export function AuditoriaView() {
         return () => { activo = false; };
     }, []);
 
+    const exportarExcel = () => {
+        if (!registros.length) return;
+        const cabeceras = ['Fecha', 'Usuario', 'Perfil', 'Qué hizo', 'Módulo', 'Referencia', 'Sede', 'Resultado'];
+        const filas = registros.map(item => [
+            new Date(item.fecha_evento).toLocaleString('es-PE').replace(/,/g, ''),
+            item.username || '-',
+            item.perfil || '-',
+            accion(item).replace(/;/g, ','),
+            nombreModulo(item.categoria),
+            referencia(item).replace(/;/g, ','),
+            item.planta_key || '-',
+            item.exitoso ? 'Completado' : 'No completado'
+        ]);
+        const csvContent = '\uFEFF' + [cabeceras, ...filas].map(e => e.join(';')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Auditoria_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-4">
             <div>
@@ -139,7 +163,7 @@ export function AuditoriaView() {
             </div>
 
             <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="grid grid-cols-3 border-b border-gray-200 lg:grid-cols-6">
+                <div className="grid grid-cols-3 border-b border-gray-200 lg:grid-cols-5">
                     {MODULOS.map((item) => (
                         <button
                             key={item.clave}
@@ -174,7 +198,15 @@ export function AuditoriaView() {
             <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
                     <div><div className="font-semibold text-gray-700">Actividad registrada</div><div className="text-xs text-gray-500">{registros.length} registros encontrados</div></div>
-                    <button type="button" onClick={() => void cargarAuditoria()} disabled={loading} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Actualizar</button>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={exportarExcel} disabled={loading || registros.length === 0} className="flex items-center gap-1 rounded-lg bg-[#0F7B3E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b5f30] shadow-sm disabled:opacity-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Exportar Excel
+                        </button>
+                        <button type="button" onClick={() => void cargarAuditoria()} disabled={loading} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Actualizar</button>
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">

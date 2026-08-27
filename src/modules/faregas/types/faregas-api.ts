@@ -10,6 +10,33 @@ export interface CrearClienteFaregasRequest {
   correo?: string;
 }
 
+export interface FaregasSede {
+  key: string;
+  nombre: string;
+  direccion: string;
+  telefono: string;
+  correo?: string;
+  empresa_key: string;
+  empresa_nombre?: string;
+  activo: boolean;
+  total_tarifas?: number;
+}
+
+export interface FaregasSerie {
+  id: number;
+  planta_key: string;
+  sede_nombre?: string;
+  tipo_comprobante: string;
+  serie: string;
+  ultimo_numero: number;
+  es_predeterminada: boolean;
+  autogenerada: boolean;
+  contingencia: boolean;
+  activo: boolean;
+  tipo_documento_referencia?: string;
+  serie_pos?: boolean;
+}
+
 export interface CrearBorradorFaregasRequest {
   tipoCertificadoClave: string;
   clienteId?: string;

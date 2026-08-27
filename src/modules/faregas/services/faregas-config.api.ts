@@ -45,6 +45,7 @@ export interface Sede {
   nombre: string;
   direccion?: string;
   telefono?: string;
+  correo?: string;
   activo: boolean;
   empresa_key: string;
   empresa_nombre: string;

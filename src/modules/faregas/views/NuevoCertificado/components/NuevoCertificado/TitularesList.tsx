@@ -40,7 +40,26 @@ export function TitularesList({ titulares, setTitulares, onRemoveTitular }: Titu
   };
 
   const handleChange = (uuid: string, field: keyof TitularState, value: string) => {
-    setTitulares(prev => prev.map(t => t._uuid === uuid ? { ...t, [field]: value.toUpperCase() } : t));
+    setTitulares(prev => prev.map(t => {
+      if (t._uuid !== uuid) return t;
+      let finalValue = value.toUpperCase();
+      
+      if (field === 'nroDocumento') {
+        const tipo = t.tipoDocumento;
+        if (tipo === 'DNI') {
+          finalValue = finalValue.replace(/[^0-9]/g, '').slice(0, 8);
+        } else if (tipo === 'RUC') {
+          finalValue = finalValue.replace(/[^0-9]/g, '').slice(0, 11);
+        } else {
+          finalValue = finalValue.replace(/[^A-Z0-9]/g, '').slice(0, 15);
+        }
+      } else if (field === 'tipoDocumento') {
+        // Reset doc number if type changes
+        return { ...t, [field]: finalValue, nroDocumento: '' };
+      }
+      
+      return { ...t, [field]: finalValue };
+    }));
   };
 
   const handleSearch = async (uuid: string, tipoDocumento: string, nroDocumento: string) => {

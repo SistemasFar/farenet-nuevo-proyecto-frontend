@@ -3,8 +3,9 @@ import TabSedes from './TabSedes';
 import TabCatalogo from './components/TabCatalogo';
 import TabFacturacion from './components/TabFacturacion';
 import TabEmpresas from './components/TabEmpresas';
+import TabCorrelativos from './components/TabCorrelativos';
 
-type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION' | 'EMPRESAS';
+type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION' | 'EMPRESAS' | 'CORRELATIVOS';
 
 export function FaregasConfiguracionView() {
   const [activeTab, setActiveTab] = useState<ConfigTab>('SEDES');
@@ -31,11 +32,13 @@ export function FaregasConfiguracionView() {
   // CONFIGURACION_SEDES conserva acceso para las sesiones actuales.
   const hasEmpresas = permisos.includes('CONFIGURACION_EMPRESAS') || hasSedes;
   const hasCatalogo = hasCategorias || hasServicios || hasProductos;
+  const hasCorrelativos = true; // Temporary permit for all admins
 
   const tabs = [];
   if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES' });
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
   if (hasSeries) tabs.push({ id: 'FACTURACION', label: 'FACTURACIÓN' });
+  if (hasCorrelativos) tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });
   if (hasEmpresas) tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
     ? activeTab
@@ -74,6 +77,7 @@ export function FaregasConfiguracionView() {
               <TabCatalogo hasCategorias={hasCategorias} hasServicios={hasServicios} hasProductos={hasProductos} />
             )}
             {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion />}
+            {tabVisible === 'CORRELATIVOS' && hasCorrelativos && <TabCorrelativos />}
             {tabVisible === 'EMPRESAS' && hasEmpresas && <TabEmpresas />}
           </div>
         </div>

@@ -27,6 +27,8 @@ export interface SerieComprobante {
   autogenerada: boolean;
   contingencia: boolean;
   activo: boolean;
+  tipo_documento_referencia?: string;
+  serie_pos?: boolean;
 }
 
 const request = async (path: string, options: RequestInit = {}) => {
@@ -51,7 +53,7 @@ export const faregasSeriesApi = {
   crear: async (body: Omit<SerieComprobante, 'id' | 'sede_nombre'>) => {
     await request('/series', { method: 'POST', body: JSON.stringify(body) });
   },
-  editar: async (id: number, body: Pick<SerieComprobante, 'es_predeterminada' | 'autogenerada' | 'contingencia'>) => {
+  editar: async (id: number, body: Pick<SerieComprobante, 'es_predeterminada' | 'autogenerada' | 'contingencia' | 'tipo_documento_referencia' | 'serie_pos'>) => {
     await request(`/series/${id}`, { method: 'PUT', body: JSON.stringify(body) });
   },
   cambiarEstado: async (id: number, activo: boolean) => {
