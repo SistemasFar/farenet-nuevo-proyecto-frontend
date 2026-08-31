@@ -29,6 +29,7 @@ export interface SerieComprobante {
   activo: boolean;
   tipo_documento_referencia?: string;
   serie_pos?: boolean;
+  fuente_correlativo?: 'COMPARTIDO_FARENET' | 'FAREGAS';
 }
 
 const request = async (path: string, options: RequestInit = {}) => {

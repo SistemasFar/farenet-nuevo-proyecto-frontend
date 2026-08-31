@@ -120,6 +120,21 @@ export const faregasCertificadosApi = {
   emitirFacturacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/emitir`, {
     method: 'POST'
   }),
+  obtenerDocumentosElectronicos: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/documentos`),
+  consultarFacturacionElectronica: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/consultar`, { method: 'POST' }),
+  emitirNotaElectronica: (id: number, data: {
+    tipo: 'CREDITO' | 'DEBITO'; motivoCodigo: string; sustento: string;
+    baseImponible: number; igv: number; importeTotal: number;
+  }) => fetchWithToken(`/certificados/borradores/${id}/facturacion/notas`, {
+    method: 'POST', body: JSON.stringify(data)
+  }),
+  reintentarNotaElectronica: (id: number, tipo: 'CREDITO' | 'DEBITO', notaId: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/notas/${tipo}/${notaId}/emitir`, { method: 'POST' }),
+  generarAnulacionElectronica: (id: number, data: {
+    tipoDocumento: 'FACTURACION' | 'CREDITO' | 'DEBITO'; documentoId?: number; motivo: string;
+  }) => fetchWithToken(`/certificados/borradores/${id}/facturacion/anulaciones`, {
+    method: 'POST', body: JSON.stringify(data)
+  }),
+  consultarAnulacionElectronica: (id: number, anulacionId: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/anulaciones/${anulacionId}/consultar`, { method: 'POST' }),
   validarEmision: (id: number) => fetchWithToken(`/certificados/borradores/${id}/validar-emision`),
   emitirCertificado: (id: number) => fetchWithToken(`/certificados/borradores/${id}/emitir`, { method: 'POST' }),
   obtenerPrevisualizacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/previsualizacion`)

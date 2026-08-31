@@ -69,6 +69,8 @@ export interface FormFacturacionState {
   tipoDocFac: string; nroDocFac: string; razonSocialFac: string; nombresFac: string; apellidosFac: string;
   paisFac: string; departamentoFac: string; provinciaFac: string; distritoFac: string; direccionFac: string;
   emailFac: string; telefonoFac: string;
+  condicionPagoFac: 'CONTADO' | 'CREDITO'; fechaVencimientoFac: string; medioPagoFac: string;
+  cuotasFac: Array<{ numeroCuota: number; fechaPago: string; importe: string }>;
 }
 
 export interface FormVerificacionState {
@@ -224,7 +226,8 @@ export function NuevoCertificadoView() {
   const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
     tipoDocFac: '', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
-    emailFac: '', telefonoFac: ''
+    emailFac: '', telefonoFac: '', condicionPagoFac: 'CONTADO', fechaVencimientoFac: '',
+    medioPagoFac: '', cuotasFac: []
   });
   const [facturacion, setFacturacion] = useState<FacturacionFaregas | null>(null);
 
@@ -366,13 +369,20 @@ export function NuevoCertificadoView() {
             if (fac) {
               setFormFacturacion(prev => ({
                 ...prev,
-                tipoComprobante: fac.tipoComprobante || 'BOLETA',
-                tipoDocumento: fac.tipoDocumentoCliente || 'DNI',
-                numeroDocumento: fac.nroDocumento || '',
-                razonSocial: fac.nombreRazonSocial || '',
-                direccion: fac.direccion || '',
-                email: fac.email || '',
-                telefono: fac.telefono || ''
+                tipoDocFac: fac.tipoComprobante || 'BOLETA',
+                nroDocFac: fac.nroDocumento || '',
+                razonSocialFac: fac.nombreRazonSocial || '',
+                direccionFac: fac.direccion || '',
+                emailFac: fac.email || '',
+                telefonoFac: fac.telefono || '',
+                condicionPagoFac: fac.condicionPago || 'CONTADO',
+                fechaVencimientoFac: String(fac.fechaVencimiento || '').slice(0, 10),
+                medioPagoFac: fac.medioPago || '',
+                cuotasFac: (fac.cuotas || []).map((cuota: any) => ({
+                  numeroCuota: Number(cuota.numeroCuota),
+                  fechaPago: String(cuota.fechaPago || '').slice(0, 10),
+                  importe: String(cuota.importe)
+                }))
               }));
               setFacturacion(fac);
             }
@@ -999,6 +1009,10 @@ export function NuevoCertificadoView() {
               direccion: formFacturacion.direccionFac,
               email: formFacturacion.emailFac || null,
               telefono: formFacturacion.telefonoFac || null,
+              condicionPago: formFacturacion.condicionPagoFac,
+              fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
+              medioPago: formFacturacion.medioPagoFac || null,
+              cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
             };
             await faregasCertificadosApi.guardarFacturacion(certificadoId, payloadFact);
           } catch (e: any) {
@@ -1062,6 +1076,10 @@ export function NuevoCertificadoView() {
             direccion: formFacturacion.direccionFac,
             email: formFacturacion.emailFac || null,
             telefono: formFacturacion.telefonoFac || null,
+            condicionPago: formFacturacion.condicionPagoFac,
+            fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
+            medioPago: formFacturacion.medioPagoFac || null,
+            cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
           };
           await faregasCertificadosApi.guardarFacturacion(certificadoId, payloadFact);
         } catch (e: any) {

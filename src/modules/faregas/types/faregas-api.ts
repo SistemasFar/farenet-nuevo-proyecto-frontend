@@ -35,6 +35,7 @@ export interface FaregasSerie {
   activo: boolean;
   tipo_documento_referencia?: string;
   serie_pos?: boolean;
+  fuente_correlativo?: 'COMPARTIDO_FARENET' | 'FAREGAS';
 }
 
 export interface CrearBorradorFaregasRequest {
@@ -77,6 +78,22 @@ export interface GuardarFacturacionFaregasRequest {
   direccion: string;
   email?: NullableText;
   telefono?: NullableText;
+  condicionPago?: 'CONTADO' | 'CREDITO';
+  fechaVencimiento?: NullableText;
+  medioPago?: NullableText;
+  cuotas?: Array<{
+    numeroCuota: number;
+    fechaPago: string;
+    importe: number | string;
+  }>;
+}
+
+export interface CuotaFacturacionFaregas {
+  id: number;
+  numeroCuota: number;
+  fechaPago: string;
+  importe: number;
+  estado: 'PENDIENTE' | 'PAGADA' | 'ANULADA';
 }
 
 export interface FacturacionFaregas {
@@ -89,10 +106,14 @@ export interface FacturacionFaregas {
   direccion: string;
   email: NullableText;
   telefono: NullableText;
+  condicionPago: 'CONTADO' | 'CREDITO';
+  fechaVencimiento: NullableText;
+  medioPago: NullableText;
+  cuotas: CuotaFacturacionFaregas[];
   baseImponible: number;
   igv: number;
   importeTotal: number;
-  estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR';
+  estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR' | 'ANULADO';
   nroComprobante: NullableText;
   aceptadaSunat: boolean | null;
   sunatDescription: NullableText;
@@ -100,6 +121,28 @@ export interface FacturacionFaregas {
   enlaceXml: NullableText;
   enlaceCdr: NullableText;
   intentos: number;
+}
+
+export interface NotaElectronicaFaregas {
+  id: number;
+  tipo: 'CREDITO' | 'DEBITO';
+  facturacionId: number;
+  motivoCodigo: string;
+  sustento: string;
+  nroComprobante: NullableText;
+  importeTotal: number;
+  estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR' | 'ANULADO';
+  enlacePdf: NullableText;
+}
+
+export interface AnulacionElectronicaFaregas {
+  id: number;
+  tipoDocumento: 'FACTURACION' | 'CREDITO' | 'DEBITO';
+  documentoId: number;
+  motivo: string;
+  estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR';
+  ticketSunat: NullableText;
+  sunatDescription: NullableText;
 }
 
 export interface VehiculoBorradorFaregasRequest {

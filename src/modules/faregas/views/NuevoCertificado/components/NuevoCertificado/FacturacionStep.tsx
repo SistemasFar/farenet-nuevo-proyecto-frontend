@@ -5,6 +5,7 @@ import { faregasCertificadosApi } from '../../../../services/faregas-certificado
 import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
 import type { FacturacionFaregas } from '../../../../types/faregas-api';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
+import { DocumentosElectronicosPanel } from './DocumentosElectronicosPanel';
 
 interface FacturacionStepProps {
   certificadoId?: number;
@@ -45,6 +46,14 @@ export function FacturacionStep({
             direccionFac: guardada.direccion,
             emailFac: guardada.email || '',
             telefonoFac: guardada.telefono || '',
+            condicionPagoFac: guardada.condicionPago || 'CONTADO',
+            fechaVencimientoFac: String(guardada.fechaVencimiento || '').slice(0, 10),
+            medioPagoFac: guardada.medioPago || '',
+            cuotasFac: (guardada.cuotas || []).map(cuota => ({
+              numeroCuota: cuota.numeroCuota,
+              fechaPago: String(cuota.fechaPago || '').slice(0, 10),
+              importe: String(cuota.importe),
+            })),
           }));
         }
       })
@@ -65,7 +74,33 @@ export function FacturacionStep({
     direccion: formFacturacion.direccionFac,
     email: formFacturacion.emailFac || null,
     telefono: formFacturacion.telefonoFac || null,
+    condicionPago: formFacturacion.condicionPagoFac,
+    fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
+    medioPago: formFacturacion.medioPagoFac || null,
+    cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
   });
+
+  const agregarCuota = () => setFormFacturacion(prev => ({
+    ...prev,
+    cuotasFac: [...prev.cuotasFac, {
+      numeroCuota: prev.cuotasFac.length + 1,
+      fechaPago: prev.fechaVencimientoFac,
+      importe: '',
+    }],
+  }));
+
+  const actualizarCuota = (index: number, campo: 'fechaPago' | 'importe', value: string) => {
+    setFormFacturacion(prev => ({
+      ...prev,
+      cuotasFac: prev.cuotasFac.map((cuota, indice) => indice === index ? { ...cuota, [campo]: value } : cuota),
+    }));
+  };
+
+  const eliminarCuota = (index: number) => setFormFacturacion(prev => ({
+    ...prev,
+    cuotasFac: prev.cuotasFac.filter((_, indice) => indice !== index)
+      .map((cuota, indice) => ({ ...cuota, numeroCuota: indice + 1 })),
+  }));
 
   const guardar = async (notificar = true) => {
     if (!certificadoId) throw new Error('No existe un borrador de certificado.');
@@ -191,13 +226,13 @@ export function FacturacionStep({
             <label className="mb-1 block text-xs font-bold text-slate-500">NOMBRE / RAZON SOCIAL</label>
             <div className="relative">
               <User className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-              <input disabled={bloqueado} name="razonSocialFac" value={formFacturacion.razonSocialFac} onChange={handleInput} className="w-full rounded-xl border-2 border-slate-200 py-3 pl-12 pr-4 font-bold uppercase disabled:bg-slate-100" />
+              <input disabled={bloqueado} name="razonSocialFac" value={formFacturacion.razonSocialFac} onChange={handleInput} maxLength={100} className="w-full rounded-xl border-2 border-slate-200 py-3 pl-12 pr-4 font-bold uppercase disabled:bg-slate-100" />
             </div>
           </div>
 
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-bold text-slate-500">DIRECCION FISCAL</label>
-            <input disabled={bloqueado} name="direccionFac" value={formFacturacion.direccionFac} onChange={handleInput} className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold uppercase disabled:bg-slate-100" />
+            <input disabled={bloqueado} name="direccionFac" value={formFacturacion.direccionFac} onChange={handleInput} maxLength={100} className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold uppercase disabled:bg-slate-100" />
           </div>
 
           <div>
@@ -208,6 +243,40 @@ export function FacturacionStep({
             <label className="mb-1 block text-xs font-bold text-slate-500">TELEFONO (OPCIONAL)</label>
             <input disabled={bloqueado} name="telefonoFac" value={formFacturacion.telefonoFac} onChange={handleInput} className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold disabled:bg-slate-100" />
           </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-500">CONDICIÓN DE PAGO</label>
+            <select disabled={bloqueado} name="condicionPagoFac" value={formFacturacion.condicionPagoFac} onChange={handleInput} className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold disabled:bg-slate-100">
+              <option value="CONTADO">CONTADO</option>
+              <option value="CREDITO">CRÉDITO</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-500">MEDIO DE PAGO (OPCIONAL)</label>
+            <input disabled={bloqueado} name="medioPagoFac" value={formFacturacion.medioPagoFac} onChange={handleInput} maxLength={250} className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold disabled:bg-slate-100" placeholder="EFECTIVO, TRANSFERENCIA..." />
+          </div>
+
+          {formFacturacion.condicionPagoFac === 'CREDITO' && (
+            <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 md:col-span-2">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-slate-600">VENCIMIENTO GENERAL</label>
+                  <input disabled={bloqueado} type="date" name="fechaVencimientoFac" value={formFacturacion.fechaVencimientoFac} onChange={handleInput} className="rounded-lg border border-blue-200 bg-white p-2 font-semibold disabled:bg-slate-100" />
+                </div>
+                {!bloqueado && <button type="button" onClick={agregarCuota} className="rounded-lg bg-[#052a79] px-4 py-2 text-xs font-black text-white">+ AGREGAR CUOTA</button>}
+              </div>
+              {formFacturacion.cuotasFac.length === 0 ? (
+                <p className="text-sm font-semibold text-blue-800">Agregue una o más cuotas. La suma debe coincidir con el saldo pendiente de la orden.</p>
+              ) : formFacturacion.cuotasFac.map((cuota, index) => (
+                <div key={cuota.numeroCuota} className="grid grid-cols-[80px_1fr_1fr_auto] items-end gap-2 rounded-lg bg-white p-3">
+                  <div><span className="text-xs font-bold text-slate-500">CUOTA</span><div className="p-2 font-black">{cuota.numeroCuota}</div></div>
+                  <label className="text-xs font-bold text-slate-500">FECHA<input disabled={bloqueado} type="date" value={cuota.fechaPago} onChange={event => actualizarCuota(index, 'fechaPago', event.target.value)} className="mt-1 w-full rounded-lg border p-2 text-sm text-slate-800 disabled:bg-slate-100" /></label>
+                  <label className="text-xs font-bold text-slate-500">IMPORTE<input disabled={bloqueado} type="number" min="0.01" step="0.01" value={cuota.importe} onChange={event => actualizarCuota(index, 'importe', event.target.value)} className="mt-1 w-full rounded-lg border p-2 text-sm text-slate-800 disabled:bg-slate-100" /></label>
+                  {!bloqueado && <button type="button" onClick={() => eliminarCuota(index)} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-black text-red-600">QUITAR</button>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {integracion && (!integracion.enabled || !integracion.configured) && (
@@ -234,6 +303,9 @@ export function FacturacionStep({
           )}
         </div>
       </div>
+      {certificadoId && facturacion?.estado === 'ACEPTADO' && (
+        <DocumentosElectronicosPanel certificadoId={certificadoId} facturacion={facturacion} integracionDisponible={Boolean(integracion?.enabled && integracion?.configured)} />
+      )}
     </div>
   );
 }
