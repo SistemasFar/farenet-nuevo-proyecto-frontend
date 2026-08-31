@@ -291,7 +291,7 @@ export function Sidebar({
   // Reordenar dinámicamente si estamos en FAREGAS
   // Se requiere que AUDITORÍA esté inmediatamente debajo de USUARIOS
   if (isFaregas) {
-    const sorted = [];
+    const sorted: MenuItem[] = [];
     menuVisible.forEach(item => {
       if (item.key !== 'auditoria') {
         sorted.push(item);

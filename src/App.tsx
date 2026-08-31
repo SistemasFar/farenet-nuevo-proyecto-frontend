@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { LoginView } from './core/views/LoginView';
 import { SelectPlantaView } from './core/views/SelectPlantaView';
@@ -29,6 +29,31 @@ import { useEmpresa } from './context/EmpresaContext';
 import type { UserSession, PlantaAsignada, EmpresaAsignada } from './types/auth';
 import { authApi, authFaregasApi, plantaSession, permisosSession } from './services/api';
 
+type FaregasUserSession = UserSession & { permisos?: string[] };
+
+interface PlantaUpdateDetail {
+  key: string;
+  activo: boolean;
+  nombre: string;
+}
+
+const leerPlantasFaregas = (): PlantaAsignada[] => {
+  try {
+    const parsed: unknown = JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]');
+    return Array.isArray(parsed) ? parsed as PlantaAsignada[] : [];
+  } catch {
+    return [];
+  }
+};
+
+const leerUsuarioFaregas = (): FaregasUserSession | null => {
+  try {
+    return JSON.parse(sessionStorage.getItem('faregasUser') || 'null') as FaregasUserSession | null;
+  } catch {
+    return null;
+  }
+};
+
 export default function App() {
   const navigate = useNavigate();
   const [isInitializing, setIsInitializing] = useState(true);
@@ -42,7 +67,7 @@ export default function App() {
   const [faregasPreToken, setFaregasPreToken] = useState<string>('');
   const [faregasAccessToken, setFaregasAccessToken] = useState<string>('');
   const [faregasPlantasDisponibles, setFaregasPlantasDisponibles] = useState<PlantaAsignada[]>([]);
-  const [faregasUser, setFaregasUser] = useState<UserSession | null>(null);
+  const [faregasUser, setFaregasUser] = useState<FaregasUserSession | null>(null);
   const [faregasPlanta, setFaregasPlanta] = useState<PlantaAsignada | null>(null);
   
   const { empresasDisponibles, establecerEmpresasDisponibles, limpiarEmpresa, empresaSeleccionada } = useEmpresa();
@@ -50,14 +75,14 @@ export default function App() {
   const isFaregas = empresaSeleccionada?.nombre?.toUpperCase().includes('FAREGAS');
 
   useEffect(() => {
-    const handleUpdate = (e: any) => {
-      const { key, activo, nombre } = e.detail;
+    const handleUpdate = (event: Event) => {
+      const { key, activo, nombre } = (event as CustomEvent<PlantaUpdateDetail>).detail;
       setFaregasPlantasDisponibles(prev => {
-        let next = prev.length > 0 ? [...prev] : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]');
+        let next: PlantaAsignada[] = prev.length > 0 ? [...prev] : leerPlantasFaregas();
         if (!activo) {
-          next = next.filter(p => p.key !== key);
+          next = next.filter((planta) => planta.key !== key);
         } else {
-          if (!next.find(p => p.key === key)) {
+          if (!next.find((planta) => planta.key === key)) {
             next.push({ key, nombre });
             next.sort((a, b) => a.nombre.localeCompare(b.nombre));
           }
@@ -69,31 +94,7 @@ export default function App() {
     window.addEventListener('updatePlantasDisponibles', handleUpdate);
     return () => window.removeEventListener('updatePlantasDisponibles', handleUpdate);
   }, []);
-
-
-  useEffect(() => {
-    const handleUpdate = (e: any) => {
-      const { key, activo, nombre } = e.detail;
-      setFaregasPlantasDisponibles(prev => {
-        let next = prev.length > 0 ? [...prev] : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]');
-        if (!activo) {
-          next = next.filter(p => p.key !== key);
-        } else {
-          if (!next.find(p => p.key === key)) {
-            next.push({ key, nombre });
-            next.sort((a, b) => a.nombre.localeCompare(b.nombre));
-          }
-        }
-        sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(next));
-        return next;
-      });
-    };
-    window.addEventListener('updatePlantasDisponibles', handleUpdate);
-    return () => window.removeEventListener('updatePlantasDisponibles', handleUpdate);
-  }, []);
-
-
-  const limpiarSesionFrontend = () => {
+  const limpiarSesionFrontend = useCallback(() => {
     sessionStorage.clear();
     plantaSession.limpiar();
     permisosSession.limpiar();
@@ -105,7 +106,7 @@ export default function App() {
     setUsernameContext('');
     setPlantasDisponibles([]);
     navigate('/login', { replace: true });
-  };
+  }, [limpiarEmpresa, navigate]);
 
   useEffect(() => {
     const restaurarSesion = async () => {
@@ -147,7 +148,7 @@ export default function App() {
     };
 
     restaurarSesion();
-  }, []);
+  }, [limpiarSesionFrontend]);
 
   const guardarSesionFrontend = (
     token: string,
@@ -226,7 +227,7 @@ export default function App() {
           navigate('/faregas/seleccionar-planta', { replace: isAutoRedirect });
         }, 0);
         return;
-      } catch (e: any) {
+      } catch (e: unknown) {
         setPendingPassword('');
         throw e;
       }
@@ -267,7 +268,7 @@ export default function App() {
       }
       
       throw new Error('No se recibió una sesión válida desde el servidor.');
-    } catch (e: any) {
+    } catch (e: unknown) {
        setPendingPassword('');
        throw e;
     }
@@ -446,8 +447,6 @@ export default function App() {
             <Navigate to={isFaregas ? '/faregas/inicio' : '/inicio'} replace />
           ) : (
             <LoginView
-              onLoginSuccess={handleLoginSuccess}
-              onRequirePlanta={handleRequirePlanta}
               onRequireEmpresa={handleRequireEmpresa}
             />
           )
@@ -529,8 +528,8 @@ export default function App() {
                   <Navigate to="/login" replace />
                 ) : (
                   <FaregasMainLayout
-                    user={faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || 'null')}
-                    permisos={(faregasUser as any)?.permisos || (JSON.parse(sessionStorage.getItem('faregasUser') || 'null') || {})?.permisos || []}
+                    user={faregasUser || leerUsuarioFaregas()}
+                    permisos={(faregasUser || leerUsuarioFaregas())?.permisos || []}
                     plantaSeleccionada={faregasPlanta || JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null')}
                     plantasDisponibles={faregasPlantasDisponibles.length > 0 ? faregasPlantasDisponibles : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]')}
                     onCambiarPlanta={handleCambiarPlantaFaregas}

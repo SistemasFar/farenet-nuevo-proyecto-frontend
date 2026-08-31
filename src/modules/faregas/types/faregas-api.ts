@@ -247,7 +247,36 @@ interface UsuarioFaregasBaseRequest {
   username: string;
   perfil_id: string | null;
   estado: boolean | 'true' | 'false';
+  user_type?: string;
+  tipoDocumentoKey?: NullableText;
+  nroDocumento?: NullableText;
+  nombres?: NullableText;
+  apellidos?: NullableText;
+  nombreRazonSocial?: NullableText;
+  paisKey?: NullableText;
+  departamentoKey?: NullableText;
+  provinciaKey?: NullableText;
+  distritoKey?: NullableText;
+  direccion?: NullableText;
+  email?: NullableText;
+  telefono?: NullableText;
+  personaContacto?: NullableText;
   sedes: string[];
+}
+
+export interface MaestroUsuario {
+  key: string;
+  nombre: string;
+}
+
+export interface UsuarioFaregas extends Omit<UsuarioFaregasBaseRequest, 'estado' | 'password' | 'sedes'> {
+  estado: boolean;
+  tipoDocumentoNombre?: string;
+  paisNombre?: string;
+  departamentoNombre?: string;
+  provinciaNombre?: string;
+  distritoNombre?: string;
+  sedes: { key: string; nombre: string }[];
 }
 
 export interface CrearUsuarioFaregasRequest extends UsuarioFaregasBaseRequest {

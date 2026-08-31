@@ -7,12 +7,22 @@ import type { FacturacionFaregas } from '../../../../types/faregas-api';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import { DocumentosElectronicosPanel } from './DocumentosElectronicosPanel';
 
+const mensajeError = (error: unknown, fallback: string): string =>
+  error instanceof Error && error.message ? error.message : fallback;
+
+const detallesError = (error: unknown): string | null => {
+  if (!error || typeof error !== 'object' || !('detalles' in error)) return null;
+  const detalles = (error as { detalles?: unknown }).detalles;
+  return Array.isArray(detalles) ? detalles.map(String).join('\n') : null;
+};
+
 interface FacturacionStepProps {
   certificadoId?: number;
   formFacturacion: FormFacturacionState;
   setFormFacturacion: Dispatch<SetStateAction<FormFacturacionState>>;
   facturacion: FacturacionFaregas | null;
   onFacturacionChange: (facturacion: FacturacionFaregas | null) => void;
+  medioPago: string;
 }
 
 export function FacturacionStep({
@@ -21,17 +31,17 @@ export function FacturacionStep({
   setFormFacturacion,
   facturacion,
   onFacturacionChange,
+  medioPago,
 }: FacturacionStepProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(Boolean(certificadoId));
   const [isSaving, setIsSaving] = useState(false);
   const [isEmitting, setIsEmitting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [integracion, setIntegracion] = useState<{ enabled: boolean; configured: boolean } | null>(null);
+  const [integracion, setIntegracion] = useState<{ enabled: boolean; configured: boolean; simulationEnabled?: boolean } | null>(null);
   const bloqueado = facturacion?.estado === 'ACEPTADO' || facturacion?.estado === 'PENDIENTE' || facturacion?.estado === 'ERROR';
 
   useEffect(() => {
     if (!certificadoId) return;
-    setIsLoading(true);
     faregasCertificadosApi.obtenerFacturacion(certificadoId)
       .then(response => {
         const guardada = response.data?.facturacion as FacturacionFaregas | null;
@@ -57,7 +67,7 @@ export function FacturacionStep({
           }));
         }
       })
-      .catch(error => Swal.fire('Facturacion', error.message || 'No se pudo recuperar la facturacion.', 'error'))
+      .catch((error: unknown) => Swal.fire('Facturacion', mensajeError(error, 'No se pudo recuperar la facturacion.'), 'error'))
       .finally(() => setIsLoading(false));
   }, [certificadoId, onFacturacionChange, setFormFacturacion]);
 
@@ -67,18 +77,20 @@ export function FacturacionStep({
     setFormFacturacion(prev => ({ ...prev, [name]: normalizado }));
   };
 
-  const datosRequest = () => ({
-    tipoComprobante: formFacturacion.tipoDocFac,
-    nroDocumento: formFacturacion.nroDocFac,
-    nombreRazonSocial: formFacturacion.razonSocialFac,
-    direccion: formFacturacion.direccionFac,
-    email: formFacturacion.emailFac || null,
-    telefono: formFacturacion.telefonoFac || null,
-    condicionPago: formFacturacion.condicionPagoFac,
-    fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
-    medioPago: formFacturacion.medioPagoFac || null,
-    cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
-  });
+  const datosRequest = () => {
+    return {
+      tipoComprobante: formFacturacion.tipoDocFac,
+      nroDocumento: formFacturacion.nroDocFac,
+      nombreRazonSocial: formFacturacion.razonSocialFac,
+      direccion: formFacturacion.direccionFac,
+      email: formFacturacion.emailFac || null,
+      telefono: formFacturacion.telefonoFac || null,
+      condicionPago: formFacturacion.condicionPagoFac,
+      fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
+      medioPago: medioPago || null,
+      cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
+    };
+  };
 
   const agregarCuota = () => setFormFacturacion(prev => ({
     ...prev,
@@ -134,8 +146,8 @@ export function FacturacionStep({
         emailFac: persona.correo || persona.email || '',
         telefonoFac: persona.telefono || '',
       }));
-    } catch (error: any) {
-      await Swal.fire('Sin coincidencias', error.message || 'No se encontro el documento en Faregas ni Farenet.', 'info');
+    } catch (error: unknown) {
+      await Swal.fire('Sin coincidencias', mensajeError(error, 'No se encontro el documento en Faregas ni Farenet.'), 'info');
     } finally {
       setIsSearching(false);
     }
@@ -165,9 +177,9 @@ export function FacturacionStep({
       const emitida = response.data as FacturacionFaregas;
       onFacturacionChange(emitida);
       await Swal.fire('Comprobante aceptado', `${emitida.nroComprobante} fue aceptado por Nubefact/SUNAT.`, 'success');
-    } catch (error: any) {
-      const detalle = Array.isArray(error.detalles) ? error.detalles.join('\n') : error.message;
-      await Swal.fire('No se emitio el comprobante', detalle || 'Revise la configuracion o respuesta de Nubefact.', 'error');
+    } catch (error: unknown) {
+      const detalle = detallesError(error) || mensajeError(error, 'Revise la configuracion o respuesta de Nubefact.');
+      await Swal.fire('No se emitio el comprobante', detalle, 'error');
     } finally {
       setIsEmitting(false);
     }
@@ -246,14 +258,14 @@ export function FacturacionStep({
 
           <div>
             <label className="mb-1 block text-xs font-bold text-slate-500">CONDICIÓN DE PAGO</label>
-            <select disabled={bloqueado} name="condicionPagoFac" value={formFacturacion.condicionPagoFac} onChange={handleInput} className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold disabled:bg-slate-100">
-              <option value="CONTADO">CONTADO</option>
-              <option value="CREDITO">CRÉDITO</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500">MEDIO DE PAGO (OPCIONAL)</label>
-            <input disabled={bloqueado} name="medioPagoFac" value={formFacturacion.medioPagoFac} onChange={handleInput} maxLength={250} className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold disabled:bg-slate-100" placeholder="EFECTIVO, TRANSFERENCIA..." />
+            <div className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 p-3">
+              <div className="font-bold text-slate-800">
+                {formFacturacion.condicionPagoFac === 'CREDITO' ? 'CRÉDITO' : 'CONTADO'}
+              </div>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                Seleccionado automáticamente en el paso Pago.
+              </p>
+            </div>
           </div>
 
           {formFacturacion.condicionPagoFac === 'CREDITO' && (
@@ -279,7 +291,11 @@ export function FacturacionStep({
           )}
         </div>
 
-        {integracion && (!integracion.enabled || !integracion.configured) && (
+        {integracion?.simulationEnabled ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-800">
+            Modo desarrollo activo: los datos se guardan y el certificado puede emitirse, pero el comprobante no se enviará a Nubefact/SUNAT.
+          </div>
+        ) : integracion && (!integracion.enabled || !integracion.configured) && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
             Nubefact esta {integracion.enabled ? 'sin URL o token configurados' : 'deshabilitado'}. Los datos pueden guardarse, pero el comprobante no podra emitirse hasta configurar el backend.
           </div>

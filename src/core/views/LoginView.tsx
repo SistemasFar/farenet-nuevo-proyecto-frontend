@@ -4,7 +4,6 @@ import { NetworkStatus } from '@/components/NetworkStatus';
 import { BackendStatus } from '@/components/BackendStatus';
 
 import type {
-  LoginResponse,
   PlantaAsignada,
   UserSession,
   EmpresaAsignada
@@ -15,22 +14,6 @@ import { useEmpresa } from '@/context/EmpresaContext';
 import bgFarenet from '@/assets/images/farenet1.png';
 
 interface LoginViewProps {
-  onLoginSuccess: (
-    token: string,
-    user: UserSession,
-    permisos: string[],
-    plantaSeleccionada?: PlantaAsignada | null,
-    plantas?: PlantaAsignada[],
-    empresas?: EmpresaAsignada[]
-  ) => void;
-
-  onRequirePlanta: (
-    username: string,
-    plantas: PlantaAsignada[],
-    user?: UserSession,
-    permisos?: string[]
-  ) => void;
-
   onRequireEmpresa: (
     username: string,
     plantas: PlantaAsignada[],
@@ -42,8 +25,6 @@ interface LoginViewProps {
 }
 
 export function LoginView({
-  onLoginSuccess,
-  onRequirePlanta,
   onRequireEmpresa
 }: LoginViewProps) {
   const [username, setUsername] = useState('');
@@ -51,7 +32,7 @@ export function LoginView({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
-  const { seleccionarEmpresa, limpiarEmpresa } = useEmpresa();
+  const { limpiarEmpresa } = useEmpresa();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

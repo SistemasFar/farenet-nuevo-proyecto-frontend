@@ -1,18 +1,24 @@
 import React from 'react';
 import { CreditCard, PlusCircle, Trash2 } from 'lucide-react';
+import type { MaestrosPagoResponse } from '@/types/maestros';
+import type { FormPagoState, PagoAgregado } from '../../NuevoCertificadoView';
+
+type TipoPago = PagoAgregado['tipo'];
 
 interface PagoStepProps {
   pagoTab: 'EFECTIVO' | 'TARJETA' | 'BANCO';
-  setPagoTab: (tab: 'EFECTIVO' | 'TARJETA' | 'BANCO') => void;
-  formPago: any;
-  setFormPago: (data: any) => void;
-  pagosAgregados: any[];
+  setPagoTab: (tab: TipoPago) => void;
+  formPago: FormPagoState;
+  setFormPago: React.Dispatch<React.SetStateAction<FormPagoState>>;
+  pagosAgregados: PagoAgregado[];
   handleAgregarPago: () => void;
   eliminarPago: (index: number) => void;
   totalPagar: number;
   tarifaOriginal?: number;
   descuento?: number;
-  maestrosPago?: any;
+  maestrosPago?: MaestrosPagoResponse['data'] | null;
+  condicionPago: 'CONTADO' | 'CREDITO';
+  onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
 }
 
 export function PagoStep({
@@ -27,20 +33,22 @@ export function PagoStep({
   tarifaOriginal = totalPagar,
   descuento = 0,
   maestrosPago,
+  condicionPago,
+  onCondicionPagoChange,
 }: PagoStepProps) {
 
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
   const pendiente = totalPagar - pagado;
-  const cuentasFiltradas = (maestrosPago?.cuentasCorrientes || []).filter((cuenta: any) =>
+  const cuentasFiltradas = (maestrosPago?.cuentasCorrientes || []).filter((cuenta) =>
     !formPago.entidadFinancieraKey || cuenta.entidadfinanciera_key === formPago.entidadFinancieraKey
   );
-  const tarjetaSeleccionada = (maestrosPago?.tarjetas || []).find((tarjeta: any) => tarjeta.key === formPago.tarjetaKey);
+  const tarjetaSeleccionada = (maestrosPago?.tarjetas || []).find((tarjeta) => tarjeta.key === formPago.tarjetaKey);
   const tarjetaSinDigitos = ['CUPONIDAD', 'PAGO WEB', 'YAPE', 'PLIN'].some(tipo =>
     String(tarjetaSeleccionada?.nombre || '').toUpperCase().includes(tipo)
   );
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormPago((prev: any) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
+    setFormPago((prev) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
 
   const agregarMockPago = () => {
@@ -66,12 +74,23 @@ export function PagoStep({
         
         {/* PANEL IZQUIERDO: INGRESAR PAGO */}
         <div className="lg:col-span-2 space-y-6">
+          <div className="rounded-2xl border-2 border-slate-200 bg-white p-5">
+            <label className="mb-2 block text-xs font-bold text-slate-500">CONDICIÓN DE PAGO</label>
+            <select
+              value={condicionPago}
+              onChange={(event) => onCondicionPagoChange(event.target.value as 'CONTADO' | 'CREDITO')}
+              className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold text-[#052a79]"
+            >
+              <option value="CONTADO">CONTADO — debe completar el pago</option>
+              <option value="CREDITO">CRÉDITO — el saldo se distribuirá en cuotas</option>
+            </select>
+          </div>
           <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex border-b border-slate-200 bg-slate-50">
               {['EFECTIVO', 'TARJETA', 'BANCO'].map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setPagoTab(tab as any)}
+                  onClick={() => setPagoTab(tab as TipoPago)}
                   className={`flex-1 py-4 font-bold text-sm tracking-wider transition-colors ${
                     pagoTab === tab
                       ? 'bg-white text-[#052a79] border-b-2 border-b-[#f59e0b]'
@@ -103,7 +122,7 @@ export function PagoStep({
                     <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TARJETA</label>
                     <select name="tarjetaKey" value={formPago.tarjetaKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
                       <option value="">-- SELECCIONAR --</option>
-                      {(maestrosPago?.tarjetas || []).map((tarjeta: any) => (
+                      {(maestrosPago?.tarjetas || []).map((tarjeta) => (
                         <option key={tarjeta.key} value={tarjeta.key}>{tarjeta.nombre}</option>
                       ))}
                     </select>
@@ -123,7 +142,7 @@ export function PagoStep({
                     <label className="block text-xs font-bold text-slate-500 mb-1">ENTIDAD FINANCIERA</label>
                     <select name="entidadFinancieraKey" value={formPago.entidadFinancieraKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
                       <option value="">-- SELECCIONAR --</option>
-                      {(maestrosPago?.entidadesFinancieras || []).map((entidad: any) => (
+                      {(maestrosPago?.entidadesFinancieras || []).map((entidad) => (
                         <option key={entidad.key} value={entidad.key}>{entidad.nombre}</option>
                       ))}
                     </select>
@@ -132,7 +151,7 @@ export function PagoStep({
                     <label className="block text-xs font-bold text-slate-500 mb-1">CUENTA CORRIENTE</label>
                     <select name="cuentaCorrienteKey" value={formPago.cuentaCorrienteKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
                       <option value="">-- SELECCIONAR --</option>
-                      {cuentasFiltradas.map((cuenta: any) => (
+                      {cuentasFiltradas.map((cuenta) => (
                         <option key={cuenta.key} value={cuenta.key}>{cuenta.nombre}</option>
                       ))}
                     </select>
@@ -206,7 +225,11 @@ export function PagoStep({
               </div>
             </div>
             {pendiente > 0 ? (
-              <p className="text-xs text-red-500 font-bold text-center mt-6 uppercase">Debe completar el saldo para continuar</p>
+              <p className={`text-xs font-bold text-center mt-6 uppercase ${condicionPago === 'CREDITO' ? 'text-blue-600' : 'text-red-500'}`}>
+                {condicionPago === 'CREDITO'
+                  ? 'El saldo pendiente se registrará en cuotas'
+                  : 'Debe completar el saldo para continuar'}
+              </p>
             ) : (
               <div className="mt-6 bg-green-100 text-green-700 text-xs font-bold p-3 rounded-lg text-center uppercase border border-green-200">
                 Monto Completo

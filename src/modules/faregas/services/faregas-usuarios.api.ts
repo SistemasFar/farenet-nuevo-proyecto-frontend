@@ -6,6 +6,7 @@ import type {
   CrearUsuarioFaregasRequest,
 } from '../types/faregas-api';
 
+
 export const faregasUsuariosApi = {
   obtenerUsuarios: () => fetchWithToken('/usuarios'),
   crearUsuario: (data: CrearUsuarioFaregasRequest) => fetchWithToken('/usuarios', {
@@ -36,5 +37,9 @@ export const faregasUsuariosApi = {
     method: 'DELETE'
   }),
   obtenerPlantas: () => fetchWithToken('/usuarios/plantas'),
-  obtenerPermisos: () => fetchWithToken('/usuarios/permisos')
+  obtenerPermisos: () => fetchWithToken('/usuarios/permisos'),
+  getMaestrosPersona: () => fetchWithToken('/usuarios/maestros/persona'),
+  getDepartamentos: (paisKey: string) => fetchWithToken(`/usuarios/maestros/departamentos/${paisKey}`),
+  getProvincias: (departamentoKey: string) => fetchWithToken(`/usuarios/maestros/provincias/${departamentoKey}`),
+  getDistritos: (provinciaKey: string) => fetchWithToken(`/usuarios/maestros/distritos/${provinciaKey}`)
 };

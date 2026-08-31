@@ -37,16 +37,7 @@ function routeToTitle(tabId: string): string {
   return map[tabId] ?? 'Panel';
 }
 
-function esPerfilSistemas(user: UserSession | null): boolean {
-  const perfil = String(user?.perfilId || '').toLowerCase().trim();
-  const userType = String(user?.userType || '').toLowerCase().trim();
 
-  return (
-    perfil === 'sistemas' ||
-    perfil === 'administrador' ||
-    userType === 'sistemas'
-  );
-}
 
 export function Header({
   user,
@@ -73,8 +64,6 @@ export function Header({
 
   const userInitial =
     userName.trim()[0]?.toUpperCase() ?? 'U';
-
-  const mostrarBackendStatus = esPerfilSistemas(user);
 
   useEffect(() => {
     function handler(e: MouseEvent) {

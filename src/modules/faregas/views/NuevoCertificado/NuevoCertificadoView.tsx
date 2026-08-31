@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
-/* eslint-disable react-hooks/immutability */
 import React, { useState, useEffect } from 'react';
 import { maestrosApi, inspeccionesApi } from '@/services/api';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
@@ -21,6 +20,7 @@ import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/farega
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { validarDatosIniciales, validarExpedienteTecnico } from './faregas-wizard.validation';
+import { calcularMedioPago } from './faregas-facturacion.utils';
 
 
 
@@ -51,6 +51,11 @@ export interface FormPagoState {
   cuentaCorrienteKey?: string;
   fechaDeposito?: string;
   digitosTarjeta?: string;
+}
+
+export interface PagoAgregado extends FormPagoState {
+  id?: number;
+  tipo: 'EFECTIVO' | 'TARJETA' | 'BANCO';
 }
 
 export interface FormVehiculoState {
@@ -156,16 +161,13 @@ export function NuevoCertificadoView() {
 
   const [isConsultado, setIsConsultado] = useState(false);
 
-  // Estados de vehiculo y facturacion (comunes)
-  const [showAnularModal, setShowAnularModal] = useState(false);
-  const [showCamposVaciosModal, setShowCamposVaciosModal] = useState(false);
-  const [documentoDescuento, setDocumentoDescuento] = useState('');
+
 
   const [precioSubtotal, setPrecioSubtotal] = useState<number>(0);
   const [descuento, setDescuento] = useState<number>(0);
   const [precioTotal, setPrecioTotal] = useState<number>(0);
 
-  const [documentoPago, setDocumentoPago] = useState<string>('');
+
 
   // Form State (Caja)
   const [formCaja, setFormCaja] = useState<FormCajaState>({
@@ -183,9 +185,9 @@ export function NuevoCertificadoView() {
 
   // Pago State
   const [maestrosPago, setMaestrosPago] = useState<MaestrosPagoResponse['data'] | null>(null);
-  const [pagosAgregados, setPagosAgregados] = useState<any[]>([]);
+  const [pagosAgregados, setPagosAgregados] = useState<PagoAgregado[]>([]);
   const [pagoTab, setPagoTab] = useState<'EFECTIVO' | 'TARJETA' | 'BANCO'>('EFECTIVO');
-  const [disablePagoTabs, setDisablePagoTabs] = useState(false);
+
 
   // Form State (Pago)
   const [formPago, setFormPago] = useState<FormPagoState>({
@@ -210,7 +212,6 @@ export function NuevoCertificadoView() {
   const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
   const [talleres, setTalleres] = useState<any[]>([]);
   const [isEmitido, setIsEmitido] = useState(false);
-  const [isVehiculoValid, setIsVehiculoValid] = useState(false);
   const [vehiculoOrigen, setVehiculoOrigen] = useState<'FARENET' | 'BORRADOR' | 'MANUAL'>('MANUAL');
   const [expedienteError, setExpedienteError] = useState('');
   const [formVehiculo, setFormVehiculo] = useState<FormVehiculoState>({
@@ -222,7 +223,6 @@ export function NuevoCertificadoView() {
   });
 
   // Form State (Facturación)
-  const [isFacturacionValid, setIsFacturacionValid] = useState(false);
   const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
     tipoDocFac: '', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
@@ -230,14 +230,25 @@ export function NuevoCertificadoView() {
     medioPagoFac: '', cuotasFac: []
   });
   const [facturacion, setFacturacion] = useState<FacturacionFaregas | null>(null);
+  const medioPagoCalculado = React.useMemo(
+    () => calcularMedioPago(pagosAgregados),
+    [pagosAgregados]
+  );
 
-  // Form State (Verificación)
-  const [formVerificacion, setFormVerificacion] = useState<FormVerificacionState>({
-    tipoInspeccion: '',
-    tipoCertificado: '',
-    tipoAutorizacion: '',
-    linea: ''
+  const construirPayloadFacturacion = () => ({
+    tipoComprobante: formFacturacion.tipoDocFac || 'BOLETA',
+    nroDocumento: formFacturacion.nroDocFac,
+    nombreRazonSocial: formFacturacion.razonSocialFac,
+    direccion: formFacturacion.direccionFac,
+    email: formFacturacion.emailFac || null,
+    telefono: formFacturacion.telefonoFac || null,
+    condicionPago: formFacturacion.condicionPagoFac,
+    fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
+    medioPago: medioPagoCalculado || null,
+    cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
   });
+
+
 
   const plantaAnterior = React.useRef(plantaSeleccionada);
   useEffect(() => {
@@ -279,12 +290,7 @@ export function NuevoCertificadoView() {
     await faregasCertificadosApi.actualizarPasoBorrador(idBorrador, paso);
   };
 
-  const validarVerificacion = () => {
-    return formVerificacion.tipoInspeccion !== '' &&
-      formVerificacion.tipoCertificado !== '' &&
-      formVerificacion.tipoAutorizacion !== '' &&
-      formVerificacion.linea !== '';
-  };
+
 
   const mostrarErroresPaso = (errores: string[]) => {
     if (errores.length === 0) return false;
@@ -297,11 +303,7 @@ export function NuevoCertificadoView() {
     return true;
   };
 
-  const getCategoriaName = () => {
-    if (!maestros || !formCaja.categoria) return '';
-    const cat = maestros.categorias.find(c => c.key === formCaja.categoria);
-    return cat ? cat.nombre.toUpperCase() : '';
-  };
+
 
   useEffect(() => {
     // Cleanup de notificaciones flotantes (SweetAlert2 toasts) al desmontar la vista
@@ -527,75 +529,11 @@ export function NuevoCertificadoView() {
         }));
       }
     }
-  }, [formVehiculo.marca, maestrosVehiculo]);
-
-  // NAVEGACIÓN CON FLECHAS DEL TECLADO
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignorar si el usuario está escribiendo en un input, textarea o select
-      const tagName = (e.target as HTMLElement).tagName;
-      if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
-        return;
-      }
-
-      if (e.key === 'ArrowRight') {
-        irSiguientePaso();
-      } else if (e.key === 'ArrowLeft') {
-        irPasoAnterior();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStepIndex, formCaja, formVehiculo, formFacturacion, isVehiculoValid, isFacturacionValid, pagosAgregados, isSavingStep]);
+  }, [formVehiculo.marca, formVehiculo.marcaCarroceria, maestrosVehiculo]);
 
   // Sincronizar Marca con Marca Carrocería
 
-  const handleSelectChange = (name: string, option: any) => {
-    const value = option ? option.value : '';
-    setFormCaja((prev: any) => ({ ...prev, [name]: value }));
-    const critical = ['tipoPlaca', 'placa', 'concepto', 'categoria', 'tipoCertificado', 'tipoAutorizacion'];
-    if (critical.includes(name)) {
-      setIsConsultado(false);
-    }
-  };
 
-  const handleCajaChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const critical = ['tipoPlaca', 'placa', 'concepto', 'categoria', 'tipoCertificado', 'tipoAutorizacion'];
-
-    if (critical.includes(name)) {
-      setIsConsultado(false);
-    }
-
-    if (name === 'tipoPlaca') {
-      setFormCaja((prev: any) => ({ ...prev, [name]: value }));
-      return;
-    }
-
-    if (name === 'placa') {
-      let val = value.toUpperCase();
-      let maxLen = 17;
-
-      const tp = maestros?.tiposPlaca?.find((x: any) => x.id?.toString() === formCaja.tipoPlaca?.toString());
-      if (tp) {
-        const n = tp.nombre?.toUpperCase() || '';
-        if (n.includes('DIPLOMATIC') || n.includes('DIPLOMÁTIC')) maxLen = 6;
-        else if (n.includes('INCORPORACI')) maxLen = 17;
-        else if (n.includes('RUTINARI')) maxLen = 6;
-        else if (n.includes('EXTRANJER')) maxLen = 7;
-      }
-
-      if (val.length > maxLen) {
-        val = val.slice(0, maxLen);
-      }
-
-      setFormCaja((prev: any) => ({ ...prev, [name]: val }));
-      return;
-    }
-
-    setFormCaja((prev: any) => ({ ...prev, [name]: value }));
-  };
 
 
 
@@ -845,9 +783,9 @@ export function NuevoCertificadoView() {
       })),
     });
     const pagosGuardados = response.data?.pagos || [];
-    setPagosAgregados(pagosGuardados.map((pago: any) => ({
+    setPagosAgregados(pagosGuardados.map((pago: any): PagoAgregado => ({
       id: pago.id,
-      tipo: String(pago.tipoContadoKey || '').toUpperCase(),
+      tipo: String(pago.tipoContadoKey || '').toUpperCase() as PagoAgregado['tipo'],
       importe: Number(pago.importe).toFixed(2),
       tarjetaKey: pago.tarjetaKey || '',
       nroOperacion: pago.nroOperacionBanco || pago.nroOperacionTarjeta || '',
@@ -981,8 +919,13 @@ export function NuevoCertificadoView() {
         }
       } else if (STEPS[currentStepIndex].id === 'pago' && certificadoId) {
         const totalPagado = pagosAgregados.reduce((total, pago) => total + Number(pago.importe || 0), 0);
-        if (Math.abs(totalPagado - precioTotal) > 0.009) {
+        const esCredito = formFacturacion.condicionPagoFac === 'CREDITO';
+        if (!esCredito && Math.abs(totalPagado - precioTotal) > 0.009) {
           mostrarErroresPaso([`El pago debe completar S/ ${precioTotal.toFixed(2)}. Saldo pendiente: S/ ${Math.max(0, precioTotal - totalPagado).toFixed(2)}.`]);
+          return;
+        }
+        if (esCredito && totalPagado >= precioTotal - 0.009) {
+          mostrarErroresPaso(['Una venta al crédito debe conservar un saldo pendiente para distribuirlo en cuotas.']);
           return;
         }
         setIsSavingStep(true);
@@ -1002,18 +945,7 @@ export function NuevoCertificadoView() {
           if (!certificadoId) throw new Error('No existe certificado');
           setIsSavingStep(true);
           try {
-            const payloadFact = {
-              tipoComprobante: formFacturacion.tipoDocFac || 'BOLETA',
-              nroDocumento: formFacturacion.nroDocFac,
-              nombreRazonSocial: formFacturacion.razonSocialFac,
-              direccion: formFacturacion.direccionFac,
-              email: formFacturacion.emailFac || null,
-              telefono: formFacturacion.telefonoFac || null,
-              condicionPago: formFacturacion.condicionPagoFac,
-              fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
-              medioPago: formFacturacion.medioPagoFac || null,
-              cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
-            };
+            const payloadFact = construirPayloadFacturacion();
             await faregasCertificadosApi.guardarFacturacion(certificadoId, payloadFact);
           } catch (e: any) {
             const res = await Swal.fire({
@@ -1069,18 +1001,7 @@ export function NuevoCertificadoView() {
       if (tieneDatosFacturacion) {
         setIsSavingStep(true);
         try {
-          const payloadFact = {
-            tipoComprobante: formFacturacion.tipoDocFac || 'BOLETA',
-            nroDocumento: formFacturacion.nroDocFac,
-            nombreRazonSocial: formFacturacion.razonSocialFac,
-            direccion: formFacturacion.direccionFac,
-            email: formFacturacion.emailFac || null,
-            telefono: formFacturacion.telefonoFac || null,
-            condicionPago: formFacturacion.condicionPagoFac,
-            fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
-            medioPago: formFacturacion.medioPagoFac || null,
-            cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
-          };
+          const payloadFact = construirPayloadFacturacion();
           await faregasCertificadosApi.guardarFacturacion(certificadoId, payloadFact);
         } catch (e: any) {
           const res = await Swal.fire({
@@ -1105,18 +1026,44 @@ export function NuevoCertificadoView() {
 
   const irPasoAnterior = () => irAtrasOStep(currentStepIndex - 1);
 
+  const navegarConFlecha = React.useEffectEvent((direccion: 'ANTERIOR' | 'SIGUIENTE') => {
+    if (direccion === 'SIGUIENTE') {
+      void irSiguientePaso();
+    } else {
+      irPasoAnterior();
+    }
+  });
+
+  // Navegación por teclado. Se registra después de construir ambos manejadores
+  // para que siempre utilice las validaciones y el estado de la vista actual.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const tagName = (event.target as HTMLElement).tagName;
+      if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') return;
+
+      if (event.key === 'ArrowRight') {
+        navegarConFlecha('SIGUIENTE');
+      } else if (event.key === 'ArrowLeft') {
+        navegarConFlecha('ANTERIOR');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const montoPendiente = Math.max(0, precioTotal - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
 
   // Efecto para inyectar automticamente el pago de Cuponidad
   useEffect(() => {
     if (formCaja.descuentoObj?.isCuponidad) {
       const uuid = formCaja.descuentoObj.documentoBusqueda || formCaja.descuentoObj.uuid;
-      const cuponidadTarjeta = maestrosPago?.tarjetas?.find((t: any) => t.nombre.toUpperCase().includes('CUPONIDAD'));
+      const cuponidadTarjeta = maestrosPago?.tarjetas?.find((tarjeta) => tarjeta.nombre.toUpperCase().includes('CUPONIDAD'));
 
       if (cuponidadTarjeta) {
-        const pagoExiste = pagosAgregados.some((p: any) => p.nroOperacion === uuid);
+        const pagoExiste = pagosAgregados.some((pago) => pago.nroOperacion === uuid);
         if (!pagoExiste) {
-          const nuevoPago = {
+          const nuevoPago: PagoAgregado = {
             tipo: 'TARJETA',
             tarjetaKey: cuponidadTarjeta.key,
             nroOperacion: uuid,
@@ -1134,26 +1081,16 @@ export function NuevoCertificadoView() {
 
   // Efecto para auto-llenar pagos de Cortesía u otros que dejan el total en 0
   useEffect(() => {
-    if (currentStepIndex === 1 && maestrosPago && formCaja.descuentoObj) {
-
-      // Si el monto pendiente es 0 (ej. Cortesía, 100% descuento)
-      if (montoPendiente === 0) {
-        setDisablePagoTabs(true);
-        setFormPago((prev: any) => ({ ...prev, importe: '0' }));
-        // Si el precio total es 0, asegurarnos de no tener pagos "basura"
-        if (precioTotal === 0 && pagosAgregados.length > 0) {
-          setPagosAgregados([]);
-        }
-      } else {
-        setDisablePagoTabs(false);
-      }
-    } else if (currentStepIndex === 1) {
-      // En caso de que se haya quitado el descuento
-      if (montoPendiente > 0) {
-        setDisablePagoTabs(false);
-      }
+    if (currentStepIndex !== 1 || !maestrosPago || !formCaja.descuentoObj || montoPendiente !== 0) {
+      return;
     }
-  }, [currentStepIndex, formCaja.descuentoObj, maestrosPago, precioTotal, montoPendiente]);
+
+    setFormPago((prev) => ({ ...prev, importe: '0' }));
+    // Si el precio total es 0, no deben conservarse pagos de una tarifa anterior.
+    if (precioTotal === 0 && pagosAgregados.length > 0) {
+      setPagosAgregados([]);
+    }
+  }, [currentStepIndex, formCaja.descuentoObj, maestrosPago, precioTotal, montoPendiente, pagosAgregados.length]);
 
   const handleAgregarPago = async () => {
     if (!formPago.importe || isNaN(parseFloat(formPago.importe)) || parseFloat(formPago.importe) <= 0) {
@@ -1217,7 +1154,7 @@ export function NuevoCertificadoView() {
       return;
     }
 
-    const nuevoPago = {
+    const nuevoPago: PagoAgregado = {
       tipo: pagoTab,
       ...formPago,
       importe: importeNumerico.toFixed(2),
@@ -1435,6 +1372,13 @@ export function NuevoCertificadoView() {
             tarifaOriginal={precioSubtotal}
             descuento={descuento}
             maestrosPago={maestrosPago}
+            condicionPago={formFacturacion.condicionPagoFac}
+            onCondicionPagoChange={(condicionPago) => setFormFacturacion((prev) => ({
+              ...prev,
+              condicionPagoFac: condicionPago,
+              fechaVencimientoFac: condicionPago === 'CONTADO' ? '' : prev.fechaVencimientoFac,
+              cuotasFac: condicionPago === 'CONTADO' ? [] : prev.cuotasFac,
+            }))}
           />
         )}
         {STEPS[currentStepIndex].id === 'facturacion' && (
@@ -1444,6 +1388,7 @@ export function NuevoCertificadoView() {
             setFormFacturacion={setFormFacturacion}
             facturacion={facturacion}
             onFacturacionChange={setFacturacion}
+            medioPago={medioPagoCalculado}
           />
         )}
         {STEPS[currentStepIndex].id === 'previsualizacion' && (

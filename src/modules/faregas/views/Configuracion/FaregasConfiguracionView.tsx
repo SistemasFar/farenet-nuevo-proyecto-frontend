@@ -25,7 +25,6 @@ export function FaregasConfiguracionView() {
   const hasServicios = true; // permisos.includes('CONFIGURACION_SERVICIOS');
   const hasCategorias = permisos.includes('CONFIGURACION_CATEGORIAS');
   const hasProductos = permisos.includes('CONFIGURACION_PRODUCTOS');
-  const hasTarifas = permisos.includes('CONFIGURACION_TARIFAS');
   const hasSeries = permisos.includes('CONFIGURACION_SERIES');
   // La relación empresa-sede forma parte de la administración de sedes.
   // El permiso específico permite separarla en perfiles futuros, mientras

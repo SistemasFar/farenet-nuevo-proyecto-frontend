@@ -21,6 +21,12 @@ interface VerificacionStepProps {
   facturacion: FacturacionFaregas | null;
 }
 
+interface ValidacionEmisionResult {
+  valido: boolean;
+  errores: any[];
+  modoFacturacion?: 'NUBEFACT' | 'SIMULACION';
+}
+
 export function VerificacionStep({
   certificadoId,
   onEmisionExitosa,
@@ -39,9 +45,10 @@ export function VerificacionStep({
   const totalPagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
 
   const [isValidating, setIsValidating] = useState(false);
-  const [validacionResult, setValidacionResult] = useState<{ valido: boolean; errores: any[] } | null>(null);
+  const [validacionResult, setValidacionResult] = useState<ValidacionEmisionResult | null>(null);
   const [isEmitting, setIsEmitting] = useState(false);
   const [emisionResult, setEmisionResult] = useState<{ numero_certificado: string; fecha_emision: string; estado: string } | null>(null);
+  const facturacionSimulada = validacionResult?.modoFacturacion === 'SIMULACION';
 
   const validar = async () => {
     if (!certificadoId) return;
@@ -68,7 +75,9 @@ export function VerificacionStep({
 
     Swal.fire({
       title: '¿Confirmas la emisión del certificado?',
-      text: 'Esta acción asignará el número correlativo definitivo y no debe ejecutarse por error.',
+      text: facturacionSimulada
+        ? 'Modo desarrollo: se asignará el correlativo definitivo, pero el comprobante no se enviará a Nubefact/SUNAT.'
+        : 'Esta acción asignará el número correlativo definitivo y no debe ejecutarse por error.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#16a34a',
@@ -85,7 +94,13 @@ export function VerificacionStep({
             fecha_emision: response.data.fecha_emision || new Date().toISOString(),
             estado: response.data.estado || 'EMITIDO'
           });
-          Swal.fire('¡Éxito!', 'Certificado emitido correctamente', 'success');
+          Swal.fire(
+            '¡Éxito!',
+            facturacionSimulada
+              ? 'Certificado emitido en modo desarrollo. El comprobante no fue enviado a Nubefact/SUNAT.'
+              : 'Certificado emitido correctamente',
+            'success'
+          );
           if (onEmisionExitosa) onEmisionExitosa();
         } catch (e: any) {
           console.error(e);
@@ -166,7 +181,15 @@ export function VerificacionStep({
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {(!facturacion || facturacion.estado !== 'ACEPTADO' || !facturacion.aceptadaSunat) && (
+      {facturacionSimulada ? (
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl shadow-sm mb-6 flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-blue-500 flex-shrink-0" />
+          <div>
+            <h4 className="font-bold text-blue-800">Facturación simulada — modo desarrollo</h4>
+            <p className="text-sm text-blue-700">Puedes emitir el certificado para realizar pruebas. El comprobante no será enviado ni marcado como aceptado por Nubefact/SUNAT.</p>
+          </div>
+        </div>
+      ) : (!facturacion || facturacion.estado !== 'ACEPTADO' || !facturacion.aceptadaSunat) && (
         <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm mb-6 flex items-start gap-3">
           <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0" />
           <div>
@@ -248,7 +271,11 @@ export function VerificacionStep({
       {!isValidating && validacionResult?.valido && (
         <div className="bg-green-50 border border-green-200 p-4 rounded-xl flex items-center gap-3 text-green-700">
           <CheckCircle2 className="w-6 h-6 flex-shrink-0 text-green-500" />
-          <span className="font-bold">CERTIFICADO LISTO PARA EMITIR. Todo está en orden.</span>
+          <span className="font-bold">
+            {facturacionSimulada
+              ? 'CERTIFICADO LISTO PARA EMITIR EN MODO DESARROLLO. La facturación no se enviará a SUNAT.'
+              : 'CERTIFICADO LISTO PARA EMITIR. Todo está en orden.'}
+          </span>
         </div>
       )}
 
@@ -351,7 +378,9 @@ export function VerificacionStep({
               <div className="text-slate-500 font-semibold">Comprobante:</div>
               <div className="font-bold text-slate-800 uppercase">{facturacion?.nroComprobante || formFacturacion.tipoDocFac || '-'}</div>
               <div className="text-slate-500 font-semibold">Estado SUNAT:</div>
-              <div className="font-bold text-green-700 uppercase">{facturacion?.estado || '-'}</div>
+              <div className={`font-bold uppercase ${facturacionSimulada ? 'text-blue-700' : 'text-green-700'}`}>
+                {facturacionSimulada ? 'NO ENVIADO (SIMULACIÓN)' : facturacion?.estado || '-'}
+              </div>
               <div className="text-slate-500 font-semibold">DNI/RUC:</div>
               <div className="font-bold text-slate-800 uppercase">{formFacturacion.nroDocFac || '-'}</div>
               <div className="text-slate-500 font-semibold">Cliente:</div>
