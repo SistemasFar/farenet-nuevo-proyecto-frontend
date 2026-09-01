@@ -3,6 +3,7 @@
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { TitularesList, type TitularState } from './TitularesList';
 import React, { useEffect } from 'react';
+import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import {
   formatVIN,
   formatAlfanumerico,
@@ -29,6 +30,8 @@ interface VehiculoStepProps {
   setFormConformidad: (data: any) => void;
   titulares: TitularState[];
   setTitulares: React.Dispatch<React.SetStateAction<TitularState[]>>;
+  formFacturacion: FormFacturacionState;
+  setFormFacturacion: React.Dispatch<React.SetStateAction<FormFacturacionState>>;
   onRemoveTitular?: (titular: TitularState) => Promise<void>;
   catalogoVerificaciones?: any;
   talleres?: any[];
@@ -51,6 +54,8 @@ export function VehiculoStep({
   setFormConformidad,
   titulares,
   setTitulares,
+  formFacturacion,
+  setFormFacturacion,
   onRemoveTitular,
   catalogoVerificaciones,
   talleres,
@@ -335,7 +340,13 @@ export function VehiculoStep({
       </div>
 
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <TitularesList titulares={titulares} setTitulares={setTitulares} onRemoveTitular={onRemoveTitular} />
+        <TitularesList
+          titulares={titulares}
+          setTitulares={setTitulares}
+          formFacturacion={formFacturacion}
+          setFormFacturacion={setFormFacturacion}
+          onRemoveTitular={onRemoveTitular}
+        />
       </div>
 
       {/* 2. SECCIÓN DINÁMICA SEGÚN CERTIFICADO */}

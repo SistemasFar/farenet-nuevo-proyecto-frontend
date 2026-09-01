@@ -1,7 +1,8 @@
 import React from 'react';
-import { Search, Plus, Trash2 } from 'lucide-react';
+import { Search, Plus, Trash2, ReceiptText } from 'lucide-react';
 import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
 import Swal from 'sweetalert2';
+import type { FormFacturacionState } from '../../NuevoCertificadoView';
 
 export interface TitularState {
   _uuid: string; // for React keys
@@ -17,10 +18,18 @@ export interface TitularState {
 interface TitularesListProps {
   titulares: TitularState[];
   setTitulares: React.Dispatch<React.SetStateAction<TitularState[]>>;
+  formFacturacion: FormFacturacionState;
+  setFormFacturacion: React.Dispatch<React.SetStateAction<FormFacturacionState>>;
   onRemoveTitular?: (titular: TitularState) => Promise<void>;
 }
 
-export function TitularesList({ titulares, setTitulares, onRemoveTitular }: TitularesListProps) {
+export function TitularesList({
+  titulares,
+  setTitulares,
+  formFacturacion,
+  setFormFacturacion,
+  onRemoveTitular,
+}: TitularesListProps) {
   
   const handleAdd = () => {
     const nextOrden = titulares.length > 0 ? Math.max(...titulares.map(t => t.orden)) + 1 : 1;
@@ -127,10 +136,53 @@ export function TitularesList({ titulares, setTitulares, onRemoveTitular }: Titu
     }
   };
 
+  const handleFacturacionChange = (field: keyof FormFacturacionState, value: string | boolean) => {
+    setFormFacturacion(prev => {
+      if (typeof value === 'boolean') return { ...prev, [field]: value };
+
+      let normalizado = value.toUpperCase();
+      if (field === 'emailFac') normalizado = value.trim().toLowerCase();
+      if (field === 'nroDocFac') normalizado = value.replace(/\D/g, '').slice(0, 11);
+      if (field === 'telefonoFac') normalizado = value.replace(/[^0-9+()\-\s]/g, '').slice(0, 30);
+      return { ...prev, [field]: normalizado };
+    });
+  };
+
+  const buscarClienteFacturacion = async () => {
+    const documento = formFacturacion.nroDocFac.replace(/\D/g, '');
+    const tipoDocumento = documento.length === 11 ? 'RUC' : documento.length === 8 ? 'DNI' : '';
+    if (!tipoDocumento) {
+      await Swal.fire('Documento inválido', 'Ingrese un DNI de 8 dígitos o un RUC de 11 dígitos.', 'warning');
+      return;
+    }
+
+    try {
+      const response = await faregasClientesApi.autocompletarPersona(tipoDocumento, documento);
+      const persona = response.data;
+      setFormFacturacion(prev => ({
+        ...prev,
+        tipoDocFac: tipoDocumento === 'RUC' ? 'FACTURA' : 'BOLETA',
+        razonSocialFac: persona.nombreRazonSocial || persona.nombrerazonsocial || '',
+        direccionFac: persona.direccion || '',
+        emailFac: persona.correo || persona.email || prev.emailFac,
+        telefonoFac: persona.telefono || prev.telefonoFac,
+      }));
+      await Swal.fire({
+        icon: 'success',
+        title: 'Cliente encontrado',
+        text: persona.origen === 'FAREGAS' ? 'Datos recuperados de Faregas.' : 'Datos recuperados de Farenet.',
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    } catch {
+      await Swal.fire('Sin coincidencias', 'Puede completar los datos de facturación manualmente.', 'info');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-        <h4 className="text-sm font-bold text-[#052a79] uppercase tracking-wider">C. Titulares del Certificado</h4>
+        <h4 className="text-sm font-bold text-[#052a79] uppercase tracking-wider">C. Titulares y Datos de Facturación</h4>
         <button type="button" onClick={handleAdd} className="flex items-center gap-1 text-xs font-bold text-white bg-[#052a79] hover:bg-[#041d54] px-3 py-1.5 rounded-lg transition-colors">
           <Plus className="w-4 h-4" /> Agregar Titular
         </button>
@@ -185,6 +237,118 @@ export function TitularesList({ titulares, setTitulares, onRemoveTitular }: Titu
           No hay titulares. Haga clic en "Agregar Titular" para registrar uno.
         </div>
       )}
+
+      <div className="overflow-hidden rounded-xl border-2 border-blue-200 bg-blue-50/40">
+        <div className="flex flex-col gap-3 border-b border-blue-200 bg-blue-50 p-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-[#052a79] p-2 text-white">
+              <ReceiptText className="h-5 w-5" />
+            </div>
+            <div>
+              <h5 className="text-sm font-black uppercase text-[#052a79]">Datos para facturación</h5>
+              <p className="text-xs font-medium text-slate-600">Se utilizarán posteriormente para emitir la boleta o factura.</p>
+            </div>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+            <input
+              type="checkbox"
+              checked={formFacturacion.usarTitularPrincipalFac}
+              onChange={(event) => handleFacturacionChange('usarTitularPrincipalFac', event.target.checked)}
+              className="h-4 w-4 accent-[#052a79]"
+            />
+            FACTURAR AL TITULAR PRINCIPAL
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-4">
+          {formFacturacion.usarTitularPrincipalFac && !titulares.length && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 md:col-span-4">
+              Agregue el titular principal para completar automáticamente los datos de facturación.
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-500">TIPO DE COMPROBANTE</label>
+            <select
+              value={formFacturacion.tipoDocFac}
+              disabled={formFacturacion.usarTitularPrincipalFac}
+              onChange={(event) => handleFacturacionChange('tipoDocFac', event.target.value)}
+              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] disabled:bg-slate-100 disabled:text-slate-500"
+            >
+              <option value="">-- SELECCIONAR --</option>
+              <option value="BOLETA">BOLETA</option>
+              <option value="FACTURA">FACTURA</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-500">DNI / RUC</label>
+            <div className="flex gap-2">
+              <input
+                value={formFacturacion.nroDocFac}
+                readOnly={formFacturacion.usarTitularPrincipalFac}
+                onChange={(event) => handleFacturacionChange('nroDocFac', event.target.value)}
+                inputMode="numeric"
+                maxLength={11}
+                className="h-[42px] min-w-0 flex-1 rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
+              />
+              {!formFacturacion.usarTitularPrincipalFac && (
+                <button type="button" onClick={buscarClienteFacturacion} className="flex h-[42px] items-center justify-center rounded-lg bg-slate-200 px-3 transition-colors hover:bg-slate-300" title="Buscar cliente">
+                  <Search className="h-5 w-5 text-slate-600" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-bold text-slate-500">NOMBRE / RAZÓN SOCIAL</label>
+            <input
+              value={formFacturacion.razonSocialFac}
+              readOnly={formFacturacion.usarTitularPrincipalFac}
+              onChange={(event) => handleFacturacionChange('razonSocialFac', event.target.value)}
+              maxLength={100}
+              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold uppercase text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
+            />
+          </div>
+
+          <div className="md:col-span-4">
+            <label className="mb-1 block text-xs font-bold text-slate-500">DIRECCIÓN FISCAL</label>
+            <input
+              value={formFacturacion.direccionFac}
+              readOnly={formFacturacion.usarTitularPrincipalFac}
+              onChange={(event) => handleFacturacionChange('direccionFac', event.target.value)}
+              maxLength={100}
+              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold uppercase text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-bold text-slate-500">CORREO ELECTRÓNICO (OPCIONAL)</label>
+            <input
+              type="email"
+              value={formFacturacion.emailFac}
+              onChange={(event) => handleFacturacionChange('emailFac', event.target.value)}
+              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-bold text-slate-500">TELÉFONO (OPCIONAL)</label>
+            <input
+              value={formFacturacion.telefonoFac}
+              onChange={(event) => handleFacturacionChange('telefonoFac', event.target.value)}
+              maxLength={30}
+              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]"
+            />
+          </div>
+
+          <div className="rounded-lg border border-blue-100 bg-white px-4 py-3 text-xs font-medium text-slate-600 md:col-span-4">
+            {formFacturacion.usarTitularPrincipalFac
+              ? 'El documento, nombre y dirección se mantienen sincronizados con el titular principal.'
+              : 'La boleta o factura se emitirá a una persona o empresa diferente del titular del certificado.'}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

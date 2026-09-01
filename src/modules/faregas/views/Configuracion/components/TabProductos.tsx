@@ -64,6 +64,12 @@ export default function TabProductos() {
 
   const guardar = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (actual.unidad === 'ZZ' && actual.es_para_venta) {
+      if (!actual.codigo_clasificacion_sunat || actual.codigo_clasificacion_sunat.length !== 8) {
+        alert('Los servicios de certificación (Unidad ZZ) deben tener un código SUNAT de exactamente 8 dígitos.');
+        return;
+      }
+    }
     try {
       setSaving(true);
       if (mode === 'CREATE') await faregasProductosApi.crear(actual);

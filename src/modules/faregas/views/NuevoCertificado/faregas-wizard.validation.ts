@@ -36,6 +36,29 @@ export const validarDatosIniciales = (caja: Record<string, any>) => {
   return errores;
 };
 
+export const validarDatosFacturacionBasica = (facturacion: Record<string, any>) => {
+  const errores: string[] = [];
+  const tipoComprobante = String(facturacion.tipoDocFac || '').trim().toUpperCase();
+  const documento = String(facturacion.nroDocFac || '').replace(/\D/g, '');
+  const email = String(facturacion.emailFac || '').trim();
+
+  if (!['BOLETA', 'FACTURA'].includes(tipoComprobante)) {
+    errores.push('Seleccione el tipo de comprobante en Titulares y Datos de Facturación.');
+  }
+  if (![8, 11].includes(documento.length)) {
+    errores.push('Complete un DNI de 8 dígitos o un RUC de 11 dígitos para facturación.');
+  }
+  if (tipoComprobante === 'FACTURA' && documento.length !== 11) {
+    errores.push('La factura requiere un RUC de 11 dígitos.');
+  }
+  if (vacio(facturacion.razonSocialFac)) errores.push('Complete el nombre o razón social de facturación.');
+  if (vacio(facturacion.direccionFac)) errores.push('Complete la dirección fiscal.');
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errores.push('El correo de facturación no tiene un formato válido.');
+  }
+  return errores;
+};
+
 export const validarExpedienteTecnico = ({
   tipoCertificado,
   modalidad,

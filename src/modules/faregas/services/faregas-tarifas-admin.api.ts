@@ -25,7 +25,10 @@ export interface TarifaAdmin {
   producto_afectacion_igv: string | null;
   producto_cuenta_por_cobrar: string | null;
   producto_precio_referencia: number | null;
+  producto_precio_referencia: number | null;
   producto_activo: boolean | null;
+  producto_es_para_venta: boolean | null;
+  producto_codigo_sunat: string | null;
   activo: boolean;
 }
 
@@ -46,6 +49,8 @@ export interface ProductoTarifa {
   cuenta_por_cobrar: string | null;
   precio_referencia: number | null;
   activo: boolean;
+  es_para_venta: boolean;
+  codigo_clasificacion_sunat: string | null;
 }
 
 const request = async (path: string, options: RequestInit = {}) => {

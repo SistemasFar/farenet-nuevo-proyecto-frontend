@@ -19,7 +19,7 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { validarDatosIniciales, validarExpedienteTecnico } from './faregas-wizard.validation';
+import { validarDatosFacturacionBasica, validarDatosIniciales, validarExpedienteTecnico } from './faregas-wizard.validation';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 
 
@@ -74,6 +74,7 @@ export interface FormFacturacionState {
   tipoDocFac: string; nroDocFac: string; razonSocialFac: string; nombresFac: string; apellidosFac: string;
   paisFac: string; departamentoFac: string; provinciaFac: string; distritoFac: string; direccionFac: string;
   emailFac: string; telefonoFac: string;
+  usarTitularPrincipalFac: boolean;
   condicionPagoFac: 'CONTADO' | 'CREDITO'; fechaVencimientoFac: string; medioPagoFac: string;
   cuotasFac: Array<{ numeroCuota: number; fechaPago: string; importe: string }>;
 }
@@ -226,7 +227,8 @@ export function NuevoCertificadoView() {
   const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
     tipoDocFac: '', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
-    emailFac: '', telefonoFac: '', condicionPagoFac: 'CONTADO', fechaVencimientoFac: '',
+    emailFac: '', telefonoFac: '', usarTitularPrincipalFac: true,
+    condicionPagoFac: 'CONTADO', fechaVencimientoFac: '',
     medioPagoFac: '', cuotasFac: []
   });
   const [facturacion, setFacturacion] = useState<FacturacionFaregas | null>(null);
@@ -234,6 +236,31 @@ export function NuevoCertificadoView() {
     () => calcularMedioPago(pagosAgregados),
     [pagosAgregados]
   );
+
+  const titularPrincipal = React.useMemo(
+    () => [...titulares].sort((a, b) => a.orden - b.orden)[0] || null,
+    [titulares]
+  );
+
+  useEffect(() => {
+    if (!formFacturacion.usarTitularPrincipalFac || !titularPrincipal) return;
+
+    const tipoComprobante = titularPrincipal.tipoDocumento === 'RUC' ? 'FACTURA' : 'BOLETA';
+    setFormFacturacion((prev) => {
+      const sincronizada = {
+        ...prev,
+        tipoDocFac: tipoComprobante,
+        nroDocFac: titularPrincipal.nroDocumento,
+        razonSocialFac: titularPrincipal.nombreRazonSocial,
+        direccionFac: titularPrincipal.direccion,
+      };
+      const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
+        && prev.nroDocFac === sincronizada.nroDocFac
+        && prev.razonSocialFac === sincronizada.razonSocialFac
+        && prev.direccionFac === sincronizada.direccionFac;
+      return sinCambios ? prev : sincronizada;
+    });
+  }, [formFacturacion.usarTitularPrincipalFac, titularPrincipal]);
 
   const construirPayloadFacturacion = () => ({
     tipoComprobante: formFacturacion.tipoDocFac || 'BOLETA',
@@ -342,7 +369,10 @@ export function NuevoCertificadoView() {
             setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(res.data.vehiculo) }));
             setVehiculoOrigen('BORRADOR');
           }
-          if (res.data.titulares) setTitulares(res.data.titulares.map(mapTitularBorrador));
+          const titularesCargados = res.data.titulares
+            ? res.data.titulares.map(mapTitularBorrador)
+            : [];
+          if (res.data.titulares) setTitulares(titularesCargados);
 
           const pagosDetalle = await faregasCertificadosApi.obtenerPagos(certificadoId);
           if (pagosDetalle.data?.importeTotal) {
@@ -369,6 +399,10 @@ export function NuevoCertificadoView() {
             const facturacionRes = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
             const fac = facturacionRes.data?.facturacion;
             if (fac) {
+              const principalGuardado = [...titularesCargados].sort((a, b) => a.orden - b.orden)[0];
+              const usaTitularPrincipal = Boolean(principalGuardado)
+                && String(fac.nroDocumento || '') === principalGuardado.nroDocumento
+                && String(fac.nombreRazonSocial || '').trim().toUpperCase() === principalGuardado.nombreRazonSocial.trim().toUpperCase();
               setFormFacturacion(prev => ({
                 ...prev,
                 tipoDocFac: fac.tipoComprobante || 'BOLETA',
@@ -377,6 +411,7 @@ export function NuevoCertificadoView() {
                 direccionFac: fac.direccion || '',
                 emailFac: fac.email || '',
                 telefonoFac: fac.telefono || '',
+                usarTitularPrincipalFac: usaTitularPrincipal,
                 condicionPagoFac: fac.condicionPago || 'CONTADO',
                 fechaVencimientoFac: String(fac.fechaVencimiento || '').slice(0, 10),
                 medioPagoFac: fac.medioPago || '',
@@ -896,20 +931,30 @@ export function NuevoCertificadoView() {
       }
     } else if (currentStepIndex < STEPS.length - 1) {
       if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
-        const errores = validarExpedienteTecnico({
-          tipoCertificado: formCaja.tipoCertificado as TipoCertificadoFaregas,
-          modalidad: formCaja.modalidadCertificado,
-          caja: formCaja,
-          vehiculo: formVehiculo,
-          titulares,
-          gnv: formGnv,
-          glp: formGlp,
-          conformidad: formConformidad,
-        });
+        const errores = [
+          ...validarExpedienteTecnico({
+            tipoCertificado: formCaja.tipoCertificado as TipoCertificadoFaregas,
+            modalidad: formCaja.modalidadCertificado,
+            caja: formCaja,
+            vehiculo: formVehiculo,
+            titulares,
+            gnv: formGnv,
+            glp: formGlp,
+            conformidad: formConformidad,
+          }),
+          ...validarDatosFacturacionBasica(formFacturacion),
+        ];
         if (mostrarErroresPaso(errores)) return;
         setIsSavingStep(true);
         try {
           await guardarPasoVehiculo(certificadoId);
+          if (formFacturacion.condicionPagoFac === 'CONTADO') {
+            const facturacionGuardada = await faregasCertificadosApi.guardarFacturacion(
+              certificadoId,
+              construirPayloadFacturacion()
+            );
+            setFacturacion(facturacionGuardada.data as FacturacionFaregas);
+          }
           await persistirPaso(certificadoId, 'FACTURACION');
         } catch (e: any) {
           Swal.fire('No se pudo guardar', e.message || 'Revise los datos del expediente técnico.', 'error');
@@ -1351,6 +1396,8 @@ export function NuevoCertificadoView() {
               setFormConformidad={setFormConformidad}
               titulares={titulares}
               setTitulares={setTitulares}
+              formFacturacion={formFacturacion}
+              setFormFacturacion={setFormFacturacion}
               onRemoveTitular={eliminarTitularBorrador}
               catalogoVerificaciones={catalogoVerificaciones}
               talleres={talleres}
@@ -1389,6 +1436,7 @@ export function NuevoCertificadoView() {
             facturacion={facturacion}
             onFacturacionChange={setFacturacion}
             medioPago={medioPagoCalculado}
+            onEditarDatosCliente={() => setCurrentStepIndex(2)}
           />
         )}
         {STEPS[currentStepIndex].id === 'previsualizacion' && (

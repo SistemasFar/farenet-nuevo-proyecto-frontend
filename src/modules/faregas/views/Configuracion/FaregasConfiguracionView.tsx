@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import TabSedes from './TabSedes';
 import TabCatalogo from './components/TabCatalogo';
+import TabTarifas from './components/TabTarifas';
 import TabFacturacion from './components/TabFacturacion';
 import TabEmpresas from './components/TabEmpresas';
 import TabCorrelativos from './components/TabCorrelativos';
@@ -36,6 +37,7 @@ export function FaregasConfiguracionView() {
   const tabs = [];
   if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES' });
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
+  if (hasSedes) tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
   if (hasSeries) tabs.push({ id: 'FACTURACION', label: 'FACTURACIÓN' });
   if (hasCorrelativos) tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });
   if (hasEmpresas) tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
@@ -75,6 +77,7 @@ export function FaregasConfiguracionView() {
             {tabVisible === 'CATALOGO' && hasCatalogo && (
               <TabCatalogo hasCategorias={hasCategorias} hasServicios={hasServicios} hasProductos={hasProductos} />
             )}
+            {tabVisible === 'TARIFAS' && hasSedes && <TabTarifas />}
             {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion />}
             {tabVisible === 'CORRELATIVOS' && hasCorrelativos && <TabCorrelativos />}
             {tabVisible === 'EMPRESAS' && hasEmpresas && <TabEmpresas />}

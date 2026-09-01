@@ -114,13 +114,101 @@ export interface FacturacionFaregas {
   igv: number;
   importeTotal: number;
   estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR' | 'ANULADO';
+  serie: NullableText;
+  numero: number | null;
   nroComprobante: NullableText;
+  proveedor: NullableText;
+  plantaKey: NullableText;
+  empresaKey: NullableText;
+  rucEmisor: NullableText;
+  razonSocialEmisor: NullableText;
+  entornoFacturador: NullableText;
+  codigoUnico: NullableText;
   aceptadaSunat: boolean | null;
   sunatDescription: NullableText;
   enlacePdf: NullableText;
   enlaceXml: NullableText;
   enlaceCdr: NullableText;
   intentos: number;
+}
+
+export interface ResumenTributarioItemFaregas {
+  orden: number;
+  productoFacturacionId: number | null;
+  codigoInterno: string;
+  codigoSunat: NullableText;
+  descripcion: string;
+  unidad: NullableText;
+  cantidad: number;
+  afectacionIgv: NullableText;
+  valorUnitario: number;
+  precioUnitario: number;
+  descuentoSinIgv: number;
+  baseImponible: number;
+  igv: number;
+  total: number;
+}
+
+export interface ResumenTributarioFaregas {
+  estado: 'LISTO' | 'INCOMPLETO';
+  errores: string[];
+  advertencias: string[];
+  emisor: {
+    empresaKey: NullableText;
+    razonSocial: NullableText;
+    ruc: NullableText;
+    direccion: NullableText;
+  };
+  sede: {
+    key: NullableText;
+    nombre: NullableText;
+    direccion: NullableText;
+  };
+  integracion: {
+    proveedor: 'NUBEFACT';
+    entorno: string;
+    habilitada: boolean;
+    simulacion: boolean;
+    configurada: boolean;
+  };
+  comprobante: {
+    tipo: NullableText;
+    serie: NullableText;
+    numero: number | null;
+    numeroAsignado: boolean;
+    fuenteSerie: 'COMPARTIDO_FARENET';
+  };
+  cliente: {
+    tipoDocumento: NullableText;
+    numeroDocumento: NullableText;
+    nombreRazonSocial: NullableText;
+    direccion: NullableText;
+    email: NullableText;
+  };
+  items: ResumenTributarioItemFaregas[];
+  totales: {
+    moneda: string;
+    precioAntesDescuento: number;
+    descuento: number;
+    baseImponible: number;
+    igv: number;
+    total: number;
+  };
+  pago: {
+    condicion: 'CONTADO' | 'CREDITO';
+    medio: NullableText;
+    fechaVencimiento: NullableText;
+  };
+}
+
+export interface FacturacionContextoFaregas {
+  facturacion: FacturacionFaregas | null;
+  integracion: {
+    enabled: boolean;
+    configured: boolean;
+    simulationEnabled?: boolean;
+  } | null;
+  resumenTributario: ResumenTributarioFaregas;
 }
 
 export interface NotaElectronicaFaregas {
