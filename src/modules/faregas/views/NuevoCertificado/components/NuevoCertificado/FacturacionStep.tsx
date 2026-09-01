@@ -310,7 +310,7 @@ export function FacturacionStep({
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl space-y-6 rounded-2xl border-2 border-slate-200 bg-white p-8">
+      <div className="mx-auto max-w-full space-y-6 rounded-2xl border-2 border-slate-200 bg-white p-8">
         {facturacion && (
           <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${estadoColor}`}>
             <div className="flex items-center gap-2 font-black"><CheckCircle2 className="h-5 w-5" /> ESTADO: {facturacion.estado}</div>

@@ -298,8 +298,8 @@ export function NuevoCertificadoView() {
       { id: 'datos_iniciales', label: 'Datos Iniciales', icon: FileText },
       { id: 'pago', label: 'Pago', icon: CreditCard },
       { id: 'vehiculo', label: 'Vehículo y Datos Técnicos', icon: Search },
-      { id: 'facturacion', label: 'Facturación', icon: User },
       { id: 'previsualizacion', label: 'Previsualización del Certificado', icon: Eye },
+      { id: 'facturacion', label: 'Facturación', icon: User },
       { id: 'verificacion', label: 'Verificación / Emisión', icon: CheckCircle2 }
     ];
   }, []);
@@ -308,8 +308,8 @@ export function NuevoCertificadoView() {
     DATOS_INICIALES: 0,
     PAGO: 1,
     VEHICULO: 2,
-    FACTURACION: 3,
-    PREVISUALIZACION: 4,
+    PREVISUALIZACION: 3,
+    FACTURACION: 4,
     VERIFICACION_EMISION: 5,
   }[paso || ''] ?? 0);
 
@@ -955,7 +955,7 @@ export function NuevoCertificadoView() {
             );
             setFacturacion(facturacionGuardada.data as FacturacionFaregas);
           }
-          await persistirPaso(certificadoId, 'FACTURACION');
+          await persistirPaso(certificadoId, 'PREVISUALIZACION');
         } catch (e: any) {
           Swal.fire('No se pudo guardar', e.message || 'Revise los datos del expediente técnico.', 'error');
           return;
@@ -1009,9 +1009,9 @@ export function NuevoCertificadoView() {
             setIsSavingStep(false);
           }
         }
-        if (certificadoId) await persistirPaso(certificadoId, 'PREVISUALIZACION');
+        if (certificadoId) await persistirPaso(certificadoId, 'VERIFICACION_EMISION');
       } else if (STEPS[currentStepIndex].id === 'previsualizacion' && certificadoId) {
-        await persistirPaso(certificadoId, 'VERIFICACION_EMISION');
+        await persistirPaso(certificadoId, 'FACTURACION');
       }
       const siguiente = currentStepIndex + 1;
       setFurthestStepIndex(prev => Math.max(prev, siguiente));
