@@ -14,10 +14,12 @@ const getTarifaStatus = (tarifa: TarifaAdmin) => {
   if (!tarifa.producto_facturacion_id) return 'INCOMPLETA';
   if (
     tarifa.producto_activo === false ||
-    tarifa.producto_es_para_venta === false ||
-    tarifa.producto_unidad !== 'ZZ' ||
-    !tarifa.producto_codigo_sunat ||
-    tarifa.producto_codigo_sunat.length !== 8
+    tarifa.producto_es_para_venta !== true ||
+    (tarifa.servicio_tipo_flujo === 'CERTIFICACION' && (
+      tarifa.producto_unidad?.trim().toUpperCase() !== 'ZZ' ||
+      (Boolean(tarifa.producto_codigo_sunat?.trim()) && !/^\d{8}$/.test(tarifa.producto_codigo_sunat?.trim() || '')) ||
+      tarifa.producto_afectacion_igv?.trim() !== '10'
+    ))
   ) {
     return 'INVALIDA';
   }
@@ -175,11 +177,12 @@ export default function TabTarifas() {
   </div>;
 }
 
-const getProductoError = (p: ProductoTarifa) => {
+const getProductoError = (p: ProductoTarifa, exigeDatosTributarios: boolean) => {
   if (!p.activo) return 'Producto inactivo';
   if (!p.es_para_venta) return 'No habilitado para venta';
-  if (p.unidad !== 'ZZ') return 'Unidad no es ZZ';
-  if (!p.codigo_clasificacion_sunat || p.codigo_clasificacion_sunat.length !== 8) return 'Cod. SUNAT inválido';
+  if (exigeDatosTributarios && p.unidad?.trim().toUpperCase() !== 'ZZ') return 'Unidad no es ZZ';
+  if (exigeDatosTributarios && p.codigo_clasificacion_sunat?.trim() && !/^\d{8}$/.test(p.codigo_clasificacion_sunat.trim())) return 'Cod. SUNAT inválido';
+  if (exigeDatosTributarios && p.tipo_afectacion_igv?.trim() !== '10') return 'Afectación IGV debe ser 10';
   return null;
 };
 
@@ -207,23 +210,29 @@ function TarifaModal({ estado, sede, onClose, onSaved }: { estado: NonNullable<M
   const [resultados, setResultados] = useState<ProductoTarifa[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const servicio = servicios.find((item) => item.id === servicioId);
+  const exigeDatosTributarios = estado.modo === 'EDITAR'
+    ? tarifa?.servicio_tipo_flujo === 'CERTIFICACION'
+    : servicio?.tipo_flujo === 'CERTIFICACION';
   
   useEffect(() => { if (estado.modo === 'CREAR') void faregasTarifasAdminApi.serviciosDisponibles(sede.key).then(setServicios).catch((err) => setError(err instanceof Error ? err.message : 'Error al cargar servicios')); }, [estado.modo, sede.key]);
   useEffect(() => {
-    if (skuQuery.trim().length < 2) {
-        setResultados([]);
-        return;
-    }
+    if (skuQuery.trim().length < 2) return;
     const timer = window.setTimeout(() => { void faregasTarifasAdminApi.buscarProductos(skuQuery.trim()).then(setResultados).catch((err) => setError(err instanceof Error ? err.message : 'Error al buscar SKU')); }, 250);
     return () => window.clearTimeout(timer);
   }, [skuQuery]);
+
+  const actualizarBusquedaSku = (value: string) => {
+    setSkuQuery(value);
+    if (value.trim().length < 2) setResultados([]);
+  };
   
   const guardar = async (event: React.FormEvent) => {
     event.preventDefault(); setError('');
     const monto = Number(precio);
     if (!Number.isFinite(monto) || monto <= 0) { setError('El precio debe ser mayor que cero.'); return; }
     if (producto) {
-      const pErr = getProductoError(producto);
+      const pErr = getProductoError(producto, exigeDatosTributarios);
       if (pErr) {
         setError(`El producto seleccionado es inválido: ${pErr}`);
         return;
@@ -239,9 +248,8 @@ function TarifaModal({ estado, sede, onClose, onSaved }: { estado: NonNullable<M
     finally { setSaving(false); }
   };
   
-  const servicio = servicios.find((item) => item.id === servicioId);
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"><h3 className="text-xl font-bold text-[#052A79]">{estado.modo === 'CREAR' ? 'Asignar Servicio' : 'Editar Tarifa'}</h3><p className="mb-5 text-sm text-slate-500">Tarifa operativa oficial de Faregas</p><form onSubmit={guardar} className="space-y-4"><div className="grid gap-4 md:grid-cols-2"><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Sede</label><input readOnly value={sede.nombre} className="w-full rounded-lg border bg-slate-100 p-2.5" /></div>{estado.modo === 'CREAR' ? <div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Servicio</label><select required value={servicioId || ''} onChange={(e) => setServicioId(Number(e.target.value))} className="w-full rounded-lg border bg-white p-2.5"><option value="">-- Seleccionar --</option>{servicios.map((item) => <option key={item.id} value={item.id}>{item.codigo} — {item.nombre}</option>)}</select></div> : <div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Servicio</label><input readOnly value={`${tarifa?.servicio_codigo} — ${tarifa?.servicio_nombre}`} className="w-full rounded-lg border bg-slate-100 p-2.5" /></div>}</div>{estado.modo === 'EDITAR' && <div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Categoría</label><input readOnly value={tarifa?.categoria_nombre || ''} className="w-full rounded-lg border bg-slate-100 p-2.5" /></div>}{estado.modo === 'CREAR' && servicio && <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">Categoría: <strong>{servicio.categoria_nombre}</strong></div>}<div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">{estado.modo === 'EDITAR' ? 'Nuevo precio Faregas' : 'Precio Faregas'}</label><div className="flex"><span className="rounded-l-lg border border-r-0 bg-slate-100 px-3 py-2.5 font-bold">S/</span><input required type="number" min="0.01" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} className="w-full rounded-r-lg border p-2.5" /></div>{tarifa && <p className="mt-1 text-xs text-slate-500">Precio actual: S/ {tarifa.precio.toFixed(2)}</p>}</div><div className="rounded-xl border p-4"><div className="mb-2 flex items-center justify-between"><label className="text-sm font-bold text-slate-700">Producto / SKU de facturación <span className="font-normal text-slate-400">(opcional)</span></label>{producto && <button type="button" onClick={() => { setProducto(null); setError(''); }} className="text-xs font-bold text-red-600">Quitar SKU</button>}</div><input value={skuQuery} onChange={(e) => setSkuQuery(e.target.value)} placeholder="Buscar por SKU o descripción (mínimo 2 caracteres)" className="w-full rounded-lg border p-2.5 text-sm" />{resultados.length > 0 && <div className="mt-2 max-h-48 overflow-auto rounded-lg border">{resultados.map((item) => {
-    const pErr = getProductoError(item);
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"><h3 className="text-xl font-bold text-[#052A79]">{estado.modo === 'CREAR' ? 'Asignar Servicio' : 'Editar Tarifa'}</h3><p className="mb-5 text-sm text-slate-500">Tarifa operativa oficial de Faregas</p><form onSubmit={guardar} className="space-y-4"><div className="grid gap-4 md:grid-cols-2"><div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Sede</label><input readOnly value={sede.nombre} className="w-full rounded-lg border bg-slate-100 p-2.5" /></div>{estado.modo === 'CREAR' ? <div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Servicio</label><select required value={servicioId || ''} onChange={(e) => setServicioId(Number(e.target.value))} className="w-full rounded-lg border bg-white p-2.5"><option value="">-- Seleccionar --</option>{servicios.map((item) => <option key={item.id} value={item.id}>{item.codigo} — {item.nombre}</option>)}</select></div> : <div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Servicio</label><input readOnly value={`${tarifa?.servicio_codigo} — ${tarifa?.servicio_nombre}`} className="w-full rounded-lg border bg-slate-100 p-2.5" /></div>}</div>{estado.modo === 'EDITAR' && <div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">Categoría</label><input readOnly value={tarifa?.categoria_nombre || ''} className="w-full rounded-lg border bg-slate-100 p-2.5" /></div>}{estado.modo === 'CREAR' && servicio && <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">Categoría: <strong>{servicio.categoria_nombre}</strong></div>}<div><label className="mb-1 block text-xs font-bold uppercase text-slate-500">{estado.modo === 'EDITAR' ? 'Nuevo precio Faregas' : 'Precio Faregas'}</label><div className="flex"><span className="rounded-l-lg border border-r-0 bg-slate-100 px-3 py-2.5 font-bold">S/</span><input required type="number" min="0.01" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} className="w-full rounded-r-lg border p-2.5" /></div>{tarifa && <p className="mt-1 text-xs text-slate-500">Precio actual: S/ {tarifa.precio.toFixed(2)}</p>}</div><div className="rounded-xl border p-4"><div className="mb-2 flex items-center justify-between"><label className="text-sm font-bold text-slate-700">Producto / SKU de facturación <span className="font-normal text-slate-400">(opcional)</span></label>{producto && <button type="button" onClick={() => { setProducto(null); setError(''); }} className="text-xs font-bold text-red-600">Quitar SKU</button>}</div><input value={skuQuery} onChange={(e) => actualizarBusquedaSku(e.target.value)} placeholder="Buscar por SKU o descripción (mínimo 2 caracteres)" className="w-full rounded-lg border p-2.5 text-sm" />{resultados.length > 0 && <div className="mt-2 max-h-48 overflow-auto rounded-lg border">{resultados.map((item) => {
+    const pErr = getProductoError(item, exigeDatosTributarios);
     return <button key={item.id} type="button" disabled={Boolean(pErr)} onClick={() => { setProducto(item); setSkuQuery(''); setResultados([]); setError(''); }} className="block w-full border-b px-3 py-2 text-left text-sm hover:bg-blue-50 disabled:bg-slate-50 disabled:opacity-75 disabled:cursor-not-allowed">
       <div className="flex justify-between items-center"><span className="font-mono font-bold text-[#052A79]">{item.codigo_sku}</span>
       {pErr && <span className="text-xs font-bold text-red-600 bg-red-100 rounded px-2">{pErr}</span>}
@@ -249,8 +257,8 @@ function TarifaModal({ estado, sede, onClose, onSaved }: { estado: NonNullable<M
       <div className="text-slate-800">{item.descripcion}</div>
       <div className="text-xs text-slate-500 mt-1 flex gap-3">
         <span>Unidad: {item.unidad || '-'}</span>
-        <span>SUNAT: {item.codigo_clasificacion_sunat || '-'}</span>
+        <span>SUNAT (opcional): {item.codigo_clasificacion_sunat || '-'}</span>
       </div>
     </button>;
-  })}</div>}{producto && <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs"><div className="mb-2 font-bold text-[#052A79]">{producto.codigo_sku} — {producto.descripcion}</div><div className="grid gap-1 md:grid-cols-2"><span>Unidad: <b>{producto.unidad || '-'}</b></span><span>Afectación IGV: <b>{producto.tipo_afectacion_igv || '-'}</b></span><span>Cuenta: <b>{producto.cuenta_por_cobrar || '-'}</b></span><span>Precio referencia SKU: <b>{producto.precio_referencia == null ? '-' : `S/ ${producto.precio_referencia.toFixed(2)}`}</b></span><span>SUNAT: <b>{producto.codigo_clasificacion_sunat || '-'}</b></span></div><div className="mt-2 border-t pt-2 font-semibold text-amber-700">El precio de referencia no modifica la tarifa Faregas.</div>{getProductoError(producto) && <div className="mt-2 font-bold text-red-600">ERROR: {getProductoError(producto)}</div>}</div>}</div><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />Tarifa activa</label>{error && <div className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}<div className="flex justify-end gap-3 border-t pt-4"><button type="button" disabled={saving} onClick={onClose} className="rounded-lg px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button disabled={saving || (estado.modo === 'CREAR' && !servicioId) || Boolean(producto && getProductoError(producto))} className="rounded-lg bg-[#052A79] px-5 py-2 font-bold text-white disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar Tarifa'}</button></div></form></div></div>;
+  })}</div>}{producto && <div className="mt-3 rounded-lg bg-slate-50 p-3 text-xs"><div className="mb-2 font-bold text-[#052A79]">{producto.codigo_sku} — {producto.descripcion}</div><div className="grid gap-1 md:grid-cols-2"><span>Unidad: <b>{producto.unidad || '-'}</b></span><span>Afectación IGV: <b>{producto.tipo_afectacion_igv || '-'}</b></span><span>Cuenta: <b>{producto.cuenta_por_cobrar || '-'}</b></span><span>Precio referencia SKU: <b>{producto.precio_referencia == null ? '-' : `S/ ${producto.precio_referencia.toFixed(2)}`}</b></span><span>SUNAT (opcional): <b>{producto.codigo_clasificacion_sunat || '-'}</b></span></div><div className="mt-2 border-t pt-2 font-semibold text-amber-700">El precio de referencia no modifica la tarifa Faregas.</div>{getProductoError(producto, exigeDatosTributarios) && <div className="mt-2 font-bold text-red-600">ERROR: {getProductoError(producto, exigeDatosTributarios)}</div>}</div>}</div><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={activo} onChange={(e) => setActivo(e.target.checked)} />Tarifa activa</label>{error && <div className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}<div className="flex justify-end gap-3 border-t pt-4"><button type="button" disabled={saving} onClick={onClose} className="rounded-lg px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button disabled={saving || (estado.modo === 'CREAR' && !servicioId) || Boolean(producto && getProductoError(producto, exigeDatosTributarios))} className="rounded-lg bg-[#052A79] px-5 py-2 font-bold text-white disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar Tarifa'}</button></div></form></div></div>;
 }

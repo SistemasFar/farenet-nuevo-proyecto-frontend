@@ -15,6 +15,7 @@ export interface TarifaAdmin {
   servicio_id: number;
   servicio_codigo: string;
   servicio_nombre: string;
+  servicio_tipo_flujo: string;
   categoria_codigo: string;
   categoria_nombre: string;
   precio: number;
@@ -24,7 +25,6 @@ export interface TarifaAdmin {
   producto_unidad: string | null;
   producto_afectacion_igv: string | null;
   producto_cuenta_por_cobrar: string | null;
-  producto_precio_referencia: number | null;
   producto_precio_referencia: number | null;
   producto_activo: boolean | null;
   producto_es_para_venta: boolean | null;
@@ -36,6 +36,7 @@ export interface ServicioDisponible {
   id: number;
   codigo: string;
   nombre: string;
+  tipo_flujo: string;
   categoria_codigo: string;
   categoria_nombre: string;
 }
