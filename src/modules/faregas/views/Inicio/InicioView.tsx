@@ -4,7 +4,7 @@ import { faregasCertificadosApi } from '../../services/faregas-certificados.api'
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 
-interface FiltrosPanel { busqueda: string; lineaKey: string; fechaDesde: string; fechaHasta: string; }
+interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
 interface BorradorPanel {
   id: number;
@@ -92,7 +92,7 @@ const obtenerFechaLocal = () => {
 
 const filtrosDelDia = (): FiltrosPanel => {
   const hoy = obtenerFechaLocal();
-  return { busqueda: '', lineaKey: 'TODOS', fechaDesde: hoy, fechaHasta: hoy };
+  return { busqueda: '', estado: 'TODOS', fechaDesde: hoy, fechaHasta: hoy };
 };
 
 export function InicioView() {
@@ -136,7 +136,8 @@ export function InicioView() {
         pageSizeConsulta,
         filtrosRef.current.busqueda,
         filtrosRef.current.fechaDesde,
-        filtrosRef.current.fechaHasta
+        filtrosRef.current.fechaHasta,
+        filtrosRef.current.estado
       );
       setBorradores(response.data || []);
       setTotal(Number(response.total || 0));
@@ -323,15 +324,17 @@ export function InicioView() {
 
         <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <p className="mb-1 text-xs font-semibold uppercase text-gray-500">
-            Línea
+            Estado de Certificado
           </p>
           <select
-            value={filtros.lineaKey}
-            onChange={(e) => handleFiltroChange('lineaKey', e.target.value)}
+            value={filtros.estado}
+            onChange={(e) => handleFiltroChange('estado', e.target.value)}
             disabled={loading}
             className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#052A79]"
           >
-            <option value="TODOS">Todas las líneas</option>
+            <option value="TODOS">Todos los estados</option>
+            <option value="BORRADOR">Borrador</option>
+            <option value="EMITIDO">Emitido</option>
           </select>
         </div>
       </div>
@@ -344,7 +347,7 @@ export function InicioView() {
 
       <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-          <span className="font-semibold text-gray-700">Borradores registrados</span>
+          <span className="font-semibold text-gray-700">Certificados registrados</span>
           <button
             type="button"
             onClick={() => navigate('/faregas/certificados/nuevo')}
@@ -376,9 +379,7 @@ export function InicioView() {
                 <th className="px-4 py-3 text-left">
                   Concepto vehicular
                 </th>
-                <th className="px-4 py-3 text-left">
-                  Línea
-                </th>
+                
                 <th className="px-4 py-3 text-left">
                   Estado actual
                 </th>
@@ -444,9 +445,7 @@ export function InicioView() {
                       <td className="px-4 py-3 min-w-[180px]">
                         {normalizarTexto(ins.conceptoVehicular)}
                       </td>
-                      <td className="px-4 py-3 font-mono text-left whitespace-nowrap">
-                        -
-                      </td>
+                      
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold tracking-wide text-amber-700">
                           {etapa}

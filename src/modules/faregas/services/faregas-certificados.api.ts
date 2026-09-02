@@ -36,13 +36,14 @@ export const faregasCertificadosApi = {
   }),
   obtenerTipos: () => fetchWithToken('/certificados/tipos'),
   obtenerVehiculo: (placa: string) => fetchWithToken(`/clientes/vehiculo/${encodeURIComponent(placa)}`),
-  obtenerBorradores: (page = 1, pageSize = 10, search = '', fechaDesde = '', fechaHasta = '') => {
+  obtenerBorradores: (page = 1, pageSize = 10, search = '', fechaDesde = '', fechaHasta = '', estado = '') => {
     const params = new URLSearchParams({
       page: String(page),
       pageSize: String(pageSize),
       search,
       fechaDesde,
       fechaHasta,
+      estado,
     });
     return fetchWithToken(`/certificados/borradores?${params.toString()}`);
   },

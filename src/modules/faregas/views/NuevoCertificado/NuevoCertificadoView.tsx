@@ -590,6 +590,73 @@ export function NuevoCertificadoView() {
           categoria: categoriaEncontrada || prev.categoria,
         }));
         setVehiculoOrigen('FARENET');
+
+        if (response.data.titularesFaregas && response.data.titularesFaregas.length > 0) {
+          setTitulares(response.data.titularesFaregas.map((t: any) => mapTitularBorrador({ ...t, id: null })));
+        }
+        if (response.data.glpFaregas) {
+          const glp = response.data.glpFaregas;
+          setFormGlp((prev: any) => ({
+            ...prev,
+            tallerAutorizadoId: glp.taller_autorizado_id || prev.tallerAutorizadoId,
+            fechaVigencia: textValue(glp.vigencia_hasta).slice(0, 10) || prev.fechaVigencia,
+            expedienteTecnico: glp.expediente_tecnico || prev.expedienteTecnico,
+            componentes: (glp.componentes || []).map((componente: any) => ({
+              orden: Number(componente.orden),
+              componente: componente.componente,
+              marca: componente.marca || '',
+              modelo: componente.modelo || '',
+              capacidadLitros: componente.capacidad_litros || '',
+              mesFabricacion: componente.mes_fabricacion || '',
+              anioFabricacion: componente.anio_fabricacion || '',
+              numeroSerie: componente.numero_serie || '',
+            })),
+            verificaciones: (glp.verificaciones || []).map((v: any) => ({
+              preguntaId: v.pregunta_id,
+              codigo: v.codigo,
+              orden: v.orden,
+              descripcion: v.descripcion,
+              cumple: v.cumple,
+              observacion: v.observacion
+            }))
+          }));
+        }
+        if (response.data.gnvFaregas) {
+          const gnv = response.data.gnvFaregas;
+          setFormGnv((prev: any) => ({
+            ...prev,
+            tallerAutorizadoId: gnv.taller_autorizado_id || prev.tallerAutorizadoId,
+            fechaVigencia: textValue(gnv.vigencia_hasta).slice(0, 10) || prev.fechaVigencia,
+            expedienteTecnico: gnv.expediente_tecnico || prev.expedienteTecnico,
+            componentes: (gnv.componentes || []).map((componente: any) => ({
+              orden: Number(componente.orden),
+              componente: componente.componente,
+              marca: componente.marca || '',
+              modelo: componente.modelo || '',
+              mesFabricacion: componente.mes_fabricacion || '',
+              anioFabricacion: componente.anio_fabricacion || '',
+              numeroSerie: componente.numero_serie || '',
+            })),
+            cilindros: (gnv.cilindros || []).map((cilindro: any) => ({
+              orden: Number(cilindro.orden),
+              marca: cilindro.marca || '',
+              mesFabricacion: cilindro.mes_fabricacion || '',
+              anioFabricacion: cilindro.anio_fabricacion || '',
+              numeroSerie: cilindro.numero_serie || '',
+              capacidadLitros: cilindro.capacidad_litros || '',
+              pesoVacio: cilindro.peso_vacio || '',
+            })),
+            verificaciones: (gnv.verificaciones || []).map((v: any) => ({
+              preguntaId: v.pregunta_id,
+              codigo: v.codigo,
+              orden: v.orden,
+              descripcion: v.descripcion,
+              cumple: v.cumple,
+              observacion: v.observacion
+            }))
+          }));
+        }
+
         Swal.fire({
           icon: 'success',
           title: 'Vehículo encontrado',
@@ -681,7 +748,9 @@ export function NuevoCertificadoView() {
     const incompleto = titulares.find(t => !t.nombreRazonSocial.trim());
     if (incompleto) throw new Error(`Complete el nombre o razón social del titular de orden ${incompleto.orden}.`);
 
+    let huboCambios = false;
     const guardados: TitularState[] = [];
+    
     for (const titular of titulares) {
       const clienteId = await asegurarClienteFaregas(titular);
       const data = {
@@ -695,17 +764,22 @@ export function NuevoCertificadoView() {
 
       if (titular.titularId) {
         await faregasCertificadosApi.actualizarTitular(idBorrador, titular.titularId, data);
-        const actualizado = { ...titular, clienteId };
-        guardados.push(actualizado);
-        setTitulares(prev => prev.map(item => item._uuid === titular._uuid ? actualizado : item));
+        if (titular.clienteId !== clienteId) {
+          guardados.push({ ...titular, clienteId });
+          huboCambios = true;
+        } else {
+          guardados.push(titular);
+        }
       } else {
         const response = await faregasCertificadosApi.crearTitular(idBorrador, data);
-        const creado = { ...titular, clienteId, titularId: Number(response.data.id) };
-        guardados.push(creado);
-        setTitulares(prev => prev.map(item => item._uuid === titular._uuid ? creado : item));
+        guardados.push({ ...titular, clienteId, titularId: Number(response.data.id) });
+        huboCambios = true;
       }
     }
-    setTitulares(guardados);
+    
+    if (huboCambios) {
+      setTitulares(guardados);
+    }
   };
 
   const guardarExpedienteTecnico = async (idBorrador: number) => {
