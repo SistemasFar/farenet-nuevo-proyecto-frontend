@@ -1,3 +1,4 @@
+import { Edit, Lock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { faregasCertificadosApi } from '../../../services/faregas-certificados.api';
 import { faregasSeriesApi } from '../../../services/faregas-series.api';
@@ -245,12 +246,12 @@ export default function TabCorrelativos() {
                     </td>
                     <td className="p-3 text-center">
                       {r.activo && (
-                        <div className="flex items-center justify-center gap-3">
-                          <button onClick={() => abrirEditarRango(r)} className="text-xs font-bold text-[#052A79] hover:underline">
-                            EDITAR
+                        <div className="flex justify-center gap-2">
+                          <button onClick={() => abrirEditarRango(r)} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 transition-colors">
+                            <Edit size={18} />
                           </button>
-                          <button onClick={() => cerrarRango(r.id, r.activo)} className="text-xs font-bold text-red-600 hover:underline">
-                            CERRAR
+                          <button onClick={() => cerrarRango(r.id, r.activo)} title="Cerrar rango" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] hover:bg-red-100 transition-colors">
+                            <Lock size={18} />
                           </button>
                         </div>
                       )}

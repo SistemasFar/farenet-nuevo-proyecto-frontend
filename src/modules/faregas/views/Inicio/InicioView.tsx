@@ -5,7 +5,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import type { FacturacionFaregas } from '../../types/faregas-api';
 import Swal from 'sweetalert2';
-import { FileText, XCircle, FileEdit, ArrowRight } from 'lucide-react';
+import { FileText, XCircle, FileEdit, ArrowRight, Edit, Eye } from 'lucide-react';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
@@ -605,8 +605,9 @@ export function InicioView() {
                             type="button"
                             onClick={() => navigate(`/faregas/certificados/${ins.id}/continuar`)}
                             className="rounded-md border border-yellow-300 bg-yellow-50 px-2.5 py-1.5 text-base text-[#052A79] transition-colors hover:bg-yellow-100"
+                            title={ins.estado === 'EMITIDO' ? 'Ver' : 'Continuar editando'}
                           >
-                            <ArrowRight size={18} title="Continuar" />
+                            {ins.estado === 'EMITIDO' ? <Eye size={18} /> : <Edit size={18} />}
                           </button>
                           {ins.estado === 'EMITIDO' && <>
                             <button

@@ -1,3 +1,4 @@
+import { Edit, Power, PowerOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   faregasConfigApi,
@@ -154,15 +155,11 @@ export default function TabCategorias() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center gap-3 text-xs font-semibold">
+                        <div className="flex justify-center gap-2">
                           <button
                             onClick={() => { setMode('EDIT'); setActual(categoria); setShowModal(true); }}
-                            className="text-[#052A79] hover:underline"
-                          >Editar</button>
-                          <button
-                            onClick={() => void cambiarEstado(categoria)}
-                            className={categoria.activo ? 'text-red-600 hover:underline' : 'text-green-600 hover:underline'}
-                          >{categoria.activo ? 'Desactivar' : 'Activar'}</button>
+                            title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button>
+                          <button onClick={() => void cambiarEstado(categoria)} title={categoria.activo ? "Desactivar" : "Activar"} className={categoria.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-[#052A79] hover:bg-green-100 transition-colors"}>{categoria.activo ? <PowerOff size={18} /> : <Power size={18} />}</button>
                         </div>
                       </td>
                     </tr>

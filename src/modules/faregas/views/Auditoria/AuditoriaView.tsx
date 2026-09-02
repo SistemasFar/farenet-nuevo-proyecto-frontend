@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Eye } from 'lucide-react';
 import { faregasAuditoriaApi, type AuditoriaAccesoFaregas } from '../../services/faregas-auditoria.api';
 
 const MODULOS = [
@@ -223,7 +224,7 @@ export function AuditoriaView() {
                                 <td className="whitespace-nowrap px-4 py-3 font-medium text-[#052A79]">{referencia(item)}</td>
                                 <td className="px-4 py-3">{item.planta_key || '-'}</td>
                                 <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.exitoso ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.exitoso ? 'Completado' : 'No completado'}</span></td>
-                                <td className="px-4 py-3"><button type="button" onClick={() => setSeleccionado(item)} className="font-semibold text-[#052A79] hover:underline">Ver</button></td>
+                                <td className="px-4 py-3"><button type="button" onClick={() => setSeleccionado(item)} title="Ver detalle" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors"><Eye size={18} /></button></td>
                             </tr>)}
                             {!loading && registros.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500">No hay actividad registrada en este módulo.</td></tr>}
                         </tbody>

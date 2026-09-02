@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Edit, Power, PowerOff } from 'lucide-react';
 import { faregasConfigApi, type CategoriaServicio, type ServicioConfiguracionFaregas } from '../../../services/faregas-config.api';
 import { ServicioModal } from './ServicioModal';
 
@@ -170,23 +171,9 @@ export default function TabServicios() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="flex justify-center gap-3 text-xs font-semibold">
-                        <button
-                          onClick={() => {
-                            setModalMode('EDIT');
-                            setCurrentServicio(s);
-                            setShowModal(true);
-                          }}
-                          className="text-[#052A79] hover:underline"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleToggleActivo(s.id, s.activo)}
-                          className={`${s.activo ? 'text-red-600 hover:underline' : 'text-green-600 hover:underline'}`}
-                        >
-                          {s.activo ? 'Desactivar' : 'Activar'}
-                        </button>
+                      <div className="flex justify-center gap-2">
+                        <button onClick={() => { setModalMode('EDIT'); setCurrentServicio(s); setShowModal(true); }} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button>
+                        <button onClick={() => handleToggleActivo(s.id, s.activo)} title={s.activo ? 'Desactivar' : 'Activar'} className={s.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-[#052A79] hover:bg-green-100 transition-colors"}>{s.activo ? <PowerOff size={18} /> : <Power size={18} />}</button>
                       </div>
                     </td>
                   </tr>

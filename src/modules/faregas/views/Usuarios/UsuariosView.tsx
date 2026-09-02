@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Edit, Trash2 } from 'lucide-react';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 import type { MaestroUsuario } from '../../types/faregas-api';
 
@@ -418,13 +419,13 @@ export function UsuariosView() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 flex gap-4">
-                        <button onClick={() => handleOpenUsuario(u)} className="text-[#052A79] font-bold hover:underline">
-                          Editar
+                      <td className="px-4 py-3 flex gap-2">
+                        <button onClick={() => handleOpenUsuario(u)} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors">
+                          <Edit size={18} />
                         </button>
                         {u.username !== currentUsername && (
-                          <button onClick={() => handleDeleteUsuario(u.username)} className="text-red-600 font-bold hover:underline">
-                            Eliminar
+                          <button onClick={() => handleDeleteUsuario(u.username)} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors">
+                            <Trash2 size={18} />
                           </button>
                         )}
                       </td>
@@ -443,7 +444,7 @@ export function UsuariosView() {
                         )}
                       </td>
                       <td className="px-4 py-3 font-medium text-gray-700">{p.num_usuarios}</td>
-                      <td className="px-4 py-3 flex gap-4">
+                      <td className="px-4 py-3 flex gap-2">
                         <button onClick={() => {
                           setModalMode('editar');
                           setFormData({
@@ -454,8 +455,8 @@ export function UsuariosView() {
                             permisos: p.permisos || []
                           });
                           setShowModal(true);
-                        }} className="text-[#052A79] font-bold hover:underline">
-                          Editar
+                        }} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors">
+                          <Edit size={18} />
                         </button>
                         {p.clave !== 'SISTEMAS' && (
                           <button onClick={async () => {
@@ -467,8 +468,8 @@ export function UsuariosView() {
                                 alert(e.message || 'Error al eliminar');
                               }
                             }
-                          }} className="text-red-600 font-bold hover:underline">
-                            Eliminar
+                          }} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors">
+                            <Trash2 size={18} />
                           </button>
                         )}
                       </td>

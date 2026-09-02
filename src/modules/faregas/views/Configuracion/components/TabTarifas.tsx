@@ -1,3 +1,4 @@
+import { Edit, Power, PowerOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   faregasTarifasAdminApi,
@@ -174,7 +175,7 @@ export default function TabTarifas() {
             {st === 'INCOMPLETA' && <span className="rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">INCOMPLETA</span>}
             {st === 'INVALIDA' && <span className="rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-700">INVÁLIDO</span>}
           </td>
-          <td className="px-4 py-3 text-center"><div className="flex justify-center gap-3 text-xs font-bold"><button onClick={() => setModal({ modo: 'EDITAR', tarifa })} className="text-[#052A79] hover:underline">Editar</button><button onClick={() => void cambiarEstado(tarifa)} className={tarifa.activo ? 'text-red-600' : 'text-green-600'}>{tarifa.activo ? 'Desactivar' : 'Activar'}</button></div></td>
+          <td className="px-4 py-3 text-center"><div className="flex justify-center gap-2"><button onClick={() => setModal({ modo: 'EDITAR', tarifa })} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button><button onClick={() => void cambiarEstado(tarifa)} title={tarifa.activo ? "Desactivar" : "Activar"} className={tarifa.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-[#052A79] hover:bg-green-100 transition-colors"}>{tarifa.activo ? <PowerOff size={18} /> : <Power size={18} />}</button></div></td>
         </tr>;
       })}</tbody></table></div>}
     </div>
