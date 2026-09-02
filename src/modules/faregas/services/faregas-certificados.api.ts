@@ -114,6 +114,7 @@ export const faregasCertificadosApi = {
     body: JSON.stringify(data)
   }),
   obtenerFacturacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion`),
+  preflightFacturacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/preflight`),
   guardarFacturacion: (id: number, data: GuardarFacturacionFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/facturacion`, {
     method: 'PUT',
     body: JSON.stringify(data)

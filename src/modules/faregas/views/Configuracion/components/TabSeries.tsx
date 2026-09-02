@@ -39,6 +39,7 @@ export default function TabSeries() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modal, setModal] = useState<ModalState>(null);
+  const [confirmarSerie, setConfirmarSerie] = useState<SerieComprobante | null>(null);
 
   const cargarSedes = async () => {
     const data = await faregasSeriesApi.listarSedes();
@@ -104,18 +105,48 @@ export default function TabSeries() {
         <div className="max-h-[58vh] overflow-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="sticky top-0 border-b border-slate-200 bg-white text-xs uppercase text-slate-500">
-              <tr><th className="px-4 py-3">Serie</th><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Referencia</th><th className="px-4 py-3 text-right">Último Número</th><th className="px-4 py-3 text-center">POS</th><th className="px-4 py-3 text-center">Estado</th><th className="px-4 py-3 text-center">Acciones</th></tr>
+              <tr><th className="px-4 py-3">Serie</th><th className="px-4 py-3">Documento</th><th className="px-4 py-3">Referencia</th><th className="px-4 py-3 text-right">Último Número</th><th className="px-4 py-3 text-center">Producción</th><th className="px-4 py-3 text-center">POS</th><th className="px-4 py-3 text-center">Estado</th><th className="px-4 py-3 text-center">Acciones</th></tr>
             </thead>
             <tbody className="divide-y divide-slate-100">{filtradas.map((serie) => {
               const detalle = detalleTipo(serie.tipo_comprobante);
               const refLabel = serie.tipo_documento_referencia === '01' ? 'Factura' : serie.tipo_documento_referencia === '03' ? 'Boleta' : detalle.referencia;
-              return <tr key={serie.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-mono text-base font-bold text-[#052A79]">{serie.serie}{serie.contingencia && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">CONTINGENCIA</span>}{serie.fuente_correlativo === 'COMPARTIDO_FARENET' && <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 font-sans text-xs text-blue-700">COMPARTIDO CON FARENET</span>}</td><td className="px-4 py-3 font-semibold">{detalle.documento}</td><td className="px-4 py-3 text-slate-600">{refLabel}</td><td className="px-4 py-3 text-right font-mono font-bold">{serie.ultimo_numero.toLocaleString('es-PE')}</td><td className="px-4 py-3 text-center">{serie.serie_pos ? <span className="rounded bg-teal-100 px-2 py-1 text-xs font-bold text-teal-700">SÍ</span> : 'No'}</td><td className="px-4 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${serie.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{serie.activo ? 'ACTIVA' : 'INACTIVA'}</span></td><td className="px-4 py-3 text-center"><div className="flex justify-center gap-3 text-xs font-bold"><button onClick={() => setModal({ modo: 'EDITAR', serie })} className="text-[#052A79]">Editar</button><button onClick={() => void cambiarEstado(serie)} className={serie.activo ? 'text-red-600' : 'text-green-600'}>{serie.activo ? 'Desactivar' : 'Activar'}</button></div></td></tr>;
+              return <tr key={serie.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-mono text-base font-bold text-[#052A79]">{serie.serie}{serie.contingencia && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">CONTINGENCIA</span>}{serie.fuente_correlativo === 'COMPARTIDO_FARENET' && <span className="ml-2 rounded bg-blue-100 px-2 py-0.5 font-sans text-xs text-blue-700">COMPARTIDO CON FARENET</span>}</td><td className="px-4 py-3 font-semibold">{detalle.documento}</td><td className="px-4 py-3 text-slate-600">{refLabel}</td><td className="px-4 py-3 text-right font-mono font-bold">{serie.ultimo_numero.toLocaleString('es-PE')}</td><td className="px-4 py-3 text-center">{serie.confirmada_produccion === undefined ? <span className="text-xs text-slate-400">MIGRACIÓN PENDIENTE</span> : serie.confirmada_produccion ? <span className="rounded bg-green-100 px-2 py-1 text-xs font-bold text-green-700">CONFIRMADA</span> : <span className="rounded bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">PENDIENTE</span>}</td><td className="px-4 py-3 text-center">{serie.serie_pos ? <span className="rounded bg-teal-100 px-2 py-1 text-xs font-bold text-teal-700">SÍ</span> : 'No'}</td><td className="px-4 py-3 text-center"><span className={`rounded-full px-2 py-1 text-xs font-bold ${serie.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{serie.activo ? 'ACTIVA' : 'INACTIVA'}</span></td><td className="px-4 py-3 text-center"><div className="flex justify-center gap-3 text-xs font-bold"><button onClick={() => setModal({ modo: 'EDITAR', serie })} className="text-[#052A79]">Editar</button>{serie.confirmada_produccion !== undefined && <button onClick={() => setConfirmarSerie(serie)} className={serie.confirmada_produccion ? 'text-amber-700' : 'text-green-700'}>{serie.confirmada_produccion ? 'Revocar producción' : 'Confirmar producción'}</button>}<button onClick={() => void cambiarEstado(serie)} className={serie.activo ? 'text-red-600' : 'text-green-600'}>{serie.activo ? 'Desactivar' : 'Activar'}</button></div></td></tr>;
             })}</tbody>
           </table>
         </div>}
     </div>
     {modal && sede && <SerieModal estado={modal} sede={sede} onClose={() => setModal(null)} onSaved={async () => { setModal(null); await refrescar(); }} />}
+    {confirmarSerie && <ConfirmarSerieModal serie={confirmarSerie} onClose={() => setConfirmarSerie(null)} onSaved={async () => { setConfirmarSerie(null); await refrescar(); }} />}
   </div>;
+}
+
+function ConfirmarSerieModal({ serie, onClose, onSaved }: { serie: SerieComprobante; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [numero, setNumero] = useState(String(serie.numero_inicial_confirmado ?? serie.ultimo_numero));
+  const [origen, setOrigen] = useState(serie.sistema_origen || 'DMS_FACT');
+  const [fechaCorte, setFechaCorte] = useState(serie.fecha_corte ? String(serie.fecha_corte).slice(0, 16) : '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const revocar = Boolean(serie.confirmada_produccion);
+  const guardar = async (event: React.FormEvent) => {
+    event.preventDefault(); setError('');
+    const numeroConfirmado = Number(numero);
+    if (!Number.isSafeInteger(numeroConfirmado) || numeroConfirmado < serie.ultimo_numero) {
+      setError(`El número debe ser entero y no menor que ${serie.ultimo_numero}.`); return;
+    }
+    if (!revocar && !fechaCorte) { setError('La fecha y hora de corte son obligatorias.'); return; }
+    try {
+      setSaving(true);
+      await faregasSeriesApi.confirmarProduccion(serie.id, {
+        confirmada: !revocar,
+        numero_inicial_confirmado: numeroConfirmado,
+        sistema_origen: origen.trim().toUpperCase(),
+        fecha_corte: fechaCorte || null
+      });
+      await onSaved();
+    } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo actualizar la confirmación.'); }
+    finally { setSaving(false); }
+  };
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl"><h3 className="text-xl font-black text-[#052a79]">{revocar ? 'Revocar confirmación productiva' : 'Confirmar serie para producción'}</h3><p className="mt-1 text-sm text-slate-500">{serie.tipo_comprobante} · {serie.serie}</p><div className="my-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Esta acción no activa Nubefact, pero registra el número de corte. Debe basarse en información verificada de DMS Fact.</div><form onSubmit={guardar} className="space-y-4"><label className="block text-xs font-bold uppercase text-slate-500">Último número confirmado<input type="number" min={serie.ultimo_numero} step="1" value={numero} disabled={revocar} onChange={event => setNumero(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5 disabled:bg-slate-100" /></label><label className="block text-xs font-bold uppercase text-slate-500">Sistema origen<input value={origen} disabled={revocar} onChange={event => setOrigen(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5 disabled:bg-slate-100" /></label><label className="block text-xs font-bold uppercase text-slate-500">Fecha y hora de corte<input type="datetime-local" value={fechaCorte} disabled={revocar} onChange={event => setFechaCorte(event.target.value)} className="mt-1 w-full rounded-lg border p-2.5 disabled:bg-slate-100" /></label>{error && <div className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{error}</div>}<div className="flex justify-end gap-3 border-t pt-4"><button type="button" onClick={onClose} className="rounded-lg px-4 py-2 font-bold text-slate-600">Cancelar</button><button disabled={saving} className={`rounded-lg px-4 py-2 font-bold text-white disabled:opacity-50 ${revocar ? 'bg-amber-700' : 'bg-green-700'}`}>{saving ? 'Guardando...' : revocar ? 'REVOCAR CONFIRMACIÓN' : 'CONFIRMAR SERIE'}</button></div></form></div></div>;
 }
 
 function SerieModal({ estado, sede, onClose, onSaved }: { estado: NonNullable<ModalState>; sede: SerieSede; onClose: () => void; onSaved: () => Promise<void> }) {

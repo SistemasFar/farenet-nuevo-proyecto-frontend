@@ -176,7 +176,7 @@ export interface ResumenTributarioFaregas {
     serie: NullableText;
     numero: number | null;
     numeroAsignado: boolean;
-    fuenteSerie: 'COMPARTIDO_FARENET';
+    fuenteSerie: 'SERIE_DOCUMENTO_BASE' | 'FG_SERIE_COMPROBANTE' | 'SIN_CONFIGURAR';
   };
   cliente: {
     tipoDocumento: NullableText;
@@ -207,6 +207,9 @@ export interface FacturacionContextoFaregas {
     enabled: boolean;
     configured: boolean;
     simulationEnabled?: boolean;
+    correlativosV2Enabled?: boolean;
+    environment?: string;
+    detractionDecision?: string;
   } | null;
   resumenTributario: ResumenTributarioFaregas;
 }

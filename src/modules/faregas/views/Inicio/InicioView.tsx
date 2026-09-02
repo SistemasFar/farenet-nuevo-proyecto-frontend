@@ -3,6 +3,9 @@ import { faregasCertificadosApi } from '../../services/faregas-certificados.api'
 
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
+import type { FacturacionFaregas } from '../../types/faregas-api';
+import Swal from 'sweetalert2';
+import { FileText, XCircle, FileEdit, ArrowRight } from 'lucide-react';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
@@ -101,6 +104,7 @@ export function InicioView() {
   const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
 
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -221,6 +225,143 @@ export function InicioView() {
     total === 0 ? 0 : (page - 1) * pageSize + 1;
 
   const registroFin = Math.min(page * pageSize, total);
+
+  const obtenerFacturacion = async (certificadoId: number): Promise<FacturacionFaregas | null> => {
+    const response = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
+    return (response.data?.facturacion || null) as FacturacionFaregas | null;
+  };
+
+  const comprobarComprobanteAceptado = async (certificadoId: number) => {
+    const facturacion = await obtenerFacturacion(certificadoId);
+    if (!facturacion || facturacion.estado !== 'ACEPTADO' || facturacion.aceptadaSunat !== true) {
+      await Swal.fire({
+        icon: 'info',
+        title: 'Comprobante no disponible',
+        text: 'Este certificado no tiene una boleta o factura aceptada por Nubefact/SUNAT. La emisión realizada en modo desarrollo solo emitió el certificado.',
+        confirmButtonColor: '#052A79',
+      });
+      return null;
+    }
+    return facturacion;
+  };
+
+  const verComprobante = async (certificadoId: number) => {
+    try {
+      setAccionEnProceso(certificadoId);
+      const facturacion = await comprobarComprobanteAceptado(certificadoId);
+      if (!facturacion) return;
+      if (!facturacion.enlacePdf) {
+        await Swal.fire('PDF no disponible', 'El comprobante está aceptado, pero Nubefact no devolvió un enlace PDF.', 'warning');
+        return;
+      }
+      window.open(facturacion.enlacePdf, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      await Swal.fire('No se pudo consultar', err instanceof Error ? err.message : 'No se pudo obtener el comprobante.', 'error');
+    } finally {
+      setAccionEnProceso(null);
+    }
+  };
+
+  const anularComprobante = async (certificadoId: number) => {
+    try {
+      setAccionEnProceso(certificadoId);
+      const facturacion = await comprobarComprobanteAceptado(certificadoId);
+      if (!facturacion) return;
+      const confirmacion = await Swal.fire({
+        icon: 'warning',
+        title: `🚫 Anular ${facturacion.nroComprobante || 'comprobante'}`,
+        input: 'text',
+        inputLabel: 'Motivo de la anulación',
+        inputPlaceholder: 'Ingrese el motivo',
+        showCancelButton: true,
+        confirmButtonText: 'SOLICITAR ANULACIÓN',
+        cancelButtonText: 'CANCELAR',
+        confirmButtonColor: '#dc2626',
+        inputValidator: value => !value.trim()
+          ? 'El motivo es obligatorio.'
+          : value.trim().length > 100 ? 'El motivo admite como máximo 100 caracteres.' : undefined,
+      });
+      if (!confirmacion.isConfirmed) return;
+      await faregasCertificadosApi.generarAnulacionElectronica(certificadoId, {
+        tipoDocumento: 'FACTURACION',
+        motivo: String(confirmacion.value).trim(),
+      });
+      await Swal.fire('Solicitud registrada', 'La anulación fue enviada. Su aceptación debe consultarse posteriormente.', 'success');
+    } catch (err) {
+      await Swal.fire('No se pudo anular', err instanceof Error ? err.message : 'La solicitud de anulación falló.', 'error');
+    } finally {
+      setAccionEnProceso(null);
+    }
+  };
+
+  const crearNotaCredito = async (certificadoId: number) => {
+    try {
+      setAccionEnProceso(certificadoId);
+      const facturacion = await comprobarComprobanteAceptado(certificadoId);
+      if (!facturacion) return;
+      const totalOriginal = Number(facturacion.importeTotal);
+      const formulario = await Swal.fire({
+        icon: 'warning',
+        title: `📝 Nota de crédito para ${facturacion.nroComprobante || 'comprobante'}`,
+        html: `
+          <label for="nota-motivo" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:8px 0 4px">MOTIVO</label>
+          <select id="nota-motivo" class="swal2-input" style="width:100%;margin:0">
+            <option value="1">1 — Anulación de la operación</option>
+            <option value="2">2 — Anulación por error en el RUC</option>
+            <option value="3">3 — Corrección por error en la descripción</option>
+            <option value="4">4 — Descuento global</option>
+            <option value="5">5 — Descuento por ítem</option>
+            <option value="6">6 — Devolución total</option>
+            <option value="7">7 — Devolución por ítem</option>
+            <option value="8">8 — Bonificación</option>
+            <option value="9">9 — Disminución en el valor</option>
+            <option value="10">10 — Otros conceptos</option>
+          </select>
+          <label for="nota-importe" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">IMPORTE TOTAL</label>
+          <input id="nota-importe" class="swal2-input" type="number" min="0.01" max="${totalOriginal.toFixed(2)}" step="0.01" value="${totalOriginal.toFixed(2)}" style="width:100%;margin:0" />
+          <label for="nota-sustento" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">SUSTENTO</label>
+          <textarea id="nota-sustento" class="swal2-textarea" maxlength="250" placeholder="Explique el motivo de la nota" style="width:100%;margin:0"></textarea>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'CREAR NOTA DE CRÉDITO',
+        cancelButtonText: 'CANCELAR',
+        confirmButtonColor: '#052A79',
+        focusConfirm: false,
+        preConfirm: () => {
+          const motivoCodigo = (document.getElementById('nota-motivo') as HTMLSelectElement | null)?.value || '';
+          const importeTotal = Number((document.getElementById('nota-importe') as HTMLInputElement | null)?.value);
+          const sustento = (document.getElementById('nota-sustento') as HTMLTextAreaElement | null)?.value.trim() || '';
+          if (!Number.isFinite(importeTotal) || importeTotal <= 0 || importeTotal > totalOriginal) {
+            Swal.showValidationMessage(`El importe debe ser mayor a cero y no superar S/ ${totalOriginal.toFixed(2)}.`);
+            return false;
+          }
+          if (!sustento) {
+            Swal.showValidationMessage('El sustento es obligatorio.');
+            return false;
+          }
+          return { motivoCodigo, importeTotal, sustento };
+        },
+      });
+      if (!formulario.isConfirmed || !formulario.value) return;
+      const importeTotal = Number(formulario.value.importeTotal);
+      const proporcion = importeTotal / totalOriginal;
+      const baseImponible = Math.round(Number(facturacion.baseImponible) * proporcion * 100) / 100;
+      const igv = Math.round((importeTotal - baseImponible) * 100) / 100;
+      await faregasCertificadosApi.emitirNotaElectronica(certificadoId, {
+        tipo: 'CREDITO',
+        motivoCodigo: formulario.value.motivoCodigo,
+        sustento: formulario.value.sustento,
+        baseImponible,
+        igv,
+        importeTotal,
+      });
+      await Swal.fire('Nota procesada', 'La nota de crédito fue registrada. Revise posteriormente su estado SUNAT.', 'success');
+    } catch (err) {
+      await Swal.fire('No se pudo crear la nota', err instanceof Error ? err.message : 'La creación de la nota de crédito falló.', 'error');
+    } finally {
+      setAccionEnProceso(null);
+    }
+  };
 
   return (
     <div className="space-y-4 pb-8">
@@ -459,14 +600,37 @@ export function InicioView() {
                         <BadgeEstado value={ins.estado} />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center align-middle">
-                        <div className="flex items-center justify-center gap-2 h-full">
+                        <div className="flex h-full flex-wrap items-center justify-center gap-1">
                           <button
                             type="button"
                             onClick={() => navigate(`/faregas/certificados/${ins.id}/continuar`)}
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-[#052A79] transition-colors hover:bg-gray-50"
+                            className="rounded-md border border-yellow-300 bg-yellow-50 px-2.5 py-1.5 text-base text-[#052A79] transition-colors hover:bg-yellow-100"
                           >
-                            Continuar
+                            <ArrowRight size={18} title="Continuar" />
                           </button>
+                          {ins.estado === 'EMITIDO' && <>
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === ins.id}
+                              onClick={() => void verComprobante(ins.id)}
+                              title="Ver comprobante"
+                              className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
+                            ><FileText size={18} /></button>
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === ins.id}
+                              onClick={() => void anularComprobante(ins.id)}
+                              title="Anular comprobante"
+                              className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 disabled:opacity-50"
+                            ><XCircle size={18} /></button>
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === ins.id}
+                              onClick={() => void crearNotaCredito(ins.id)}
+                              title="Crear nota de crédito"
+                              className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-violet-100 disabled:opacity-50"
+                            ><FileEdit size={18} /></button>
+                          </>}
                         </div>
                       </td>
                     </tr>

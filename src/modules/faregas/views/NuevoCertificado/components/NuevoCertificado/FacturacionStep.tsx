@@ -147,8 +147,10 @@ export function FacturacionStep({
   const [isLoading, setIsLoading] = useState(Boolean(certificadoId));
   const [isSaving, setIsSaving] = useState(false);
   const [isEmitting, setIsEmitting] = useState(false);
-  const [integracion, setIntegracion] = useState<{ enabled: boolean; configured: boolean; simulationEnabled?: boolean } | null>(null);
+  const [integracion, setIntegracion] = useState<{ enabled: boolean; configured: boolean; simulationEnabled?: boolean; correlativosV2Enabled?: boolean } | null>(null);
   const [resumenTributario, setResumenTributario] = useState<ResumenTributarioFaregas | null>(null);
+  const [preflight, setPreflight] = useState<{ estado: 'LISTO' | 'BLOQUEADO'; bloqueos: number; advertencias: number; checks: Array<{ codigo: string; estado: 'OK' | 'ADVERTENCIA' | 'BLOQUEO'; mensaje: string }> } | null>(null);
+  const [validating, setValidating] = useState(false);
   const bloqueado = facturacion?.estado === 'ACEPTADO' || facturacion?.estado === 'PENDIENTE' || facturacion?.estado === 'ERROR';
 
   const aplicarContexto = useCallback((data: FacturacionContextoFaregas) => {
@@ -248,11 +250,24 @@ export function FacturacionStep({
     }
   };
 
+  const validarPreparacion = async () => {
+    if (!certificadoId) return null;
+    try {
+      setValidating(true);
+      const response = await faregasCertificadosApi.preflightFacturacion(certificadoId);
+      const resultado = response.data as NonNullable<typeof preflight>;
+      setPreflight(resultado);
+      return resultado;
+    } finally { setValidating(false); }
+  };
+
   const emitir = async () => {
     if (!certificadoId || isEmitting) return;
     const confirmation = await Swal.fire({
       title: '¿Emitir comprobante electronico?',
-      text: 'Se reservara el siguiente numero de la serie compartida con Farenet y se enviara a Nubefact/SUNAT.',
+      text: integracion?.correlativosV2Enabled
+        ? 'Se reservará el siguiente número de la serie tributaria Faregas y se enviará a Nubefact/SUNAT.'
+        : 'El motor tributario V2 aún no está activo. La emisión no debería habilitarse en producción.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'EMITIR COMPROBANTE',
@@ -276,6 +291,13 @@ export function FacturacionStep({
           : 'No se pudo validar el resumen tributario.';
         const error = new Error(errores) as Error & { detalles?: string[] };
         error.detalles = resumenActual?.errores;
+        throw error;
+      }
+      const validacion = await validarPreparacion();
+      if (!validacion || validacion.estado !== 'LISTO') {
+        const mensajes = validacion?.checks.filter(item => item.estado === 'BLOQUEO').map(item => item.mensaje) || [];
+        const error = new Error(mensajes.join('\n') || 'La preparación integral de Nubefact está bloqueada.') as Error & { detalles?: string[] };
+        error.detalles = mensajes;
         throw error;
       }
       const response = await faregasCertificadosApi.emitirFacturacion(certificadoId);
@@ -402,6 +424,13 @@ export function FacturacionStep({
 
         <ResumenTributario resumen={resumenTributario} />
 
+        {preflight && (
+          <div className={`rounded-xl border p-4 ${preflight.estado === 'LISTO' ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
+            <div className="mb-3 flex items-center justify-between"><strong>Validación integral Nubefact: {preflight.estado}</strong><span className="text-xs font-bold">{preflight.bloqueos} bloqueos · {preflight.advertencias} advertencias</span></div>
+            <ul className="space-y-1 text-sm">{preflight.checks.map((item, index) => <li key={`${item.codigo}-${index}`} className={item.estado === 'OK' ? 'text-green-700' : item.estado === 'BLOQUEO' ? 'text-red-700' : 'text-amber-800'}>{item.estado === 'OK' ? '✓' : item.estado === 'BLOQUEO' ? '✕' : '!'} {item.mensaje}</li>)}</ul>
+          </div>
+        )}
+
         {integracion?.simulationEnabled ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-800">
             Modo desarrollo activo: los datos se guardan y el certificado puede emitirse, pero el comprobante no se enviará a Nubefact/SUNAT.
@@ -417,6 +446,9 @@ export function FacturacionStep({
         )}
 
         <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-5">
+          <button type="button" disabled={validating || isSaving || isEmitting || !certificadoId} onClick={() => void validarPreparacion()} className="rounded-xl border border-slate-300 px-5 py-3 text-xs font-black text-slate-700 disabled:opacity-50">
+            {validating ? 'VALIDANDO...' : 'VALIDAR PREPARACIÓN'}
+          </button>
           {!bloqueado && (
             <button type="button" disabled={isSaving || isEmitting} onClick={() => guardar(true)} className="rounded-xl border-2 border-[#052a79] px-5 py-3 text-xs font-black text-[#052a79] disabled:opacity-50">
               {isSaving ? 'GUARDANDO...' : 'GUARDAR DATOS'}

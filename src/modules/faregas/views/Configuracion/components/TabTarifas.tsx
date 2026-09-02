@@ -7,6 +7,7 @@ import {
   type TarifaSede
 } from '../../../services/faregas-tarifas-admin.api';
 import { exportarExcel } from '../../../utils/exportar-excel';
+import CatalogoFiscalImportModal from './CatalogoFiscalImportModal';
 
 type ModalState = { modo: 'CREAR' | 'EDITAR'; tarifa?: TarifaAdmin } | null;
 
@@ -37,6 +38,7 @@ export default function TabTarifas() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modal, setModal] = useState<ModalState>(null);
+  const [importModal, setImportModal] = useState(false);
 
   const cargarSedes = async () => {
     const data = await faregasTarifasAdminApi.listarSedes();
@@ -131,6 +133,7 @@ export default function TabTarifas() {
       <select value={estado} onChange={(e) => setEstado(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Estado: Todas</option><option value="1">Activas</option><option value="0">Inactivas</option></select>
       <select value={filtroEstadoTributario} onChange={(e) => setFiltroEstadoTributario(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2.5 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Tributario: Todas</option><option value="CONFIGURADA">Configuradas correctamente</option><option value="INCOMPLETA">Sin SKU asignado (Incompleta)</option><option value="INVALIDA">Producto Inválido</option></select>
       <button type="button" disabled={loading || filtradas.length === 0} onClick={() => exportarExcel(`faregas_tarifas_${plantaKey}`, 'Tarifas', [
+        { key: 'tarifa_id', header: 'TARIFA_ID', width: 14 },
         { key: 'sede', header: 'SEDE', width: 24 },
         { key: 'codigo', header: 'CÓDIGO SERVICIO', width: 22 },
         { key: 'servicio', header: 'SERVICIO', width: 42 },
@@ -141,6 +144,7 @@ export default function TabTarifas() {
         { key: 'estado', header: 'ESTADO', width: 14 },
         { key: 'tributario', header: 'TRIBUTARIO', width: 20 }
       ], filtradas.map((tarifa) => ({
+        tarifa_id: tarifa.id,
         sede: tarifa.sede_nombre,
         codigo: tarifa.servicio_codigo,
         servicio: tarifa.servicio_nombre,
@@ -151,6 +155,7 @@ export default function TabTarifas() {
         estado: tarifa.activo ? 'ACTIVA' : 'INACTIVA',
         tributario: getTarifaStatus(tarifa)
       })))} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">↓ EXPORTAR EXCEL</button>
+      <button type="button" onClick={() => setImportModal(true)} className="rounded-lg border border-[#052A79] bg-white px-4 py-2.5 text-sm font-bold text-[#052A79]">IMPORTAR VINCULACIONES</button>
       <button disabled={!plantaKey} onClick={() => setModal({ modo: 'CREAR' })} className="rounded-lg bg-[#052A79] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">+ ASIGNAR SERVICIO</button>
     </div>
 
@@ -174,6 +179,7 @@ export default function TabTarifas() {
       })}</tbody></table></div>}
     </div>
     {modal && sede && <TarifaModal estado={modal} sede={sede} onClose={() => setModal(null)} onSaved={async () => { setModal(null); await refrescar(); }} />}
+    {importModal && <CatalogoFiscalImportModal tarifas={tarifas.filter(item => item.activo).map(item => ({ id: item.id, sku: item.producto_sku || '' }))} onClose={() => setImportModal(false)} onApplied={refrescar} />}
   </div>;
 }
 

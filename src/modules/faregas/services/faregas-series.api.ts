@@ -30,6 +30,10 @@ export interface SerieComprobante {
   tipo_documento_referencia?: string;
   serie_pos?: boolean;
   fuente_correlativo?: 'COMPARTIDO_FARENET' | 'FAREGAS';
+  confirmada_produccion?: boolean;
+  numero_inicial_confirmado?: number | null;
+  sistema_origen?: string | null;
+  fecha_corte?: string | null;
 }
 
 const request = async (path: string, options: RequestInit = {}) => {
@@ -59,5 +63,13 @@ export const faregasSeriesApi = {
   },
   cambiarEstado: async (id: number, activo: boolean) => {
     await request(`/series/${id}/estado`, { method: 'PUT', body: JSON.stringify({ activo }) });
+  },
+  confirmarProduccion: async (id: number, body: {
+    confirmada: boolean;
+    numero_inicial_confirmado: number;
+    sistema_origen: string;
+    fecha_corte: string | null;
+  }) => {
+    await request(`/series/${id}/confirmacion-produccion`, { method: 'PUT', body: JSON.stringify(body) });
   }
 };
