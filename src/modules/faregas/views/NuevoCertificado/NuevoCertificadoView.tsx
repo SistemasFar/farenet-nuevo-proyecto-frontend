@@ -365,7 +365,7 @@ export function NuevoCertificadoView() {
             }));
           }
 
-          if (res.data.vehiculo) {
+          if (res.data.vehiculo && (res.data.vehiculo.marca || res.data.vehiculo.clase || res.data.vehiculo.modelo || res.data.vehiculo.vin)) {
             setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(res.data.vehiculo) }));
             setVehiculoOrigen('BORRADOR');
           }
