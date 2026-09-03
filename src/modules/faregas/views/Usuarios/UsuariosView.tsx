@@ -545,6 +545,7 @@ export function UsuariosView() {
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Username <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                                            minLength={3} pattern="^[a-zA-Z0-9_.-]+$" title="El usuario debe tener al menos 3 caracteres y no contener espacios"
                                             value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} disabled={modalMode === 'editar'} />
                                     </div>
                                     <div>
@@ -575,6 +576,7 @@ export function UsuariosView() {
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nro Documento <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                                            minLength={8} maxLength={15} pattern="^[0-9a-zA-Z]+$" title="Ingrese un número de documento válido (sin guiones ni espacios)"
                                             value={formData.nroDocumento} onChange={e => setFormData({ ...formData, nroDocumento: e.target.value })} />
                                     </div>
                                 </div>
@@ -584,11 +586,13 @@ export function UsuariosView() {
                                         <div>
                                             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nombres <span className="text-red-500">*</span></label>
                                             <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                                                minLength={2} pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$" title="Solo letras y espacios (min. 2 caracteres)"
                                                 value={formData.nombres} onChange={e => setFormData({ ...formData, nombres: e.target.value })} />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Apellidos <span className="text-red-500">*</span></label>
                                             <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                                                minLength={2} pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$" title="Solo letras y espacios (min. 2 caracteres)"
                                                 value={formData.apellidos} onChange={e => setFormData({ ...formData, apellidos: e.target.value })} />
                                         </div>
                                     </div>
@@ -596,6 +600,7 @@ export function UsuariosView() {
                                     <div className="mb-4">
                                         <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Razón Social <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                                            minLength={3} title="Ingrese una razón social válida (min. 3 caracteres)"
                                             value={formData.nombreRazonSocial} onChange={e => setFormData({ ...formData, nombreRazonSocial: e.target.value })} />
                                     </div>
                                 )}
@@ -669,12 +674,14 @@ export function UsuariosView() {
                                 <div className="mb-4">
                                     <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Dirección <span className="text-red-500">*</span></label>
                                     <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                                        minLength={5} title="Ingrese una dirección válida (min. 5 caracteres)"
                                         value={formData.direccion} onChange={e => setFormData({ ...formData, direccion: e.target.value })} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Teléfono <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                                            minLength={6} pattern="^[0-9+\-\s]+$" title="Ingrese un número de teléfono válido"
                                             value={formData.telefono} onChange={e => setFormData({ ...formData, telefono: e.target.value })} />
                                     </div>
                                     <div>
@@ -686,7 +693,7 @@ export function UsuariosView() {
                                 <div>
                                     <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Persona de Contacto {formData.tipoDocumentoKey === '06' && <span className="text-red-500">*</span>}</label>
                                     <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
-                                        required={formData.tipoDocumentoKey === '06'}
+                                        required={formData.tipoDocumentoKey === '06'} minLength={formData.tipoDocumentoKey === '06' ? 3 : undefined} title="Ingrese el nombre del contacto (min. 3 caracteres)"
                                         value={formData.personaContacto} onChange={e => setFormData({ ...formData, personaContacto: e.target.value })} />
                                 </div>
                             </div>

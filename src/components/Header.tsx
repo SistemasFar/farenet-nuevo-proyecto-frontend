@@ -60,7 +60,27 @@ export function Header({
 
   const pageTitle = routeToTitle(activeTab);
 
-  const userName = String(user?.nombreCompleto || user?.username || 'OPERADOR').toUpperCase();
+  const [nombreOperador, setNombreOperador] = useState('');
+
+  useEffect(() => {
+    if (isFaregas && user?.username) {
+      import('../modules/faregas/services/faregas-usuarios.api')
+        .then(({ faregasUsuariosApi }) => faregasUsuariosApi.obtenerUsuarios())
+        .then((usuarios: any[]) => {
+          const u = usuarios.find((x: any) => x.username === user.username);
+          if (u) {
+            if (u.nombreRazonSocial) {
+              setNombreOperador(u.nombreRazonSocial);
+            } else if (u.nombres || u.apellidos) {
+              setNombreOperador(`${u.nombres || ''} ${u.apellidos || ''}`.trim());
+            }
+          }
+        })
+        .catch(console.error);
+    }
+  }, [isFaregas, user?.username]);
+
+  const userName = String(nombreOperador || user?.nombreCompleto || user?.username || 'OPERADOR').toUpperCase();
 
   const userInitial =
     userName.trim()[0]?.toUpperCase() ?? 'U';

@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Edit, Settings, Power, PowerOff, Edit2, Loader2, MapPin, X } from 'lucide-react';
+import { Edit, Settings, Power, PowerOff, Loader2, MapPin, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasDescuentosAdminApi, type DescuentoAdmin, type DescuentoFormData, type TipoCampana } from '../../services/faregas-descuentos.api';
 

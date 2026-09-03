@@ -29,7 +29,14 @@ export default function NubefactReadinessPanel() {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { void cargar(); }, [cargar]);
+  useEffect(() => {
+    let cancelado = false;
+    void faregasNubefactReadinessApi.obtenerPanel()
+      .then((result) => { if (!cancelado) setData(result); })
+      .catch((err) => { if (!cancelado) setError(err instanceof Error ? err.message : 'No se pudo evaluar Nubefact.'); })
+      .finally(() => { if (!cancelado) setLoading(false); });
+    return () => { cancelado = true; };
+  }, []);
 
   if (loading) return <div className="flex items-center justify-center gap-2 rounded-xl border p-12 font-semibold text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Evaluando preparación...</div>;
   if (error) return <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-700">{error}</div>;
@@ -50,7 +57,7 @@ export default function NubefactReadinessPanel() {
       <Card label="Tarifas activas" value={data.catalogo.activas} />
       <Card label="Listas para Nubefact" value={data.catalogo.listas} tone="green" />
       <Card label="Sin producto fiscal" value={data.catalogo.sinVincular} tone={data.catalogo.sinVincular ? 'red' : 'green'} />
-      <Card label="Series confirmadas" value={data.series.confirmadasProduccion} tone={data.series.confirmadasProduccion ? 'green' : 'amber'} />
+      <Card label={`Series Nubefact ${data.configuracion.environment}`} value={data.series.nubefactExclusivas} tone={data.series.nubefactExclusivas ? 'green' : 'amber'} />
       <Card label="Series por agotarse" value={data.series.proximasAgotarse} tone={data.series.proximasAgotarse ? 'red' : 'green'} />
     </div>
 
@@ -64,6 +71,10 @@ export default function NubefactReadinessPanel() {
             ['Producción confirmada', data.configuracion.productionConfirmed ? 'SÍ' : 'NO'],
             ['Migración V2 aplicada', data.configuracion.migracionV2Aplicada ? 'SÍ' : 'NO'],
             ['Motor V2 habilitado', data.configuracion.correlativosV2Enabled ? 'SÍ' : 'NO'],
+            [`Credenciales ${data.credenciales.ambiente}`, `${data.credenciales.configuradas} / ${data.credenciales.total}`],
+            ['Series legacy excluidas', String(data.series.legacy)],
+            ['Series Nubefact predeterminadas', String(data.series.nubefactPredeterminadas)],
+            ['Series productivas confirmadas', String(data.series.confirmadasProduccion)],
             ['Detracción', data.configuracion.detractionDecision]
           ].map(([label, value]) => <div key={label} className="flex justify-between border-b py-2"><span className="text-slate-500">{label}</span><strong>{value}</strong></div>)}
         </div>

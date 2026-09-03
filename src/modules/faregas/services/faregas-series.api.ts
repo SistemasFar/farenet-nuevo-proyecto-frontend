@@ -29,11 +29,19 @@ export interface SerieComprobante {
   activo: boolean;
   tipo_documento_referencia?: string;
   serie_pos?: boolean;
-  fuente_correlativo?: 'COMPARTIDO_FARENET' | 'FAREGAS';
+  fuente_correlativo?: 'COMPARTIDO_FARENET' | 'FAREGAS' | 'NUBEFACT_EXCLUSIVA';
+  proveedor_emision?: 'LEGACY' | 'NUBEFACT';
+  entorno_emision?: 'DEMO' | 'PRODUCCION';
+  migracion_nubefact_aplicada?: boolean;
   confirmada_produccion?: boolean;
   numero_inicial_confirmado?: number | null;
   sistema_origen?: string | null;
   fecha_corte?: string | null;
+}
+
+export interface ListadoSeriesComprobante {
+  series: SerieComprobante[];
+  migracionNubefactAplicada: boolean;
 }
 
 const request = async (path: string, options: RequestInit = {}) => {
@@ -53,8 +61,13 @@ const request = async (path: string, options: RequestInit = {}) => {
 
 export const faregasSeriesApi = {
   listarSedes: async (): Promise<SerieSede[]> => (await request('/series/sedes')).sedes || [],
-  listar: async (plantaKey: string): Promise<SerieComprobante[]> =>
-    (await request(`/series?planta_key=${encodeURIComponent(plantaKey)}`)).series || [],
+  listar: async (plantaKey: string): Promise<ListadoSeriesComprobante> => {
+    const data = await request(`/series?planta_key=${encodeURIComponent(plantaKey)}`);
+    return {
+      series: data.series || [],
+      migracionNubefactAplicada: Boolean(data.migracionNubefactAplicada)
+    };
+  },
   crear: async (body: Omit<SerieComprobante, 'id' | 'sede_nombre'>) => {
     await request('/series', { method: 'POST', body: JSON.stringify(body) });
   },

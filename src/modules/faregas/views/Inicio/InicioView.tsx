@@ -5,7 +5,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import type { FacturacionFaregas } from '../../types/faregas-api';
 import Swal from 'sweetalert2';
-import { FileText, XCircle, FileEdit, ArrowRight, Edit, Eye } from 'lucide-react';
+import { FileText, XCircle, FileEdit, Edit, Eye } from 'lucide-react';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
