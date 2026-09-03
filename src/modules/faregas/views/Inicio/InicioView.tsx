@@ -237,7 +237,14 @@ export function InicioView() {
 
   const comprobarComprobanteAceptado = async (certificadoId: number) => {
     const facturacion = await obtenerFacturacion(certificadoId);
-    if (!facturacion || facturacion.estado !== 'ACEPTADO' || facturacion.aceptadaSunat !== true) {
+    
+    // Si esta aceptado O si esta pendiente de SUNAT (modo demo/contingencia), permitimos ver el comprobante
+    const comprobanteDisponible = facturacion && (
+      (facturacion.estado === 'ACEPTADO' && facturacion.aceptadaSunat === true) || 
+      (facturacion.estado === 'PENDIENTE_SUNAT')
+    );
+
+    if (!comprobanteDisponible) {
       await Swal.fire({
         icon: 'info',
         title: 'Comprobante no disponible',

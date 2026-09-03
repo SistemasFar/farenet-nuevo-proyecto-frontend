@@ -106,6 +106,7 @@ export interface FacturacionFaregas {
   direccion: string;
   email: NullableText;
   telefono: NullableText;
+
   condicionPago: 'CONTADO' | 'CREDITO';
   fechaVencimiento: NullableText;
   medioPago: NullableText;
@@ -113,7 +114,7 @@ export interface FacturacionFaregas {
   baseImponible: number;
   igv: number;
   importeTotal: number;
-  estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR' | 'ANULADO';
+  estado: 'BORRADOR' | 'PENDIENTE' | 'PENDIENTE_SUNAT' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR' | 'ANULADO';
   serie: NullableText;
   numero: number | null;
   nroComprobante: NullableText;

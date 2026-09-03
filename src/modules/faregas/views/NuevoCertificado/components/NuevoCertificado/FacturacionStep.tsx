@@ -151,7 +151,7 @@ export function FacturacionStep({
   const [resumenTributario, setResumenTributario] = useState<ResumenTributarioFaregas | null>(null);
   const [preflight, setPreflight] = useState<{ estado: 'LISTO' | 'BLOQUEADO'; bloqueos: number; advertencias: number; checks: Array<{ codigo: string; estado: 'OK' | 'ADVERTENCIA' | 'BLOQUEO'; mensaje: string }> } | null>(null);
   const [validating, setValidating] = useState(false);
-  const bloqueado = facturacion?.estado === 'ACEPTADO' || facturacion?.estado === 'PENDIENTE' || facturacion?.estado === 'ERROR';
+  const bloqueado = facturacion?.estado === 'ACEPTADO' || facturacion?.estado === 'PENDIENTE_SUNAT' || facturacion?.estado === 'PENDIENTE' || facturacion?.estado === 'ERROR';
 
   const aplicarContexto = useCallback((data: FacturacionContextoFaregas) => {
     setIntegracion(data.integracion || null);
@@ -303,7 +303,11 @@ export function FacturacionStep({
       const response = await faregasCertificadosApi.emitirFacturacion(certificadoId);
       const emitida = response.data as FacturacionFaregas;
       onFacturacionChange(emitida);
-      await Swal.fire('Comprobante aceptado', `${emitida.nroComprobante} fue aceptado por Nubefact/SUNAT.`, 'success');
+      if (emitida.estado === 'PENDIENTE_SUNAT') {
+        await Swal.fire('Comprobante Generado', `${emitida.nroComprobante} se generó pero está pendiente de aceptación en SUNAT.`, 'info');
+      } else {
+        await Swal.fire('Comprobante aceptado', `${emitida.nroComprobante} fue aceptado por Nubefact/SUNAT.`, 'success');
+      }
     } catch (error: unknown) {
       const detalle = detallesError(error) || mensajeError(error, 'Revise la configuracion o respuesta de Nubefact.');
       await Swal.fire('No se emitio el comprobante', detalle, 'error');
@@ -312,15 +316,18 @@ export function FacturacionStep({
     }
   };
 
+
   if (isLoading) {
     return <div className="flex items-center justify-center gap-3 p-16 font-bold text-slate-600"><Loader2 className="h-6 w-6 animate-spin" /> Cargando facturacion...</div>;
   }
 
   const estadoColor = facturacion?.estado === 'ACEPTADO'
     ? 'border-green-200 bg-green-50 text-green-700'
-    : facturacion?.estado === 'RECHAZADO' || facturacion?.estado === 'ERROR'
-      ? 'border-red-200 bg-red-50 text-red-700'
-      : 'border-amber-200 bg-amber-50 text-amber-700';
+    : facturacion?.estado === 'PENDIENTE_SUNAT'
+      ? 'border-blue-200 bg-blue-50 text-blue-700'
+      : facturacion?.estado === 'RECHAZADO' || facturacion?.estado === 'ERROR'
+        ? 'border-red-200 bg-red-50 text-red-700'
+        : 'border-amber-200 bg-amber-50 text-amber-700';
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -454,7 +461,7 @@ export function FacturacionStep({
               {isSaving ? 'GUARDANDO...' : 'GUARDAR DATOS'}
             </button>
           )}
-          {facturacion?.estado !== 'ACEPTADO' && (
+          {facturacion?.estado !== 'ACEPTADO' && facturacion?.estado !== 'PENDIENTE_SUNAT' && (
             <button type="button" disabled={isSaving || isEmitting || !integracion?.enabled || !integracion?.configured || resumenTributario?.estado !== 'LISTO'} onClick={emitir} className="flex items-center gap-2 rounded-xl bg-[#052a79] px-5 py-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300">
               {isEmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {isEmitting
@@ -468,7 +475,7 @@ export function FacturacionStep({
           )}
         </div>
       </div>
-      {certificadoId && facturacion?.estado === 'ACEPTADO' && (
+      {certificadoId && (facturacion?.estado === 'ACEPTADO' || facturacion?.estado === 'PENDIENTE_SUNAT') && (
         <DocumentosElectronicosPanel certificadoId={certificadoId} facturacion={facturacion} integracionDisponible={Boolean(integracion?.enabled && integracion?.configured)} />
       )}
     </div>
