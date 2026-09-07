@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { FileMinus2, Loader2, RefreshCw, RotateCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
+import { permisosSession } from '@/services/api';
 import type { AnulacionElectronicaFaregas, FacturacionFaregas, NotaElectronicaFaregas } from '../../../../types/faregas-api';
 
 interface Props {
@@ -19,6 +20,7 @@ export function DocumentosElectronicosPanel({ certificadoId, facturacion, integr
   const [procesando, setProcesando] = useState(false);
   const [mostrarNota, setMostrarNota] = useState(false);
   const [nota, setNota] = useState({ tipo: 'CREDITO' as 'CREDITO' | 'DEBITO', motivoCodigo: '1', sustento: '', importeTotal: String(facturacion.importeTotal) });
+  const tienePermisoNC = permisosSession.obtener().includes('FAREGAS_NOTA_CREDITO');
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -89,16 +91,25 @@ export function DocumentosElectronicosPanel({ certificadoId, facturacion, integr
         <div><h4 className="font-black text-slate-800">Documentos relacionados</h4><p className="text-sm text-slate-500">Consultas, notas de crédito/débito y anulaciones.</p></div>
         <div className="flex gap-2">
           <button type="button" disabled={procesando || !integracionDisponible} onClick={consultarComprobante} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-black disabled:opacity-40"><RefreshCw className="h-4 w-4" /> CONSULTAR</button>
-          <button type="button" disabled={procesando || !integracionDisponible} onClick={() => setMostrarNota(!mostrarNota)} className="flex items-center gap-2 rounded-lg bg-[#052a79] px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"><FileMinus2 className="h-4 w-4" /> NUEVA NOTA</button>
+          <button type="button" title={!tienePermisoNC ? 'No tienes permiso para emitir Notas de Crédito' : facturacion.estado === 'ACEPTADO' ? 'Crear una nota vinculada al comprobante aceptado' : 'La nota requiere un comprobante aceptado por SUNAT'} disabled={procesando || !integracionDisponible || facturacion.estado !== 'ACEPTADO' || !tienePermisoNC} onClick={() => { setMostrarNota(!mostrarNota); if (!mostrarNota) setNota(prev => ({ ...prev, importeTotal: String(facturacion.importeTotal) })); }} className="flex items-center gap-2 rounded-lg bg-[#052a79] px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"><FileMinus2 className="h-4 w-4" /> NUEVA NOTA</button>
           <button type="button" disabled={procesando || !integracionDisponible || facturacion.estado !== 'ACEPTADO'} onClick={() => anular('FACTURACION')} className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40"><RotateCcw className="h-4 w-4" /> ANULAR</button>
         </div>
       </div>
 
       {mostrarNota && <div className="grid gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 md:grid-cols-4">
         <label className="text-xs font-bold">TIPO<select value={nota.tipo} onChange={e => setNota(prev => ({ ...prev, tipo: e.target.value as 'CREDITO' | 'DEBITO' }))} className="mt-1 w-full rounded-lg border bg-white p-2"><option value="CREDITO">CRÉDITO</option><option value="DEBITO">DÉBITO</option></select></label>
-        <label className="text-xs font-bold">MOTIVO CÓDIGO<input value={nota.motivoCodigo} onChange={e => setNota(prev => ({ ...prev, motivoCodigo: e.target.value }))} className="mt-1 w-full rounded-lg border p-2" /></label>
-        <label className="text-xs font-bold">IMPORTE TOTAL<input type="number" step="0.01" value={nota.importeTotal} onChange={e => setNota(prev => ({ ...prev, importeTotal: e.target.value }))} className="mt-1 w-full rounded-lg border p-2" /></label>
-        <label className="text-xs font-bold md:col-span-4">SUSTENTO<input value={nota.sustento} maxLength={250} onChange={e => setNota(prev => ({ ...prev, sustento: e.target.value }))} className="mt-1 w-full rounded-lg border p-2" /></label>
+        <label className="text-xs font-bold">MOTIVO
+          <select value={nota.motivoCodigo} onChange={e => {
+            const val = e.target.value;
+            setNota(prev => ({ ...prev, motivoCodigo: val, sustento: val === '3' ? 'CORRECCIÓN DE DESCRIPCIÓN' : '' }));
+          }} className="mt-1 w-full rounded-lg border bg-white p-2">
+            <option value="1">01: Anulación de la operación</option>
+            <option value="2">02: Anulación por error en el RUC</option>
+            <option value="3">03: Corrección por error en la descripción</option>
+          </select>
+        </label>
+        <label className="text-xs font-bold">IMPORTE TOTAL<input type="number" step="0.01" value={nota.importeTotal} readOnly className="mt-1 w-full rounded-lg border bg-slate-100 p-2 text-slate-500 cursor-not-allowed" title="Las Notas de Crédito FAREGAS deben ser por el importe total del comprobante" /></label>
+        <label className="text-xs font-bold md:col-span-4">{nota.motivoCodigo === '3' ? 'DESCRIPCIÓN CORREGIDA' : 'SUSTENTO'}<input value={nota.sustento} maxLength={250} onChange={e => setNota(prev => ({ ...prev, sustento: e.target.value }))} className="mt-1 w-full rounded-lg border p-2" placeholder={nota.motivoCodigo === '3' ? 'Ingrese la descripción correcta del ítem...' : ''} /></label>
         <button type="button" disabled={procesando} onClick={emitirNota} className="rounded-lg bg-green-600 px-4 py-2 text-xs font-black text-white md:col-start-4">EMITIR NOTA</button>
       </div>}
 

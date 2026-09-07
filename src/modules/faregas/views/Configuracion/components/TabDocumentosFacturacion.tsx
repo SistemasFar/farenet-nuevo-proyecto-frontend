@@ -17,7 +17,7 @@ const fechaLocal = (value: string | null) => value
 const estadoClass = (estado: string) => {
   if (estado === 'ACEPTADO') return 'bg-green-100 text-green-700';
   if (estado === 'ERROR' || estado === 'RECHAZADO') return 'bg-red-100 text-red-700';
-  if (estado === 'PENDIENTE') return 'bg-amber-100 text-amber-700';
+  if (estado === 'PENDIENTE' || estado === 'PENDIENTE_SUNAT') return 'bg-amber-100 text-amber-700';
   return 'bg-slate-100 text-slate-700';
 };
 
@@ -123,7 +123,7 @@ export default function TabDocumentosFacturacion() {
         <input value={filtros.texto || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, texto: e.target.value }))} placeholder="Comprobante, cliente, DNI/RUC o placa" className="rounded-lg border p-2.5 md:col-span-2" />
         <select value={filtros.empresaKey || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, empresaKey: e.target.value, plantaKey: '' }))} className="rounded-lg border bg-white p-2.5"><option value="">Todas las empresas</option>{empresas.map((empresa) => <option key={empresa.key} value={empresa.key}>{empresa.nombre}</option>)}</select>
         <select value={filtros.plantaKey || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, plantaKey: e.target.value }))} className="rounded-lg border bg-white p-2.5"><option value="">Todas las sedes autorizadas</option>{plantasFiltradas.map((planta) => <option key={planta.key} value={planta.key}>{planta.nombre}</option>)}</select>
-        <select value={filtros.estado || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, estado: e.target.value }))} className="rounded-lg border bg-white p-2.5"><option value="">Todos los estados</option>{['BORRADOR', 'PENDIENTE', 'ACEPTADO', 'RECHAZADO', 'ERROR', 'ANULADO'].map((estado) => <option key={estado}>{estado}</option>)}</select>
+        <select value={filtros.estado || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, estado: e.target.value }))} className="rounded-lg border bg-white p-2.5"><option value="">Todos los estados</option>{['BORRADOR', 'PENDIENTE', 'PENDIENTE_SUNAT', 'ACEPTADO', 'RECHAZADO', 'ERROR', 'ANULADO'].map((estado) => <option key={estado}>{estado}</option>)}</select>
         <div className="flex gap-2"><button type="button" onClick={buscar} className="flex-1 rounded-lg bg-[#052a79] px-3 py-2 font-bold text-white">BUSCAR</button><button type="button" onClick={limpiar} className="rounded-lg border px-3 py-2 font-bold">LIMPIAR</button></div>
         <input type="date" value={filtros.fechaDesde || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value }))} className="rounded-lg border p-2.5" />
         <input type="date" value={filtros.fechaHasta || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value }))} className="rounded-lg border p-2.5" />

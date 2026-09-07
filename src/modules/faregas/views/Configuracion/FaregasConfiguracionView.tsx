@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import TabSedes from './TabSedes';
 import TabCatalogo from './components/TabCatalogo';
 import TabTarifas from './components/TabTarifas';
@@ -10,6 +12,7 @@ type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION' | 'EMPRESAS' |
 
 export function FaregasConfiguracionView() {
   const [activeTab, setActiveTab] = useState<ConfigTab>('SEDES');
+  const { plantaKey, plantaNombre } = useOutletContext<MainLayoutContext>();
   
   
   let fUser: { permisos?: string[] } = {};
@@ -78,7 +81,7 @@ export function FaregasConfiguracionView() {
               <TabCatalogo hasCategorias={hasCategorias} hasServicios={hasServicios} hasProductos={hasProductos} />
             )}
             {tabVisible === 'TARIFAS' && hasSedes && <TabTarifas />}
-            {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion />}
+            {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion plantaKey={plantaKey} plantaNombre={plantaNombre} />}
             {tabVisible === 'CORRELATIVOS' && hasCorrelativos && <TabCorrelativos />}
             {tabVisible === 'EMPRESAS' && hasEmpresas && <TabEmpresas />}
           </div>
