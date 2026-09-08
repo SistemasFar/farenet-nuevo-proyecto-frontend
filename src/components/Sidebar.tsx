@@ -227,6 +227,44 @@ const menuItems: MenuItem[] = [
 },
 
   {
+    key: 'chips', path: '/chips',
+    label: 'CHIPS',
+    permisos: ['CHIPS_VER'],
+    icon: (
+      <svg
+        className="h-6 w-6 text-current"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+      >
+        <rect
+          x="6"
+          y="6"
+          width="12"
+          height="12"
+          rx="2"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <rect
+          x="9"
+          y="9"
+          width="6"
+          height="6"
+          rx="1"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <path
+          d="M9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
     key: 'configuracion', path: '/configuracion',
     label: 'CONFIGURACIÓN',
     permisos: ['MENU_CONFIGURACION'],
@@ -268,6 +306,9 @@ export function Sidebar({
       }
       if (item.key === 'configuracion') {
         return permisos.includes('MENU_CONFIGURACION');
+      }
+      if (item.key === 'chips') {
+        return permisos.includes('CHIPS_VER');
       }
       return false;
     }

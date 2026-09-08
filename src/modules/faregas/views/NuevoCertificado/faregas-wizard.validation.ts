@@ -13,6 +13,17 @@ type DatosAsistente = {
 
 const vacio = (valor: unknown) => valor === null || valor === undefined || String(valor).trim() === '';
 
+export const esRucValido = (valor: unknown): boolean => {
+  const ruc = String(valor ?? '').trim();
+  if (!/^\d{11}$/.test(ruc)) return false;
+
+  const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  const suma = pesos.reduce((total, peso, index) => total + Number(ruc[index]) * peso, 0);
+  const diferencia = 11 - (suma % 11);
+  const digitoCalculado = diferencia === 10 ? 0 : diferencia === 11 ? 1 : diferencia;
+  return digitoCalculado === Number(ruc[10]);
+};
+
 const agregarFaltantes = (
   errores: string[],
   datos: Record<string, any>,
@@ -50,6 +61,9 @@ export const validarDatosFacturacionBasica = (facturacion: Record<string, any>) 
   }
   if (tipoComprobante === 'FACTURA' && documento.length !== 11) {
     errores.push('La factura requiere un RUC de 11 dígitos.');
+  }
+  if (tipoComprobante === 'FACTURA' && documento.length === 11 && !esRucValido(documento)) {
+    errores.push('El RUC ingresado no tiene un dígito verificador válido. Revise el número antes de facturar.');
   }
   if (vacio(facturacion.razonSocialFac)) errores.push('Complete el nombre o razón social de facturación.');
   if (vacio(facturacion.direccionFac)) errores.push('Complete la dirección fiscal.');

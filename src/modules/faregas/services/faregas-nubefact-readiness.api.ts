@@ -9,6 +9,7 @@ export interface NubefactReadiness {
     productionConfirmed: boolean;
     correlativosV2Enabled: boolean;
     cronReconciliationEnabled: boolean;
+    enviarSunat: boolean;
     reconciliationRetryMs: number;
     maxAttempts: number;
     detractionDecision: string;
@@ -19,7 +20,7 @@ export interface NubefactReadiness {
     pendienteSunatAplicado: boolean;
     completo: boolean;
   };
-  catalogo: { activas: number; vinculadas: number; sinVincular: number; listas: number };
+  catalogo: { activas: number; vinculadas: number; sinVincular: number; listas: number; listasProduccion: number };
   series: {
     activas: number;
     predeterminadas: number;
@@ -48,6 +49,47 @@ export interface NubefactReadiness {
       siguienteAccion: string | null;
     }>;
   };
+  preparacionProduccion: {
+    estado: 'EN_PREPARACION' | 'LISTA_PARA_EMISION_CONTROLADA' | 'OPERATIVA';
+    progreso: number;
+    completados: number;
+    total: number;
+    requiereDemo: false;
+    pasos: Array<{
+      codigo: string;
+      nombre: string;
+      estado: 'COMPLETADO' | 'PENDIENTE';
+      detalle: string;
+      siguienteAccion: string | null;
+    }>;
+  };
+  ambientes: Record<'demo' | 'produccion', {
+    credenciales: { ambiente: string; total: number; configuradas: number; faltantes: string[] };
+    series: {
+      requeridas: number;
+      configuradas: number;
+      confirmadas: number;
+      faltantes: string[];
+      detalle: Array<{
+        plantaKey: string;
+        empresaKey: string;
+        rucEmisor: string;
+        tipoComprobante: string;
+        configurada: boolean;
+        serie: string | null;
+        ultimoNumero: number | null;
+        siguienteNumero: number | null;
+        confirmadaProduccion: boolean;
+        numeroInicialConfirmado: number | null;
+        fechaCorte: string | null;
+      }>;
+    };
+    pruebas: {
+      boletaAceptadaConArchivos: boolean;
+      facturaAceptadaConArchivos: boolean;
+      detalle: Array<{ tipoComprobante: string; aceptadas: number; aceptadasConArchivos: number }>;
+    };
+  }>;
   documentos: Array<{ estado: string; cantidad: number }>;
   monitoreo: { pendientes: number; pendientesSunat: number; errores: number; rechazados: number; aceptados: number };
   evaluadoEn: string;
@@ -55,13 +97,16 @@ export interface NubefactReadiness {
 
 export interface CatalogoFiscalFila {
   fila: number;
-  tarifaId: number;
+  plantaKey: string;
+  servicioCodigo: string;
   productoSku: string;
-  estado: 'VALIDA' | 'INVALIDA';
+  tarifaId: number | null;
+  estado: 'VALIDA' | 'SIN_CAMBIOS' | 'INVALIDA';
   errores: string[];
   tarifa: null | {
     id: number;
     plantaKey: string;
+    plantaNombre: string;
     servicioCodigo: string;
     servicioNombre: string;
     productoActualId: number | null;
@@ -70,6 +115,7 @@ export interface CatalogoFiscalFila {
     id: number;
     sku: string;
     descripcion: string;
+    categoriaDms: string | null;
     unidad: string;
     afectacionIgv: string;
     codigoSunat: string | null;
@@ -80,7 +126,16 @@ export interface CatalogoFiscalPreview {
   total: number;
   validas: number;
   invalidas: number;
+  cambios: number;
+  sinCambios: number;
   filas: CatalogoFiscalFila[];
+}
+
+export interface CatalogoFiscalImportRow {
+  planta_key: string;
+  servicio_codigo: string;
+  codigo_sku: string;
+  tarifa_id?: number | null;
 }
 
 const unwrap = async <T>(request: Promise<unknown>): Promise<T> => {
@@ -109,6 +164,50 @@ export const normalizarNubefactReadiness = (payload: unknown): NubefactReadiness
   const credenciales = isRecord(source.credenciales) ? source.credenciales : null;
   const pruebaDemo = isRecord(source.pruebaDemo) ? source.pruebaDemo : {};
   const fase2 = isRecord(source.fase2) ? source.fase2 : null;
+  const preparacionProduccion = isRecord(source.preparacionProduccion) ? source.preparacionProduccion : null;
+  const ambientes = isRecord(source.ambientes) ? source.ambientes : {};
+  const normalizarAmbiente = (value: unknown, ambiente: string): NubefactReadiness['ambientes']['demo'] => {
+    const item = isRecord(value) ? value : {};
+    const cred = isRecord(item.credenciales) ? item.credenciales : {};
+    const seriesAmbiente = isRecord(item.series) ? item.series : {};
+    const pruebas = isRecord(item.pruebas) ? item.pruebas : {};
+    return {
+      credenciales: {
+        ambiente,
+        total: asNumber(cred.total),
+        configuradas: asNumber(cred.configuradas),
+        faltantes: Array.isArray(cred.faltantes) ? cred.faltantes.filter((v): v is string => typeof v === 'string') : []
+      },
+      series: {
+        requeridas: asNumber(seriesAmbiente.requeridas),
+        configuradas: asNumber(seriesAmbiente.configuradas),
+        confirmadas: asNumber(seriesAmbiente.confirmadas),
+        faltantes: Array.isArray(seriesAmbiente.faltantes) ? seriesAmbiente.faltantes.filter((v): v is string => typeof v === 'string') : [],
+        detalle: Array.isArray(seriesAmbiente.detalle) ? seriesAmbiente.detalle.filter(isRecord).map((serie) => ({
+          plantaKey: typeof serie.plantaKey === 'string' ? serie.plantaKey : '',
+          empresaKey: typeof serie.empresaKey === 'string' ? serie.empresaKey : '',
+          rucEmisor: typeof serie.rucEmisor === 'string' ? serie.rucEmisor : '',
+          tipoComprobante: typeof serie.tipoComprobante === 'string' ? serie.tipoComprobante : '',
+          configurada: serie.configurada === true,
+          serie: typeof serie.serie === 'string' ? serie.serie : null,
+          ultimoNumero: serie.ultimoNumero === null ? null : asNumber(serie.ultimoNumero),
+          siguienteNumero: serie.siguienteNumero === null ? null : asNumber(serie.siguienteNumero),
+          confirmadaProduccion: serie.confirmadaProduccion === true,
+          numeroInicialConfirmado: serie.numeroInicialConfirmado === null ? null : asNumber(serie.numeroInicialConfirmado),
+          fechaCorte: typeof serie.fechaCorte === 'string' ? serie.fechaCorte : null
+        })) : []
+      },
+      pruebas: {
+        boletaAceptadaConArchivos: pruebas.boletaAceptadaConArchivos === true,
+        facturaAceptadaConArchivos: pruebas.facturaAceptadaConArchivos === true,
+        detalle: Array.isArray(pruebas.detalle) ? pruebas.detalle.filter(isRecord).map((v) => ({
+          tipoComprobante: typeof v.tipoComprobante === 'string' ? v.tipoComprobante : '',
+          aceptadas: asNumber(v.aceptadas),
+          aceptadasConArchivos: asNumber(v.aceptadasConArchivos)
+        })) : []
+      }
+    };
+  };
   const monitoreo = isRecord(source.monitoreo) ? source.monitoreo : {};
   const bloqueos = Array.isArray(source.bloqueos)
     ? source.bloqueos.filter((item): item is string => typeof item === 'string')
@@ -122,6 +221,9 @@ export const normalizarNubefactReadiness = (payload: unknown): NubefactReadiness
     || !Object.hasOwn(configuracion, 'reconciliationRetryMs')
     || !Object.hasOwn(configuracion, 'maxAttempts')
     || !fase2
+    || !preparacionProduccion
+    || !isRecord(ambientes.demo)
+    || !isRecord(ambientes.produccion)
     || !Object.hasOwn(esquema, 'pendienteSunatAplicado');
 
   if (respuestaDesactualizada) {
@@ -141,6 +243,7 @@ export const normalizarNubefactReadiness = (payload: unknown): NubefactReadiness
       productionConfirmed: configuracion.productionConfirmed === true,
       correlativosV2Enabled: configuracion.correlativosV2Enabled === true,
       cronReconciliationEnabled: configuracion.cronReconciliationEnabled === true,
+      enviarSunat: configuracion.enviarSunat === true,
       reconciliationRetryMs: asNumber(configuracion.reconciliationRetryMs),
       maxAttempts: asNumber(configuracion.maxAttempts),
       detractionDecision: typeof configuracion.detractionDecision === 'string'
@@ -157,7 +260,8 @@ export const normalizarNubefactReadiness = (payload: unknown): NubefactReadiness
       activas: asNumber(catalogo.activas),
       vinculadas: asNumber(catalogo.vinculadas),
       sinVincular: asNumber(catalogo.sinVincular),
-      listas: asNumber(catalogo.listas)
+      listas: asNumber(catalogo.listas),
+      listasProduccion: asNumber(catalogo.listasProduccion)
     },
     series: {
       activas: asNumber(series.activas),
@@ -209,6 +313,30 @@ export const normalizarNubefactReadiness = (payload: unknown): NubefactReadiness
         }))
         : []
     },
+    preparacionProduccion: {
+      estado: preparacionProduccion?.estado === 'OPERATIVA'
+        ? 'OPERATIVA'
+        : preparacionProduccion?.estado === 'LISTA_PARA_EMISION_CONTROLADA'
+          ? 'LISTA_PARA_EMISION_CONTROLADA'
+          : 'EN_PREPARACION',
+      progreso: asNumber(preparacionProduccion?.progreso),
+      completados: asNumber(preparacionProduccion?.completados),
+      total: asNumber(preparacionProduccion?.total),
+      requiereDemo: false,
+      pasos: preparacionProduccion && Array.isArray(preparacionProduccion.pasos)
+        ? preparacionProduccion.pasos.filter(isRecord).map((item) => ({
+          codigo: typeof item.codigo === 'string' ? item.codigo : 'PASO_PRODUCCION',
+          nombre: typeof item.nombre === 'string' ? item.nombre : 'Paso productivo',
+          estado: item.estado === 'COMPLETADO' ? 'COMPLETADO' as const : 'PENDIENTE' as const,
+          detalle: typeof item.detalle === 'string' ? item.detalle : '',
+          siguienteAccion: typeof item.siguienteAccion === 'string' ? item.siguienteAccion : null
+        }))
+        : []
+    },
+    ambientes: {
+      demo: normalizarAmbiente(ambientes.demo, 'DEMO'),
+      produccion: normalizarAmbiente(ambientes.produccion, 'PRODUCCION')
+    },
     documentos: Array.isArray(source.documentos)
       ? source.documentos as NubefactReadiness['documentos']
       : [],
@@ -229,12 +357,12 @@ export const faregasNubefactReadinessApi = {
     const response = await unwrap<unknown>(faregasFetch(`/certificados/facturacion/admin/readiness${query}`));
     return normalizarNubefactReadiness(response);
   },
-  previsualizarCatalogo: (filas: Array<{ tarifa_id: number; producto_sku: string }>) =>
+  previsualizarCatalogo: (filas: CatalogoFiscalImportRow[]) =>
     unwrap<CatalogoFiscalPreview>(faregasFetch('/config/tarifas/importar/previsualizar', {
       method: 'POST', body: JSON.stringify({ filas })
     })),
-  aplicarCatalogo: (filas: Array<{ tarifa_id: number; producto_sku: string }>) =>
-    unwrap<{ totalActualizadas: number }>(faregasFetch('/config/tarifas/importar/aplicar', {
+  aplicarCatalogo: (filas: CatalogoFiscalImportRow[]) =>
+    unwrap<{ totalProcesadas: number; totalActualizadas: number; totalSinCambios: number }>(faregasFetch('/config/tarifas/importar/aplicar', {
       method: 'POST', body: JSON.stringify({ filas, confirmar: true })
     }))
 };

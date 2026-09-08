@@ -26,27 +26,28 @@ export function FaregasConfiguracionView() {
   const permisos = fUser?.permisos || [];
 
   const hasSedes = permisos.includes('CONFIGURACION_SEDES');
-  const hasServicios = true; // permisos.includes('CONFIGURACION_SERVICIOS');
+  const hasServicios = permisos.includes('CONFIGURACION_SERVICIOS');
   const hasCategorias = permisos.includes('CONFIGURACION_CATEGORIAS');
   const hasProductos = permisos.includes('CONFIGURACION_PRODUCTOS');
+  const hasTarifas = permisos.includes('CONFIGURACION_TARIFAS');
   const hasSeries = permisos.includes('CONFIGURACION_SERIES');
   // La relación empresa-sede forma parte de la administración de sedes.
   // El permiso específico permite separarla en perfiles futuros, mientras
   // CONFIGURACION_SEDES conserva acceso para las sesiones actuales.
   const hasEmpresas = permisos.includes('CONFIGURACION_EMPRESAS') || hasSedes;
   const hasCatalogo = hasCategorias || hasServicios || hasProductos;
-  const hasCorrelativos = true; // Temporary permit for all admins
+  const hasCorrelativos = hasSeries;
 
   const tabs = [];
   if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES' });
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
-  if (hasSedes) tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
+  if (hasTarifas) tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
   if (hasSeries) tabs.push({ id: 'FACTURACION', label: 'FACTURACIÓN' });
   if (hasCorrelativos) tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });
   if (hasEmpresas) tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
     ? activeTab
-    : tabs[0].id as ConfigTab;
+    : tabs[0]?.id as ConfigTab | undefined;
 
   return (
     <div className="space-y-4">
@@ -76,11 +77,22 @@ export function FaregasConfiguracionView() {
           </div>
 
           <div className="p-6">
+            {!tabVisible && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+                Tu perfil no tiene permisos para administrar módulos de Configuración.
+              </div>
+            )}
             {tabVisible === 'SEDES' && hasSedes && <TabSedes />}
             {tabVisible === 'CATALOGO' && hasCatalogo && (
-              <TabCatalogo hasCategorias={hasCategorias} hasServicios={hasServicios} hasProductos={hasProductos} />
+              <TabCatalogo
+                hasCategorias={hasCategorias}
+                hasServicios={hasServicios}
+                hasProductos={hasProductos}
+                hasTarifas={hasTarifas}
+                onGoToTarifas={() => setActiveTab('TARIFAS')}
+              />
             )}
-            {tabVisible === 'TARIFAS' && hasSedes && <TabTarifas />}
+            {tabVisible === 'TARIFAS' && hasTarifas && <TabTarifas />}
             {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion plantaKey={plantaKey} plantaNombre={plantaNombre} />}
             {tabVisible === 'CORRELATIVOS' && hasCorrelativos && <TabCorrelativos />}
             {tabVisible === 'EMPRESAS' && hasEmpresas && <TabEmpresas />}

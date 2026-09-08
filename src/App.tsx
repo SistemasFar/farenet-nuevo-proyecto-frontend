@@ -23,6 +23,7 @@ import { UsuariosView as FaregasUsuariosView } from './modules/faregas/views/Usu
 import { AuditoriaView as FaregasAuditoriaView } from './modules/faregas/views/Auditoria/AuditoriaView';
 import { FaregasConfiguracionView } from './modules/faregas/views/Configuracion/FaregasConfiguracionView';
 import { DescuentosView as FaregasDescuentosView } from './modules/faregas/views/Descuentos/DescuentosView';
+import { ChipsView as FaregasChipsView } from './modules/faregas/views/Chips/ChipsView';
 
 import { useEmpresa } from './context/EmpresaContext';
 
@@ -585,6 +586,20 @@ export default function App() {
                 } 
               />
               <Route path="configuracion" element={<FaregasConfiguracionView />} />
+              <Route
+                path="chips"
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    return userPerms.includes('CHIPS_VER') ? (
+                      <FaregasChipsView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                }
+              />
               <Route path="*" element={<NotFoundView />} />
             </Route>
           </Routes>

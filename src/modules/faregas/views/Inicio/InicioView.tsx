@@ -4,6 +4,7 @@ import { faregasCertificadosApi } from '../../services/faregas-certificados.api'
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import type { FacturacionFaregas } from '../../types/faregas-api';
+import { permisosSession } from '@/services/api';
 import Swal from 'sweetalert2';
 import { FileText, FileEdit, Edit, Eye, Ban } from 'lucide-react';
 
@@ -21,6 +22,9 @@ interface BorradorPanel {
   estado?: string;
   estadoPago?: string;
   estadoFacturacion?: string;
+  aceptadaSunat?: boolean | null;
+  enlacePdf?: string | null;
+  nroComprobante?: string | null;
 }
 
 const normalizarTexto = (valor?: string | null): string => {
@@ -101,6 +105,7 @@ const filtrosDelDia = (): FiltrosPanel => {
 export function InicioView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
+  const tienePermisoNotaCredito = permisosSession.obtener().includes('FAREGAS_NOTA_CREDITO');
   const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -235,20 +240,30 @@ export function InicioView() {
     return (response.data?.facturacion || null) as FacturacionFaregas | null;
   };
 
-  const comprobarComprobanteAceptado = async (certificadoId: number) => {
+  const comprobarComprobanteDisponible = async (
+    certificadoId: number
+  ): Promise<(FacturacionFaregas & { enlacePdf: string }) | null> => {
     const facturacion = await obtenerFacturacion(certificadoId);
-    
-    // Si esta aceptado O si esta pendiente de SUNAT (modo demo/contingencia), permitimos ver el comprobante
-    const comprobanteDisponible = facturacion && (
-      (facturacion.estado === 'ACEPTADO' && facturacion.aceptadaSunat === true) || 
-      (facturacion.estado === 'PENDIENTE_SUNAT')
-    );
 
-    if (!comprobanteDisponible) {
+    if (!facturacion?.enlacePdf) {
       await Swal.fire({
         icon: 'info',
         title: 'Comprobante no disponible',
-        text: 'Este certificado no tiene una boleta o factura aceptada por Nubefact/SUNAT. La emisión realizada en modo desarrollo solo emitió el certificado.',
+        text: 'Nubefact todavía no ha proporcionado un PDF para este comprobante.',
+        confirmButtonColor: '#052A79',
+      });
+      return null;
+    }
+    return facturacion as FacturacionFaregas & { enlacePdf: string };
+  };
+
+  const comprobarComprobanteAceptado = async (certificadoId: number) => {
+    const facturacion = await obtenerFacturacion(certificadoId);
+    if (!facturacion || facturacion.estado !== 'ACEPTADO' || facturacion.aceptadaSunat !== true) {
+      await Swal.fire({
+        icon: 'info',
+        title: 'Acción no disponible',
+        text: 'La operación tributaria requiere que la boleta o factura esté aceptada por SUNAT.',
         confirmButtonColor: '#052A79',
       });
       return null;
@@ -259,12 +274,8 @@ export function InicioView() {
   const verComprobante = async (certificadoId: number) => {
     try {
       setAccionEnProceso(certificadoId);
-      const facturacion = await comprobarComprobanteAceptado(certificadoId);
+      const facturacion = await comprobarComprobanteDisponible(certificadoId);
       if (!facturacion) return;
-      if (!facturacion.enlacePdf) {
-        await Swal.fire('PDF no disponible', 'El comprobante está aceptado, pero Nubefact no devolvió un enlace PDF.', 'warning');
-        return;
-      }
       window.open(facturacion.enlacePdf, '_blank', 'noopener,noreferrer');
     } catch (err) {
       await Swal.fire('No se pudo consultar', err instanceof Error ? err.message : 'No se pudo obtener el comprobante.', 'error');
@@ -588,6 +599,13 @@ export function InicioView() {
               {!loading &&
                 borradores.map((ins) => {
                   const etapa = PASO_PANEL[ins.pasoActual || ''] || 'Datos iniciales';
+                  const certificadoEditable = ins.estado === 'BORRADOR';
+                  const certificadoEmitido = ins.estado === 'EMITIDO';
+                  const estadoFacturacion = String(ins.estadoFacturacion || '').toUpperCase();
+                  const comprobanteAceptado = estadoFacturacion === 'ACEPTADO' && ins.aceptadaSunat === true;
+                  const puedeVerComprobante = Boolean(ins.enlacePdf);
+                  const puedeAnular = comprobanteAceptado;
+                  const puedeCrearNotaCredito = comprobanteAceptado && tienePermisoNotaCredito;
 
                   return (
                     <tr
@@ -627,15 +645,17 @@ export function InicioView() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center align-middle">
                         <div className="flex h-full flex-wrap items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => ins.estado === 'EMITIDO' ? void verPreview(ins.id) : navigate(`/faregas/certificados/${ins.id}/continuar`)}
-                            className="rounded-md border border-gray-300 bg-white p-1.5 text-gray-600 transition-colors hover:bg-gray-100"
-                            title={ins.estado === 'EMITIDO' ? 'Ver Certificado' : 'Continuar editando'}
-                          >
-                            {ins.estado === 'EMITIDO' ? <Eye size={16} /> : <Edit size={16} />}
-                          </button>
-                          {ins.estado === 'EMITIDO' && <>
+                          {(certificadoEditable || certificadoEmitido) && (
+                            <button
+                              type="button"
+                              onClick={() => certificadoEmitido ? void verPreview(ins.id) : navigate(`/faregas/certificados/${ins.id}/continuar`)}
+                              className="rounded-md border border-gray-300 bg-white p-1.5 text-gray-600 transition-colors hover:bg-gray-100"
+                              title={certificadoEmitido ? 'Ver Certificado' : 'Continuar editando'}
+                            >
+                              {certificadoEmitido ? <Eye size={16} /> : <Edit size={16} />}
+                            </button>
+                          )}
+                          {puedeVerComprobante && (
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
@@ -643,6 +663,8 @@ export function InicioView() {
                               title="Ver comprobante"
                               className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
                             ><FileText size={16} /></button>
+                          )}
+                          {puedeAnular && (
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
@@ -650,6 +672,8 @@ export function InicioView() {
                               title="Anular comprobante"
                               className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-red-600 hover:bg-red-100 disabled:opacity-50"
                             ><Ban size={16} /></button>
+                          )}
+                          {puedeCrearNotaCredito && (
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
@@ -657,7 +681,7 @@ export function InicioView() {
                               title="Crear nota de crédito"
                               className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[#052A79] hover:bg-violet-100 disabled:opacity-50"
                             ><FileEdit size={16} /></button>
-                          </>}
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -677,6 +701,13 @@ export function InicioView() {
             )}
             {!loading && borradores.map((ins) => {
               const etapa = PASO_PANEL[ins.pasoActual || ''] || 'Datos iniciales';
+              const certificadoEditable = ins.estado === 'BORRADOR';
+              const certificadoEmitido = ins.estado === 'EMITIDO';
+              const estadoFacturacion = String(ins.estadoFacturacion || '').toUpperCase();
+              const comprobanteAceptado = estadoFacturacion === 'ACEPTADO' && ins.aceptadaSunat === true;
+              const puedeVerComprobante = Boolean(ins.enlacePdf);
+              const puedeAnular = comprobanteAceptado;
+              const puedeCrearNotaCredito = comprobanteAceptado && tienePermisoNotaCredito;
               return (
                 <div key={ins.id} className="p-4 flex flex-col gap-3 bg-white">
                   <div className="flex justify-between items-start">
@@ -703,36 +734,42 @@ export function InicioView() {
                   </div>
 
                   <div className="pt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => ins.estado === 'EMITIDO' ? void verPreview(ins.id) : navigate(`/faregas/certificados/${ins.id}/continuar`)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${ins.estado === 'EMITIDO' ? 'border-blue-300 bg-blue-50 text-[#052A79] hover:bg-blue-100' : 'border-yellow-400 bg-yellow-50 text-yellow-800 hover:bg-yellow-100'}`}
-                    >
-                      {ins.estado === 'EMITIDO' ? <><Eye size={16} /> Ver Certificado</> : <><Edit size={16} className="text-yellow-600" /> Continuar editando</>}
-                    </button>
-                    {ins.estado === 'EMITIDO' && <>
+                    {(certificadoEditable || certificadoEmitido) && (
+                      <button
+                        type="button"
+                        onClick={() => certificadoEmitido ? void verPreview(ins.id) : navigate(`/faregas/certificados/${ins.id}/continuar`)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${certificadoEmitido ? 'border-blue-300 bg-blue-50 text-[#052A79] hover:bg-blue-100' : 'border-yellow-400 bg-yellow-50 text-yellow-800 hover:bg-yellow-100'}`}
+                      >
+                        {certificadoEmitido ? <><Eye size={16} /> Ver Certificado</> : <><Edit size={16} className="text-yellow-600" /> Continuar editando</>}
+                      </button>
+                    )}
+                    {puedeVerComprobante && (
                       <button
                         type="button"
                         disabled={accionEnProceso === ins.id}
                         onClick={() => void verComprobante(ins.id)}
                         className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
                       ><FileText size={16} /> PDF</button>
-                    </>}
+                    )}
                   </div>
-                  {ins.estado === 'EMITIDO' && (
+                  {(puedeAnular || puedeCrearNotaCredito) && (
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={accionEnProceso === ins.id}
-                        onClick={() => void anularComprobante(ins.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
-                      ><Ban size={16} /> Anular</button>
-                      <button
-                        type="button"
-                        disabled={accionEnProceso === ins.id}
-                        onClick={() => void crearNotaCredito(ins.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
-                      ><FileEdit size={16} /> Nota de Crédito</button>
+                      {puedeAnular && (
+                        <button
+                          type="button"
+                          disabled={accionEnProceso === ins.id}
+                          onClick={() => void anularComprobante(ins.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                        ><Ban size={16} /> Anular</button>
+                      )}
+                      {puedeCrearNotaCredito && (
+                        <button
+                          type="button"
+                          disabled={accionEnProceso === ins.id}
+                          onClick={() => void crearNotaCredito(ins.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                        ><FileEdit size={16} /> Nota de Crédito</button>
+                      )}
                     </div>
                   )}
                 </div>

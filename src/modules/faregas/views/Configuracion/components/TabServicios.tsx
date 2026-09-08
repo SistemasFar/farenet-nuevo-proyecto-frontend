@@ -60,7 +60,7 @@ export default function TabServicios() {
     if (tipo === 'GLP_ANUAL' && modalidad === 'INICIAL') return 'GLP Inicial';
     if (tipo === 'GLP_ANUAL' && modalidad === 'ANUAL') return 'GLP Anual';
     if (tipo === 'CONFORMIDAD') return 'Conformidad';
-    return '-';
+    return <span className="text-red-500 font-semibold text-xs">Sin formato estructural</span>;
   };
 
   const filteredServicios = servicios.filter(s => {

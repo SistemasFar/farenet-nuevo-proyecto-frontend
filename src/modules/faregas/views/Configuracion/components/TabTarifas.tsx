@@ -12,13 +12,18 @@ import CatalogoFiscalImportModal from './CatalogoFiscalImportModal';
 
 type ModalState = { modo: 'CREAR' | 'EDITAR'; tarifa?: TarifaAdmin } | null;
 
+const UNIDADES_TRIBUTARIAS_ADMITIDAS = new Set(['NIU', 'ZZ']);
+
+const esUnidadTributariaAdmitida = (unidad?: string | null) =>
+  UNIDADES_TRIBUTARIAS_ADMITIDAS.has(unidad?.trim().toUpperCase() || '');
+
 const getTarifaStatus = (tarifa: TarifaAdmin) => {
   if (!tarifa.producto_facturacion_id) return 'INCOMPLETA';
   if (
     tarifa.producto_activo === false ||
     tarifa.producto_es_para_venta !== true ||
     (tarifa.servicio_tipo_flujo === 'CERTIFICACION' && (
-      tarifa.producto_unidad?.trim().toUpperCase() !== 'ZZ' ||
+      !esUnidadTributariaAdmitida(tarifa.producto_unidad) ||
       (Boolean(tarifa.producto_codigo_sunat?.trim()) && !/^\d{8}$/.test(tarifa.producto_codigo_sunat?.trim() || '')) ||
       tarifa.producto_afectacion_igv?.trim() !== '10'
     ))
@@ -180,14 +185,14 @@ export default function TabTarifas() {
       })}</tbody></table></div>}
     </div>
     {modal && sede && <TarifaModal estado={modal} sede={sede} onClose={() => setModal(null)} onSaved={async () => { setModal(null); await refrescar(); }} />}
-    {importModal && <CatalogoFiscalImportModal tarifas={tarifas.filter(item => item.activo).map(item => ({ id: item.id, sku: item.producto_sku || '' }))} onClose={() => setImportModal(false)} onApplied={refrescar} />}
+    {importModal && <CatalogoFiscalImportModal tarifas={tarifas.filter(item => item.activo).map(item => ({ id: item.id, plantaKey: item.planta_key, servicioCodigo: item.servicio_codigo, sku: item.producto_sku || '' }))} onClose={() => setImportModal(false)} onApplied={refrescar} />}
   </div>;
 }
 
 const getProductoError = (p: ProductoTarifa, exigeDatosTributarios: boolean) => {
   if (!p.activo) return 'Producto inactivo';
   if (!p.es_para_venta) return 'No habilitado para venta';
-  if (exigeDatosTributarios && p.unidad?.trim().toUpperCase() !== 'ZZ') return 'Unidad no es ZZ';
+  if (exigeDatosTributarios && !esUnidadTributariaAdmitida(p.unidad)) return 'Unidad debe ser NIU o ZZ';
   if (exigeDatosTributarios && p.codigo_clasificacion_sunat?.trim() && !/^\d{8}$/.test(p.codigo_clasificacion_sunat.trim())) return 'Cod. SUNAT inválido';
   if (exigeDatosTributarios && p.tipo_afectacion_igv?.trim() !== '10') return 'Afectación IGV debe ser 10';
   return null;

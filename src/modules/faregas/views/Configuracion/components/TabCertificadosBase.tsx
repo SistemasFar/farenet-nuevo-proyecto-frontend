@@ -3,71 +3,78 @@ import {
   faregasConfigApi,
   type ServicioConfiguracionFaregas
 } from '../../../services/faregas-config.api';
-import { AsignarSedesModal } from './AsignarSedesModal';
 
 interface CertificadoBase {
-  id: string;
+  variante: string;
   nombre: string;
-  claveTecnica: 'GNV_ANUAL' | 'GLP_ANUAL' | 'CONFORMIDAD';
+  formatoEstructural: 'GNV_ANUAL' | 'GLP_ANUAL' | 'CONFORMIDAD';
   modalidad: 'INICIAL' | 'ANUAL' | null;
 }
 
+interface Props {
+  canViewTarifas: boolean;
+  onGoToTarifas: () => void;
+}
+
 const CERTIFICADOS_BASE: CertificadoBase[] = [
-  { id: 'GNV_INICIAL', nombre: 'GNV Inicial', claveTecnica: 'GNV_ANUAL', modalidad: 'INICIAL' },
-  { id: 'GNV_ANUAL', nombre: 'GNV Anual', claveTecnica: 'GNV_ANUAL', modalidad: 'ANUAL' },
-  { id: 'GLP_INICIAL', nombre: 'GLP Inicial', claveTecnica: 'GLP_ANUAL', modalidad: 'INICIAL' },
-  { id: 'GLP_ANUAL', nombre: 'GLP Anual', claveTecnica: 'GLP_ANUAL', modalidad: 'ANUAL' },
-  { id: 'CONFORMIDAD', nombre: 'Conformidad', claveTecnica: 'CONFORMIDAD', modalidad: null }
+  { variante: 'GNV_INICIAL', nombre: 'GNV Inicial', formatoEstructural: 'GNV_ANUAL', modalidad: 'INICIAL' },
+  { variante: 'GNV_ANUAL', nombre: 'GNV Anual', formatoEstructural: 'GNV_ANUAL', modalidad: 'ANUAL' },
+  { variante: 'GLP_INICIAL', nombre: 'GLP Inicial', formatoEstructural: 'GLP_ANUAL', modalidad: 'INICIAL' },
+  { variante: 'GLP_ANUAL', nombre: 'GLP Anual', formatoEstructural: 'GLP_ANUAL', modalidad: 'ANUAL' },
+  { variante: 'CONFORMIDAD', nombre: 'Conformidad', formatoEstructural: 'CONFORMIDAD', modalidad: null }
 ];
 
-export default function TabCertificadosBase() {
+export default function TabCertificadosBase({ canViewTarifas, onGoToTarifas }: Props) {
   const [servicios, setServicios] = useState<ServicioConfiguracionFaregas[]>([]);
-  const [sedesAsignadas, setSedesAsignadas] = useState<Record<number, { key: string; nombre: string; tarifa_id: number; precio: number; producto_facturacion_id: number | null; activo: boolean }[]>>({});
-  const [todasLasSedes, setTodasLasSedes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
-  const [selectedServicio, setSelectedServicio] = useState<{ id: number; nombre: string } | null>(null);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [dataServicios, dataSedes, sedesDisponibles] = await Promise.all([
-        faregasConfigApi.getServicios(),
-        faregasConfigApi.obtenerSedesPorServicio().catch(() => ({})),
-        faregasConfigApi.obtenerSedes().catch(() => [])
-      ]);
-      setServicios(dataServicios);
-      setSedesAsignadas(dataSedes);
-      setTodasLasSedes(sedesDisponibles.filter(s => s.activo));
-    } catch (err: any) {
-      setError(err.message || 'Error al cargar certificados base');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    loadData();
+    let cancelado = false;
+    void faregasConfigApi.getServicios()
+      .then((data) => {
+        if (!cancelado) {
+          setServicios(data);
+          setError('');
+        }
+      })
+      .catch((err) => {
+        if (!cancelado) setError(err instanceof Error ? err.message : 'Error al cargar certificados base');
+      })
+      .finally(() => {
+        if (!cancelado) setLoading(false);
+      });
+    return () => { cancelado = true; };
   }, []);
 
   const certificados = useMemo(() => CERTIFICADOS_BASE.map((certificado) => ({
     ...certificado,
     servicios: servicios.filter((servicio) =>
       servicio.requiere_certificado
-      && servicio.tipo_certificado_clave === certificado.claveTecnica
+      && servicio.tipo_certificado_clave === certificado.formatoEstructural
       && servicio.modalidad === certificado.modalidad
     )
   })), [servicios]);
 
   return (
-    <div className="space-y-5 relative">
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        <p className="mb-1 font-semibold">Certificados base estructurales</p>
-        <p>
-          Estos cinco formatos son de solo lectura. Los servicios asociados se obtienen
-          automáticamente de la configuración actual de servicios Faregas.
-        </p>
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="mb-1 font-semibold">Variantes de certificados y formatos estructurales</p>
+          <p>
+            Esta vista es de solo lectura. Cada variante reutiliza un formato estructural protegido
+            y obtiene sus servicios asociados desde el catálogo Faregas.
+          </p>
+        </div>
+        {canViewTarifas && (
+          <button
+            type="button"
+            onClick={onGoToTarifas}
+            className="whitespace-nowrap rounded-lg bg-[#052A79] px-4 py-2 text-xs font-bold text-white hover:bg-blue-900"
+          >
+            Ver tarifas por sede
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -81,11 +88,11 @@ export default function TabCertificadosBase() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {certificados.map((certificado) => (
-            <article key={certificado.id} className="flex min-h-64 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <article key={certificado.variante} className="flex min-h-64 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-4">
                 <div>
                   <h3 className="text-lg font-bold text-[#052A79]">{certificado.nombre}</h3>
-                  <p className="mt-1 text-xs text-gray-500">Formato oficial Faregas</p>
+                  <p className="mt-1 text-xs text-gray-500">Formato oficial Faregas protegido</p>
                 </div>
                 <span className="whitespace-nowrap rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-bold uppercase text-gray-600">
                   Solo lectura
@@ -93,8 +100,10 @@ export default function TabCertificadosBase() {
               </div>
 
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 border-b border-gray-100 py-4 text-sm">
-                <dt className="font-semibold text-gray-500">Clave técnica:</dt>
-                <dd className="font-mono font-bold text-gray-800">{certificado.claveTecnica}</dd>
+                <dt className="font-semibold text-gray-500">Variante:</dt>
+                <dd className="font-mono font-bold text-gray-800">{certificado.variante}</dd>
+                <dt className="font-semibold text-gray-500">Formato estructural:</dt>
+                <dd className="font-mono font-bold text-gray-800">{certificado.formatoEstructural}</dd>
                 <dt className="font-semibold text-gray-500">Modalidad:</dt>
                 <dd className="font-bold text-gray-800">{certificado.modalidad || 'NO APLICA'}</dd>
               </dl>
@@ -110,38 +119,14 @@ export default function TabCertificadosBase() {
                   <p className="text-sm italic text-gray-400">Sin servicios asociados actualmente.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {certificado.servicios.map((servicio) => {
-                      const sedes = (sedesAsignadas[servicio.id] || []).filter(s => s.activo);
-                      return (
-                        <li key={servicio.id} className="flex flex-col gap-2 rounded-lg bg-gray-50 px-3 py-2">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="font-mono text-xs font-bold text-gray-700">{servicio.codigo}</span>
-                            <div className="flex items-center gap-2">
-                              {!servicio.activo && (
-                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">INACTIVO</span>
-                              )}
-                              <button
-                                onClick={() => setSelectedServicio({ id: servicio.id, nombre: servicio.codigo })}
-                                className="text-[10px] font-bold bg-[#052A79] text-white px-2 py-1 rounded hover:bg-blue-800 transition-colors"
-                              >
-                                Asignar Sedes
-                              </button>
-                            </div>
-                          </div>
-                          {sedes.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {sedes.map(sede => (
-                                <span key={sede.key} className="rounded border border-blue-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 shadow-sm">
-                                  {sede.nombre}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-[10px] italic text-gray-400">Sin sedes asignadas</div>
-                          )}
-                        </li>
-                      );
-                    })}
+                    {certificado.servicios.map((servicio) => (
+                      <li key={servicio.id} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2">
+                        <span className="font-mono text-xs font-bold text-gray-700">{servicio.codigo}</span>
+                        {!servicio.activo && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">INACTIVO</span>
+                        )}
+                      </li>
+                    ))}
                   </ul>
                 )}
               </div>
@@ -150,18 +135,29 @@ export default function TabCertificadosBase() {
         </div>
       )}
 
-      {selectedServicio && (
-        <AsignarSedesModal
-          servicioId={selectedServicio.id}
-          servicioNombre={selectedServicio.nombre}
-          sedesDisponibles={todasLasSedes}
-          tarifasAsignadas={sedesAsignadas[selectedServicio.id] || []}
-          onClose={() => setSelectedServicio(null)}
-          onSaved={() => {
-            setSelectedServicio(null);
-            loadData();
-          }}
-        />
+      {!loading && !error && (
+        <div className="mt-8">
+          <h3 className="mb-4 text-lg font-bold text-red-700">Servicios sin formato de certificado</h3>
+          <div className="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
+            <p className="mb-4 text-sm text-gray-600">
+              Estos servicios requieren certificado pero no tienen asignado un formato estructural o modalidad válidos en la base de datos.
+            </p>
+            {servicios.filter(s => s.requiere_certificado && (!s.tipo_certificado_clave || !CERTIFICADOS_BASE.find(c => c.formatoEstructural === s.tipo_certificado_clave && c.modalidad === s.modalidad))).length === 0 ? (
+              <p className="text-sm italic text-gray-400">Todos los servicios con certificado tienen un formato asignado.</p>
+            ) : (
+              <ul className="space-y-2">
+                {servicios.filter(s => s.requiere_certificado && (!s.tipo_certificado_clave || !CERTIFICADOS_BASE.find(c => c.formatoEstructural === s.tipo_certificado_clave && c.modalidad === s.modalidad))).map((servicio) => (
+                  <li key={servicio.id} className="flex items-center justify-between gap-3 rounded-lg bg-red-50 px-3 py-2 border border-red-100">
+                    <span className="font-mono text-xs font-bold text-gray-700">{servicio.codigo} - {servicio.nombre}</span>
+                    {!servicio.activo && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">INACTIVO</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

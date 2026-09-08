@@ -23,6 +23,7 @@ export interface MainLayoutContext {
   plantaSeleccionada: PlantaAsignada | null;
   plantaKey: string;
   plantaNombre: string;
+  plantasDisponibles: PlantaAsignada[];
 }
 
 export function MainLayout({
@@ -66,6 +67,7 @@ export function MainLayout({
   else if (path.startsWith('/maestros/descuentos') || path.startsWith('/faregas/descuentos')) activeMenu = 'descuentos';
   else if (path.startsWith('/auditoria') || path.startsWith('/faregas/auditoria')) activeMenu = 'auditoria';
   else if (path.startsWith('/configuracion') || path.startsWith('/faregas/configuracion')) activeMenu = 'configuracion';
+  else if (path.startsWith('/faregas/chips')) activeMenu = 'chips';
 
   const contextValue: MainLayoutContext = {
     user,
@@ -73,6 +75,7 @@ export function MainLayout({
     plantaSeleccionada,
     plantaKey,
     plantaNombre
+    , plantasDisponibles
   };
 
   return (

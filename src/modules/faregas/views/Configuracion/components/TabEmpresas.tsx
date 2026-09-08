@@ -82,7 +82,7 @@ export default function TabEmpresas() {
 
   return <div className="space-y-6">
     <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-      <strong>Empresas propias de FAREGAS.</strong> Los datos fueron copiados desde FARENET y ahora se administran independientemente. Editarlos aquí no modifica las tablas legacy.
+      <strong>Empresas disponibles y asignación por sede.</strong> Este maestro multiempresa se administra de forma independiente; editarlo aquí no modifica las tablas legacy.
     </div>
 
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
