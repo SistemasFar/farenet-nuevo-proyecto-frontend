@@ -16,6 +16,7 @@ export interface TarifaAdmin {
   servicio_codigo: string;
   servicio_nombre: string;
   servicio_tipo_flujo: string;
+  categoria_id: number;
   categoria_codigo: string;
   categoria_nombre: string;
   precio: number;
@@ -29,6 +30,9 @@ export interface TarifaAdmin {
   producto_activo: boolean | null;
   producto_es_para_venta: boolean | null;
   producto_codigo_sunat: string | null;
+  producto_categoria_id: number | null;
+  producto_categoria_codigo: string | null;
+  producto_categoria_nombre: string | null;
   activo: boolean;
 }
 
@@ -37,6 +41,7 @@ export interface ServicioDisponible {
   codigo: string;
   nombre: string;
   tipo_flujo: string;
+  categoria_id: number;
   categoria_codigo: string;
   categoria_nombre: string;
 }
@@ -52,6 +57,9 @@ export interface ProductoTarifa {
   activo: boolean;
   es_para_venta: boolean;
   codigo_clasificacion_sunat: string | null;
+  categoria_id: number | null;
+  categoria_codigo: string | null;
+  categoria_nombre: string | null;
 }
 
 const request = async (path: string, options: RequestInit = {}) => {

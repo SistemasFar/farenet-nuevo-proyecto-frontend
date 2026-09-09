@@ -6,6 +6,9 @@ export interface ProductoFacturacion {
   descripcion: string;
   tipo_producto?: string | null;
   categoria_dms?: string | null;
+  categoria_id?: number | null;
+  categoria_codigo?: string | null;
+  categoria_nombre?: string | null;
   cuenta_por_cobrar?: string | null;
   unidad?: string | null;
   precio_unitario?: number | null;

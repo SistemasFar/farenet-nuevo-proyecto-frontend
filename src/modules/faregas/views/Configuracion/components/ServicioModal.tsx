@@ -1,384 +1,337 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import {
   faregasConfigApi,
   type CategoriaServicio,
-  type ServicioConfiguracionFaregas,
-  type TipoFlujoServicioFaregas,
-  type SedeTarifaAsignada
+  type SedeTarifaAsignada,
+  type ServicioConfiguracionFaregas
 } from '../../../services/faregas-config.api';
-import { faregasTarifasAdminApi } from '../../../services/faregas-tarifas-admin.api';
+import type { ProductoFacturacion } from '../../../services/faregas-productos.api';
+import {
+  faregasTarifasAdminApi,
+  type TarifaSede
+} from '../../../services/faregas-tarifas-admin.api';
+
+type VarianteCertificado = 'GNV_INICIAL' | 'GNV_ANUAL' | 'GLP_INICIAL' | 'GLP_ANUAL' | 'CONFORMIDAD';
+
+interface EstadoSede {
+  seleccionada: boolean;
+  precio: string;
+  productoId: string;
+  productoBusqueda: string;
+  tarifaId?: number;
+  activaOriginalmente: boolean;
+}
 
 interface Props {
   mode: 'CREATE' | 'EDIT';
   initialData: Partial<ServicioConfiguracionFaregas>;
-  categorias: CategoriaServicio[];
-  sedesDisponibles: any[];
+  categoria: CategoriaServicio;
+  productos: ProductoFacturacion[];
+  productoInicialId?: number | null;
+  sedesDisponibles: TarifaSede[];
   tarifasAsignadas: SedeTarifaAsignada[];
   onClose: () => void;
   onSaved: () => void;
 }
 
-type FormularioServicio = Omit<Partial<ServicioConfiguracionFaregas>, 'categoria_id'> & {
-  categoria_id?: number | '';
-  certificado_base: string;
+const varianteDesdeServicio = (servicio: Partial<ServicioConfiguracionFaregas>): VarianteCertificado => {
+  if (servicio.tipo_certificado_clave === 'GNV_ANUAL' && servicio.modalidad === 'INICIAL') return 'GNV_INICIAL';
+  if (servicio.tipo_certificado_clave === 'GNV_ANUAL' && servicio.modalidad === 'ANUAL') return 'GNV_ANUAL';
+  if (servicio.tipo_certificado_clave === 'GLP_ANUAL' && servicio.modalidad === 'INICIAL') return 'GLP_INICIAL';
+  if (servicio.tipo_certificado_clave === 'GLP_ANUAL' && servicio.modalidad === 'ANUAL') return 'GLP_ANUAL';
+  if (servicio.tipo_certificado_clave === 'CONFORMIDAD') return 'CONFORMIDAD';
+  return 'GNV_INICIAL';
 };
 
-export function ServicioModal({ mode, initialData, categorias, sedesDisponibles, tarifasAsignadas, onClose, onSaved }: Props) {
-  const [formData, setFormData] = useState<FormularioServicio>({
-    codigo: '',
-    nombre: '',
-    categoria_id: categorias[0]?.id || '',
-    tipo_flujo: 'CERTIFICACION',
-    requiere_certificado: true,
-    certificado_base: 'GNV_INICIAL',
-    requiere_vehiculo: true,
-    orden: 10,
-    activo: true,
-    ...initialData
+const configuracionVariante = (variante: VarianteCertificado) => {
+  switch (variante) {
+    case 'GNV_INICIAL': return { tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'INICIAL' as const };
+    case 'GNV_ANUAL': return { tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL' as const };
+    case 'GLP_INICIAL': return { tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'INICIAL' as const };
+    case 'GLP_ANUAL': return { tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL' as const };
+    case 'CONFORMIDAD': return { tipo_certificado_clave: 'CONFORMIDAD', modalidad: null };
+  }
+};
+
+const codigoTecnico = (codigo: string) => codigo
+  .trim()
+  .toUpperCase()
+  .replace(/[^A-Z0-9_]+/g, '_')
+  .replace(/^_+|_+$/g, '')
+  .slice(0, 30);
+
+export function ServicioModal({
+  mode,
+  initialData,
+  categoria,
+  productos,
+  productoInicialId,
+  sedesDisponibles,
+  tarifasAsignadas,
+  onClose,
+  onSaved
+}: Props) {
+  const productoInicialSolicitado = productos.find((producto) => Number(producto.id) === Number(productoInicialId));
+  const productoInicial = productoInicialSolicitado
+    && Number(productoInicialSolicitado.categoria_id) === Number(categoria.id)
+    ? productoInicialSolicitado
+    : productos.find((producto) =>
+      Number(producto.categoria_id) === Number(categoria.id)
+      && producto.activo
+      && producto.es_para_venta
+    );
+  const [codigo, setCodigo] = useState(initialData.codigo || codigoTecnico(productoInicial?.codigo_sku || categoria.codigo));
+  const [nombre, setNombre] = useState(initialData.nombre || productoInicial?.descripcion || categoria.nombre);
+  const [generaCertificado, setGeneraCertificado] = useState(Boolean(initialData.requiere_certificado));
+  const [variante, setVariante] = useState<VarianteCertificado>(varianteDesdeServicio(initialData));
+  const [requiereVehiculo, setRequiereVehiculo] = useState(initialData.requiere_vehiculo ?? Boolean(initialData.requiere_certificado));
+  const [orden, setOrden] = useState(initialData.orden ?? 10);
+  const productosSeleccionables = useMemo(() => productos.filter((producto) =>
+    Number(producto.categoria_id) === Number(categoria.id)
+    || tarifasAsignadas.some((tarifa) => Number(tarifa.producto_facturacion_id) === Number(producto.id))
+  ), [categoria.id, productos, tarifasAsignadas]);
+
+  const [sedes, setSedes] = useState<Record<string, EstadoSede>>(() => {
+    const inicial: Record<string, EstadoSede> = {};
+    for (const sede of sedesDisponibles) {
+      const tarifasDeSede = tarifasAsignadas.filter((item) => String(item.key) === String(sede.key));
+      const tarifa = tarifasDeSede.find((item) => item.activo) || tarifasDeSede[0];
+      const productoTarifa = tarifa?.producto_facturacion_id
+        ? productos.find((producto) => Number(producto.id) === Number(tarifa.producto_facturacion_id))
+        : undefined;
+      const productoPredeterminado = mode === 'CREATE' ? productoInicial : undefined;
+      const productoSede = productoTarifa || productoPredeterminado;
+      inicial[sede.key] = {
+        seleccionada: Boolean(tarifa?.activo),
+        precio: tarifa ? String(tarifa.precio) : String(productoInicial?.precio_referencia || ''),
+        productoId: productoSede ? String(productoSede.id) : '',
+        productoBusqueda: productoSede?.codigo_sku || '',
+        tarifaId: tarifa?.tarifa_id,
+        activaOriginalmente: Boolean(tarifa?.activo)
+      };
+    }
+    return inicial;
   });
-  
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const [sedesState, setSedesState] = useState<Record<string, { selected: boolean, precio: string, sku: string, tarifa_id?: number, original_activo?: boolean }>>({});
+  const actualizarSede = (key: string, cambios: Partial<EstadoSede>) => {
+    setSedes((actual) => ({ ...actual, [key]: { ...actual[key], ...cambios } }));
+  };
 
-  useEffect(() => {
-    const initialState: Record<string, { selected: boolean, precio: string, sku: string, tarifa_id?: number, original_activo?: boolean }> = {};
-    sedesDisponibles.forEach(sede => {
-      const tarifa = tarifasAsignadas.find(t => t.key === sede.key);
-      initialState[sede.key] = {
-        selected: tarifa ? tarifa.activo : false,
-        precio: tarifa ? tarifa.precio.toString() : '0',
-        sku: tarifa?.producto_facturacion_id ? tarifa.producto_facturacion_id.toString() : '',
-        tarifa_id: tarifa?.tarifa_id,
-        original_activo: tarifa?.activo
-      };
+  const escribirProducto = (key: string, value: string) => {
+    const sku = value.trim().toUpperCase();
+    const producto = productos.find((item) => String(item.codigo_sku).trim().toUpperCase() === sku);
+    const estado = sedes[key];
+    actualizarSede(key, {
+      productoBusqueda: value.toUpperCase(),
+      productoId: producto ? String(producto.id) : '',
+      precio: !estado?.precio && producto?.precio_referencia != null
+        ? String(producto.precio_referencia)
+        : estado?.precio || ''
     });
-    setSedesState(initialState);
-  }, [sedesDisponibles, tarifasAsignadas]);
+  };
 
-  // En inicialización, mapear DB -> Combo si es modo EDIT
-  useEffect(() => {
-    if (mode === 'EDIT' && initialData.requiere_certificado) {
-      const tipo = initialData.tipo_certificado_clave;
-      const mod = initialData.modalidad;
-      let combo = '';
-      if (tipo === 'GNV_ANUAL' && mod === 'INICIAL') combo = 'GNV_INICIAL';
-      else if (tipo === 'GNV_ANUAL' && mod === 'ANUAL') combo = 'GNV_ANUAL';
-      else if (tipo === 'GLP_ANUAL' && mod === 'INICIAL') combo = 'GLP_INICIAL';
-      else if (tipo === 'GLP_ANUAL' && mod === 'ANUAL') combo = 'GLP_ANUAL';
-      else if (tipo === 'CONFORMIDAD') combo = 'CONFORMIDAD';
-      
-      setFormData((prev) => ({ ...prev, certificado_base: combo || 'GNV_INICIAL' }));
+  const problemaProductoFiscal = (productoId: string, productoBusqueda = ''): string | null => {
+    const producto = productos.find((item) => String(item.id) === String(productoId));
+    if (!producto) {
+      const skuEscrito = productoBusqueda.trim().toUpperCase();
+      return skuEscrito
+        ? `No existe un producto fiscal con el SKU ${skuEscrito}.`
+        : 'Falta escribir o seleccionar un producto fiscal.';
     }
-  }, [mode, initialData]);
+    if (Number(producto.categoria_id) !== Number(categoria.id)) return `El SKU ${producto.codigo_sku} no pertenece a esta categoría.`;
+    if (!producto.activo || !producto.es_para_venta) return `El SKU ${producto.codigo_sku} debe estar activo y habilitado para venta.`;
+    if (!['NIU', 'ZZ'].includes(String(producto.unidad || '').toUpperCase())) return `El SKU ${producto.codigo_sku} debe utilizar unidad NIU o ZZ.`;
+    if (generaCertificado && String(producto.tipo_afectacion_igv || '') !== '10') return `El SKU ${producto.codigo_sku} debe tener afectación IGV 10 para una certificación.`;
+    return null;
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const hayProductosFiscalesValidos = productosSeleccionables.some((producto) =>
+    !problemaProductoFiscal(String(producto.id))
+  );
+  const haySedesSeleccionadasIncompletas = Object.values(sedes).some((sede) =>
+    sede.seleccionada && Boolean(problemaProductoFiscal(sede.productoId, sede.productoBusqueda))
+  );
+
+  const validar = () => {
+    if (!codigoTecnico(codigo) || !nombre.trim()) throw new Error('El código y el nombre de la operación son obligatorios.');
+    for (const [sedeKey, sede] of Object.entries(sedes).filter(([, item]) => item.seleccionada)) {
+      const sedeConfigurada = sedesDisponibles.find((item) => item.key === sedeKey);
+      const nombreSede = sedeConfigurada?.nombre || sedeKey;
+      const precio = Number(sede.precio);
+      if (!Number.isFinite(precio) || precio <= 0) throw new Error(`La sede ${nombreSede} debe tener un precio mayor que cero.`);
+      const problemaProducto = problemaProductoFiscal(sede.productoId, sede.productoBusqueda);
+      if (problemaProducto) throw new Error(`La sede ${nombreSede}: ${problemaProducto}`);
+    }
+  };
+
+  const guardar = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError('');
-    setSaving(true);
-    
     try {
-      const payload = { ...formData };
-
-      if (payload.tipo_flujo === 'CERTIFICACION' && !payload.requiere_certificado) {
-        throw new Error('Una certificación debe generar uno de los cinco certificados base.');
-      }
-      if (payload.tipo_flujo === 'SERVICIO_COMPLEMENTARIO' && payload.requiere_certificado) {
-        throw new Error('Un servicio complementario no puede generar un certificado.');
-      }
-      
-      if (!payload.requiere_certificado) {
-        payload.tipo_certificado_clave = null;
-        payload.modalidad = null;
-      } else {
-        switch (payload.certificado_base) {
-          case 'GNV_INICIAL':
-            payload.tipo_certificado_clave = 'GNV_ANUAL';
-            payload.modalidad = 'INICIAL';
-            break;
-          case 'GNV_ANUAL':
-            payload.tipo_certificado_clave = 'GNV_ANUAL';
-            payload.modalidad = 'ANUAL';
-            break;
-          case 'GLP_INICIAL':
-            payload.tipo_certificado_clave = 'GLP_ANUAL';
-            payload.modalidad = 'INICIAL';
-            break;
-          case 'GLP_ANUAL':
-            payload.tipo_certificado_clave = 'GLP_ANUAL';
-            payload.modalidad = 'ANUAL';
-            break;
-          case 'CONFORMIDAD':
-            payload.tipo_certificado_clave = 'CONFORMIDAD';
-            payload.modalidad = null;
-            break;
-        }
-      }
-
-      const servicio: Partial<ServicioConfiguracionFaregas> = {
-        ...payload,
-        categoria_id: Number(payload.categoria_id)
+      validar();
+      setSaving(true);
+      const certificado = generaCertificado ? configuracionVariante(variante) : null;
+      const payload: Partial<ServicioConfiguracionFaregas> = {
+        codigo: codigoTecnico(codigo), nombre: nombre.trim(), categoria_id: categoria.id,
+        tipo_flujo: generaCertificado ? 'CERTIFICACION' : 'SERVICIO_COMPLEMENTARIO',
+        requiere_certificado: generaCertificado,
+        tipo_certificado_clave: certificado?.tipo_certificado_clave || null,
+        modalidad: certificado?.modalidad || null,
+        requiere_vehiculo: requiereVehiculo, orden
       };
-      
-      let targetId = formData.id;
-      if (mode === 'CREATE') {
-        targetId = await faregasConfigApi.crearServicio(servicio);
-      } else {
-        if (!targetId) throw new Error('No se pudo identificar el servicio a editar.');
-        await faregasConfigApi.editarServicio(targetId, servicio);
-      }
-      
-      const promesasTarifas = [];
-      for (const sede of sedesDisponibles) {
-        const key = sede.key;
-        const state = sedesState[key];
-        if (!state) continue;
 
-        if (state.selected) {
-           if (state.tarifa_id) {
-               promesasTarifas.push(
-                  faregasTarifasAdminApi.editar(state.tarifa_id, {
-                      precio: Number(state.precio) || 0,
-                      producto_facturacion_id: state.sku ? Number(state.sku) : null,
-                      activo: true
-                  })
-               );
-           } else {
-               promesasTarifas.push(
-                  faregasTarifasAdminApi.crear({
-                      planta_key: key,
-                      servicio_id: targetId!,
-                      precio: Number(state.precio) || 0,
-                      producto_facturacion_id: state.sku ? Number(state.sku) : null,
-                      activo: true
-                  })
-               );
-           }
-        } else {
-           if (state.tarifa_id && state.original_activo !== false) {
-               promesasTarifas.push(faregasTarifasAdminApi.cambiarEstado(state.tarifa_id, false));
-           }
+      let servicioId = initialData.id;
+      if (mode === 'CREATE') servicioId = await faregasConfigApi.crearServicio(payload);
+      else if (servicioId) await faregasConfigApi.editarServicio(servicioId, payload);
+      else throw new Error('No se pudo identificar la operación.');
+
+      for (const sede of sedesDisponibles) {
+        const estado = sedes[sede.key];
+        if (!estado) continue;
+        if (estado.seleccionada) {
+          const datos = { precio: Number(estado.precio), producto_facturacion_id: Number(estado.productoId), activo: true };
+          if (estado.tarifaId) await faregasTarifasAdminApi.editar(estado.tarifaId, datos);
+          else await faregasTarifasAdminApi.crear({ planta_key: sede.key, servicio_id: servicioId, ...datos });
+        } else if (estado.tarifaId && estado.activaOriginalmente) {
+          await faregasTarifasAdminApi.cambiarEstado(estado.tarifaId, false);
         }
       }
 
-      await Promise.all(promesasTarifas);
-      
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar el servicio');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la configuración.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <h3 className="text-xl font-bold mb-4 text-[#052A79]">
-          {mode === 'CREATE' ? 'Nuevo Servicio' : 'Editar Servicio'}
-        </h3>
-        
-        {error && (
-          <div className="mb-4 bg-red-50 text-red-600 p-3 rounded border border-red-200 text-sm font-semibold">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Código técnico</label>
-              <input
-                type="text"
-                required
-                disabled={mode === 'EDIT'}
-                maxLength={30}
-                className="w-full border rounded-lg p-2 text-sm disabled:bg-slate-100 disabled:text-slate-500 uppercase"
-                value={formData.codigo || ''}
-                onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
-              />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div><p className="text-xs font-bold uppercase tracking-wide text-blue-600">{categoria.codigo} · {categoria.nombre}</p><h3 className="mt-1 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Configurar nueva operación' : 'Configurar operación'}</h3><p className="mt-1 text-sm text-slate-500">Define el comportamiento, el formato y las sedes usando la misma configuración oficial de Tarifas por sede.</p></div>
+          <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 font-bold text-slate-500 hover:bg-slate-100">✕</button>
+        </div>
+        {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
+        <form onSubmit={guardar} className="space-y-5">
+          <section className="rounded-xl border border-slate-200 p-4">
+            <h4 className="mb-3 font-bold text-slate-800">1. Identidad de la operación</h4>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="text-sm font-semibold text-slate-700">Código técnico<input required disabled={mode === 'EDIT'} value={codigo} onChange={(event) => setCodigo(event.target.value)} className="mt-1 w-full rounded-lg border p-2 uppercase disabled:bg-slate-100" /></label>
+              <label className="text-sm font-semibold text-slate-700">Nombre<input required value={nombre} onChange={(event) => setNombre(event.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Nombre comercial</label>
-              <input
-                type="text"
-                required
-                className="w-full border rounded-lg p-2 text-sm"
-                value={formData.nombre || ''}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              />
+          </section>
+          <section className="rounded-xl border border-slate-200 p-4">
+            <h4 className="mb-3 font-bold text-slate-800">2. Certificado</h4>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="flex cursor-pointer items-center gap-3 rounded-lg border bg-slate-50 p-3 text-sm font-bold text-slate-800"><input type="checkbox" checked={generaCertificado} onChange={(event) => { setGeneraCertificado(event.target.checked); if (event.target.checked) setRequiereVehiculo(true); }} className="h-5 w-5" />Genera certificado</label>
+              {generaCertificado && <label className="text-sm font-semibold text-slate-700">Formato protegido<select value={variante} onChange={(event) => setVariante(event.target.value as VarianteCertificado)} className="mt-1 w-full rounded-lg border bg-white p-2"><option value="GNV_INICIAL">GNV Inicial</option><option value="GNV_ANUAL">GNV Anual</option><option value="GLP_INICIAL">GLP Inicial</option><option value="GLP_ANUAL">GLP Anual</option><option value="CONFORMIDAD">Conformidad</option></select></label>}
+              <label className="flex items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={requiereVehiculo} onChange={(event) => setRequiereVehiculo(event.target.checked)} className="h-4 w-4" />Requiere vehículo en planta</label>
+              <label className="text-sm font-semibold text-slate-700">Orden de visualización<input type="number" value={orden} onChange={(event) => setOrden(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border p-2" /></label>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Tipo de flujo</label>
-              <select
-                required
-                className="w-full border rounded-lg p-2 text-sm bg-white"
-                value={formData.tipo_flujo}
-                onChange={(e) => setFormData({ ...formData, tipo_flujo: e.target.value as TipoFlujoServicioFaregas })}
-              >
-                <option value="CERTIFICACION">Certificación</option>
-                <option value="SERVICIO_COMPLEMENTARIO">Servicio complementario</option>
-              </select>
-              <p className="mt-1 text-xs text-slate-500">Sólo las certificaciones pueden aparecer en Nuevo Certificado.</p>
+          </section>
+          <section className="rounded-xl border border-slate-200 p-4">
+            <div className="mb-3">
+              <h4 className="font-bold text-slate-800">3. Sedes, precio y producto fiscal</h4>
+              <p className="mt-1 text-xs text-slate-500">Estas selecciones son las tarifas reales de la operación; no se guardan en una tabla duplicada.</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Categoría</label>
-              <select
-                required
-                className="w-full border rounded-lg p-2 text-sm bg-white"
-                value={formData.categoria_id}
-                onChange={(e) => setFormData({ ...formData, categoria_id: Number(e.target.value) })}
-              >
-                <option value="">-- Seleccionar --</option>
-                {categorias.map((categoria) => (
-                  <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="flex items-center gap-2 pt-2 md:col-start-2">
-              <input
-                type="checkbox"
-                id="req_veh"
-                className="w-4 h-4 text-[#052A79]"
-                checked={formData.requiere_vehiculo}
-                onChange={(e) => setFormData({ ...formData, requiere_vehiculo: e.target.checked })}
-              />
-              <label htmlFor="req_veh" className="text-sm font-semibold text-slate-700 cursor-pointer">¿Requiere vehículo en planta?</label>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-            <div className="flex flex-col gap-2">
-              <label className="block text-sm font-semibold text-slate-700">¿Genera certificado?</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-1 text-sm cursor-pointer">
-                  <input type="radio" name="req_cert" checked={formData.requiere_certificado === true} 
-                    onChange={() => setFormData({ ...formData, requiere_certificado: true })} />
-                  Sí
-                </label>
-                <label className="flex items-center gap-1 text-sm cursor-pointer">
-                  <input type="radio" name="req_cert" checked={formData.requiere_certificado === false} 
-                    onChange={() => setFormData({ ...formData, requiere_certificado: false })} />
-                  No
-                </label>
-              </div>
-            </div>
-
-            {formData.requiere_certificado && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">Certificado base</label>
-                <select
-                  required
-                  className="w-full border rounded-lg p-2 text-sm bg-white"
-                  value={formData.certificado_base}
-                  onChange={(e) => setFormData({ ...formData, certificado_base: e.target.value })}
-                >
-                  <option value="GNV_INICIAL">GNV Inicial</option>
-                  <option value="GNV_ANUAL">GNV Anual</option>
-                  <option value="GLP_INICIAL">GLP Inicial</option>
-                  <option value="GLP_ANUAL">GLP Anual</option>
-                  <option value="CONFORMIDAD">Conformidad</option>
-                </select>
+            {!hayProductosFiscalesValidos && (
+              <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <p className="font-semibold">Esta categoría no tiene un producto fiscal activo y válido.</p>
+                <p className="mt-1 text-xs">Las sedes y precios existentes se muestran abajo. Para guardar una sede seleccionada, primero vincula un producto fiscal a esta categoría.</p>
               </div>
             )}
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Orden de visualización</label>
-              <input
-                type="number"
-                required
-                className="w-full border rounded-lg p-2 text-sm"
-                value={formData.orden}
-                onChange={(e) => setFormData({ ...formData, orden: parseInt(e.target.value) || 0 })}
-              />
-            </div>
-            
-            <div className="flex items-center gap-2 pt-6">
-              <input
-                type="checkbox"
-                id="activo"
-                className="w-4 h-4 text-[#052A79]"
-                checked={formData.activo}
-                onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-              />
-              <label htmlFor="activo" className="text-sm font-semibold text-slate-700 cursor-pointer">Servicio Activo</label>
-            </div>
-          </div>
+            <datalist id="faregas-productos-fiscales">
+              {productos.map((producto) => (
+                <option key={producto.id} value={producto.codigo_sku}>
+                  {producto.descripcion} · {producto.categoria_nombre || 'Sin categoría'}
+                </option>
+              ))}
+            </datalist>
 
-          <div className="border-t pt-4 mt-4">
-            <h4 className="text-sm font-bold text-[#052A79] mb-3">Disponibilidad en Sedes (Tarifas)</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6 max-h-60 overflow-y-auto pr-2">
-              {sedesDisponibles.map(sede => {
-                const state = sedesState[sede.key];
-                if (!state) return null;
-                return (
-                  <div key={sede.key} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${state.selected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 text-[#052A79] shrink-0"
-                      checked={state.selected}
-                      onChange={(e) => setSedesState(prev => ({
-                        ...prev,
-                        [sede.key]: { ...state, selected: e.target.checked }
-                      }))}
-                    />
-                    <div className="flex-1 min-w-0 flex flex-col gap-2">
-                      <span className="text-sm font-bold text-gray-700 truncate block leading-tight">{sede.nombre}</span>
-                      {state.selected && (
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            required={state.selected}
-                            placeholder="Precio (S/)"
-                            className="w-1/2 border border-blue-200 rounded p-1.5 text-xs focus:outline-none focus:border-blue-500"
-                            value={state.precio}
-                            onChange={(e) => setSedesState(prev => ({ ...prev, [sede.key]: { ...state, precio: e.target.value } }))}
-                          />
-                          <input
-                            type="number"
-                            placeholder="SKU ID (Opcional)"
-                            className="w-1/2 border border-blue-200 rounded p-1.5 text-xs focus:outline-none focus:border-blue-500"
-                            value={state.sku}
-                            onChange={(e) => setSedesState(prev => ({ ...prev, [sede.key]: { ...state, sku: e.target.value } }))}
-                          />
+            {sedesDisponibles.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No hay sedes disponibles.</div>
+            ) : (
+              <div className="grid max-h-80 gap-3 overflow-y-auto pr-1 lg:grid-cols-2">
+                {sedesDisponibles.map((sede) => {
+                  const estado = sedes[sede.key];
+                  if (!estado) return null;
+                  const problemaProducto = estado.seleccionada
+                    ? problemaProductoFiscal(estado.productoId, estado.productoBusqueda)
+                    : null;
+                  const productoSeleccionado = productos.find((producto) =>
+                    String(producto.id) === String(estado.productoId)
+                  );
+
+                  return (
+                    <div
+                      key={sede.key}
+                      className={`rounded-xl border p-3 ${estado.seleccionada ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}
+                    >
+                      <label className="flex cursor-pointer items-center gap-2 font-bold text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={estado.seleccionada}
+                          onChange={(event) => actualizarSede(sede.key, { seleccionada: event.target.checked })}
+                          className="h-4 w-4"
+                        />
+                        {sede.nombre}
+                      </label>
+
+                      {estado.seleccionada && (
+                        <div className="mt-3 space-y-2">
+                          <div className="grid gap-2 sm:grid-cols-[1fr_7rem]">
+                            <input
+                              required
+                              type="text"
+                              list="faregas-productos-fiscales"
+                              value={estado.productoBusqueda}
+                              onChange={(event) => escribirProducto(sede.key, event.target.value)}
+                              placeholder="Escribir o buscar SKU"
+                              autoComplete="off"
+                              className={`min-w-0 rounded-lg border bg-white p-2 text-xs ${problemaProducto ? 'border-amber-400' : ''}`}
+                            />
+                            <input
+                              required
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={estado.precio}
+                              onChange={(event) => actualizarSede(sede.key, { precio: event.target.value })}
+                              placeholder="Precio"
+                              className="rounded-lg border p-2 text-xs"
+                            />
+                          </div>
+                          {productoSeleccionado && (
+                            <p className="text-xs text-slate-600">
+                              <b>{productoSeleccionado.descripcion}</b> · {productoSeleccionado.categoria_nombre || 'Sin categoría'}
+                            </p>
+                          )}
+                          {problemaProducto && (
+                            <p className="text-xs font-semibold text-amber-700">⚠ {problemaProducto}</p>
+                          )}
                         </div>
                       )}
                     </div>
-                  </div>
-                );
-              })}
-              {sedesDisponibles.length === 0 && (
-                <div className="text-sm text-gray-500 italic col-span-2">No hay sedes disponibles.</div>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-8 flex justify-end gap-3 pt-4 border-t">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={onClose}
-              className="px-6 py-2 text-slate-600 hover:bg-slate-100 rounded font-semibold transition-colors disabled:opacity-50"
-            >
-              Cancelar
-            </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+          <div className="flex justify-end gap-3 border-t pt-4">
+            <button type="button" disabled={saving} onClick={onClose} className="rounded-lg px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
             <button
               type="submit"
-              disabled={saving}
-              className="px-6 py-2 bg-[#052A79] hover:bg-blue-900 text-white font-bold rounded transition-colors disabled:opacity-50"
+              disabled={saving || haySedesSeleccionadasIncompletas}
+              title={haySedesSeleccionadasIncompletas ? 'Completa el producto fiscal de todas las sedes seleccionadas.' : undefined}
+              className="rounded-lg bg-[#052A79] px-5 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? 'Guardando...' : 'Guardar'}
+              {saving ? 'Guardando...' : 'Guardar configuración'}
             </button>
           </div>
         </form>
