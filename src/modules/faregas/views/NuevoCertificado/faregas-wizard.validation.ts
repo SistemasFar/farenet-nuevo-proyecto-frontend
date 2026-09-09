@@ -106,7 +106,12 @@ export const validarExpedienteTecnico = ({
   if (tipoCertificado === 'GNV_ANUAL') {
     agregarFaltantes(errores, vehiculo, [['color', 'el color']]);
     agregarFaltantes(errores, gnv, [['tallerAutorizadoId', 'el taller autorizado'], ['fechaVigencia', 'la vigencia GNV']]);
-    if (modalidad === 'INICIAL' && vacio(gnv.numeroChip)) errores.push('Complete el número de chip GNV.');
+    if (modalidad === 'INICIAL') {
+      if (vacio(gnv.numeroChip)) errores.push('Complete el número de chip GNV.');
+      else if (!/^[A-Z0-9]{1,15}$/.test(String(gnv.numeroChip).trim().toUpperCase())) {
+        errores.push('El número de chip GNV debe ser alfanumérico y tener máximo 15 caracteres.');
+      }
+    }
     const verificaciones = gnv.verificaciones || [];
     if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
       errores.push('Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');

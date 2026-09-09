@@ -1456,6 +1456,7 @@ export function NuevoCertificadoView() {
               </div>
             )}
             <VehiculoStep
+              certificadoId={certificadoId}
               tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
               modalidadCertificado={formCaja.modalidadCertificado}
               formVehiculo={formVehiculo}

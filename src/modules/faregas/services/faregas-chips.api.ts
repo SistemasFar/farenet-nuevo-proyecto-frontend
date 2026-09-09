@@ -14,6 +14,17 @@ export interface ChipResumen {
   mappingFiscalCompleto: boolean;
 }
 
+export interface ChipDisponibilidad {
+  id?: number;
+  numeroChip: string;
+  encontrado: boolean;
+  disponible: boolean;
+  asignadoAlCertificado: boolean;
+  estado?: ChipEstado;
+  plantaNombre?: string;
+  codigo: 'DISPONIBLE' | 'ASIGNADO_CERTIFICADO' | 'CHIP_NO_ENCONTRADO' | 'CHIP_OTRA_SEDE' | 'CHIP_NO_DISPONIBLE';
+}
+
 export const faregasChipsApi = {
   listar: async (filtros: { estado?:string; buscar?:string } = {}) => {
     const params=new URLSearchParams();
@@ -22,6 +33,12 @@ export const faregasChipsApi = {
     return faregasFetch(`/chips?${params}`) as Promise<{items:Chip[];total:number}>;
   },
   resumen: async () => (await faregasFetch('/chips/resumen')).resumen as ChipResumen,
+  consultarDisponibilidad: async (numeroChip:string, certificadoId?:number|null) => {
+    const params = new URLSearchParams();
+    if(certificadoId)params.set('certificadoId',String(certificadoId));
+    const query=params.toString();
+    return (await faregasFetch(`/chips/disponibilidad/${encodeURIComponent(numeroChip)}${query?`?${query}`:''}`)).chip as ChipDisponibilidad;
+  },
   ingresar: async (numeros:string[],referencia?:string) => faregasFetch('/chips/ingresos',{method:'POST',body:JSON.stringify({numeros,referencia})}),
   transferir: async (destinoKey:string,numeros:string[],referencia?:string) => faregasFetch('/chips/transferencias',{method:'POST',body:JSON.stringify({destinoKey,numeros,referencia})}),
   baja: async (numeroChip:string,referencia:string) => faregasFetch('/chips/bajas',{method:'POST',body:JSON.stringify({numeroChip,referencia})}),

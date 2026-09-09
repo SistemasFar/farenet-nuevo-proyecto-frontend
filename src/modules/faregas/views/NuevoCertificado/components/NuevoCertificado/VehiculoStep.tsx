@@ -4,6 +4,7 @@ import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { TitularesList, type TitularState } from './TitularesList';
 import React, { useEffect } from 'react';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
+import { ChipBarcodeField } from './ChipBarcodeField';
 import {
   formatVIN,
   formatAlfanumerico,
@@ -16,6 +17,7 @@ import {
 } from '../../../../utils/vehiculo-formatters';
 
 interface VehiculoStepProps {
+  certificadoId?: number | null;
   tipoCertificado: TipoCertificadoFaregas;
   modalidadCertificado: '' | 'INICIAL' | 'ANUAL';
   formVehiculo: any;
@@ -40,6 +42,7 @@ interface VehiculoStepProps {
 }
 
 export function VehiculoStep({
+  certificadoId,
   tipoCertificado,
   modalidadCertificado,
   formVehiculo,
@@ -515,18 +518,13 @@ export function VehiculoStep({
                 <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
               </div>
               {modalidadCertificado === 'INICIAL' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">N° CHIP <span className="text-red-500">*</span> <span className="font-normal text-slate-400">(alfanumérico, máx 15)</span></label>
-                  <input
-                    name="numeroChip"
-                    value={formGnv.numeroChip || ''}
-                    onChange={e => setFormGnv((prev: any) => ({ ...prev, numeroChip: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15) }))}
-                    maxLength={15}
-                    className="w-full p-2 border-2 border-amber-300 rounded-lg text-slate-800 font-semibold focus:border-amber-500 focus:ring-0 uppercase transition-colors"
-                    placeholder="EJ: ABC12345"
-                  />
-                </div>
-              )}            </div>
+                <ChipBarcodeField
+                  value={formGnv.numeroChip ?? formGnv.numero_chip ?? ''}
+                  certificadoId={certificadoId}
+                  onChange={(numeroChip) => setFormGnv((prev: any) => ({ ...prev, numeroChip }))}
+                />
+              )}
+            </div>
 
             <div className="mt-4">
               <label className="block text-xs font-bold text-slate-500 mb-1">OBSERVACIONES GNV (Opcional) <span className="font-normal text-slate-400">({formGnv.observaciones?.length || 0}/250)</span></label>

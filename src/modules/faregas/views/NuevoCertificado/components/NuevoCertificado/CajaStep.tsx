@@ -10,6 +10,7 @@ import type {
 
 import type { ConsultaDescuentoResult } from '../../../../services/faregas-descuentos.api';
 import { ConsultaDescuento } from './ConsultaDescuento';
+import { ReservaChipAdicional } from './ReservaChipAdicional';
 
 interface CajaStepProps {
   plantaSeleccionada: string;
@@ -223,6 +224,7 @@ export function CajaStep({
             </div>
           </section>
 
+          <ReservaChipAdicional certificadoId={certificadoId} />
           <ConsultaDescuento
             certificadoId={certificadoId}
             onDescuentoChange={onDescuentoChange}

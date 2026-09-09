@@ -525,7 +525,7 @@ export function InicioView() {
 
       <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-          <span className="font-semibold text-gray-700">Certificados registrados</span>
+          <span className="font-semibold text-gray-700">Operaciones recientes</span>
           <button
             type="button"
             onClick={() => navigate('/faregas/certificados/nuevo')}
