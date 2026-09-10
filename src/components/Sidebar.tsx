@@ -229,7 +229,7 @@ const menuItems: MenuItem[] = [
   {
     key: 'chips', path: '/chips',
     label: 'CHIPS',
-    permisos: ['CHIPS_VER'],
+    permisos: ['MENU_CHIPS', 'CHIPS_VER'],
     icon: (
       <svg
         className="h-6 w-6 text-current"
@@ -308,7 +308,7 @@ export function Sidebar({
         return permisos.includes('MENU_CONFIGURACION');
       }
       if (item.key === 'chips') {
-        return permisos.includes('CHIPS_VER');
+        return permisos.includes('MENU_CHIPS') || permisos.includes('CHIPS_VER');
       }
       return false;
     }

@@ -592,7 +592,7 @@ export default function App() {
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
                     const userPerms = fUser?.permisos || [];
-                    return userPerms.includes('CHIPS_VER') ? (
+                    return userPerms.includes('MENU_CHIPS') || userPerms.includes('CHIPS_VER') ? (
                       <FaregasChipsView />
                     ) : (
                       <ForbiddenView />
