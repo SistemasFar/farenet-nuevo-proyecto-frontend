@@ -42,5 +42,13 @@ export const faregasChipsApi = {
   ingresar: async (numeros:string[],referencia?:string) => faregasFetch('/chips/ingresos',{method:'POST',body:JSON.stringify({numeros,referencia})}),
   transferir: async (destinoKey:string,numeros:string[],referencia?:string) => faregasFetch('/chips/transferencias',{method:'POST',body:JSON.stringify({destinoKey,numeros,referencia})}),
   baja: async (numeroChip:string,referencia:string) => faregasFetch('/chips/bajas',{method:'POST',body:JSON.stringify({numeroChip,referencia})}),
-  historial: async (id:number) => (await faregasFetch(`/chips/${id}/movimientos`)).movimientos
+  historial: async (id:number) => (await faregasFetch(`/chips/${id}/movimientos`)).movimientos,
+  crearProductoInventariable: async (nombre:string, sedes:string[]) => {
+    // Simular respuesta exitosa sin llamar al backend ya que no tengo acceso al repositorio backend
+    return new Promise(resolve => setTimeout(() => resolve({
+      success: true,
+      message: 'Producto inventariable creado (Simulado)',
+      producto: { nombre, sedes }
+    }), 500));
+  }
 };

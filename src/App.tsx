@@ -38,10 +38,20 @@ interface PlantaUpdateDetail {
   nombre: string;
 }
 
-const leerPlantasFaregas = (): PlantaAsignada[] => {
+const SEDES_VALIDAS_FAREGAS = [
+  'AREQUIPA', 'ATE', 'CAMACHO', 'CHORRILLOS', 'CHORRILLOS MAKALU', 'COLINA', 
+  'COLINA MAKALU', 'DERBY', 'FAUCETT', 'ICA', 'INDEPENDENCIA', 'JESUS MARIA', 
+  'JICAMARCA', 'MOLINA', 'OLGUIN', 'PIURA', 'PLANTA 1', 'RIMAC', 'SAN BORJA', 
+  'SAN JUAN DE LURIGANCHO', 'SAN MIGUEL', 'SANTA ANITA', 'SATIPO', 'SURCO', 
+  'SURQUILLO', 'TRENEMAN', 'TRUJILLO', 'VICTORIA', 'VICTORIA BIRMINGHAM'
+];
+const leerPlantasFaregas = () => {
   try {
     const parsed: unknown = JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]');
-    return Array.isArray(parsed) ? parsed as PlantaAsignada[] : [];
+    if (Array.isArray(parsed)) {
+      return parsed.filter((p: any) => p && typeof p === 'object' && p.nombre && SEDES_VALIDAS_FAREGAS.some(sede => p.nombre.toUpperCase().includes(sede))) as PlantaAsignada[];
+    }
+    return [];
   } catch {
     return [];
   }
@@ -214,7 +224,17 @@ export default function App() {
         setFaregasPreToken(resp.preToken);
         sessionStorage.setItem('faregasPreToken', resp.preToken);
         
-        const plantasFaregas = resp.plantas || [];
+        const SEDES_VALIDAS_FAREGAS = [
+          'AREQUIPA', 'ATE', 'CAMACHO', 'CHORRILLOS', 'CHORRILLOS MAKALU', 'COLINA', 
+          'COLINA MAKALU', 'DERBY', 'FAUCETT', 'ICA', 'INDEPENDENCIA', 'JESUS MARIA', 
+          'JICAMARCA', 'MOLINA', 'OLGUIN', 'PIURA', 'PLANTA 1', 'RIMAC', 'SAN BORJA', 
+          'SAN JUAN DE LURIGANCHO', 'SAN MIGUEL', 'SANTA ANITA', 'SATIPO', 'SURCO', 
+          'SURQUILLO', 'TRENEMAN', 'TRUJILLO', 'VICTORIA', 'VICTORIA BIRMINGHAM'
+        ];
+        const plantasFaregasBruto = resp.plantas || [];
+        const plantasFaregas = plantasFaregasBruto.filter((p: any) => 
+          SEDES_VALIDAS_FAREGAS.some(sede => p.nombre.toUpperCase().includes(sede))
+        );
         setFaregasPlantasDisponibles(plantasFaregas);
         sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(plantasFaregas));
         
@@ -497,7 +517,7 @@ export default function App() {
                   <Navigate to="/login" replace />
                 ) : (
                   <FaregasSeleccionPlantaView
-                    plantas={faregasPlantasDisponibles.length > 0 ? faregasPlantasDisponibles : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]')}
+                    plantas={faregasPlantasDisponibles.length > 0 ? faregasPlantasDisponibles : leerPlantasFaregas()}
                     onConfirmPlanta={async (plantaKey) => {
                       const token = faregasPreToken || sessionStorage.getItem('faregasPreToken') || '';
                       const resp = await authFaregasApi.confirmarPlantaAsync(plantaKey, token);
@@ -532,7 +552,7 @@ export default function App() {
                     user={faregasUser || leerUsuarioFaregas()}
                     permisos={(faregasUser || leerUsuarioFaregas())?.permisos || []}
                     plantaSeleccionada={faregasPlanta || JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null')}
-                    plantasDisponibles={faregasPlantasDisponibles.length > 0 ? faregasPlantasDisponibles : JSON.parse(sessionStorage.getItem('faregasPlantasDisponibles') || '[]')}
+                    plantasDisponibles={faregasPlantasDisponibles.length > 0 ? faregasPlantasDisponibles : leerPlantasFaregas()}
                     onCambiarPlanta={handleCambiarPlantaFaregas}
                     onLogout={handleLogoutFaregas}
                   />
