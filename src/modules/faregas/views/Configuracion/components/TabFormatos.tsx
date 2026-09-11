@@ -9,6 +9,7 @@ export default function TabFormatos() {
   const [error, setError] = useState('');
   const [selectedFormato, setSelectedFormato] = useState<Formato | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [formatoPadreParaCrear, setFormatoPadreParaCrear] = useState<Formato | null>(null);
   
   // Create state
   const [nombre, setNombre] = useState('');
@@ -33,16 +34,29 @@ export default function TabFormatos() {
     e.preventDefault();
     try {
       setSaving(true);
-      await faregasFormatosApi.crearFormato({ nombre, codigo, motor: 'DOCX_DINAMICO' });
+      await faregasFormatosApi.crearFormato({ 
+        nombre, 
+        codigo, 
+        motor: formatoPadreParaCrear ? 'HTML_DINAMICO' : 'DOCX_DINAMICO',
+        formato_padre_id: formatoPadreParaCrear ? formatoPadreParaCrear.id : null
+      });
       setShowCreateModal(false);
+      setFormatoPadreParaCrear(null);
       setNombre('');
       setCodigo('');
       await cargar();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error');
+      alert(err instanceof Error ? err.message : 'Error al crear');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleOpenCreateModal = (padre: Formato | null = null) => {
+    setFormatoPadreParaCrear(padre);
+    setShowCreateModal(true);
+    setNombre('');
+    setCodigo('');
   };
 
   return (
@@ -51,7 +65,7 @@ export default function TabFormatos() {
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
           <span className="font-semibold text-gray-700">Administración de Formatos Dinámicos</span>
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => handleOpenCreateModal()}
             className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white"
           >
             + Nuevo Formato
@@ -77,8 +91,15 @@ export default function TabFormatos() {
                 <tbody className="divide-y divide-gray-100">
                   {formatos.map((f) => (
                     <tr key={f.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono font-bold text-gray-700">{f.codigo}</td>
-                      <td className="px-4 py-3 font-medium text-gray-800">{f.nombre}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-gray-700">
+                        {f.formato_padre_id && <span className="mr-2 text-gray-400">↳</span>}
+                        {f.codigo}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-800">
+                        <div className={f.formato_padre_id ? "pl-4" : ""}>
+                          {f.nombre}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-gray-600">{f.motor}</td>
                       <td className="px-4 py-3 text-center">
                         {f.tiene_version_vigente ? (
@@ -122,13 +143,21 @@ export default function TabFormatos() {
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-            <h3 className="mb-4 text-xl font-bold text-[#052A79]">Nuevo Formato</h3>
+            <h3 className="mb-4 text-xl font-bold text-[#052A79]">
+              {formatoPadreParaCrear ? 'Nueva Variante de Formato' : 'Nuevo Formato'}
+            </h3>
+            {formatoPadreParaCrear && (
+              <div className="mb-4 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-800">
+                <span className="font-semibold">Basado en:</span> {formatoPadreParaCrear.nombre} ({formatoPadreParaCrear.codigo})<br />
+                <span className="font-semibold">Motor:</span> HTML Dinámico
+              </div>
+            )}
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Código Técnico</label>
                 <input required maxLength={50} value={codigo}
                   onChange={(e) => setCodigo(e.target.value.toUpperCase().replace(/\s+/g, '_'))}
-                  placeholder="EJ: TALLER_INSPECCION"
+                  placeholder={formatoPadreParaCrear ? `EJ: ${formatoPadreParaCrear.codigo}_VAR` : "EJ: TALLER_INSPECCION"}
                   className="w-full rounded-lg border p-2 uppercase" />
               </div>
               <div>
@@ -139,7 +168,7 @@ export default function TabFormatos() {
                   className="w-full rounded-lg border p-2" />
               </div>
               <div className="flex justify-end gap-3 border-t pt-4">
-                <button type="button" disabled={saving} onClick={() => setShowCreateModal(false)} className="rounded px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
+                <button type="button" disabled={saving} onClick={() => { setShowCreateModal(false); setFormatoPadreParaCrear(null); }} className="rounded px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button>
                 <button type="submit" disabled={saving} className="rounded bg-[#052A79] px-5 py-2 font-bold text-white disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar'}</button>
               </div>
             </form>
@@ -151,6 +180,10 @@ export default function TabFormatos() {
         <FormatoDetalleModal 
           formato={selectedFormato} 
           onClose={() => { setSelectedFormato(null); void cargar(); }} 
+          onCreateVariant={(padre) => {
+            setSelectedFormato(null);
+            handleOpenCreateModal(padre);
+          }}
         />
       )}
     </div>

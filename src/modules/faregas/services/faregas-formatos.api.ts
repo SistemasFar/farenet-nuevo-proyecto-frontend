@@ -9,13 +9,17 @@ export interface Formato {
   es_protegido: boolean;
   activo: boolean;
   tiene_version_vigente: boolean;
+  formato_padre_id?: number | null;
+  formato_padre_nombre?: string;
 }
 
 export interface FormatoVersion {
   id: number;
   version: number;
+  archivo_ruta: string;
   configuracion: any;
-  estado: string;
+  estado: 'BORRADOR' | 'VIGENTE' | 'RETIRADA';
+  motor: 'DOCX_DINAMICO' | 'HTML_DINAMICO' | 'SISTEMA';
   vigente_desde: string | null;
   creado_en: string;
 }
@@ -37,6 +41,12 @@ export const faregasFormatosApi = {
     return faregasFetch('/formatos', {
       method: 'POST',
       body: JSON.stringify(formato),
+    }) as Promise<Formato>;
+  },
+
+  cambiarEstado: async (id: number): Promise<Formato> => {
+    return faregasFetch(`/formatos/${id}/estado`, {
+      method: 'PUT',
     }) as Promise<Formato>;
   },
 

@@ -1,14 +1,16 @@
-import { Edit3, Eye, FileUp, PlayCircle } from 'lucide-react';
+import { FileUp, Eye, Edit3, PlayCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { faregasFormatosApi, type Formato, type FormatoVersion } from '../../../services/faregas-formatos.api';
 import FormatosVariablesEditor from './FormatosVariablesEditor';
+import FormatoHtmlVariablesEditor from './FormatoHtmlVariablesEditor';
 
 interface Props {
   formato: Formato;
   onClose: () => void;
+  onCreateVariant?: (f: Formato) => void;
 }
 
-export default function FormatoDetalleModal({ formato, onClose }: Props) {
+export default function FormatoDetalleModal({ formato, onClose, onCreateVariant }: Props) {
   const [versiones, setVersiones] = useState<FormatoVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -50,21 +52,31 @@ export default function FormatoDetalleModal({ formato, onClose }: Props) {
     }
   };
 
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+
   const handlePreview = async (v: FormatoVersion) => {
     try {
       const token = sessionStorage.getItem('faregasAccessToken');
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       const url = `${API_URL}/faregas/formatos/${formato.id}/versiones/${v.id}/preview`;
       
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        .then(res => res.blob())
-        .then(blob => {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `preview_v${v.version}.docx`;
-          a.click();
-        });
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      
+      if (v.motor === 'HTML_DINAMICO') {
+        const data = await res.json();
+        if (res.ok) {
+           setPreviewHtml(data.html);
+        } else {
+           throw new Error(data.message || 'Error al obtener preview HTML');
+        }
+      } else {
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `preview_v${v.version}.docx`;
+        a.click();
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error');
     }
@@ -81,8 +93,21 @@ export default function FormatoDetalleModal({ formato, onClose }: Props) {
   };
 
   if (editorVersion) {
+    if (editorVersion.motor === 'HTML_DINAMICO') {
+      return <FormatoHtmlVariablesEditor formato={formato} version={editorVersion} onBack={() => { setEditorVersion(null); void cargar(); }} />;
+    }
     return <FormatosVariablesEditor formato={formato} version={editorVersion} onBack={() => { setEditorVersion(null); void cargar(); }} />;
   }
+
+  const handleCambiarEstado = async () => {
+    try {
+      if (!confirm(`¿Seguro que deseas ${formato.activo ? 'desactivar' : 'reactivar'} este formato?`)) return;
+      await faregasFormatosApi.cambiarEstado(formato.id);
+      onClose(); // Reload logic handled in parent
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al cambiar estado');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -94,6 +119,11 @@ export default function FormatoDetalleModal({ formato, onClose }: Props) {
               <span className="font-semibold">{formato.nombre}</span>
               <span className="rounded bg-gray-100 px-2 py-0.5 font-mono">{formato.codigo}</span>
               <span className="rounded bg-gray-100 px-2 py-0.5">{formato.motor}</span>
+              {formato.formato_padre_nombre && (
+                <span className="rounded bg-indigo-100 text-indigo-700 px-2 py-0.5 text-xs font-semibold">
+                  Base: {formato.formato_padre_nombre}
+                </span>
+              )}
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${formato.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                 {formato.activo ? 'ACTIVO' : 'INACTIVO'}
               </span>
@@ -105,15 +135,29 @@ export default function FormatoDetalleModal({ formato, onClose }: Props) {
           <div className="flex gap-2">
             {!formato.es_protegido && (
               <>
+                <button
+                  onClick={handleCambiarEstado}
+                  className={`rounded-lg border px-4 py-2 text-sm font-semibold ${formato.activo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
+                >
+                  {formato.activo ? 'Desactivar Formato' : 'Reactivar Formato'}
+                </button>
                 <input type="file" ref={fileInputRef} onChange={handleUpload} accept=".docx" className="hidden" />
                 <button 
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                   className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
                 >
-                  <FileUp size={16} /> {uploading ? 'Subiendo...' : 'Subir Nueva Versión (Word)'}
+                  <FileUp size={16} /> {uploading ? 'Subiendo...' : 'Subir Nueva Versión'}
                 </button>
               </>
+            )}
+            {formato.es_protegido && formato.motor === 'SISTEMA' && onCreateVariant && (
+              <button
+                onClick={() => onCreateVariant(formato)}
+                className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+              >
+                + Crear Variante
+              </button>
             )}
             <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">
               Cerrar
@@ -153,21 +197,21 @@ export default function FormatoDetalleModal({ formato, onClose }: Props) {
                       </button>
                       
                       {!formato.es_protegido && v.estado === 'BORRADOR' && (
-                        <>
-                          <button 
-                            onClick={() => setEditorVersion(v)}
-                            className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-200"
-                          >
-                            <Edit3 size={16} /> Configurar Variables
-                          </button>
-                          
-                          <button 
-                            onClick={() => void handleActivar(v)}
-                            className="flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
-                          >
-                            <PlayCircle size={16} /> Activar
-                          </button>
-                        </>
+                        <button 
+                          onClick={() => setEditorVersion(v)}
+                          className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-200"
+                        >
+                          <Edit3 size={16} /> Configurar Variables
+                        </button>
+                      )}
+                      
+                      {!formato.es_protegido && v.estado === 'BORRADOR' && (
+                        <button 
+                          onClick={() => void handleActivar(v)}
+                          className="flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
+                        >
+                          <PlayCircle size={16} /> Activar
+                        </button>
                       )}
                     </div>
                   </div>
@@ -190,6 +234,28 @@ export default function FormatoDetalleModal({ formato, onClose }: Props) {
           )}
         </div>
       </div>
+      
+      {/* PREVIEW HTML MODAL */}
+      {previewHtml !== null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
+          <div className="flex h-full max-h-[95vh] w-full max-w-5xl flex-col bg-white rounded shadow-2xl">
+            <div className="flex justify-between items-center bg-gray-100 p-3 border-b">
+              <h3 className="font-bold text-gray-800">Previsualización (A4)</h3>
+              <button onClick={() => setPreviewHtml(null)} className="px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700">Cerrar</button>
+            </div>
+            <div className="flex-1 bg-gray-50 p-4 overflow-auto flex justify-center items-start">
+               <div className="w-[210mm] min-h-[297mm] bg-white shadow-xl relative scale-[0.8] origin-top">
+                  <iframe 
+                    title="preview"
+                    srcDoc={previewHtml}
+                    className="w-full h-full border-none pointer-events-none"
+                    style={{ minHeight: '297mm' }}
+                  />
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
