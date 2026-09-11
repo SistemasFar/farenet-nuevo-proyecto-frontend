@@ -1,4 +1,4 @@
-import { Edit, FileText, Upload } from 'lucide-react';
+import { Edit } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { faregasFormatosApi, type Formato } from '../../../services/faregas-formatos.api';
 import FormatoDetalleModal from './FormatoDetalleModal';
@@ -68,8 +68,9 @@ export default function TabFormatos() {
                     <th className="px-4 py-3">Código</th>
                     <th className="px-4 py-3">Nombre</th>
                     <th className="px-4 py-3">Motor</th>
-                    <th className="px-4 py-3 text-center">Estado</th>
                     <th className="px-4 py-3 text-center">Vigencia</th>
+                    <th className="px-4 py-3 text-center">Estado</th>
+                    <th className="px-4 py-3 text-center">Tipo</th>
                     <th className="px-4 py-3 text-center">Acciones</th>
                   </tr>
                 </thead>
@@ -80,16 +81,21 @@ export default function TabFormatos() {
                       <td className="px-4 py-3 font-medium text-gray-800">{f.nombre}</td>
                       <td className="px-4 py-3 text-gray-600">{f.motor}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${f.es_protegido ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
-                          {f.es_protegido ? 'PROTEGIDO' : 'PERSONALIZADO'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
                         {f.tiene_version_vigente ? (
                           <span className="text-green-600 font-semibold">VIGENTE</span>
                         ) : (
-                          <span className="text-red-500 font-semibold">SIN VERSIÓN</span>
+                          <span className="text-gray-500 font-semibold">SIN VERSIÓN</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${f.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {f.activo ? 'ACTIVO' : 'INACTIVO'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${f.es_protegido ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                          {f.es_protegido ? 'PROTEGIDO' : 'DINÁMICO'}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex justify-center gap-2">

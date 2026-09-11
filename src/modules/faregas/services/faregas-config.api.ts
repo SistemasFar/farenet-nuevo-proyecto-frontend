@@ -72,7 +72,7 @@ export interface CategoriaServicio {
   orden: number;
 }
 
-export type TipoFlujoServicioFaregas = 'CERTIFICACION' | 'SERVICIO_COMPLEMENTARIO';
+export type TipoFlujoServicioFaregas = 'CERTIFICACION' | 'SERVICIO_COMPLEMENTARIO' | 'TALLER_INSPECCION';
 
 export interface ServicioConfiguracionFaregas {
   id: number;
@@ -86,6 +86,7 @@ export interface ServicioConfiguracionFaregas {
   requiere_certificado: boolean;
   tipo_certificado_clave: string | null;
   modalidad: 'INICIAL' | 'ANUAL' | null;
+  formato_id?: number | null;
   requiere_vehiculo: boolean;
   activo: boolean;
   orden: number;

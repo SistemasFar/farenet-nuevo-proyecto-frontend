@@ -11,6 +11,8 @@ import { CheckCircle2, FileText, User, CreditCard, ArrowLeft, Search, Loader2, S
 import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
+import { TallerStep } from './components/NuevoCertificado/TallerStep';
+import type { GuardarTallerFaregasRequest } from '../../types/faregas-api';
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
@@ -212,6 +214,7 @@ export function NuevoCertificadoView() {
   const [formGlp, setFormGlp] = useState<any>({});
   const [formGnv, setFormGnv] = useState<any>({});
   const [formConformidad, setFormConformidad] = useState<any>({});
+  const [formTaller, setFormTaller] = useState<GuardarTallerFaregasRequest>({});
 
   const [titulares, setTitulares] = useState<TitularState[]>([]);
   const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
@@ -301,7 +304,7 @@ export function NuevoCertificadoView() {
     return [
       { id: 'datos_iniciales', label: 'Datos Iniciales', icon: FileText },
       { id: 'pago', label: 'Pago', icon: CreditCard },
-      { id: 'vehiculo', label: 'Vehículo y Datos Técnicos', icon: Search },
+      { id: 'vehiculo', label: formCaja.tipo_flujo === 'TALLER_INSPECCION' ? 'Datos del Taller' : 'Vehículo y Datos Técnicos', icon: Search },
       { id: 'previsualizacion', label: 'Previsualización del Certificado', icon: Eye },
       { id: 'facturacion', label: 'Facturación', icon: User },
       { id: 'verificacion', label: 'Verificación / Emisión', icon: CheckCircle2 }
@@ -820,6 +823,10 @@ export function NuevoCertificadoView() {
     await guardarTitularesBorrador(idBorrador);
   };
 
+  const guardarPasoTaller = async (idBorrador: number) => {
+    await faregasCertificadosApi.guardarTaller(idBorrador, formTaller);
+  };
+
   const guardarPasoVehiculo = async (idBorrador: number) => {
     await guardarExpedienteTecnico(idBorrador);
     if (formCaja.tipoCertificado === 'GNV_ANUAL') {
@@ -933,7 +940,11 @@ export function NuevoCertificadoView() {
   useEffect(() => {
     if (!certificadoId || loading || currentStepIndex !== 2) return;
     const timer = window.setTimeout(() => {
-      void encolarAutosave(() => guardarPasoVehiculo(certificadoId)).catch(() => undefined);
+      if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
+        void encolarAutosave(() => guardarPasoTaller(certificadoId)).catch(() => undefined);
+      } else {
+        void encolarAutosave(() => guardarPasoVehiculo(certificadoId)).catch(() => undefined);
+      }
     }, 1500);
     return () => window.clearTimeout(timer);
     // Los objetos representan el bloque completo que se está editando.
@@ -1025,7 +1036,8 @@ export function NuevoCertificadoView() {
         if (mostrarErroresPaso(errores)) return;
         setIsSavingStep(true);
         try {
-          await guardarPasoVehiculo(certificadoId);
+          if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
+          else await guardarPasoVehiculo(certificadoId);
           if (formFacturacion.condicionPagoFac === 'CONTADO') {
             const facturacionGuardada = await faregasCertificadosApi.guardarFacturacion(
               certificadoId,
@@ -1102,7 +1114,8 @@ export function NuevoCertificadoView() {
     if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
       setIsSavingStep(true);
       try {
-        await guardarPasoVehiculo(certificadoId);
+        if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
+        else await guardarPasoVehiculo(certificadoId);
       } catch (e: any) {
         Swal.fire('No se pudo guardar', e.message || 'No se cambió de paso para evitar perder información.', 'error');
         return;
@@ -1326,7 +1339,8 @@ export function NuevoCertificadoView() {
       } else if (currentStepIndex === 1 && precioTotal > 0) {
         await guardarPasoPagos(certificadoId);
       } else if (currentStepIndex === 2) {
-        await guardarPasoVehiculo(certificadoId);
+        if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
+        else await guardarPasoVehiculo(certificadoId);
       }
       setLastSavedAt(new Date());
       navigate('/faregas/inicio');
@@ -1485,11 +1499,13 @@ export function NuevoCertificadoView() {
             />
           </>
         )}
+
         {STEPS[currentStepIndex].id === 'vehiculo' && formCaja.tipo_flujo === 'TALLER_INSPECCION' && (
-          <div className="p-12 text-center rounded-2xl border-2 border-slate-200 bg-slate-50">
-            <h3 className="font-black text-slate-800 text-2xl">Formato de Taller en Desarrollo</h3>
-            <p className="mt-4 text-slate-500 font-semibold max-w-md mx-auto">El flujo y formulario especializado para Inspección de Taller será implementado en la siguiente fase de desarrollo.</p>
-          </div>
+          <TallerStep
+            formTaller={formTaller}
+            setFormTaller={setFormTaller}
+            certificadoId={certificadoId}
+          />
         )}
         {STEPS[currentStepIndex].id === 'pago' && (
           <PagoStep

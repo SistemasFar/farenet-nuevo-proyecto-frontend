@@ -1,5 +1,6 @@
 import { faregasFetchWithStatus as fetchWithToken } from './faregas-http-client';
 import type {
+  GuardarTallerFaregasRequest,
   ActualizarBorradorFaregasRequest,
   ActualizarTitularFaregasRequest,
   CrearBorradorFaregasRequest,
@@ -58,6 +59,10 @@ export const faregasCertificadosApi = {
   actualizarPasoBorrador: (id: number, pasoActual: PasoBorradorFaregas) => fetchWithToken(`/certificados/borradores/${id}/paso`, {
     method: 'PATCH',
     body: JSON.stringify({ pasoActual })
+  }),
+  guardarTaller: (id: number, data: GuardarTallerFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/snapshot`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
   }),
   guardarVehiculoBorrador: (id: number, data: VehiculoBorradorFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/vehiculo`, {
     method: 'PUT',

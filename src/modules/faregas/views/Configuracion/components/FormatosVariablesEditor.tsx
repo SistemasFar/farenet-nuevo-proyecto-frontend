@@ -225,7 +225,7 @@ export default function FormatosVariablesEditor({ formato, version, onBack }: Pr
               <div className="text-center text-gray-500">Analizando estructura del documento...</div>
             ) : (
               <div className="space-y-3 text-[15px] leading-relaxed text-gray-800">
-                {paragraphs.map((p, i) => (
+                {paragraphs.map((p) => (
                   <p 
                     key={`${p.part}-${p.index}`} 
                     data-part={p.part} 

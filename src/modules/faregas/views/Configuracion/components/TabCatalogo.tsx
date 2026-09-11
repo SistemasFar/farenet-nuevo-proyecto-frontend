@@ -1,10 +1,11 @@
-import { FileCheck2, PackageSearch, Tags } from 'lucide-react';
+import { FileCheck2, FileText, PackageSearch, Tags } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import TabCategorias from './TabCategorias';
 import TabProductos from './TabProductos';
 import TabOperacionesWrapper from './TabOperacionesWrapper';
+import TabFormatos from './TabFormatos';
 
-type CatalogoTab = 'CATEGORIAS' | 'FISCALES' | 'OPERACIONES';
+type CatalogoTab = 'CATEGORIAS' | 'FISCALES' | 'OPERACIONES' | 'FORMATOS';
 
 interface Props {
   hasCategorias: boolean;
@@ -18,7 +19,8 @@ export default function TabCatalogo({ hasCategorias, hasServicios, hasProductos,
   const tabs = useMemo(() => [
     ...(hasProductos ? [{ id: 'FISCALES' as const, label: 'PRODUCTOS FISCALES', icon: PackageSearch }] : []),
     ...(hasCategorias ? [{ id: 'CATEGORIAS' as const, label: 'CATEGORÍAS', icon: Tags }] : []),
-    ...(hasServicios && hasCategorias ? [{ id: 'OPERACIONES' as const, label: 'OPERACIÓN Y FORMATOS', icon: FileCheck2 }] : [])
+    ...(hasServicios && hasCategorias ? [{ id: 'OPERACIONES' as const, label: 'OPERACIÓN Y FORMATOS', icon: FileCheck2 }] : []),
+    ...(hasServicios ? [{ id: 'FORMATOS' as const, label: 'FORMATOS', icon: FileText }] : [])
   ], [hasCategorias, hasProductos, hasServicios]);
   
   const [activeTab, setActiveTab] = useState<CatalogoTab>(tabs[0]?.id || 'FISCALES');
@@ -63,6 +65,10 @@ export default function TabCatalogo({ hasCategorias, hasServicios, hasProductos,
           canManageTarifas={hasTarifas} 
           onGoToTarifas={onGoToTarifas} 
         />
+      )}
+
+      {activeTab === 'FORMATOS' && hasServicios && (
+        <TabFormatos />
       )}
     </div>
   );

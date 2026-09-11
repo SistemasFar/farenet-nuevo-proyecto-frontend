@@ -425,3 +425,14 @@ export interface CatalogoFaregas {
   };
   categorias: CategoriaCatalogoFaregas[];
 }
+
+export interface GuardarTallerFaregasRequest {
+  nombre?: NullableText;
+  direccion?: NullableText;
+  telefono?: NullableText;
+  ciudad?: NullableText;
+  representanteLegal?: NullableText;
+  numeroAutorizacion?: NullableText;
+  observaciones?: NullableText;
+  fechaProximaInspeccion?: NullableText;
+}

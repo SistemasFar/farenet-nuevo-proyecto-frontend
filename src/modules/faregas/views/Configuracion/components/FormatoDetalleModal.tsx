@@ -1,4 +1,4 @@
-import { Download, Edit3, Eye, FileUp, PlayCircle } from 'lucide-react';
+import { Edit3, Eye, FileUp, PlayCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { faregasFormatosApi, type Formato, type FormatoVersion } from '../../../services/faregas-formatos.api';
 import FormatosVariablesEditor from './FormatosVariablesEditor';
@@ -90,7 +90,17 @@ export default function FormatoDetalleModal({ formato, onClose }: Props) {
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-xl font-bold text-[#052A79]">Detalle de Formato</h2>
-            <p className="text-sm text-gray-500">{formato.nombre} ({formato.codigo}) - {formato.motor}</p>
+            <div className="mt-1 flex items-center gap-3 text-sm text-gray-600">
+              <span className="font-semibold">{formato.nombre}</span>
+              <span className="rounded bg-gray-100 px-2 py-0.5 font-mono">{formato.codigo}</span>
+              <span className="rounded bg-gray-100 px-2 py-0.5">{formato.motor}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${formato.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {formato.activo ? 'ACTIVO' : 'INACTIVO'}
+              </span>
+              <span className="text-xs font-semibold">
+                {formato.tiene_version_vigente ? <span className="text-green-600">Con Versión Vigente</span> : <span className="text-gray-500">Sin Versión Vigente</span>}
+              </span>
+            </div>
           </div>
           <div className="flex gap-2">
             {!formato.es_protegido && (
