@@ -33,7 +33,9 @@ export interface FormCajaState {
   categoria: string;
   tipoInspeccion: string;
   tipoCertificado: string;
-  modalidadCertificado: '' | 'INICIAL' | 'ANUAL';
+  modalidadCertificado: string;
+  tipo_flujo: string;
+  requiere_certificado: boolean;
   servicioCodigo: string;
   tarifaCodigo: string;
   tipoAutorizacion: string;
@@ -179,6 +181,8 @@ export function NuevoCertificadoView() {
     tipoInspeccion: '',
     tipoCertificado: '',
     modalidadCertificado: '',
+    tipo_flujo: '',
+    requiere_certificado: true,
     servicioCodigo: '',
     tipoAutorizacion: '',
     tarifaCodigo: ''
@@ -1447,7 +1451,7 @@ export function NuevoCertificadoView() {
             }}
           />
         )}
-        {STEPS[currentStepIndex].id === 'vehiculo' && (
+        {STEPS[currentStepIndex].id === 'vehiculo' && (formCaja.tipo_flujo === 'CERTIFICACION' || formCaja.tipo_flujo === 'VEHICULAR_EXISTENTE') && (
           <>
             {expedienteError && (
               <div role="alert" className="mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
@@ -1480,6 +1484,12 @@ export function NuevoCertificadoView() {
               maestrosVehiculo={maestrosVehiculo}
             />
           </>
+        )}
+        {STEPS[currentStepIndex].id === 'vehiculo' && formCaja.tipo_flujo === 'TALLER_INSPECCION' && (
+          <div className="p-12 text-center rounded-2xl border-2 border-slate-200 bg-slate-50">
+            <h3 className="font-black text-slate-800 text-2xl">Formato de Taller en Desarrollo</h3>
+            <p className="mt-4 text-slate-500 font-semibold max-w-md mx-auto">El flujo y formulario especializado para Inspección de Taller será implementado en la siguiente fase de desarrollo.</p>
+          </div>
         )}
         {STEPS[currentStepIndex].id === 'pago' && (
           <PagoStep

@@ -19,7 +19,7 @@ import {
 interface VehiculoStepProps {
   certificadoId?: number | null;
   tipoCertificado: TipoCertificadoFaregas;
-  modalidadCertificado: '' | 'INICIAL' | 'ANUAL';
+  modalidadCertificado: string;
   formVehiculo: any;
   setFormVehiculo: (data: any) => void;
   formPropietario: any;

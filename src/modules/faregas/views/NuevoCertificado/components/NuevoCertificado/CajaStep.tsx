@@ -113,6 +113,8 @@ export function CajaStep({
       tarifaCodigo: servicio.tarifa.codigo,
       tipoCertificado: servicio.tipo_certificado_clave,
       modalidadCertificado: servicio.modalidad ?? '',
+      tipo_flujo: servicio.tipo_flujo ?? 'VEHICULAR_EXISTENTE',
+      requiere_certificado: servicio.requiere_certificado ?? true,
     }));
   };
 

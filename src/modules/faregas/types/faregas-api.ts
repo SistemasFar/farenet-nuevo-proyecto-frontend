@@ -403,7 +403,7 @@ export interface ServicioCatalogoFaregas {
   codigo: string;
   nombre: string;
   orden: number;
-  tipo_flujo: 'CERTIFICACION';
+  tipo_flujo: string;
   requiere_certificado: boolean;
   requiere_vehiculo: boolean;
   tipo_certificado_clave: string;
