@@ -1,4 +1,4 @@
-import { FileUp, Eye, Edit3, PlayCircle } from 'lucide-react';
+import { FileUp, Eye, Edit3, PlayCircle, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { faregasFormatosApi, type Formato, type FormatoVersion } from '../../../services/faregas-formatos.api';
 import FormatosVariablesEditor from './FormatosVariablesEditor';
@@ -89,6 +89,16 @@ export default function FormatoDetalleModal({ formato, onClose, onCreateVariant 
       await cargar();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error');
+    }
+  };
+
+  const handleEliminar = async (v: FormatoVersion) => {
+    if (!confirm('¿Seguro que deseas eliminar esta versión de forma permanente?')) return;
+    try {
+      await faregasFormatosApi.eliminarVersion(formato.id, v.id);
+      await cargar();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al eliminar');
     }
   };
 
@@ -205,10 +215,19 @@ export default function FormatoDetalleModal({ formato, onClose, onCreateVariant 
                         </button>
                       )}
                       
-                      {!formato.es_protegido && v.estado === 'BORRADOR' && (
+                      {!formato.es_protegido && (v.estado === 'BORRADOR' || v.estado === 'RETIRADA') && (
+                        <button 
+                          onClick={() => void handleEliminar(v)}
+                          className="flex items-center gap-1 rounded border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
+                        >
+                          <Trash2 size={16} /> Eliminar
+                        </button>
+                      )}
+
+                      {v.estado !== 'VIGENTE' && (
                         <button 
                           onClick={() => void handleActivar(v)}
-                          className="flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
+                          className="flex items-center gap-1 rounded bg-green-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
                         >
                           <PlayCircle size={16} /> Activar
                         </button>

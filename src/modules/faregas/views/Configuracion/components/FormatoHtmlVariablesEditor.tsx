@@ -10,7 +10,7 @@ interface Props {
 
 const DESIGN_CSS = `
 <style id="faregas-design-css">
-  [data-faregas-var] {
+  [data-faregas-slot] {
     background-color: #fef08a !important;
     outline: 2px dashed #eab308 !important;
     outline-offset: 2px;
@@ -19,7 +19,10 @@ const DESIGN_CSS = `
     color: #854d0e !important;
     font-weight: bold !important;
   }
-  .variable-slot {
+  [data-faregas-slot]:empty::before {
+    content: '[' attr(data-faregas-slot) ']';
+  }
+  [data-faregas-editable-slot] {
     min-width: 50px;
     min-height: 20px;
     display: inline-block;
@@ -27,7 +30,7 @@ const DESIGN_CSS = `
     background-color: #f8fafc;
     cursor: pointer;
   }
-  .variable-slot:hover {
+  [data-faregas-editable-slot]:hover {
     background-color: #e2e8f0;
   }
   body {
@@ -139,7 +142,7 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
       }
       
       // If clicking an existing variable, we can make it active to change it
-      if (target.hasAttribute('data-faregas-var') || target.classList.contains('variable-slot') || target.tagName === 'TD' || target.tagName === 'SPAN') {
+      if (target.hasAttribute('data-faregas-slot') || target.hasAttribute('data-faregas-editable-slot') || target.tagName === 'TD' || target.tagName === 'SPAN') {
           target.setAttribute('data-active-slot', 'true');
           target.style.outline = '2px solid blue';
           setActiveElement(target);
@@ -160,18 +163,18 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
     if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
       const range = sel.getRangeAt(0);
       const span = doc.createElement('span');
-      span.setAttribute('data-faregas-var', varKey);
-      span.textContent = `[${varKey.toUpperCase()}]`;
+      span.setAttribute('data-faregas-slot', varKey);
+      span.textContent = `{{${varKey}}}`;
       range.deleteContents();
       range.insertNode(span);
       sel.removeAllRanges();
       return;
     }
 
-    // Case 2: Active element slot (e.g. empty TD or variable-slot)
+    // Case 2: Active element slot (e.g. empty TD or data-faregas-editable-slot)
     if (activeElement) {
-        activeElement.setAttribute('data-faregas-var', varKey);
-        activeElement.textContent = `[${varKey.toUpperCase()}]`;
+        activeElement.setAttribute('data-faregas-slot', varKey);
+        activeElement.textContent = `{{${varKey}}}`;
         activeElement.removeAttribute('data-active-slot');
         activeElement.style.outline = '';
         setActiveElement(null);
@@ -182,9 +185,9 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
   };
 
   const removeVariable = () => {
-      if (activeElement && activeElement.hasAttribute('data-faregas-var')) {
-          activeElement.removeAttribute('data-faregas-var');
-          activeElement.textContent = '...';
+      if (activeElement && activeElement.hasAttribute('data-faregas-slot')) {
+          activeElement.removeAttribute('data-faregas-slot');
+          activeElement.textContent = '';
           activeElement.removeAttribute('data-active-slot');
           activeElement.style.outline = '';
           setActiveElement(null);
@@ -212,7 +215,7 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
           <span className="text-sm text-gray-500">v{version.version} ({version.motor})</span>
         </div>
         <div className="flex gap-2">
-          {activeElement && activeElement.hasAttribute('data-faregas-var') && (
+          {activeElement && activeElement.hasAttribute('data-faregas-slot') && (
               <button 
                 onClick={removeVariable} 
                 className="flex items-center gap-2 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100"

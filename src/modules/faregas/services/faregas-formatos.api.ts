@@ -90,9 +90,15 @@ export const faregasFormatosApi = {
     });
   },
 
-  activarVersion: async (formatoId: number, versionId: number): Promise<any> => {
+  activarVersion: async (formatoId: number, versionId: number): Promise<void> => {
     return faregasFetch(`/formatos/${formatoId}/versiones/${versionId}/activar`, {
-      method: 'POST'
+      method: 'PUT',
+    });
+  },
+
+  eliminarVersion: async (formatoId: number, versionId: number): Promise<void> => {
+    return faregasFetch(`/formatos/${formatoId}/versiones/${versionId}`, {
+      method: 'DELETE',
     });
   }
 };
