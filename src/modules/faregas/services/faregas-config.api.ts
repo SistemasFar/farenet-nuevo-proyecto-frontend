@@ -87,6 +87,9 @@ export interface ServicioConfiguracionFaregas {
   tipo_certificado_clave: string | null;
   modalidad: 'INICIAL' | 'ANUAL' | null;
   formato_id?: number | null;
+  formato_codigo?: string | null;
+  formato_nombre?: string | null;
+  formato_motor?: string | null;
   requiere_vehiculo: boolean;
   activo: boolean;
   orden: number;
@@ -175,6 +178,17 @@ export const faregasConfigApi = {
   cambiarEstadoServicio: async (id: number, activo: boolean): Promise<void> => {
     const response = await api.put(`/api/faregas/config/servicios/${id}/estado`, { activo });
     return response;
+  },
+
+  asignarFormato: async (id: number, formatoId: number): Promise<void> => {
+    return api.put(`/api/faregas/config/servicios/${id}/formato`, { formato_id: formatoId });
+  },
+
+  crearVarianteFormato: async (id: number, formatoPadreId?: number): Promise<import('./faregas-formatos.api').Formato> => {
+    const response = await api.post(`/api/faregas/config/servicios/${id}/formato/variante`, {
+      formato_padre_id: formatoPadreId ?? null
+    });
+    return response.formato;
   },
 
   obtenerSedesPorServicio: async (): Promise<Record<number, SedeTarifaAsignada[]>> => {

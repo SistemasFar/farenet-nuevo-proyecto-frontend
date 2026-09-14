@@ -102,7 +102,9 @@ export default function TabFormatos() {
                       </td>
                       <td className="px-4 py-3 text-gray-600">{f.motor}</td>
                       <td className="px-4 py-3 text-center">
-                        {f.tiene_version_vigente ? (
+                        {f.es_protegido && f.motor === 'SISTEMA' ? (
+                          <span className="font-semibold text-blue-700">SISTEMA / INTEGRADO</span>
+                        ) : f.tiene_version_vigente ? (
                           <span className="text-green-600 font-semibold">VIGENTE</span>
                         ) : (
                           <span className="text-gray-500 font-semibold">SIN VERSIÓN</span>

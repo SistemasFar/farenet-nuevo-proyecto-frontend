@@ -69,9 +69,19 @@ export const faregasFormatosApi = {
     
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.mensaje || 'Error al subir versión');
+        throw new Error(err.message || 'Error al subir versión');
     }
     return res.json();
+  },
+
+  crearVersionHtml: async (formatoId: number): Promise<{ version: FormatoVersion }> => {
+    return faregasFetch(`/formatos/${formatoId}/versiones/html`, {
+      method: 'POST',
+    }) as Promise<{ version: FormatoVersion }>;
+  },
+
+  obtenerOperacionesPorFormato: async (formatoId: number): Promise<{ id: number; codigo: string; nombre: string; activo: boolean }[]> => {
+    return faregasFetch(`/formatos/${formatoId}/operaciones`) as Promise<{ id: number; codigo: string; nombre: string; activo: boolean }[]>;
   },
 
   obtenerVariables: async (): Promise<VariableCatalogo[]> => {
@@ -100,5 +110,18 @@ export const faregasFormatosApi = {
     return faregasFetch(`/formatos/${formatoId}/versiones/${versionId}`, {
       method: 'DELETE',
     });
+  },
+
+  guardarConfiguracion: async (formatoId: number, versionId: number, configuracion: Record<string, unknown>): Promise<void> => {
+    return faregasFetch(`/formatos/${formatoId}/versiones/${versionId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ configuracion }),
+    });
+  },
+
+  obtenerPreviewHtml: async (formatoId: number, versionId: number): Promise<string> => {
+    const response = await faregasFetch(`/formatos/${formatoId}/versiones/${versionId}/preview`) as { html?: string };
+    if (!response.html) throw new Error('El servidor no devolvió una previsualización HTML.');
+    return response.html;
   }
 };

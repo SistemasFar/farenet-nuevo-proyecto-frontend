@@ -1,277 +1,307 @@
-import { FileUp, Eye, Edit3, PlayCircle, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Edit3, Eye, FileUp, PlayCircle, Trash2 } from 'lucide-react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { faregasConfigApi, type ServicioConfiguracionFaregas } from '../../../services/faregas-config.api';
 import { faregasFormatosApi, type Formato, type FormatoVersion } from '../../../services/faregas-formatos.api';
 import FormatosVariablesEditor from './FormatosVariablesEditor';
-import FormatoHtmlVariablesEditor from './FormatoHtmlVariablesEditor';
+
+const FormatoHtmlVariablesEditor = lazy(() => import('./FormatoHtmlVariablesEditor'));
 
 interface Props {
-  formato: Formato;
+  formatoId?: number;
+  formato?: Formato;
+  contextoOperacion?: ServicioConfiguracionFaregas;
   onClose: () => void;
-  onCreateVariant?: (f: Formato) => void;
+  onCreateVariant?: (formato: Formato) => void;
+  onFormatoChanged?: (formato: Formato) => void;
 }
 
-export default function FormatoDetalleModal({ formato, onClose, onCreateVariant }: Props) {
+interface OperacionVinculada {
+  id: number;
+  codigo: string;
+  nombre: string;
+  activo: boolean;
+}
+
+const mensajeError = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
+
+export default function FormatoDetalleModal({
+  formatoId,
+  formato: formatoInicial,
+  contextoOperacion,
+  onClose,
+  onCreateVariant,
+  onFormatoChanged
+}: Props) {
+  const [formato, setFormato] = useState<Formato | null>(formatoInicial || null);
+  const [operacionesVinculadas, setOperacionesVinculadas] = useState<OperacionVinculada[]>([]);
   const [versiones, setVersiones] = useState<FormatoVersion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [loadingFormato, setLoadingFormato] = useState(!formatoInicial);
+  const [loadingVersiones, setLoadingVersiones] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState('');
   const [editorVersion, setEditorVersion] = useState<FormatoVersion | null>(null);
-  
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const cargar = async () => {
+  const cargarMetadatos = async (id: number) => {
+    const formatos = await faregasFormatosApi.listarFormatos();
+    const encontrado = formatos.find((item) => item.id === id);
+    if (!encontrado) throw new Error('Formato no encontrado.');
+    setFormato(encontrado);
+    return encontrado;
+  };
+
+  useEffect(() => {
+    const id = formatoInicial?.id ?? formatoId;
+    if (!id) {
+      setError('No se indicó el formato que se debe administrar.');
+      setLoadingFormato(false);
+      return;
+    }
+    let cancelado = false;
+    setLoadingFormato(!formatoInicial);
+    Promise.all([
+      formatoInicial ? Promise.resolve(formatoInicial) : faregasFormatosApi.listarFormatos().then((items) => {
+        const encontrado = items.find((item) => item.id === id);
+        if (!encontrado) throw new Error('Formato no encontrado.');
+        return encontrado;
+      }),
+      faregasFormatosApi.obtenerOperacionesPorFormato(id)
+    ]).then(([formatoCargado, operaciones]) => {
+      if (cancelado) return;
+      setFormato(formatoCargado);
+      setOperacionesVinculadas(operaciones);
+      setError('');
+    }).catch((cause: unknown) => {
+      if (!cancelado) setError(mensajeError(cause));
+    }).finally(() => {
+      if (!cancelado) setLoadingFormato(false);
+    });
+    return () => { cancelado = true; };
+  }, [formatoId, formatoInicial]);
+
+  const cargarVersiones = async (id: number) => {
+    setLoadingVersiones(true);
     try {
-      setLoading(true);
-      setVersiones(await faregasFormatosApi.listarVersiones(formato.id));
-    } catch (err) {
-      console.error(err);
+      setVersiones(await faregasFormatosApi.listarVersiones(id));
     } finally {
-      setLoading(false);
+      setLoadingVersiones(false);
     }
   };
 
-  useEffect(() => { void cargar(); }, [formato.id]);
+  useEffect(() => {
+    if (!formato?.id) return;
+    let cancelado = false;
+    setLoadingVersiones(true);
+    faregasFormatosApi.listarVersiones(formato.id)
+      .then((resultado) => { if (!cancelado) setVersiones(resultado); })
+      .catch((cause: unknown) => { if (!cancelado) setError(mensajeError(cause)); })
+      .finally(() => { if (!cancelado) setLoadingVersiones(false); });
+    return () => { cancelado = true; };
+  }, [formato?.id]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
+  const crearVersionHtml = async () => {
+    if (!formato) return;
+    setWorking(true);
+    setError('');
+    try {
+      await faregasFormatosApi.crearVersionHtml(formato.id);
+      await cargarVersiones(formato.id);
+    } catch (cause) {
+      setError(mensajeError(cause));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const subirVersion = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = event.target.files?.[0];
+    if (!archivo || !formato) return;
     if (formato.es_protegido) {
-      alert('No se pueden subir versiones a un formato protegido');
+      setError('No se pueden subir versiones a un formato protegido.');
       return;
     }
-
+    setWorking(true);
+    setError('');
     try {
-      setUploading(true);
-      await faregasFormatosApi.subirVersion(formato.id, file);
-      await cargar();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al subir');
+      await faregasFormatosApi.subirVersion(formato.id, archivo);
+      await cargarVersiones(formato.id);
+    } catch (cause) {
+      setError(mensajeError(cause));
     } finally {
-      setUploading(false);
+      setWorking(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-
-  const handlePreview = async (v: FormatoVersion) => {
+  const previsualizar = async (version: FormatoVersion) => {
+    if (!formato) return;
     try {
       const token = sessionStorage.getItem('faregasAccessToken');
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const url = `${API_URL}/faregas/formatos/${formato.id}/versiones/${v.id}/preview`;
-      
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      
-      if (v.motor === 'HTML_DINAMICO') {
-        const data = await res.json();
-        if (res.ok) {
-           setPreviewHtml(data.html);
-        } else {
-           throw new Error(data.message || 'Error al obtener preview HTML');
-        }
-      } else {
-        const blob = await res.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `preview_v${v.version}.docx`;
-        a.click();
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${apiUrl}/faregas/formatos/${formato.id}/versiones/${version.id}/preview`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || 'No se pudo obtener la previsualización.');
       }
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error');
+      if (version.motor === 'HTML_DINAMICO') {
+        const payload = await response.json();
+        setPreviewHtml(payload.html);
+        return;
+      }
+      const blobUrl = window.URL.createObjectURL(await response.blob());
+      const enlace = document.createElement('a');
+      enlace.href = blobUrl;
+      enlace.download = `preview_v${version.version}.docx`;
+      enlace.click();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (cause) {
+      setError(mensajeError(cause));
     }
   };
 
-  const handleActivar = async (v: FormatoVersion) => {
-    if (!confirm('¿Seguro que deseas activar esta versión? La anterior pasará a estado RETIRADA.')) return;
+  const activar = async (version: FormatoVersion) => {
+    if (!formato || formato.es_protegido) return;
+    if (!window.confirm('¿Activar esta versión? La versión vigente anterior pasará a RETIRADA.')) return;
+    setWorking(true);
     try {
-      await faregasFormatosApi.activarVersion(formato.id, v.id);
-      await cargar();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error');
+      await faregasFormatosApi.activarVersion(formato.id, version.id);
+      await cargarVersiones(formato.id);
+    } catch (cause) {
+      setError(mensajeError(cause));
+    } finally {
+      setWorking(false);
     }
   };
 
-  const handleEliminar = async (v: FormatoVersion) => {
-    if (!confirm('¿Seguro que deseas eliminar esta versión de forma permanente?')) return;
+  const eliminar = async (version: FormatoVersion) => {
+    if (!formato || formato.es_protegido) return;
+    if (!window.confirm('¿Eliminar esta versión?')) return;
+    setWorking(true);
     try {
-      await faregasFormatosApi.eliminarVersion(formato.id, v.id);
-      await cargar();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al eliminar');
+      await faregasFormatosApi.eliminarVersion(formato.id, version.id);
+      await cargarVersiones(formato.id);
+    } catch (cause) {
+      setError(mensajeError(cause));
+    } finally {
+      setWorking(false);
     }
   };
 
-  if (editorVersion) {
-    if (editorVersion.motor === 'HTML_DINAMICO') {
-      return <FormatoHtmlVariablesEditor formato={formato} version={editorVersion} onBack={() => { setEditorVersion(null); void cargar(); }} />;
-    }
-    return <FormatosVariablesEditor formato={formato} version={editorVersion} onBack={() => { setEditorVersion(null); void cargar(); }} />;
-  }
-
-  const handleCambiarEstado = async () => {
+  const cambiarEstado = async () => {
+    if (!formato || formato.es_protegido) return;
+    if (!window.confirm(`¿${formato.activo ? 'Desactivar' : 'Reactivar'} este formato?`)) return;
+    setWorking(true);
     try {
-      if (!confirm(`¿Seguro que deseas ${formato.activo ? 'desactivar' : 'reactivar'} este formato?`)) return;
       await faregasFormatosApi.cambiarEstado(formato.id);
-      onClose(); // Reload logic handled in parent
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al cambiar estado');
+      const actualizado = await cargarMetadatos(formato.id);
+      onFormatoChanged?.(actualizado);
+    } catch (cause) {
+      setError(mensajeError(cause));
+    } finally {
+      setWorking(false);
     }
   };
+
+  const crearVarianteOperacion = async () => {
+    if (!formato || !contextoOperacion) return;
+    if (!window.confirm(`¿Crear una variante de ${formato.nombre} solo para ${contextoOperacion.nombre}?`)) return;
+    setWorking(true);
+    try {
+      const variante = await faregasConfigApi.crearVarianteFormato(contextoOperacion.id);
+      setFormato(variante);
+      setOperacionesVinculadas([{ ...contextoOperacion, activo: contextoOperacion.activo }]);
+      onFormatoChanged?.(variante);
+    } catch (cause) {
+      setError(mensajeError(cause));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  if (formato && editorVersion) {
+    return editorVersion.motor === 'HTML_DINAMICO'
+      ? <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-slate-100 text-slate-500">Cargando diseñador…</div>}><FormatoHtmlVariablesEditor formato={formato} version={editorVersion} onBack={() => { setEditorVersion(null); void cargarVersiones(formato.id); }} /></Suspense>
+      : <FormatosVariablesEditor formato={formato} version={editorVersion} onBack={() => { setEditorVersion(null); void cargarVersiones(formato.id); }} />;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="flex h-full max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <div>
-            <h2 className="text-xl font-bold text-[#052A79]">Detalle de Formato</h2>
-            <div className="mt-1 flex items-center gap-3 text-sm text-gray-600">
-              <span className="font-semibold">{formato.nombre}</span>
-              <span className="rounded bg-gray-100 px-2 py-0.5 font-mono">{formato.codigo}</span>
-              <span className="rounded bg-gray-100 px-2 py-0.5">{formato.motor}</span>
-              {formato.formato_padre_nombre && (
-                <span className="rounded bg-indigo-100 text-indigo-700 px-2 py-0.5 text-xs font-semibold">
-                  Base: {formato.formato_padre_nombre}
-                </span>
-              )}
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${formato.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {formato.activo ? 'ACTIVO' : 'INACTIVO'}
-              </span>
-              <span className="text-xs font-semibold">
-                {formato.tiene_version_vigente ? <span className="text-green-600">Con Versión Vigente</span> : <span className="text-gray-500">Sin Versión Vigente</span>}
-              </span>
-            </div>
+        {loadingFormato ? (
+          <div className="m-auto text-slate-500">Cargando formato...</div>
+        ) : !formato ? (
+          <div className="m-auto max-w-md text-center">
+            <p className="mb-4 font-semibold text-red-700">{error || 'Formato no disponible.'}</p>
+            <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2">Cerrar</button>
           </div>
-          <div className="flex gap-2">
-            {!formato.es_protegido && (
-              <>
-                <button
-                  onClick={handleCambiarEstado}
-                  className={`rounded-lg border px-4 py-2 text-sm font-semibold ${formato.activo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
-                >
-                  {formato.activo ? 'Desactivar Formato' : 'Reactivar Formato'}
-                </button>
-                <input type="file" ref={fileInputRef} onChange={handleUpload} accept=".docx" className="hidden" />
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
-                >
-                  <FileUp size={16} /> {uploading ? 'Subiendo...' : 'Subir Nueva Versión'}
-                </button>
-              </>
-            )}
-            {formato.es_protegido && formato.motor === 'SISTEMA' && onCreateVariant && (
-              <button
-                onClick={() => onCreateVariant(formato)}
-                className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
-              >
-                + Crear Variante
-              </button>
-            )}
-            <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">
-              Cerrar
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto p-6">
-          {loading ? (
-            <div className="text-center">Cargando...</div>
-          ) : versiones.length === 0 ? (
-            <div className="text-center text-gray-500">No hay versiones subidas.</div>
-          ) : (
-            <div className="space-y-4">
-              {versiones.map(v => (
-                <div key={v.id} className={`rounded-lg border p-4 ${v.estado === 'VIGENTE' ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                        Versión {v.version}
-                        <span className={`rounded px-2 py-0.5 text-xs text-white ${v.estado === 'VIGENTE' ? 'bg-green-600' : v.estado === 'BORRADOR' ? 'bg-yellow-500' : 'bg-gray-400'}`}>
-                          {v.estado}
-                        </span>
-                      </h4>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Subido: {new Date(v.creado_en).toLocaleString()}
-                        {v.vigente_desde && ` | Vigente desde: ${new Date(v.vigente_desde).toLocaleString()}`}
-                      </p>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => void handlePreview(v)}
-                        className="flex items-center gap-1 rounded border px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-100"
-                      >
-                        <Eye size={16} /> Preview
-                      </button>
-                      
-                      {!formato.es_protegido && v.estado === 'BORRADOR' && (
-                        <button 
-                          onClick={() => setEditorVersion(v)}
-                          className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-200"
-                        >
-                          <Edit3 size={16} /> Configurar Variables
-                        </button>
-                      )}
-                      
-                      {!formato.es_protegido && (v.estado === 'BORRADOR' || v.estado === 'RETIRADA') && (
-                        <button 
-                          onClick={() => void handleEliminar(v)}
-                          className="flex items-center gap-1 rounded border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-100"
-                        >
-                          <Trash2 size={16} /> Eliminar
-                        </button>
-                      )}
-
-                      {v.estado !== 'VIGENTE' && (
-                        <button 
-                          onClick={() => void handleActivar(v)}
-                          className="flex items-center gap-1 rounded bg-green-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
-                        >
-                          <PlayCircle size={16} /> Activar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {v.configuracion?.mappings && v.configuracion.mappings.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-xs font-semibold text-gray-500 mb-1">Variables mapeadas:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {v.configuracion.mappings.map((m: any, idx: number) => (
-                          <span key={idx} className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800 border border-blue-200">
-                            {m.variable}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+        ) : (
+          <>
+            <header className="flex flex-col gap-4 border-b px-6 py-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-[#052A79]">Detalle de formato</h2>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                  <b>{formato.nombre}</b>
+                  <span className="rounded bg-slate-100 px-2 py-0.5 font-mono">{formato.codigo}</span>
+                  <span className="rounded bg-slate-100 px-2 py-0.5">{formato.motor}</span>
+                  {formato.formato_padre_nombre && <span className="rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">Base: {formato.formato_padre_nombre}</span>}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${formato.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{formato.activo ? 'ACTIVO' : 'INACTIVO'}</span>
+                  {formato.es_protegido && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">SISTEMA / PROTEGIDO</span>}
                 </div>
-              ))}
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                {!formato.es_protegido && <button type="button" disabled={working} onClick={() => void cambiarEstado()} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">{formato.activo ? 'Desactivar formato' : 'Reactivar formato'}</button>}
+                {!formato.es_protegido && formato.motor === 'HTML_DINAMICO' && <button type="button" disabled={working} onClick={() => void crearVersionHtml()} className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileUp size={16} /> Nueva versión HTML</button>}
+                {!formato.es_protegido && formato.motor === 'DOCX_DINAMICO' && <><input type="file" ref={fileInputRef} onChange={subirVersion} accept=".docx" className="hidden" /><button type="button" disabled={working} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileUp size={16} /> Subir versión DOCX</button></>}
+                {contextoOperacion && (formato.es_protegido || operacionesVinculadas.length > 1) && <button type="button" disabled={working} onClick={() => void crearVarianteOperacion()} className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Crear variante para esta operación</button>}
+                {!contextoOperacion && formato.es_protegido && onCreateVariant && <button type="button" onClick={() => onCreateVariant(formato)} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">Crear variante</button>}
+                <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-semibold text-slate-600">Cerrar</button>
+              </div>
+            </header>
+
+            <div className="flex-1 overflow-auto p-6">
+              {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
+              {operacionesVinculadas.length > 1 && (
+                <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                  <p className="font-bold">Este formato es utilizado por {operacionesVinculadas.length} operaciones.</p>
+                  <p className="mt-1">Activar una nueva versión afectará las futuras emisiones de todas ellas.</p>
+                  <ul className="mt-2 list-inside list-disc">{operacionesVinculadas.map((operacion) => <li key={operacion.id}><span className="font-mono">{operacion.codigo}</span> — {operacion.nombre}</li>)}</ul>
+                </div>
+              )}
+
+              {loadingVersiones ? <div className="py-12 text-center text-slate-500">Cargando versiones...</div> : versiones.length === 0 ? <div className="py-12 text-center text-slate-500">No hay versiones registradas.</div> : (
+                <div className="space-y-4">
+                  {versiones.map((version) => (
+                    <article key={version.id} className={`rounded-lg border p-4 ${version.estado === 'VIGENTE' ? 'border-green-400 bg-green-50' : 'border-slate-200'}`}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h4 className="flex items-center gap-2 font-bold text-slate-800">Versión {version.version}<span className={`rounded px-2 py-0.5 text-xs text-white ${version.estado === 'VIGENTE' ? 'bg-green-600' : version.estado === 'BORRADOR' ? 'bg-amber-500' : 'bg-slate-400'}`}>{version.estado}</span></h4>
+                          <p className="mt-1 text-xs text-slate-500">Creada: {new Date(version.creado_en).toLocaleString()}{version.vigente_desde && ` · Vigente desde: ${new Date(version.vigente_desde).toLocaleString()}`}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={() => void previsualizar(version)} className="flex items-center gap-1 rounded border px-3 py-1.5 text-sm font-semibold"><Eye size={16} /> Preview</button>
+                          {version.motor === 'HTML_DINAMICO' && <button type="button" onClick={() => setEditorVersion(version)} className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700"><Edit3 size={16} /> {version.estado === 'BORRADOR' ? 'Diseñar certificado' : 'Ver diseño'}</button>}
+                          {version.motor === 'DOCX_DINAMICO' && !formato.es_protegido && version.estado === 'BORRADOR' && <button type="button" onClick={() => setEditorVersion(version)} className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700"><Edit3 size={16} /> Configurar variables</button>}
+                          {!formato.es_protegido && version.estado !== 'VIGENTE' && <button type="button" disabled={working} onClick={() => void eliminar(version)} className="flex items-center gap-1 rounded border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600"><Trash2 size={16} /> Eliminar</button>}
+                          {!formato.es_protegido && version.estado === 'BORRADOR' && <button type="button" disabled={working} onClick={() => void activar(version)} className="flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white"><PlayCircle size={16} /> Activar versión</button>}
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
-      
-      {/* PREVIEW HTML MODAL */}
+
       {previewHtml !== null && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
-          <div className="flex h-full max-h-[95vh] w-full max-w-5xl flex-col bg-white rounded shadow-2xl">
-            <div className="flex justify-between items-center bg-gray-100 p-3 border-b">
-              <h3 className="font-bold text-gray-800">Previsualización (A4)</h3>
-              <button onClick={() => setPreviewHtml(null)} className="px-4 py-1 bg-red-600 text-white rounded hover:bg-red-700">Cerrar</button>
-            </div>
-            <div className="flex-1 bg-gray-50 p-4 overflow-auto flex justify-center items-start">
-               <div className="w-[210mm] min-h-[297mm] bg-white shadow-xl relative scale-[0.8] origin-top">
-                  <iframe 
-                    title="preview"
-                    srcDoc={previewHtml}
-                    className="w-full h-full border-none pointer-events-none"
-                    style={{ minHeight: '297mm' }}
-                  />
-               </div>
-            </div>
+          <div className="flex h-full max-h-[95vh] w-full max-w-5xl flex-col rounded bg-white shadow-2xl">
+            <header className="flex items-center justify-between border-b bg-slate-100 p-3"><h3 className="font-bold">Previsualización</h3><button type="button" onClick={() => setPreviewHtml(null)} className="rounded bg-red-600 px-4 py-1 text-white">Cerrar</button></header>
+            <div className="flex flex-1 justify-center overflow-auto bg-slate-50 p-4"><iframe title="Previsualización del formato" srcDoc={previewHtml} className="min-h-[297mm] w-[210mm] border-0 bg-white shadow-xl" /></div>
           </div>
         </div>
       )}
