@@ -1,4 +1,5 @@
 import type { TipoCertificadoFaregas } from '../../types/faregas';
+import type { CampoFormatoDinamicoFaregas } from '../../types/faregas-api';
 
 type DatosAsistente = {
   tipoCertificado: TipoCertificadoFaregas;
@@ -12,6 +13,13 @@ type DatosAsistente = {
 };
 
 const vacio = (valor: unknown) => valor === null || valor === undefined || String(valor).trim() === '';
+
+export const validarFormularioFormatoDinamico = (
+  campos: CampoFormatoDinamicoFaregas[],
+  valores: Record<string, string>
+) => campos
+  .filter((campo) => campo.requerido && vacio(valores[campo.key]))
+  .map((campo) => `Complete ${campo.label.toLocaleLowerCase('es-PE')}.`);
 
 export const esRucValido = (valor: unknown): boolean => {
   const ruc = String(valor ?? '').trim();

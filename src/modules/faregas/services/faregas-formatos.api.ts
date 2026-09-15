@@ -74,10 +74,27 @@ export const faregasFormatosApi = {
     return res.json();
   },
 
-  crearVersionHtml: async (formatoId: number): Promise<{ version: FormatoVersion }> => {
+  crearVersionHtml: async (formatoId: number, origen: 'PLANTILLA_FAREGAS' | 'ULTIMA_VERSION' = 'PLANTILLA_FAREGAS'): Promise<{ version: FormatoVersion }> => {
     return faregasFetch(`/formatos/${formatoId}/versiones/html`, {
       method: 'POST',
+      body: JSON.stringify({ origen }),
     }) as Promise<{ version: FormatoVersion }>;
+  },
+
+  importarWordComoHtml: async (formatoId: number, file: File): Promise<{ version: FormatoVersion; advertencias: string[] }> => {
+    const formData = new FormData();
+    formData.append('archivo', file);
+    const token = sessionStorage.getItem('faregasAccessToken');
+    const res = await fetch(`${API_URL}/faregas/formatos/${formatoId}/versiones/html/importar-docx`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'No se pudo convertir el documento Word a HTML.');
+    }
+    return res.json() as Promise<{ version: FormatoVersion; advertencias: string[] }>;
   },
 
   obtenerOperacionesPorFormato: async (formatoId: number): Promise<{ id: number; codigo: string; nombre: string; activo: boolean }[]> => {
@@ -102,6 +119,12 @@ export const faregasFormatosApi = {
 
   activarVersion: async (formatoId: number, versionId: number): Promise<void> => {
     return faregasFetch(`/formatos/${formatoId}/versiones/${versionId}/activar`, {
+      method: 'PUT',
+    });
+  },
+
+  desactivarVersion: async (formatoId: number, versionId: number): Promise<void> => {
+    return faregasFetch(`/formatos/${formatoId}/versiones/${versionId}/desactivar`, {
       method: 'PUT',
     });
   },

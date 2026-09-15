@@ -435,4 +435,25 @@ export interface GuardarTallerFaregasRequest {
   numeroAutorizacion?: NullableText;
   observaciones?: NullableText;
   fechaProximaInspeccion?: NullableText;
+  valores?: Record<string, string | null>;
+}
+
+export interface CampoFormatoDinamicoFaregas {
+  key: string;
+  label: string;
+  grupo: string;
+  tipo: 'text' | 'date';
+  requerido: boolean;
+  valor: string;
+}
+
+export interface FormularioFormatoDinamicoFaregas {
+  formatoId: number;
+  formatoNombre: string;
+  versionId: number;
+  version: number;
+  versionEstado: 'BORRADOR' | 'VIGENTE' | 'INACTIVA';
+  motor: 'HTML_DINAMICO' | 'DOCX_DINAMICO';
+  campos: CampoFormatoDinamicoFaregas[];
+  valores: Record<string, string>;
 }

@@ -1,4 +1,4 @@
-import { Edit3, Eye, FileUp, PlayCircle, Trash2 } from 'lucide-react';
+import { Copy, Edit3, Eye, FileText, FileUp, PauseCircle, PlayCircle, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { faregasConfigApi, type ServicioConfiguracionFaregas } from '../../../services/faregas-config.api';
 import { faregasFormatosApi, type Formato, type FormatoVersion } from '../../../services/faregas-formatos.api';
@@ -41,7 +41,9 @@ export default function FormatoDetalleModal({
   const [error, setError] = useState('');
   const [editorVersion, setEditorVersion] = useState<FormatoVersion | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [showVersionSource, setShowVersionSource] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importWordInputRef = useRef<HTMLInputElement>(null);
 
   const cargarMetadatos = async (id: number) => {
     const formatos = await faregasFormatosApi.listarFormatos();
@@ -100,17 +102,40 @@ export default function FormatoDetalleModal({
     return () => { cancelado = true; };
   }, [formato?.id]);
 
-  const crearVersionHtml = async () => {
+  const crearVersionHtml = async (origen: 'PLANTILLA_FAREGAS' | 'ULTIMA_VERSION') => {
     if (!formato) return;
     setWorking(true);
     setError('');
     try {
-      await faregasFormatosApi.crearVersionHtml(formato.id);
+      const resultado = await faregasFormatosApi.crearVersionHtml(formato.id, origen);
+      setShowVersionSource(false);
       await cargarVersiones(formato.id);
+      setEditorVersion(resultado.version);
     } catch (cause) {
       setError(mensajeError(cause));
     } finally {
       setWorking(false);
+    }
+  };
+
+  const importarWordComoHtml = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = event.target.files?.[0];
+    if (!archivo || !formato) return;
+    setWorking(true);
+    setError('');
+    try {
+      const resultado = await faregasFormatosApi.importarWordComoHtml(formato.id, archivo);
+      setShowVersionSource(false);
+      await cargarVersiones(formato.id);
+      if (resultado.advertencias.length > 0) {
+        window.alert(`El Word fue convertido. Revisa estos detalles:\n\n${resultado.advertencias.join('\n')}`);
+      }
+      setEditorVersion(resultado.version);
+    } catch (cause) {
+      setError(mensajeError(cause));
+    } finally {
+      setWorking(false);
+      if (importWordInputRef.current) importWordInputRef.current.value = '';
     }
   };
 
@@ -168,6 +193,21 @@ export default function FormatoDetalleModal({
     setWorking(true);
     try {
       await faregasFormatosApi.activarVersion(formato.id, version.id);
+      await cargarVersiones(formato.id);
+    } catch (cause) {
+      setError(mensajeError(cause));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const desactivar = async (version: FormatoVersion) => {
+    if (!formato || formato.es_protegido || version.estado !== 'VIGENTE') return;
+    if (!window.confirm('¿Desactivar esta versión? Pasará a RETIRADA y no se podrán realizar nuevas emisiones con este formato hasta activar otra versión.')) return;
+    setWorking(true);
+    setError('');
+    try {
+      await faregasFormatosApi.desactivarVersion(formato.id, version.id);
       await cargarVersiones(formato.id);
     } catch (cause) {
       setError(mensajeError(cause));
@@ -253,7 +293,7 @@ export default function FormatoDetalleModal({
               </div>
               <div className="flex flex-wrap justify-end gap-2">
                 {!formato.es_protegido && <button type="button" disabled={working} onClick={() => void cambiarEstado()} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">{formato.activo ? 'Desactivar formato' : 'Reactivar formato'}</button>}
-                {!formato.es_protegido && formato.motor === 'HTML_DINAMICO' && <button type="button" disabled={working} onClick={() => void crearVersionHtml()} className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileUp size={16} /> Nueva versión HTML</button>}
+                {!formato.es_protegido && formato.motor === 'HTML_DINAMICO' && <button type="button" disabled={working} onClick={() => setShowVersionSource(true)} className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileUp size={16} /> Nueva versión</button>}
                 {!formato.es_protegido && formato.motor === 'DOCX_DINAMICO' && <><input type="file" ref={fileInputRef} onChange={subirVersion} accept=".docx" className="hidden" /><button type="button" disabled={working} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileUp size={16} /> Subir versión DOCX</button></>}
                 {contextoOperacion && (formato.es_protegido || operacionesVinculadas.length > 1) && <button type="button" disabled={working} onClick={() => void crearVarianteOperacion()} className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Crear variante para esta operación</button>}
                 {!contextoOperacion && formato.es_protegido && onCreateVariant && <button type="button" onClick={() => onCreateVariant(formato)} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">Crear variante</button>}
@@ -286,6 +326,7 @@ export default function FormatoDetalleModal({
                           {version.motor === 'DOCX_DINAMICO' && !formato.es_protegido && version.estado === 'BORRADOR' && <button type="button" onClick={() => setEditorVersion(version)} className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700"><Edit3 size={16} /> Configurar variables</button>}
                           {!formato.es_protegido && version.estado !== 'VIGENTE' && <button type="button" disabled={working} onClick={() => void eliminar(version)} className="flex items-center gap-1 rounded border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600"><Trash2 size={16} /> Eliminar</button>}
                           {!formato.es_protegido && version.estado === 'BORRADOR' && <button type="button" disabled={working} onClick={() => void activar(version)} className="flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white"><PlayCircle size={16} /> Activar versión</button>}
+                          {!formato.es_protegido && version.estado === 'VIGENTE' && <button type="button" disabled={working} onClick={() => void desactivar(version)} className="flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800"><PauseCircle size={16} /> Desactivar versión</button>}
                         </div>
                       </div>
                     </article>
@@ -302,6 +343,39 @@ export default function FormatoDetalleModal({
           <div className="flex h-full max-h-[95vh] w-full max-w-5xl flex-col rounded bg-white shadow-2xl">
             <header className="flex items-center justify-between border-b bg-slate-100 p-3"><h3 className="font-bold">Previsualización</h3><button type="button" onClick={() => setPreviewHtml(null)} className="rounded bg-red-600 px-4 py-1 text-white">Cerrar</button></header>
             <div className="flex flex-1 justify-center overflow-auto bg-slate-50 p-4"><iframe title="Previsualización del formato" srcDoc={previewHtml} className="min-h-[297mm] w-[210mm] border-0 bg-white shadow-xl" /></div>
+          </div>
+        </div>
+      )}
+
+      {showVersionSource && formato && (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-black/60 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-[#052A79]">Crear versión HTML</h3>
+            <p className="mt-1 text-sm text-slate-600">Elige cómo quieres iniciar el nuevo borrador del certificado.</p>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <button type="button" disabled={working} onClick={() => void crearVersionHtml('PLANTILLA_FAREGAS')} className="rounded-xl border-2 border-blue-200 bg-blue-50 p-5 text-left transition hover:border-blue-600 disabled:opacity-50">
+                <FileText className="text-blue-700" size={28} />
+                <span className="mt-3 block font-bold text-blue-950">Usar plantilla FAREGAS</span>
+                <span className="mt-1 block text-sm leading-5 text-slate-600">Crea la hoja A4 con cabecera, título, tabla de taller y variables iniciales.</span>
+              </button>
+
+              <button type="button" disabled={working} onClick={() => importWordInputRef.current?.click()} className="rounded-xl border-2 border-slate-200 p-5 text-left transition hover:border-blue-600 hover:bg-slate-50 disabled:opacity-50">
+                <FileUp className="text-slate-700" size={28} />
+                <span className="mt-3 block font-bold text-slate-900">Importar Word (.docx)</span>
+                <span className="mt-1 block text-sm leading-5 text-slate-600">Convierte textos, tablas y estilos compatibles a un borrador HTML editable.</span>
+              </button>
+              <input ref={importWordInputRef} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={importarWordComoHtml} className="hidden" />
+            </div>
+
+            {versiones.length > 0 && (
+              <button type="button" disabled={working} onClick={() => void crearVersionHtml('ULTIMA_VERSION')} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-800 disabled:opacity-50">
+                <Copy size={17} /> Copiar la última versión HTML
+              </button>
+            )}
+
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">La conversión desde Word puede requerir ajustes visuales. Las imágenes se indican como pendientes hasta implementar la galería documental.</div>
+            <div className="mt-5 flex justify-end"><button type="button" disabled={working} onClick={() => setShowVersionSource(false)} className="rounded border px-4 py-2 text-sm font-semibold text-slate-700">Cancelar</button></div>
           </div>
         </div>
       )}

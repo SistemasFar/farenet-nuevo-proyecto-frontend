@@ -12,7 +12,7 @@ import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import { TallerStep } from './components/NuevoCertificado/TallerStep';
-import type { GuardarTallerFaregasRequest } from '../../types/faregas-api';
+import type { FormularioFormatoDinamicoFaregas } from '../../types/faregas-api';
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
@@ -21,7 +21,7 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { validarDatosFacturacionBasica, validarDatosIniciales, validarExpedienteTecnico } from './faregas-wizard.validation';
+import { validarDatosFacturacionBasica, validarDatosIniciales, validarExpedienteTecnico, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 
 
@@ -214,7 +214,10 @@ export function NuevoCertificadoView() {
   const [formGlp, setFormGlp] = useState<any>({});
   const [formGnv, setFormGnv] = useState<any>({});
   const [formConformidad, setFormConformidad] = useState<any>({});
-  const [formTaller, setFormTaller] = useState<GuardarTallerFaregasRequest>({});
+  const [formatoFormulario, setFormatoFormulario] = useState<FormularioFormatoDinamicoFaregas | null>(null);
+  const [formatoValores, setFormatoValores] = useState<Record<string, string>>({});
+  const [formatoFormularioLoading, setFormatoFormularioLoading] = useState(false);
+  const [formatoFormularioError, setFormatoFormularioError] = useState('');
 
   const [titulares, setTitulares] = useState<TitularState[]>([]);
   const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
@@ -309,7 +312,7 @@ export function NuevoCertificadoView() {
       { id: 'facturacion', label: 'Facturación', icon: User },
       { id: 'verificacion', label: 'Verificación / Emisión', icon: CheckCircle2 }
     ];
-  }, []);
+  }, [formCaja.tipo_flujo]);
 
   const indicePaso = (paso?: string) => ({
     DATOS_INICIALES: 0,
@@ -367,9 +370,16 @@ export function NuevoCertificadoView() {
               tarifaCodigo: res.data.tarifaCodigo || prev.tarifaCodigo,
               servicioCodigo: res.data.servicio?.codigo || prev.servicioCodigo,
               modalidadCertificado: res.data.servicio?.modalidad || prev.modalidadCertificado,
+              tipo_flujo: res.data.servicio?.tipoFlujo || prev.tipo_flujo,
               placa: res.data.vehiculo?.placa || prev.placa,
               categoria: res.data.vehiculo?.categoria || prev.categoria,
             }));
+          }
+
+          if (res.data.formatoFormulario?.motor === 'HTML_DINAMICO') {
+            setFormatoFormulario(res.data.formatoFormulario as FormularioFormatoDinamicoFaregas);
+            setFormatoValores(res.data.formatoFormulario.valores || {});
+            setFormatoFormularioError('');
           }
 
           if (res.data.vehiculo && (res.data.vehiculo.marca || res.data.vehiculo.clase || res.data.vehiculo.modelo || res.data.vehiculo.vin)) {
@@ -550,15 +560,40 @@ export function NuevoCertificadoView() {
     }
   };
 
+  const cargarFormularioFormato = async (idBorrador: number) => {
+    try {
+      setFormatoFormularioLoading(true);
+      setFormatoFormularioError('');
+      const respuesta = await faregasCertificadosApi.obtenerBorradorCompleto(idBorrador);
+      const formulario = respuesta.data?.formatoFormulario as FormularioFormatoDinamicoFaregas | null;
+      if (!formulario || formulario.motor !== 'HTML_DINAMICO') {
+        setFormatoFormulario(null);
+        setFormatoFormularioError('El servicio seleccionado no tiene una versión HTML con variables para construir este formulario.');
+        return;
+      }
+      setFormatoFormulario(formulario);
+      setFormatoValores(formulario.valores || {});
+    } catch (err: any) {
+      setFormatoFormularioError(err.message || 'No se pudo leer el formato del certificado.');
+    } finally {
+      setFormatoFormularioLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (currentStepIndex === 0 && !maestros) {
       cargarMaestros();
     } else if (currentStepIndex === 1 && !maestrosPago) {
       cargarMaestrosPago();
-    } else if (currentStepIndex === 2 && !maestrosVehiculo) {
+    } else if (currentStepIndex === 2 && formCaja.tipo_flujo !== 'TALLER_INSPECCION' && !maestrosVehiculo) {
       cargarMaestrosVehiculo();
     }
-  }, [currentStepIndex, maestros, maestrosPago, maestrosVehiculo]);
+  }, [currentStepIndex, maestros, maestrosPago, maestrosVehiculo, formCaja.tipo_flujo]);
+
+  useEffect(() => {
+    if (currentStepIndex !== 2 || formCaja.tipo_flujo !== 'TALLER_INSPECCION' || !certificadoId || formatoFormulario) return;
+    void cargarFormularioFormato(certificadoId);
+  }, [currentStepIndex, formCaja.tipo_flujo, certificadoId, formatoFormulario]);
 
   // Sincronizar Marca con Marca Carrocería
   useEffect(() => {
@@ -824,7 +859,8 @@ export function NuevoCertificadoView() {
   };
 
   const guardarPasoTaller = async (idBorrador: number) => {
-    await faregasCertificadosApi.guardarTaller(idBorrador, formTaller);
+    if (!formatoFormulario) throw new Error(formatoFormularioError || 'No se pudo cargar el formulario del formato.');
+    await faregasCertificadosApi.guardarTaller(idBorrador, { valores: formatoValores });
   };
 
   const guardarPasoVehiculo = async (idBorrador: number) => {
@@ -941,6 +977,7 @@ export function NuevoCertificadoView() {
     if (!certificadoId || loading || currentStepIndex !== 2) return;
     const timer = window.setTimeout(() => {
       if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
+        if (!formatoFormulario) return;
         void encolarAutosave(() => guardarPasoTaller(certificadoId)).catch(() => undefined);
       } else {
         void encolarAutosave(() => guardarPasoVehiculo(certificadoId)).catch(() => undefined);
@@ -949,7 +986,7 @@ export function NuevoCertificadoView() {
     return () => window.clearTimeout(timer);
     // Los objetos representan el bloque completo que se está editando.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, currentStepIndex, formVehiculo, formGlp, formGnv, formConformidad, titulares]);
+  }, [certificadoId, loading, currentStepIndex, formVehiculo, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores, titulares]);
 
   useEffect(() => {
     if (!certificadoId || loading || currentStepIndex !== 1 || precioTotal <= 0) return;
@@ -1020,17 +1057,22 @@ export function NuevoCertificadoView() {
       }
     } else if (currentStepIndex < STEPS.length - 1) {
       if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
+        const erroresExpediente = formCaja.tipo_flujo === 'TALLER_INSPECCION'
+          ? (formatoFormulario
+              ? validarFormularioFormatoDinamico(formatoFormulario.campos, formatoValores)
+              : [formatoFormularioError || 'No se pudo cargar el formulario dinámico del formato.'])
+          : validarExpedienteTecnico({
+              tipoCertificado: formCaja.tipoCertificado as TipoCertificadoFaregas,
+              modalidad: formCaja.modalidadCertificado,
+              caja: formCaja,
+              vehiculo: formVehiculo,
+              titulares,
+              gnv: formGnv,
+              glp: formGlp,
+              conformidad: formConformidad,
+            });
         const errores = [
-          ...validarExpedienteTecnico({
-            tipoCertificado: formCaja.tipoCertificado as TipoCertificadoFaregas,
-            modalidad: formCaja.modalidadCertificado,
-            caja: formCaja,
-            vehiculo: formVehiculo,
-            titulares,
-            gnv: formGnv,
-            glp: formGlp,
-            conformidad: formConformidad,
-          }),
+          ...erroresExpediente,
           ...validarDatosFacturacionBasica(formFacturacion),
         ];
         if (mostrarErroresPaso(errores)) return;
@@ -1502,9 +1544,11 @@ export function NuevoCertificadoView() {
 
         {STEPS[currentStepIndex].id === 'vehiculo' && formCaja.tipo_flujo === 'TALLER_INSPECCION' && (
           <TallerStep
-            formTaller={formTaller}
-            setFormTaller={setFormTaller}
-            certificadoId={certificadoId}
+            formulario={formatoFormulario}
+            valores={formatoValores}
+            setValores={setFormatoValores}
+            cargando={formatoFormularioLoading}
+            error={formatoFormularioError}
           />
         )}
         {STEPS[currentStepIndex].id === 'pago' && (
