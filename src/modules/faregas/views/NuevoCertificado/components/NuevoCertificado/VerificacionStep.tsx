@@ -109,7 +109,7 @@ export function VerificacionStep({
             msg = 'El borrador ya no es válido para emisión. Los datos podrían haber cambiado.';
             validar();
           } else if (e.message === 'NO_EXISTE_RANGO_ACTIVO') {
-            msg = 'No existe un rango de correlativos activo para esta sede y tipo de certificado.';
+            msg = 'No existe un rango disponible para esta operación. Configura un rango en Configuración -> Correlativos.';
           } else if (e.message === 'RANGO_AGOTADO') {
             msg = 'El rango de correlativos asignado se encuentra agotado.';
           } else if (e.message === 'ESTADO_INVALIDO' || e.message === 'CERTIFICADO_NOT_FOUND') {

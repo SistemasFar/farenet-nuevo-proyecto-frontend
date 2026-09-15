@@ -1,43 +1,37 @@
-import { Edit, Lock } from 'lucide-react';
+import { Edit, Lock, History } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { faregasCertificadosApi } from '../../../services/faregas-certificados.api';
 import { faregasSeriesApi } from '../../../services/faregas-series.api';
 
-interface OperacionAsociada {
-  servicioId: number;
-  codigo: string;
-  nombre: string;
-  formatoId: number;
-}
-
-interface OperacionAsociada {
-  servicioId: number;
-  codigo: string;
-  nombre: string;
-  formatoId: number;
-}
-
-interface CorrelativoRango {
+interface CorrelativoHistorial {
   id: number;
-  plantaKey: string;
-  plantaNombre: string;
-  tipoClave: string;
-  tipoBase: string;
-  modalidad: 'INICIAL' | 'ANUAL' | 'UNICA';
-  tipoCodigo: string;
-  tipoNombre: string;
   nroInicio: number;
   nroActual: number;
   nroMaximo: number;
   activo: boolean;
   disponibles: number;
-  agotado: boolean;
   fechaAsignacion: string;
   fechaCierre: string | null;
-  operacionesAsociadas?: OperacionAsociada[];
-  sinRango?: boolean;
-  operacionesAsociadas?: OperacionAsociada[];
-  sinRango?: boolean;
+}
+
+interface CorrelativoOperacion {
+  servicioId: number;
+  servicioCodigo: string;
+  servicioNombre: string;
+  plantaKey: string;
+  plantaNombre: string;
+  tipoCertificadoClave: string;
+  modalidad: 'INICIAL' | 'ANUAL' | 'UNICA';
+  tipoNumeracionNombre: string;
+  prefijo: string;
+  rangoId: number | null;
+  nroInicio: number | null;
+  nroActual: number | null;
+  nroMaximo: number | null;
+  disponibles: number | null;
+  compartido: boolean;
+  historial: CorrelativoHistorial[];
+  estado: 'ACTIVO' | 'PROXIMO_A_AGOTARSE' | 'AGOTADO' | 'SIN_RANGO' | 'HISTORICO';
 }
 
 const mensajeError = (error: unknown, alternativo: string) =>
@@ -56,17 +50,18 @@ export default function TabCorrelativos() {
   const [plantaKey, setPlantaKey] = useState('');
   const [tipo, setTipo] = useState('');
   
-  const [rangos, setRangos] = useState<CorrelativoRango[]>([]);
+  const [rangos, setRangos] = useState<CorrelativoOperacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
   const [modal, setModal] = useState<boolean>(false);
-  const [rangoEditando, setRangoEditando] = useState<CorrelativoRango | null>(null);
+  const [rangoEditando, setRangoEditando] = useState<CorrelativoOperacion | null>(null);
   const [formRango, setFormRango] = useState({ plantaKey: '', tipoCertificadoClave: '', nroInicio: 1, nroMaximo: 100 });
   const [modalSaving, setModalSaving] = useState(false);
+  const [historialAbierto, setHistorialAbierto] = useState<CorrelativoOperacion | null>(null);
 
-  const rangosAgotados = rangos.filter((r) => r.activo && r.disponibles <= 0);
-  const rangosPorAgotarse = rangos.filter((r) => r.activo && r.disponibles > 0 && r.disponibles <= 10);
+  const rangosAgotados = rangos.filter((r) => r.estado === 'AGOTADO');
+  const rangosPorAgotarse = rangos.filter((r) => r.estado === 'PROXIMO_A_AGOTARSE');
 
   const cargarCorrelativos = async () => {
     try {
@@ -123,8 +118,8 @@ export default function TabCorrelativos() {
     }
     try {
       setModalSaving(true);
-      if (rangoEditando) {
-        await faregasCertificadosApi.actualizarRangoCorrelativo(rangoEditando.id, {
+      if (rangoEditando && rangoEditando.rangoId) {
+        await faregasCertificadosApi.actualizarRangoCorrelativo(rangoEditando.rangoId, {
           nroInicio: formRango.nroInicio,
           nroMaximo: formRango.nroMaximo
         });
@@ -141,24 +136,24 @@ export default function TabCorrelativos() {
     }
   };
 
-  const abrirNuevoRango = () => {
+  const abrirAsignarRango = (op: CorrelativoOperacion) => {
     setRangoEditando(null);
     setFormRango({
-      plantaKey: plantaKey || (sedes[0]?.key || ''),
-      tipoCertificadoClave: tipo || (tipos[0]?.clave || ''),
+      plantaKey: op.plantaKey,
+      tipoCertificadoClave: op.tipoCertificadoClave,
       nroInicio: 1,
       nroMaximo: 100
     });
     setModal(true);
   };
 
-  const abrirEditarRango = (rango: CorrelativoRango) => {
-    setRangoEditando(rango);
+  const abrirEditarRango = (op: CorrelativoOperacion) => {
+    setRangoEditando(op);
     setFormRango({
-      plantaKey: rango.plantaKey,
-      tipoCertificadoClave: rango.tipoClave,
-      nroInicio: rango.nroInicio,
-      nroMaximo: rango.nroMaximo
+      plantaKey: op.plantaKey,
+      tipoCertificadoClave: op.tipoCertificadoClave,
+      nroInicio: op.nroInicio || 1,
+      nroMaximo: op.nroMaximo || 100
     });
     setModal(true);
   };
@@ -169,8 +164,7 @@ export default function TabCorrelativos() {
     setRangoEditando(null);
   };
 
-  const cerrarRango = async (id: number, activo: boolean) => {
-    if (!activo) return;
+  const cerrarRango = async (id: number) => {
     if (!confirm('¿Deseas cerrar este rango activo de forma manual? Los números restantes se perderán.')) return;
     try {
       await faregasCertificadosApi.cerrarRangoCorrelativo(id);
@@ -183,20 +177,20 @@ export default function TabCorrelativos() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
       <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-        <strong>Rangos de certificados por sede y modalidad.</strong> Cada rango se asigna a una combinación exacta, por ejemplo Independencia + GNV Inicial. La primera previsualización reserva un correlativo real y la emisión reutiliza ese mismo número.
+        <strong>Rangos de certificados por sede y operación.</strong> Cada rango se asigna a una combinación exacta, por ejemplo Independencia + GNV Inicial. La primera previsualización reserva un correlativo real y la emisión reutiliza ese mismo número.
       </div>
 
       {rangosAgotados.length > 0 && (
         <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800" role="alert">
-          <strong>Atención: {rangosAgotados.length === 1 ? 'hay un rango agotado' : `hay ${rangosAgotados.length} rangos agotados`}.</strong>{' '}
-          Ya no se podrán reservar nuevos certificados para {rangosAgotados.map((r) => `${r.plantaNombre} / ${r.tipoNombre}`).join(', ')}. Usa <strong>Editar</strong> para ampliar el número final o cierra el rango y asigna uno nuevo.
+          <strong>Atención: {rangosAgotados.length === 1 ? 'hay una operación con rango agotado' : `hay ${rangosAgotados.length} operaciones con rango agotado`}.</strong>{' '}
+          Ya no se podrán reservar nuevos certificados para {rangosAgotados.map((r) => `${r.plantaNombre} / ${r.servicioNombre}`).join(', ')}. Usa <strong>Asignar nuevo rango</strong> para continuar operando.
         </div>
       )}
 
       {rangosPorAgotarse.length > 0 && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
           <strong>Correlativos próximos a agotarse:</strong>{' '}
-          {rangosPorAgotarse.map((r) => `${r.plantaNombre} / ${r.tipoNombre} (${r.disponibles} disponibles)`).join(', ')}.
+          {rangosPorAgotarse.map((r) => `${r.plantaNombre} / ${r.servicioNombre} (${r.disponibles} disponibles)`).join(', ')}.
         </div>
       )}
       
@@ -216,9 +210,6 @@ export default function TabCorrelativos() {
           </select>
         </div>
         <div className="flex-1"></div>
-        <button onClick={abrirNuevoRango} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-bold text-white shadow hover:bg-blue-800">
-          + ASIGNAR NUEVO RANGO
-        </button>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -227,7 +218,7 @@ export default function TabCorrelativos() {
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
               <tr>
                 <th className="p-3 font-bold uppercase">Sede</th>
-                <th className="p-3 font-bold uppercase">Certificado / prefijo</th>
+                <th className="p-3 font-bold uppercase">Operación / Certificado</th>
                 <th className="p-3 font-bold uppercase text-center">Rango Asignado</th>
                 <th className="p-3 font-bold uppercase text-center">N° Actual</th>
                 <th className="p-3 font-bold uppercase text-center">Disponibles</th>
@@ -241,58 +232,58 @@ export default function TabCorrelativos() {
               ) : error ? (
                 <tr><td colSpan={7} className="p-8 text-center text-red-500">{error}</td></tr>
               ) : rangos.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-slate-500">No hay rangos de correlativos registrados para los filtros seleccionados.</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-slate-500">No hay operaciones de certificados para los filtros seleccionados.</td></tr>
               ) : (
                 rangos.map((r) => (
-                  <tr key={r.id} className={`border-b border-slate-100 ${r.activo && r.agotado ? 'bg-red-50' : r.activo ? 'bg-white' : 'bg-slate-50 text-slate-400'}`}>
+                  <tr key={`${r.plantaKey}-${r.servicioId}`} className={`border-b border-slate-100 ${r.estado === 'AGOTADO' ? 'bg-red-50' : r.rangoId ? 'bg-white' : 'bg-slate-50 text-slate-400'}`}>
                     <td className="p-3 font-bold">{r.plantaNombre}</td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
-                        <div className="font-bold text-slate-700">{r.tipoNombre}</div>
-                        {r.sinRango && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">SIN RANGO</span>}
+                        <div className="font-bold text-slate-700">{r.servicioNombre}</div>
+                        {r.compartido && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700" title="Comparte numeración con otras operaciones">COMPARTIDO</span>}
                       </div>
-                      <span className="mt-1 inline-block rounded border border-slate-200 bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-slate-600">DG-{r.tipoCodigo}</span>
-                      
-                      {r.operacionesAsociadas && r.operacionesAsociadas.length > 0 && (
-                        <details className="mt-2 text-xs group">
-                          <summary className="cursor-pointer font-semibold text-[#052A79] hover:underline list-none flex items-center gap-1">
-                            <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                            {r.sinRango ? 'Requerido por ' : 'Operaciones: '}
-                            {r.operacionesAsociadas.length} {r.operacionesAsociadas.length === 1 ? 'operación' : 'operaciones'}
-                          </summary>
-                          <ul className="mt-1.5 ml-1 space-y-1 text-slate-600 border-l-2 border-slate-200 pl-2">
-                            {r.operacionesAsociadas.map(op => (
-                              <li key={op.servicioId} title={`Formato ID: ${op.formatoId}`}>
-                                • <span className="font-mono text-[10px] bg-slate-100 px-1 rounded border border-slate-200">{op.codigo}</span> - {op.nombre}
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
+                      <span className="mt-1 inline-block rounded border border-slate-200 bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-slate-600">{r.tipoNumeracionNombre} — {r.prefijo}</span>
                     </td>
-                    <td className="p-3 text-center font-mono font-bold text-[#052A79]">{r.nroInicio} - {r.nroMaximo}</td>
-                    <td className="p-3 text-center font-mono font-bold">{r.nroActual}</td>
-                    <td className={`p-3 text-center font-bold ${r.activo && r.disponibles <= 0 ? 'text-red-600' : r.activo && r.disponibles <= 10 ? 'text-amber-600' : ''}`}>{r.disponibles}</td>
+                    <td className="p-3 text-center font-mono font-bold text-[#052A79]">
+                      {r.nroInicio ? `${r.nroInicio} - ${r.nroMaximo}` : '-'}
+                    </td>
+                    <td className="p-3 text-center font-mono font-bold">{r.nroActual ?? '-'}</td>
+                    <td className={`p-3 text-center font-bold ${r.disponibles != null && r.disponibles <= 0 ? 'text-red-600' : r.disponibles != null && r.disponibles <= 10 ? 'text-amber-600' : ''}`}>{r.disponibles ?? '-'}</td>
                     <td className="p-3 text-center">
-                      {r.activo && r.agotado ? (
+                      {r.estado === 'AGOTADO' ? (
                         <span className="rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-700 border border-red-200">AGOTADO</span>
-                      ) : r.activo ? (
-                        <span className="rounded bg-green-100 px-2 py-1 text-xs font-bold text-green-700 border border-green-200">ACTIVO</span>
+                      ) : r.estado === 'SIN_RANGO' ? (
+                        <span className="rounded bg-slate-200 px-2 py-1 text-xs font-bold text-slate-600 border border-slate-300">SIN RANGO</span>
+                      ) : r.estado === 'HISTORICO' ? (
+                        <span className="rounded bg-slate-200 px-2 py-1 text-xs font-bold text-slate-600 border border-slate-300">HISTÓRICO</span>
                       ) : (
-                        <span className="rounded bg-slate-200 px-2 py-1 text-xs font-bold text-slate-600 border border-slate-300">CERRADO</span>
+                        <span className="rounded bg-green-100 px-2 py-1 text-xs font-bold text-green-700 border border-green-200">ACTIVO</span>
                       )}
                     </td>
                     <td className="p-3 text-center">
-                      {r.activo && (
-                        <div className="flex justify-center gap-2">
-                          <button onClick={() => abrirEditarRango(r)} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 transition-colors">
-                            <Edit size={18} />
+                      <div className="flex justify-center gap-2">
+                        {r.estado === 'SIN_RANGO' || r.estado === 'AGOTADO' || r.estado === 'HISTORICO' ? (
+                          <button onClick={() => abrirAsignarRango(r)} className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-[#052A79] hover:bg-blue-100 transition-colors">
+                            Asignar rango
                           </button>
-                          <button onClick={() => cerrarRango(r.id, r.activo)} title="Cerrar rango" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] hover:bg-red-100 transition-colors">
-                            <Lock size={18} />
+                        ) : (
+                          <>
+                            <button onClick={() => abrirEditarRango(r)} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 transition-colors">
+                              <Edit size={18} />
+                            </button>
+                            {r.rangoId && (
+                              <button onClick={() => cerrarRango(r.rangoId!)} title="Cerrar rango" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] hover:bg-red-100 transition-colors">
+                                <Lock size={18} />
+                              </button>
+                            )}
+                          </>
+                        )}
+                        {r.historial && r.historial.length > 0 && (
+                          <button onClick={() => setHistorialAbierto(r)} title="Ver Historial" className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-slate-600 hover:bg-slate-100 transition-colors">
+                            <History size={18} />
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -311,20 +302,27 @@ export default function TabCorrelativos() {
             </div>
             <div className="p-6 space-y-4">
               <div className="bg-amber-50 text-amber-800 text-xs font-bold p-3 rounded-lg border border-amber-200 mb-2">
-                {rangoEditando
+                {rangoEditando && rangoEditando.rangoId && rangoEditando.nroActual != null && rangoEditando.nroInicio != null && rangoEditando.nroActual >= rangoEditando.nroInicio
                   ? 'Si el rango ya reservó correlativos, su número inicial queda protegido. Puedes ampliar o corregir el número final, pero nunca dejarlo por debajo del número actual.'
                   : 'Solo puede existir un rango activo por sede y modalidad. Si ya existe uno, ciérrelo antes. Tampoco se permiten rangos numéricos cruzados con otra sede que use el mismo prefijo.'}
               </div>
+              
+              {(rangoEditando?.compartido || (!rangoEditando && rangos.find(r => r.plantaKey === formRango.plantaKey && r.tipoCertificadoClave === formRango.tipoCertificadoClave)?.compartido)) && (
+                <div className="bg-blue-50 text-blue-800 text-xs font-bold p-3 rounded-lg border border-blue-200 mb-2">
+                  Atención: Este rango técnico es compartido por varias operaciones en esta sede.
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-500">Sede</label>
-                <select disabled={Boolean(rangoEditando)} value={formRango.plantaKey} onChange={e => setFormRango({...formRango, plantaKey: e.target.value})} className="w-full rounded-lg border-2 border-slate-200 p-2 font-bold focus:border-[#052A79] disabled:bg-slate-100 disabled:text-slate-500">
+                <select disabled={true} value={formRango.plantaKey} className="w-full rounded-lg border-2 border-slate-200 p-2 font-bold focus:border-[#052A79] disabled:bg-slate-100 disabled:text-slate-500">
                   <option value="">-- SELECCIONE SEDE --</option>
                   {sedes.filter(s => s.activo).map(s => <option key={s.key} value={s.key}>{s.nombre}</option>)}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-bold text-slate-500">Tipo de Certificado</label>
-                <select disabled={Boolean(rangoEditando)} value={formRango.tipoCertificadoClave} onChange={e => setFormRango({...formRango, tipoCertificadoClave: e.target.value})} className="w-full rounded-lg border-2 border-slate-200 p-2 font-bold focus:border-[#052A79] disabled:bg-slate-100 disabled:text-slate-500">
+                <select disabled={true} value={formRango.tipoCertificadoClave} className="w-full rounded-lg border-2 border-slate-200 p-2 font-bold focus:border-[#052A79] disabled:bg-slate-100 disabled:text-slate-500">
                   <option value="">-- SELECCIONE TIPO --</option>
                   {tipos.map(t => <option key={t.clave} value={t.clave}>{t.nombre} — DG-{t.codigo}</option>)}
                 </select>
@@ -334,7 +332,7 @@ export default function TabCorrelativos() {
                   <label className="mb-1 block text-xs font-bold text-slate-500">Correlativo Inicial</label>
                   <input
                     type="number"
-                    disabled={Boolean(rangoEditando && rangoEditando.nroActual >= rangoEditando.nroInicio)}
+                    disabled={Boolean(rangoEditando && rangoEditando.nroActual != null && rangoEditando.nroInicio != null && rangoEditando.nroActual >= rangoEditando.nroInicio)}
                     value={formRango.nroInicio}
                     onChange={e => setFormRango({...formRango, nroInicio: parseInt(e.target.value) || 0})}
                     className="w-full rounded-lg border-2 border-slate-200 p-2 font-bold text-center text-lg text-[#052A79] focus:border-[#052A79] disabled:bg-slate-100 disabled:text-slate-500"
@@ -347,7 +345,7 @@ export default function TabCorrelativos() {
               </div>
               {rangoEditando && (
                 <p className="text-xs text-slate-500">
-                  {rangoEditando.nroActual >= rangoEditando.nroInicio
+                  {rangoEditando.nroActual != null && rangoEditando.nroInicio != null && rangoEditando.nroActual >= rangoEditando.nroInicio
                     ? `Este rango ya llegó al correlativo ${rangoEditando.nroActual}; por trazabilidad, el inicio no puede modificarse.`
                     : 'Este rango todavía no ha reservado correlativos, por lo que puedes modificar tanto el inicio como el final.'}
                 </p>
@@ -358,6 +356,49 @@ export default function TabCorrelativos() {
               <button disabled={modalSaving} onClick={guardarRango} className="rounded-lg bg-[#052A79] px-5 py-2 font-bold text-white hover:bg-blue-800 disabled:opacity-50">
                 {modalSaving ? 'Guardando...' : rangoEditando ? 'Guardar Cambios' : 'Guardar Rango'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {historialAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-100 p-6 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-800">Historial de Rangos: {historialAbierto.servicioNombre}</h2>
+              <button onClick={() => setHistorialAbierto(null)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+            </div>
+            <div className="p-6">
+              <div className="overflow-hidden rounded border border-slate-200 bg-white shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                    <tr>
+                      <th className="p-2 font-bold uppercase">Rango</th>
+                      <th className="p-2 font-bold uppercase text-center">N° Actual</th>
+                      <th className="p-2 font-bold uppercase text-center">Estado</th>
+                      <th className="p-2 font-bold uppercase text-center">Cierre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historialAbierto.historial.map((h) => (
+                      <tr key={h.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="p-2 font-mono">{h.nroInicio} - {h.nroMaximo}</td>
+                        <td className="p-2 text-center font-mono">{h.nroActual}</td>
+                        <td className="p-2 text-center">
+                          {h.activo ? (
+                             <span className="text-xs font-bold text-green-600">Vigente</span>
+                          ) : (
+                             <span className="text-xs font-bold text-slate-500">Cerrado</span>
+                          )}
+                        </td>
+                        <td className="p-2 text-center text-xs text-slate-500">
+                          {h.fechaCierre ? new Date(h.fechaCierre).toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
