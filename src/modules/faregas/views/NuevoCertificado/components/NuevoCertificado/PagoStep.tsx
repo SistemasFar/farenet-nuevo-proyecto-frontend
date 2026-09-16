@@ -2,6 +2,7 @@ import React from 'react';
 import { CreditCard, PlusCircle, Trash2 } from 'lucide-react';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../../NuevoCertificadoView';
+import type { ResumenComercialFaregas } from '../../../../types/faregas-api';
 
 type TipoPago = PagoAgregado['tipo'];
 
@@ -16,6 +17,7 @@ interface PagoStepProps {
   totalPagar: number;
   tarifaOriginal?: number;
   descuento?: number;
+  resumenComercial?: ResumenComercialFaregas | null;
   maestrosPago?: MaestrosPagoResponse['data'] | null;
   condicionPago: 'CONTADO' | 'CREDITO';
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
@@ -32,6 +34,7 @@ export function PagoStep({
   totalPagar,
   tarifaOriginal = totalPagar,
   descuento = 0,
+  resumenComercial,
   maestrosPago,
   condicionPago,
   onCondicionPagoChange,
@@ -204,10 +207,12 @@ export function PagoStep({
             <h4 className="font-bold text-[#052a79] mb-6 uppercase tracking-wider">Resumen de Cuenta</h4>
             
             <div className="space-y-4">
-              {descuento > 0 && <>
-                <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">Tarifa original:</span><span className="font-bold text-slate-600">S/ {tarifaOriginal.toFixed(2)}</span></div>
-                <div className="flex justify-between items-center"><span className="text-emerald-700 font-semibold">Descuento aplicado:</span><span className="font-black text-emerald-700">- S/ {descuento.toFixed(2)}</span></div>
-              </>}
+              <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">Certificado:</span><span className="font-bold text-slate-700">S/ {tarifaOriginal.toFixed(2)}</span></div>
+              {descuento > 0 && <div className="flex justify-between items-center"><span className="text-emerald-700 font-semibold">Descuento certificado:</span><span className="font-black text-emerald-700">- S/ {descuento.toFixed(2)}</span></div>}
+              {resumenComercial?.requiereChip && (
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">Chip y porta chip:</span><span className="font-bold text-slate-700">S/ {resumenComercial.precioChip.toFixed(2)}</span></div>
+              )}
+              {resumenComercial?.requiereChip && <div className="h-px bg-slate-200" />}
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-semibold">Total a pagar:</span>
                 <span className="text-slate-800 font-black text-xl">S/ {totalPagar.toFixed(2)}</span>

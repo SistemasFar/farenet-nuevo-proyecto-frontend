@@ -10,7 +10,6 @@ import type {
 
 import type { ConsultaDescuentoResult } from '../../../../services/faregas-descuentos.api';
 import { ConsultaDescuento } from './ConsultaDescuento';
-import { ReservaChipAdicional } from './ReservaChipAdicional';
 
 interface CajaStepProps {
   plantaSeleccionada: string;
@@ -170,9 +169,18 @@ export function CajaStep({
                   {seleccionado && <CheckCircle className="absolute right-4 top-4 h-6 w-6 text-[#052a79]" />}
                   <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-[#052a79]">{categoria.nombre}</span>
                   <h5 className="mt-5 pr-8 text-base font-black text-slate-800">{servicio.nombre}</h5>
-                  <div className="mt-6 flex items-end justify-between gap-3">
+                  {servicio.tarifa.requiereChip && (
+                    <div className="mt-4 space-y-1 rounded-lg bg-slate-50 p-2 text-xs font-semibold text-slate-600">
+                      <div className="flex justify-between gap-3"><span>Certificado</span><span>S/ {servicio.tarifa.precio.toFixed(2)}</span></div>
+                      <div className="flex justify-between gap-3"><span>{servicio.tarifa.chip?.nombre || 'Chip'}</span><span>S/ {Number(servicio.tarifa.chip?.precio || 0).toFixed(2)}</span></div>
+                    </div>
+                  )}
+                  <div className="mt-4 flex items-end justify-between gap-3">
                     <span className="text-[11px] font-semibold text-slate-400">{servicio.codigo}</span>
-                    <span className="text-xl font-black text-[#052a79]">S/ {servicio.tarifa.precio.toFixed(2)}</span>
+                    <div className="text-right">
+                      <span className="block text-xl font-black text-[#052a79]">S/ {servicio.tarifa.importeTotal.toFixed(2)}</span>
+                      {servicio.tarifa.requiereChip && <span className="mt-1 block text-[10px] font-black uppercase text-emerald-700">Incluye chip</span>}
+                    </div>
                   </div>
                 </button>
               );
@@ -222,11 +230,12 @@ export function CajaStep({
               <div><span className="block text-xs font-semibold text-blue-600">Servicio</span><span className="font-bold text-slate-800">{seleccion.servicio.nombre}</span></div>
               <div><span className="block text-xs font-semibold text-blue-600">Categoría</span><span className="font-bold text-slate-800">{seleccion.categoria.nombre}</span></div>
               <div><span className="block text-xs font-semibold text-blue-600">Sede</span><span className="font-bold text-slate-800">{catalogo?.sede.nombre || plantaNombre}</span></div>
-              <div><span className="block text-xs font-semibold text-blue-600">Precio</span><span className="text-lg font-black text-[#052a79]">S/ {seleccion.servicio.tarifa.precio.toFixed(2)}</span></div>
+              <div><span className="block text-xs font-semibold text-blue-600">Certificado</span><span className="font-bold text-slate-800">S/ {seleccion.servicio.tarifa.precio.toFixed(2)}</span></div>
+              {seleccion.servicio.tarifa.requiereChip && <div><span className="block text-xs font-semibold text-blue-600">{seleccion.servicio.tarifa.chip?.nombre || 'Chip'}</span><span className="font-bold text-slate-800">S/ {Number(seleccion.servicio.tarifa.chip?.precio || 0).toFixed(2)}</span></div>}
+              <div><span className="block text-xs font-semibold text-blue-600">Total</span><span className="text-lg font-black text-[#052a79]">S/ {seleccion.servicio.tarifa.importeTotal.toFixed(2)}</span></div>
             </div>
           </section>
 
-          <ReservaChipAdicional certificadoId={certificadoId} />
           <ConsultaDescuento
             certificadoId={certificadoId}
             onDescuentoChange={onDescuentoChange}

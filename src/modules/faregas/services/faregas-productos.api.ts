@@ -22,6 +22,9 @@ export interface ProductoFacturacion {
   es_para_compra: boolean;
   tiene_icbper: boolean;
   activo: boolean;
+  requiere_chip?: boolean;
+  producto_chip_id?: number | null;
+  precio_chip?: number | null;
 }
 
 const request = async (path: string, options: RequestInit = {}) => {

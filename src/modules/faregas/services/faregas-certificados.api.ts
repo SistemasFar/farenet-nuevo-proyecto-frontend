@@ -110,6 +110,11 @@ export const faregasCertificadosApi = {
     body: JSON.stringify(data)
   }),
   obtenerBorradorCompleto: (id: number) => fetchWithToken(`/certificados/borradores/${id}`),
+  obtenerChipBorrador: (id: number) => fetchWithToken(`/certificados/borradores/${id}/chip`),
+  seleccionarChipBorrador: (id: number, numeroChip: string) => fetchWithToken(`/certificados/borradores/${id}/chip`, {
+    method: 'PUT',
+    body: JSON.stringify({ numeroChip })
+  }),
   obtenerGnv: (id: number) => fetchWithToken(`/certificados/borradores/${id}/gnv`),
   obtenerGlp: (id: number) => fetchWithToken(`/certificados/borradores/${id}/glp`),
   obtenerConformidad: (id: number) => fetchWithToken(`/certificados/borradores/${id}/conformidad`),

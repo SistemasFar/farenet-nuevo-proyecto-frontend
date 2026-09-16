@@ -4,7 +4,6 @@ import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { TitularesList, type TitularState } from './TitularesList';
 import React, { useEffect } from 'react';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
-import { ChipBarcodeField } from './ChipBarcodeField';
 import {
   formatVIN,
   formatAlfanumerico,
@@ -17,7 +16,6 @@ import {
 } from '../../../../utils/vehiculo-formatters';
 
 interface VehiculoStepProps {
-  certificadoId?: number | null;
   tipoCertificado: TipoCertificadoFaregas;
   modalidadCertificado: string;
   formVehiculo: any;
@@ -42,7 +40,6 @@ interface VehiculoStepProps {
 }
 
 export function VehiculoStep({
-  certificadoId,
   tipoCertificado,
   modalidadCertificado,
   formVehiculo,
@@ -517,13 +514,6 @@ export function VehiculoStep({
                 <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA <span className="text-red-500">*</span></label>
                 <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
               </div>
-              {modalidadCertificado === 'INICIAL' && (
-                <ChipBarcodeField
-                  value={formGnv.numeroChip ?? formGnv.numero_chip ?? ''}
-                  certificadoId={certificadoId}
-                  onChange={(numeroChip) => setFormGnv((prev: any) => ({ ...prev, numeroChip }))}
-                />
-              )}
             </div>
 
             <div className="mt-4">

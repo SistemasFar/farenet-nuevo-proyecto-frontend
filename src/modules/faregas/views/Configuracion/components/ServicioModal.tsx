@@ -30,6 +30,7 @@ interface Props {
   categoria: CategoriaServicio;
   productos: ProductoFacturacion[];
   productoInicialId?: number | null;
+  productoFijoId?: number | null;
   sedesDisponibles: TarifaSede[];
   tarifasAsignadas: SedeTarifaAsignada[];
   onClose: () => void;
@@ -79,6 +80,7 @@ export function ServicioModal({
   categoria,
   productos,
   productoInicialId,
+  productoFijoId,
   sedesDisponibles,
   tarifasAsignadas,
   onClose,
@@ -93,6 +95,7 @@ export function ServicioModal({
       && producto.activo
       && producto.es_para_venta
     );
+  const productoFijo = productos.find((producto) => Number(producto.id) === Number(productoFijoId));
   const [codigo, setCodigo] = useState(initialData.codigo || codigoTecnico(productoInicial?.codigo_sku || categoria.codigo));
   const [nombre, setNombre] = useState(initialData.nombre || productoInicial?.descripcion || categoria.nombre);
   const [generaCertificado, setGeneraCertificado] = useState(Boolean(initialData.requiere_certificado));
@@ -114,7 +117,7 @@ export function ServicioModal({
       const productoTarifa = tarifa?.producto_facturacion_id
         ? productos.find((producto) => Number(producto.id) === Number(tarifa.producto_facturacion_id))
         : undefined;
-      const productoPredeterminado = mode === 'CREATE' ? productoInicial : undefined;
+      const productoPredeterminado = productoFijo || (mode === 'CREATE' ? productoInicial : undefined);
       const productoSede = productoTarifa || productoPredeterminado;
       inicial[sede.key] = {
         seleccionada: Boolean(tarifa?.activo),
@@ -143,6 +146,7 @@ export function ServicioModal({
   };
 
   const escribirProducto = (key: string, value: string) => {
+    if (productoFijo) return;
     const sku = value.trim().toUpperCase();
     const producto = productos.find((item) => String(item.codigo_sku).trim().toUpperCase() === sku);
     const estado = sedes[key];
@@ -180,6 +184,9 @@ export function ServicioModal({
   const validar = () => {
     if (!codigoTecnico(codigo) || !nombre.trim()) throw new Error('El c�digo y el nombre de la operaci�n son obligatorios.');
     if (generaCertificado && !formatoId) throw new Error('Selecciona el formato real que utilizaráá��á esta operaci�n.');
+    if (productoFijo && !Object.values(sedes).some((sede) => sede.seleccionada)) {
+      throw new Error(`Selecciona al menos una sede para el producto ${productoFijo.codigo_sku}.`);
+    }
     for (const [sedeKey, sede] of Object.entries(sedes).filter(([, item]) => item.seleccionada)) {
       const sedeConfigurada = sedesDisponibles.find((item) => item.key === sedeKey);
       const nombreSede = sedeConfigurada?.nombre || sedeKey;
@@ -308,7 +315,14 @@ export function ServicioModal({
                         <input
                           type="checkbox"
                           checked={estado.seleccionada}
-                          onChange={(event) => actualizarSede(sede.key, { seleccionada: event.target.checked })}
+                          onChange={(event) => actualizarSede(sede.key, {
+                            seleccionada: event.target.checked,
+                            ...(event.target.checked && productoFijo ? {
+                              productoId: String(productoFijo.id),
+                              productoBusqueda: productoFijo.codigo_sku,
+                              precio: estado.precio || String(productoFijo.precio_referencia || '')
+                            } : {})
+                          })}
                           className="h-4 w-4"
                         />
                         {sede.nombre}
@@ -325,6 +339,8 @@ export function ServicioModal({
                               onChange={(event) => escribirProducto(sede.key, event.target.value)}
                               placeholder="Escribir o buscar SKU"
                               autoComplete="off"
+                              readOnly={Boolean(productoFijo)}
+                              title={productoFijo ? 'Esta operación pertenece únicamente a este producto fiscal.' : undefined}
                               className={`min-w-0 rounded-lg border bg-white p-2 text-xs ${problemaProducto ? 'border-amber-400' : ''}`}
                             />
                             <input

@@ -396,6 +396,28 @@ export interface TarifaCatalogoFaregas {
   id: number;
   codigo: string;
   precio: number;
+  productoFacturacionId: number | null;
+  requiereChip: boolean;
+  chip: {
+    productoInventariableId: number | null;
+    codigo: NullableText;
+    nombre: NullableText;
+    productoFacturacionId: number | null;
+    codigoSku: NullableText;
+    descripcion: NullableText;
+    precio: number | null;
+  } | null;
+  importeTotal: number;
+}
+
+export interface ResumenComercialFaregas {
+  precioCertificado: number;
+  descuentoCertificado: number;
+  certificadoNeto: number;
+  requiereChip: boolean;
+  productoChipId: number | null;
+  precioChip: number;
+  importeTotal: number;
 }
 
 export interface ServicioCatalogoFaregas {

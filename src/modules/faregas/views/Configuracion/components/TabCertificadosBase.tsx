@@ -1,4 +1,4 @@
-import { FileText, MapPin, Pencil, Plus, Tags } from 'lucide-react';
+import { FileText, MapPin, Plus, Tags } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   faregasConfigApi,
@@ -23,6 +23,7 @@ interface ModalState {
   categoria: CategoriaServicio;
   servicio?: ServicioConfiguracionFaregas;
   productoInicialId?: number | null;
+  productoFijoId?: number | null;
 }
 
 const nombreFormato = (servicio: ServicioConfiguracionFaregas) => {
@@ -35,6 +36,12 @@ const nombreFormato = (servicio: ServicioConfiguracionFaregas) => {
   const combustible = servicio.tipo_certificado_clave?.startsWith('GNV') ? 'GNV' : 'GLP';
   return `Legacy visual: ${combustible} ${servicio.modalidad === 'INICIAL' ? 'Inicial' : 'Anual'}`;
 };
+
+const codigoComparable = (value: string | null | undefined) => String(value || '')
+  .trim()
+  .toUpperCase()
+  .replace(/[^A-Z0-9_]+/g, '_')
+  .replace(/^_+|_+$/g, '');
 
 export default function TabCertificadosBase({ canViewProducts, canManageTarifas, onGoToTarifas }: Props) {
   const [categorias, setCategorias] = useState<CategoriaServicio[]>([]);
@@ -120,6 +127,14 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
             const serviciosCategoria = serviciosDe(categoria.id);
             const sedesCategoria = [...new Map(serviciosCategoria.flatMap((servicio) => sedesActivasDe(servicio.id)).map((sede) => [sede.key, sede])).values()];
             const certificaciones = serviciosCategoria.filter((servicio) => servicio.requiere_certificado);
+            const servicioDeProducto = (producto: ProductoFacturacion) => serviciosCategoria.find((servicio) =>
+              productoIdsDe(servicio.id).includes(producto.id)
+              || codigoComparable(servicio.codigo) === codigoComparable(producto.codigo_sku)
+            );
+            const productoPendiente = productosCategoria.find((producto) =>
+              producto.activo
+              && !servicioDeProducto(producto)
+            );
             return (
               <article key={categoria.id} className={`overflow-hidden rounded-xl border bg-white shadow-sm ${categoria.activo ? 'border-slate-200' : 'border-red-200 opacity-75'}`}>
                 <header className="flex flex-col gap-3 border-b bg-slate-50 p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -136,7 +151,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600"><MapPin size={15} />{sedesCategoria.length ? sedesCategoria.map((sede) => sede.nombre).join(', ') : 'Sin sedes asignadas'}</div>
-                    {canManageTarifas && canViewProducts && categoria.activo && productosCategoria.some((producto) => producto.activo) && <button type="button" onClick={() => setModal({ mode: 'CREATE', categoria, productoInicialId: productosCategoria.find((producto) => producto.activo)?.id })} className="flex items-center gap-1 rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white"><Plus size={15} /> Nueva operación</button>}
+                    {canManageTarifas && canViewProducts && categoria.activo && productoPendiente && <button type="button" onClick={() => setModal({ mode: 'CREATE', categoria, productoInicialId: productoPendiente.id, productoFijoId: productoPendiente.id })} className="flex items-center gap-1 rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white"><Plus size={15} /> Configurar {productoPendiente.codigo_sku}</button>}
                   </div>
                 </header>
 
@@ -144,9 +159,23 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
                   <section>
                     <h4 className="mb-2 text-xs font-bold uppercase text-slate-500">Productos fiscales</h4>
                     {productosCategoria.length === 0 ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Esta categoría todavía no tiene productos fiscales.</div> : (
-                      <div className="flex flex-wrap gap-2">{productosCategoria.map((producto) => {
-                        const usado = serviciosCategoria.some((servicio) => productoIdsDe(servicio.id).includes(producto.id));
-                        return <span key={producto.id} title={producto.descripcion} className={`rounded-lg border px-2.5 py-2 text-xs ${usado ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-600'}`}><b>{producto.codigo_sku}</b><span className="ml-1">{producto.descripcion}</span>{!producto.activo && <b className="ml-1 text-red-600">INACTIVO</b>}</span>;
+                      <div className="grid gap-2 sm:grid-cols-2">{productosCategoria.map((producto) => {
+                        const servicioVinculado = servicioDeProducto(producto);
+                        const usado = Boolean(servicioVinculado);
+                        return <div key={producto.id} title={producto.descripcion} className={`rounded-lg border p-2.5 text-xs ${usado ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-600'}`}>
+                          <div><b>{producto.codigo_sku}</b><span className="ml-1">{producto.descripcion}</span>{!producto.activo && <b className="ml-1 text-red-600">INACTIVO</b>}</div>
+                          {canManageTarifas && canViewProducts && producto.activo && categoria.activo && (
+                            <button
+                              type="button"
+                              onClick={() => servicioVinculado
+                                ? setModal({ mode: 'EDIT', categoria, servicio: servicioVinculado, productoInicialId: producto.id, productoFijoId: producto.id })
+                                : setModal({ mode: 'CREATE', categoria, productoInicialId: producto.id, productoFijoId: producto.id })}
+                              className="mt-2 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 font-bold text-[#052A79] hover:bg-blue-100"
+                            >
+                              {servicioVinculado ? 'Configurar operación' : '+ Configurar operación'}
+                            </button>
+                          )}
+                        </div>;
                       })}</div>
                     )}
                   </section>
@@ -174,7 +203,6 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
                               </div>
                               {canManageTarifas && canViewProducts && (
                                 <div className="flex shrink-0 flex-wrap gap-2">
-                                  <button type="button" onClick={() => setModal({ mode: 'EDIT', categoria, servicio, productoInicialId: productosServicio[0]?.id })} className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-[#052A79] hover:bg-blue-100"><Pencil size={14} /> Configurar</button>
                                   {servicio.requiere_certificado && (servicio.formato_id ? (
                                     <button type="button" onClick={() => setEditarFormato({ id: servicio.formato_id as number, servicio })} className="flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100"><FileText size={14} /> Editar formato</button>
                                   ) : (
@@ -195,7 +223,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
         </div>
       )}
 
-      {modal && <ServicioModal mode={modal.mode} initialData={modal.servicio || { categoria_id: modal.categoria.id, requiere_certificado: false, requiere_vehiculo: false, orden: 10 }} categoria={modal.categoria} productos={productos} productoInicialId={modal.productoInicialId} sedesDisponibles={sedes} tarifasAsignadas={modal.servicio ? (sedesPorServicio[modal.servicio.id] || []) : []} onClose={() => setModal(null)} onSaved={recargar} />}
+      {modal && <ServicioModal mode={modal.mode} initialData={modal.servicio || { categoria_id: modal.categoria.id, requiere_certificado: false, requiere_vehiculo: false, orden: 10 }} categoria={modal.categoria} productos={productos} productoInicialId={modal.productoInicialId} productoFijoId={modal.productoFijoId} sedesDisponibles={sedes} tarifasAsignadas={modal.servicio ? (sedesPorServicio[modal.servicio.id] || []) : []} onClose={() => setModal(null)} onSaved={recargar} />}
 
       {asignarFormatoServicio && <FormatoAsignadorModal servicio={asignarFormatoServicio} onClose={() => setAsignarFormatoServicio(null)} onAsignado={(formato) => {
         setAsignarFormatoServicio(null);

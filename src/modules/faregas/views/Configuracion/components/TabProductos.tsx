@@ -1,3 +1,4 @@
+import { faregasChipsApi } from '../../../services/faregas-chips.api';
 import { Edit, Link2, Power, PowerOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -19,7 +20,8 @@ const productoVacio = (): Partial<ProductoFacturacion> => ({
   precio_referencia: null, valor_referencial_unitario: null,
   codigo_clasificacion_sunat: null, tipo_afectacion_igv: '10',
   porcentaje_isc: null, disponible_pos: false, es_para_venta: true,
-  es_para_compra: false, tiene_icbper: false, activo: true
+  es_para_compra: false, tiene_icbper: false, activo: true,
+  requiere_chip: false, producto_chip_id: null, precio_chip: null
 });
 
 const nullableNumber = (value: string) => value === '' ? null : Number(value);
@@ -38,6 +40,7 @@ interface VinculacionOperativa {
 export default function TabProductos({ canViewRelations = false, canViewTarifas = false, onGoToTarifas }: Props) {
   const [productos, setProductos] = useState<ProductoFacturacion[]>([]);
   const [categorias, setCategorias] = useState<CategoriaServicio[]>([]);
+  const [chipsOpciones, setChipsOpciones] = useState<{ id: number; codigo: string; nombre: string; }[]>([]);
   const [servicios, setServicios] = useState<ServicioConfiguracionFaregas[]>([]);
   const [sedesPorServicio, setSedesPorServicio] = useState<Record<number, SedeTarifaAsignada[]>>({});
   const [loading, setLoading] = useState(true);
@@ -57,15 +60,18 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     try {
       setLoading(true);
       setError('');
-      const [productosData, categoriasData, relacionesData] = await Promise.all([
+      const [productosData, categoriasData, chipsData, relacionesData] = await Promise.all([
         faregasProductosApi.listar(),
         faregasConfigApi.obtenerCategorias(true),
+        faregasChipsApi.listarCatalogoChipsFiscales().catch(() => []),
+
         canViewRelations
           ? Promise.all([faregasConfigApi.getServicios(), faregasConfigApi.obtenerSedesPorServicio()]).catch(() => null)
           : Promise.resolve(null)
       ]);
       setProductos(productosData);
       setCategorias(categoriasData);
+      setChipsOpciones(chipsData || []);
       if (relacionesData) {
         setServicios(relacionesData[0]);
         setSedesPorServicio(relacionesData[1]);
@@ -85,11 +91,14 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
       canViewRelations
         ? Promise.all([faregasConfigApi.getServicios(), faregasConfigApi.obtenerSedesPorServicio()]).catch(() => null)
         : Promise.resolve(null)
+    ,
+      faregasChipsApi.listarCatalogoChipsFiscales().catch(() => [])
     ])
-      .then(([productosData, categoriasData, relacionesData]) => {
+      .then(([productosData, categoriasData, relacionesData, chipsData]) => {
         if (cancelado) return;
         setProductos(productosData);
         setCategorias(categoriasData);
+        setChipsOpciones(chipsData as any || []);
         if (relacionesData) {
           setServicios(relacionesData[0]);
           setSedesPorServicio(relacionesData[1]);
@@ -260,11 +269,42 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
       {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"><h3 className="mb-2 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Nuevo producto fiscal' : 'Editar producto fiscal'}</h3><p className="mb-4 text-sm text-slate-600">Aquí se registran únicamente los datos del concepto facturable. La sede, tarifa y operación se asignan después sin duplicar el producto.</p><form onSubmit={guardar} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2"><div><label className="mb-1 block text-sm font-semibold">Código SKU</label><input required disabled={mode === 'EDIT'} value={actual.codigo_sku || ''} onChange={(e) => setActual({ ...actual, codigo_sku: e.target.value })} className="w-full rounded-lg border p-2 disabled:bg-slate-100" /></div><div><label className="mb-1 block text-sm font-semibold">Categoría</label><select required value={actual.categoria_id || ''} onChange={(e) => setActual({ ...actual, categoria_id: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border bg-white p-2"><option value="">Seleccionar categoría...</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre} ({item.codigo})</option>)}</select></div></div>
         <div><label className="mb-1 block text-sm font-semibold">Unidad tributaria</label><select required value={actual.unidad || 'NIU'} onChange={(e) => setActual({ ...actual, unidad: e.target.value })} className="w-full rounded-lg border bg-white p-2"><option value="NIU">NIU — Bien / unidad</option><option value="ZZ">ZZ — Servicio</option></select></div>
-        <div><label className="mb-1 block text-sm font-semibold">Descripción</label><input required value={actual.descripcion || ''} onChange={(e) => setActual({ ...actual, descripcion: e.target.value })} className="w-full rounded-lg border p-2" /></div>
+        <div><label className="mb-1 block text-sm font-semibold">Nombre del certificado</label><input required value={actual.descripcion || ''} onChange={(e) => setActual({ ...actual, descripcion: e.target.value })} className="w-full rounded-lg border p-2" /></div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2"><div><label className="mb-1 block text-sm font-semibold">Tipo afectación IGV</label><input maxLength={2} value={actual.tipo_afectacion_igv || ''} onChange={(e) => setActual({ ...actual, tipo_afectacion_igv: e.target.value })} className="w-full rounded-lg border p-2" /></div><div><label className="mb-1 block text-sm font-semibold">Código producto SUNAT <span className="font-normal text-slate-500">(opcional)</span></label><input inputMode="numeric" maxLength={8} value={actual.codigo_clasificacion_sunat || ''} onChange={(e) => setActual({ ...actual, codigo_clasificacion_sunat: e.target.value.replace(/\D/g, '') })} className="w-full rounded-lg border p-2" /></div></div>
         <div><label className="mb-1 block text-sm font-semibold">Cuenta por Cobrar</label><input value={actual.cuenta_por_cobrar || ''} onChange={(e) => setActual({ ...actual, cuenta_por_cobrar: e.target.value })} className="w-full rounded-lg border p-2" /></div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3"><div><label className="mb-1 block text-sm font-semibold">Precio unitario</label><input type="number" min="0" step="0.0001" value={actual.precio_unitario ?? ''} onChange={(e) => setActual({ ...actual, precio_unitario: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div><div><label className="mb-1 block text-sm font-semibold">Precio referencia</label><input type="number" min="0" step="0.0001" value={actual.precio_referencia ?? ''} onChange={(e) => setActual({ ...actual, precio_referencia: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div><div><label className="mb-1 block text-sm font-semibold">Valor referencial</label><input type="number" min="0" step="0.0001" value={actual.valor_referencial_unitario ?? ''} onChange={(e) => setActual({ ...actual, valor_referencial_unitario: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div></div>
-        <div className="flex flex-wrap gap-5 border-t pt-4">{[['es_para_venta','Es para venta'],['disponible_pos','Disponible POS'],['es_para_compra','Es para compra'],['tiene_icbper','Tiene ICBPER']].map(([campo,label]) => <label key={campo} className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(actual[campo as keyof ProductoFacturacion])} onChange={(e) => setActual({ ...actual, [campo]: e.target.checked })} />{label}</label>)}<label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" disabled={mode === 'EDIT'} checked={Boolean(actual.activo)} onChange={(e) => setActual({ ...actual, activo: e.target.checked })} />Activo</label></div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-1"><div><label className="mb-1 block text-sm font-semibold">Precio unitario</label><input type="number" min="0" step="0.0001" value={actual.precio_unitario ?? ''} onChange={(e) => setActual({ ...actual, precio_unitario: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div>{/* Precio referencia */}{/* Valor referencial */}</div>
+        <div className="flex flex-wrap gap-5 border-t pt-4">{[['es_para_venta','Es para venta'],['disponible_pos','Disponible POS'],['es_para_compra','Es para compra'],['tiene_icbper','Tiene ICBPER']].map(([campo,label]) => <label key={campo} className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(actual[campo as keyof ProductoFacturacion])} onChange={(e) => setActual({ ...actual, [campo]: e.target.checked })} />{label}</label>)}<label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" disabled={mode === 'EDIT'} checked={Boolean(actual.activo)} onChange={(e) => setActual({ ...actual, activo: e.target.checked })} />Activo</label>
+        </div>
+        <div className="border-t pt-4">
+          <label className="flex items-center gap-2 text-sm font-semibold mb-3">
+            <input type="checkbox" checked={Boolean(actual.requiere_chip)} onChange={(e) => {
+              const checked = e.target.checked;
+              setActual({
+                ...actual,
+                requiere_chip: checked,
+                producto_chip_id: checked ? actual.producto_chip_id : null,
+                precio_chip: checked ? actual.precio_chip : null
+              });
+            }} />
+            Agregar chip
+          </label>
+          {actual.requiere_chip && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="text-sm font-semibold">Tipo de chip
+                <select required value={actual.producto_chip_id || ''} onChange={(e) => setActual({ ...actual, producto_chip_id: e.target.value ? Number(e.target.value) : null })} className="mt-1 w-full rounded-lg border bg-white p-2">
+                  <option value="">Seleccionar tipo de chip...</option>
+                  {chipsOpciones.map(chip => <option key={chip.id} value={chip.id}>{chip.codigo} - {chip.nombre}</option>)}
+                </select>
+              </label>
+              <label className="text-sm font-semibold">Monto del chip
+                <div className="mt-1 flex overflow-hidden rounded-lg border bg-white">
+                  <span className="flex items-center bg-slate-50 px-3 text-slate-600">S/</span>
+                  <input required type="number" min="0.01" step="0.01" value={actual.precio_chip ?? ''} onChange={(e) => setActual({ ...actual, precio_chip: nullableNumber(e.target.value) })} className="min-w-0 flex-1 p-2 outline-none" placeholder="0.00" />
+                </div>
+                <span className="mt-1 block text-xs font-normal text-slate-500">Se suma completo al precio del certificado; no recibe descuentos.</span>
+              </label>
+            </div>
+          )}</div>
         <div className="flex justify-end gap-3 border-t pt-4"><button type="button" disabled={saving} onClick={() => setModal(false)} className="rounded px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button type="submit" disabled={saving} className="rounded bg-[#052A79] px-5 py-2 font-bold text-white disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></div></div>}
     </div>

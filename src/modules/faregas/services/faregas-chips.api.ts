@@ -35,12 +35,18 @@ export interface ProductoInventariable {
   tipo: string;
   controlStock: boolean;
   activo: boolean;
+  productoFacturacionId?: number | null;
   sedes: ProductoInventariableSede[];
   stockTotal: number;
   stockSede: number;
+  disponiblesSede: number;
+  reservadosSede: number;
+  vendidosSede: number;
+  bajasSede: number;
 }
 
 export interface CrearProductoInventariablePayload {
+  productoFacturacionId?: number;
   codigo: string;
   nombre: string;
   tipo: string;
@@ -65,6 +71,10 @@ export interface ChipDisponibilidad {
 }
 
 export const faregasChipsApi = {
+  listarCatalogoChipsFiscales: async () => {
+    const res = await faregasFetch('/chips/catalogo-fiscales') as { chips: { id: number; codigo: string; nombre: string; }[] };
+    return res.chips;
+  },
   listar: async (filtros: { productoInventariableId?:number; estado?:string; buscar?:string } = {}) => {
     const params=new URLSearchParams();
     if(filtros.productoInventariableId)params.set('productoInventariableId',String(filtros.productoInventariableId));

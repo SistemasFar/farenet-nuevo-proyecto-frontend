@@ -12,7 +12,8 @@ import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import { TallerStep } from './components/NuevoCertificado/TallerStep';
-import type { FormularioFormatoDinamicoFaregas } from '../../types/faregas-api';
+import { CertificateChipSection } from './components/NuevoCertificado/CertificateChipSection';
+import type { FormularioFormatoDinamicoFaregas, ResumenComercialFaregas } from '../../types/faregas-api';
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
 import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
 import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
@@ -171,6 +172,34 @@ export function NuevoCertificadoView() {
   const [precioSubtotal, setPrecioSubtotal] = useState<number>(0);
   const [descuento, setDescuento] = useState<number>(0);
   const [precioTotal, setPrecioTotal] = useState<number>(0);
+  const [resumenComercial, setResumenComercial] = useState<ResumenComercialFaregas | null>(null);
+
+  const aplicarResumenComercial = (data: any) => {
+    const resumen = data?.resumenComercial as ResumenComercialFaregas | undefined;
+    if (resumen) {
+      const normalizado: ResumenComercialFaregas = {
+        precioCertificado: Number(resumen.precioCertificado || 0),
+        descuentoCertificado: Number(resumen.descuentoCertificado || 0),
+        certificadoNeto: Number(resumen.certificadoNeto || 0),
+        requiereChip: Boolean(resumen.requiereChip),
+        productoChipId: resumen.productoChipId ? Number(resumen.productoChipId) : null,
+        precioChip: Number(resumen.precioChip || 0),
+        importeTotal: Number(resumen.importeTotal || 0),
+      };
+      setResumenComercial(normalizado);
+      setPrecioSubtotal(normalizado.precioCertificado);
+      setDescuento(normalizado.descuentoCertificado);
+      setPrecioTotal(normalizado.importeTotal);
+      return;
+    }
+    const importe = Number(data?.orden?.importe_total ?? data?.importeTotal ?? 0);
+    if (importe > 0) {
+      setResumenComercial(null);
+      setPrecioSubtotal(importe);
+      setDescuento(0);
+      setPrecioTotal(importe);
+    }
+  };
 
 
 
@@ -392,14 +421,7 @@ export function NuevoCertificadoView() {
           if (res.data.titulares) setTitulares(titularesCargados);
 
           const pagosDetalle = await faregasCertificadosApi.obtenerPagos(certificadoId);
-          if (pagosDetalle.data?.importeTotal) {
-            setPrecioTotal(Number(pagosDetalle.data.importeTotal));
-            setPrecioSubtotal(Number(pagosDetalle.data.importeTotal));
-          }
-          if (pagosDetalle.data?.orden) {
-            setPrecioTotal(Number(pagosDetalle.data.orden.importe_total));
-            setPrecioSubtotal(Number(pagosDetalle.data.orden.importe_total));
-          }
+          aplicarResumenComercial(pagosDetalle.data);
           setPagosAgregados((pagosDetalle.data?.pagos || []).map((pago: any) => ({
             id: pago.id,
             tipo: String(pago.tipoContadoKey || '').toUpperCase(),
@@ -749,10 +771,7 @@ export function NuevoCertificadoView() {
 
       await consultarVehiculoFarenet();
       const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
-      if (tarifaResponse.data?.importeTotal) {
-        setPrecioTotal(Number(tarifaResponse.data.importeTotal));
-        setPrecioSubtotal(Number(tarifaResponse.data.importeTotal));
-      }
+      aplicarResumenComercial(tarifaResponse.data);
       setCurrentStepIndex(0);
       setFurthestStepIndex((actual) => Math.max(actual, 0));
       setIsConsultado(true);
@@ -760,6 +779,23 @@ export function NuevoCertificadoView() {
     } catch (e: any) {
       setIsConsultado(false);
       setSaveError(e.message || 'No se pudieron consultar los datos iniciales.');
+      if (e.codigo === 'CONFIGURACION_CHIP_INCOMPLETA') {
+        const productoChipId = Number(e.detalles?.productoChipId || 0);
+        const resultado = await Swal.fire({
+          icon: 'warning',
+          title: 'Falta configurar la facturación del chip',
+          html: '<p>El serial del chip se escaneará después, en la sección de datos del taller.</p><p style="margin-top:8px">Para continuar ahora, vincule el <b>producto fiscal que facturará el chip</b> en la sede actual.</p>',
+          showCancelButton: true,
+          confirmButtonText: 'Configurar producto fiscal',
+          cancelButtonText: 'Cerrar',
+          confirmButtonColor: '#052A79',
+        });
+        if (resultado.isConfirmed) {
+          const productoParam = productoChipId ? `&producto=${productoChipId}` : '';
+          navigate(`/faregas/chips?tab=productos${productoParam}`);
+        }
+        return;
+      }
       Swal.fire('No se pudo consultar', e.message || 'Revise los datos ingresados.', 'error');
     } finally {
       setIsSavingStep(false);
@@ -939,6 +975,7 @@ export function NuevoCertificadoView() {
       })),
     });
     const pagosGuardados = response.data?.pagos || [];
+    aplicarResumenComercial(response.data);
     setPagosAgregados(pagosGuardados.map((pago: any): PagoAgregado => ({
       id: pago.id,
       tipo: String(pago.tipoContadoKey || '').toUpperCase() as PagoAgregado['tipo'],
@@ -1042,10 +1079,7 @@ export function NuevoCertificadoView() {
           setFormGnv((prev: any) => ({ ...prev, modalidad: formCaja.modalidadCertificado }));
         }
         const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
-        if (tarifaResponse.data?.importeTotal) {
-          setPrecioTotal(Number(tarifaResponse.data.importeTotal));
-          setPrecioSubtotal(Number(tarifaResponse.data.importeTotal));
-        }
+        aplicarResumenComercial(tarifaResponse.data);
         setLastSavedAt(new Date());
         await persistirPaso(idBorrador, 'PAGO');
         setFurthestStepIndex(prev => Math.max(prev, 1));
@@ -1057,6 +1091,16 @@ export function NuevoCertificadoView() {
       }
     } else if (currentStepIndex < STEPS.length - 1) {
       if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
+        try {
+          const chipResponse = await faregasCertificadosApi.obtenerChipBorrador(certificadoId);
+          if (chipResponse.data?.requiereChip && !chipResponse.data?.seleccionado) {
+            mostrarErroresPaso(['Escanee o escriba y valide el chip requerido antes de continuar.']);
+            return;
+          }
+        } catch (e: any) {
+          mostrarErroresPaso([e.message || 'No se pudo validar el chip seleccionado.']);
+          return;
+        }
         const erroresExpediente = formCaja.tipo_flujo === 'TALLER_INSPECCION'
           ? (formatoFormulario
               ? validarFormularioFormatoDinamico(formatoFormulario.campos, formatoValores)
@@ -1111,6 +1155,23 @@ export function NuevoCertificadoView() {
           await persistirPaso(certificadoId, 'VEHICULO');
           setMinimumEditableStepIndex(2);
         } catch (e: any) {
+          if (e.codigo === 'PRODUCTO_FISCAL_CHIP_INVALIDO') {
+            const productoChipId = Number(e.detalles?.productoChipId || resumenComercial?.productoChipId || 0);
+            const resultado = await Swal.fire({
+              icon: 'warning',
+              title: 'Falta completar el producto fiscal del chip',
+              html: '<p>No se registró ningún cobro y el borrador sigue intacto. El SKU elegido para el chip no tiene los datos tributarios obligatorios.</p><p style="margin-top:8px">Seleccione un producto fiscal válido para la sede; el serial físico se escaneará después, en Datos del taller.</p>',
+              showCancelButton: true,
+              confirmButtonText: 'Configurar producto fiscal',
+              cancelButtonText: 'Cerrar',
+              confirmButtonColor: '#052A79',
+            });
+            if (resultado.isConfirmed) {
+              const productoParam = productoChipId ? `&producto=${productoChipId}` : '';
+              navigate(`/faregas/chips?tab=productos${productoParam}`);
+            }
+            return;
+          }
           Swal.fire('No se pudo guardar el pago', e.message || 'Revise los medios de pago.', 'error');
           return;
         } finally {
@@ -1493,19 +1554,36 @@ export function NuevoCertificadoView() {
             onInvalidarConsulta={() => {
               setIsConsultado(false);
               setDescuento(0);
-              setPrecioTotal(precioSubtotal);
+              setPrecioTotal(precioSubtotal + Number(resumenComercial?.precioChip || 0));
             }}
             onDescuentoChange={(desc) => {
+              const precioChip = Number(resumenComercial?.precioChip || 0);
               if (desc) {
                 setPrecioSubtotal(desc.tarifaOriginal);
                 setDescuento(desc.importeDescuento);
-                setPrecioTotal(desc.importeFinal);
+                setPrecioTotal(desc.importeFinal + precioChip);
+                setResumenComercial((actual) => actual ? {
+                  ...actual,
+                  precioCertificado: desc.tarifaOriginal,
+                  descuentoCertificado: desc.importeDescuento,
+                  certificadoNeto: desc.importeFinal,
+                  importeTotal: desc.importeFinal + precioChip,
+                } : actual);
               } else {
                 setDescuento(0);
-                setPrecioTotal(precioSubtotal);
+                setPrecioTotal(precioSubtotal + precioChip);
+                setResumenComercial((actual) => actual ? {
+                  ...actual,
+                  descuentoCertificado: 0,
+                  certificadoNeto: precioSubtotal,
+                  importeTotal: precioSubtotal + precioChip,
+                } : actual);
               }
             }}
           />
+        )}
+        {STEPS[currentStepIndex].id === 'vehiculo' && (
+          <CertificateChipSection certificadoId={certificadoId} />
         )}
         {STEPS[currentStepIndex].id === 'vehiculo' && (formCaja.tipo_flujo === 'CERTIFICACION' || formCaja.tipo_flujo === 'VEHICULAR_EXISTENTE') && (
           <>
@@ -1516,7 +1594,6 @@ export function NuevoCertificadoView() {
               </div>
             )}
             <VehiculoStep
-              certificadoId={certificadoId}
               tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
               modalidadCertificado={formCaja.modalidadCertificado}
               formVehiculo={formVehiculo}
@@ -1563,6 +1640,7 @@ export function NuevoCertificadoView() {
             totalPagar={precioTotal}
             tarifaOriginal={precioSubtotal}
             descuento={descuento}
+            resumenComercial={resumenComercial}
             maestrosPago={maestrosPago}
             condicionPago={formFacturacion.condicionPagoFac}
             onCondicionPagoChange={(condicionPago) => setFormFacturacion((prev) => ({
