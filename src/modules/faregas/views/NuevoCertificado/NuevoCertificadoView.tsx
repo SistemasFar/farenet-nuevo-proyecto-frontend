@@ -897,6 +897,7 @@ export function NuevoCertificadoView() {
   const guardarPasoTaller = async (idBorrador: number) => {
     if (!formatoFormulario) throw new Error(formatoFormularioError || 'No se pudo cargar el formulario del formato.');
     await faregasCertificadosApi.guardarTaller(idBorrador, { valores: formatoValores });
+    await guardarTitularesBorrador(idBorrador);
   };
 
   const guardarPasoVehiculo = async (idBorrador: number) => {
@@ -1626,6 +1627,11 @@ export function NuevoCertificadoView() {
             setValores={setFormatoValores}
             cargando={formatoFormularioLoading}
             error={formatoFormularioError}
+            titulares={titulares}
+            setTitulares={setTitulares}
+            formFacturacion={formFacturacion}
+            setFormFacturacion={setFormFacturacion}
+            onRemoveTitular={eliminarTitularBorrador}
           />
         )}
         {STEPS[currentStepIndex].id === 'pago' && (

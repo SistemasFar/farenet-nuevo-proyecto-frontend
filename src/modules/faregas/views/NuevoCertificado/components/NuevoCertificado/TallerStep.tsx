@@ -1,5 +1,8 @@
 import React from 'react';
 import type { FormularioFormatoDinamicoFaregas } from '../../../../types/faregas-api';
+import { TitularesList } from './TitularesList';
+import type { TitularState } from './TitularesList';
+import type { FormFacturacionState } from '../../NuevoCertificadoView';
 
 interface TallerStepProps {
   formulario: FormularioFormatoDinamicoFaregas | null;
@@ -7,9 +10,17 @@ interface TallerStepProps {
   setValores: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   cargando?: boolean;
   error?: string;
+  titulares: TitularState[];
+  setTitulares: React.Dispatch<React.SetStateAction<TitularState[]>>;
+  formFacturacion: FormFacturacionState;
+  setFormFacturacion: React.Dispatch<React.SetStateAction<FormFacturacionState>>;
+  onRemoveTitular?: (titular: TitularState) => Promise<void>;
 }
 
-export const TallerStep: React.FC<TallerStepProps> = ({ formulario, valores, setValores, cargando, error }) => {
+export const TallerStep: React.FC<TallerStepProps> = ({ 
+  formulario, valores, setValores, cargando, error,
+  titulares, setTitulares, formFacturacion, setFormFacturacion, onRemoveTitular 
+}) => {
   if (cargando) {
     return <div className="rounded-xl border border-slate-200 bg-white p-8 text-sm text-slate-500">Leyendo las variables del formato seleccionado...</div>;
   }
@@ -83,6 +94,13 @@ export const TallerStep: React.FC<TallerStepProps> = ({ formulario, valores, set
           </div>
         </section>
       ))}
+      <TitularesList
+        titulares={titulares}
+        setTitulares={setTitulares}
+        formFacturacion={formFacturacion}
+        setFormFacturacion={setFormFacturacion}
+        onRemoveTitular={onRemoveTitular}
+      />
     </div>
   );
 };
