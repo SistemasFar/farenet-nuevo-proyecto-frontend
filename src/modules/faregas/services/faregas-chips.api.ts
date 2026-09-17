@@ -45,6 +45,20 @@ export interface ProductoInventariable {
   bajasSede: number;
 }
 
+
+export interface VentaDirectaPayload {
+  tipoComprobante: string;
+  tipoDocumentoCliente: string;
+  nroDocumento: string;
+  nombreRazonSocial: string;
+  direccion?: string;
+  email?: string;
+  telefono?: string;
+  condicionPago: string;
+  medioPago: string;
+  chips: string[];
+}
+
 export interface CrearProductoInventariablePayload {
   productoFacturacionId?: number;
   codigo: string;
@@ -97,6 +111,7 @@ export const faregasChipsApi = {
   ingresar: async (productoInventariableId:number,numeros:string[],referencia?:string) => faregasFetch('/chips/ingresos',{method:'POST',body:JSON.stringify({productoInventariableId,numeros,referencia})}),
   transferir: async (productoInventariableId:number,destinoKey:string,numeros:string[],referencia?:string) => faregasFetch('/chips/transferencias',{method:'POST',body:JSON.stringify({productoInventariableId,destinoKey,numeros,referencia})}),
   baja: async (numeroChip:string,referencia:string) => faregasFetch('/chips/bajas',{method:'POST',body:JSON.stringify({numeroChip,referencia})}),
+  ventaDirecta: async (payload: VentaDirectaPayload) => faregasFetch('/chips/venta-directa', { method: 'POST', body: JSON.stringify(payload) }),
   historial: async (id:number) => (await faregasFetch(`/chips/${id}/movimientos`)).movimientos,
   listarProductosInventariables: async () => (await faregasFetch('/chips/productos')).productos as ProductoInventariable[],
   catalogosProductosInventariables: async () => (await faregasFetch('/chips/productos/catalogos')) as {sedes:Array<{key:string;nombre:string}>},
