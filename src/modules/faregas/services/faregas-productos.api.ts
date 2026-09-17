@@ -55,5 +55,8 @@ export const faregasProductosApi = {
   },
   cambiarEstado: async (id: number, activo: boolean): Promise<void> => {
     await request(`/productos/${id}/estado`, { method: 'PUT', body: JSON.stringify({ activo }) });
+  },
+  eliminar: async (id: number): Promise<void> => {
+    await request(`/productos/${id}`, { method: 'DELETE' });
   }
 };

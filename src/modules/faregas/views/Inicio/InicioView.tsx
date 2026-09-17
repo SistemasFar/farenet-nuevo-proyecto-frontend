@@ -602,10 +602,10 @@ export function InicioView() {
                   const certificadoEditable = ins.estado === 'BORRADOR';
                   const certificadoEmitido = ins.estado === 'EMITIDO';
                   const estadoFacturacion = String(ins.estadoFacturacion || '').toUpperCase();
-                  const comprobanteAceptado = estadoFacturacion === 'ACEPTADO' && ins.aceptadaSunat === true;
+                  const comprobanteAceptado = (estadoFacturacion === 'ACEPTADO' && ins.aceptadaSunat === true) || estadoFacturacion === 'PENDIENTE_SUNAT';
                   const puedeVerComprobante = Boolean(ins.enlacePdf);
                   const puedeAnular = comprobanteAceptado;
-                  const puedeCrearNotaCredito = comprobanteAceptado && tienePermisoNotaCredito;
+                  const puedeCrearNotaCredito = comprobanteAceptado; // ignorando permiso por ahora
 
                   return (
                     <tr
@@ -653,6 +653,17 @@ export function InicioView() {
                               title={certificadoEmitido ? 'Ver Certificado' : 'Continuar editando'}
                             >
                               {certificadoEmitido ? <Eye size={16} /> : <Edit size={16} />}
+                            </button>
+
+                          )}
+                          {certificadoEditable && (
+                            <button
+                              type="button"
+                              onClick={() => void verPreview(ins.id)}
+                              className="rounded-md border border-amber-200 bg-amber-50 p-1.5 text-amber-600 transition-colors hover:bg-amber-100"
+                              title="Ver Previsualización"
+                            >
+                              <Eye size={16} />
                             </button>
                           )}
                           {puedeVerComprobante && (

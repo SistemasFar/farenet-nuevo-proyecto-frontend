@@ -1,5 +1,5 @@
 import { faregasChipsApi } from '../../../services/faregas-chips.api';
-import { Edit, Link2, Power, PowerOff } from 'lucide-react';
+import { Edit, Link2, Power, PowerOff, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   faregasConfigApi,
@@ -259,7 +259,15 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
                   <td className="px-3 py-3 text-center">{vinculacion ? <><div className="font-bold text-slate-800">{vinculacion.sedesActivas.length}</div><div className="max-w-40 truncate text-xs text-slate-500" title={vinculacion.sedesActivas.join(', ')}>{vinculacion.sedesActivas.join(', ') || 'Sin tarifa activa'}</div></> : '-'}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-right">{producto.precio_referencia == null ? '-' : `S/ ${producto.precio_referencia.toFixed(2)}`}</td>
                   <td className="px-3 py-3 text-center"><div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${producto.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{producto.activo ? 'ACTIVO' : 'INACTIVO'}</span></div><div className="mt-2 text-xs text-slate-500">{producto.es_para_venta ? 'Para venta' : 'No vendible'}</div></td>
-                  <td className="px-3 py-3 text-center"><div className="flex justify-center gap-2"><button onClick={() => { setMode('EDIT'); setActual(producto); setProductoGuardado(''); setModal(true); }} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-blue-100"><Edit size={18} /></button><button onClick={() => void cambiarEstado(producto)} title={producto.activo ? 'Desactivar' : 'Activar'} className={producto.activo ? 'rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-red-100' : 'rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-green-100'}>{producto.activo ? <PowerOff size={18} /> : <Power size={18} />}</button></div></td>
+                  <td className="px-3 py-3 text-center"><div className="flex justify-center gap-2"><button onClick={() => { setMode('EDIT'); setActual(producto); setProductoGuardado(''); setModal(true); }} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-blue-100"><Edit size={18} /></button><button onClick={async () => {
+    if (!confirm(`¿Seguro que deseas eliminar permanentemente el SKU ${producto.codigo_sku}?`)) return;
+    try {
+      await faregasProductosApi.eliminar(producto.id);
+      await cargar();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al eliminar producto');
+    }
+  }} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-red-600 transition-colors hover:bg-red-100"><Trash2 size={18} /></button><button onClick={() => void cambiarEstado(producto)} title={producto.activo ? 'Desactivar' : 'Activar'} className={producto.activo ? 'rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-red-100' : 'rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-green-100'}>{producto.activo ? <PowerOff size={18} /> : <Power size={18} />}</button></div></td>
                 </tr>;
               })}</tbody>
             </table>
