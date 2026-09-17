@@ -3,6 +3,7 @@ import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { DownloadCloud, Info, Cpu, Boxes, FileText, Search } from 'lucide-react';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { faregasChipsApi, type Chip, type ChipResumen, type ProductoInventariable } from '../../services/faregas-chips.api';
+import { faregasProductosApi, type ProductoFacturacion } from '../../services/faregas-productos.api';
 import { ChipScannerInput, parseChipScan } from './ChipScannerInput';
 import { ModalVentaChips } from './ModalVentaChips';
 
@@ -37,6 +38,9 @@ export function ChipsView() {
   const [newProductName, setNewProductName] = useState('');
   const [newProductTipo, setNewProductTipo] = useState('CHIP_SERIALIZADO');
   const [savingProduct, setSavingProduct] = useState(false);
+  const [newProductProductoFacturacionId, setNewProductProductoFacturacionId] = useState<number | ''>('');
+  const [productosFiscales, setProductosFiscales] = useState<any[]>([]);
+  const [newProductSedes, setNewProductSedes] = useState<Record<string, EditableSede>>({});
 
   // Edit Product Modal State
   const [editingProductoId, setEditingProductoId] = useState<number | null>(null);
@@ -53,16 +57,18 @@ export function ChipsView() {
 
   const cargar = useCallback(async () => {
     try {
-      const [r, l, prods, cat] = await Promise.all([
+      const [r, l, prods, cat, pf] = await Promise.all([
         faregasChipsApi.resumen(selectedProductId === '' ? undefined : Number(selectedProductId)),
         faregasChipsApi.listar({ buscar, estado: filtroEstado === 'TODOS' ? undefined : filtroEstado }),
         faregasChipsApi.listarProductosInventariables(),
-        faregasChipsApi.catalogosProductosInventariables()
+        faregasChipsApi.catalogosProductosInventariables(),
+        faregasProductosApi.listar()
       ]);
       setResumen(r);
       setChips(l.items);
       setProductos(prods);
       setCatalogos(cat);
+      setProductosFiscales(pf.filter((p: any) => p.activo && p.es_para_venta));
       if (selectedProductId === '' && prods.length > 0) {
         const defaultProd = prods.find(p => p.codigo === 'CHIP') || prods[0];
         setSelectedProductId(defaultProd.id);
@@ -128,7 +134,7 @@ export function ChipsView() {
     setEditProductTipo(prod.tipo);
     setEditProductProductoFacturacionId(prod.productoFacturacionId || '');
     const sedesConfig: Record<string, EditableSede> = {};
-    prod.sedes.forEach(s => {
+    (prod.sedes || []).forEach(s => {
       sedesConfig[s.plantaKey] = {
         precio: Number(s.precio),
         stockPermitido: s.stockPermitido,
@@ -137,6 +143,7 @@ export function ChipsView() {
       };
     });
     setEditProductSedes(sedesConfig);
+    setShowProductModal(true);
   };
 
   useEffect(() => {
@@ -151,7 +158,7 @@ export function ChipsView() {
       setEditProductTipo(prod.tipo);
       setEditProductProductoFacturacionId(prod.productoFacturacionId || '');
       const sedesConfig: Record<string, EditableSede> = {};
-      prod.sedes.forEach((sede) => {
+      (prod.sedes || []).forEach((sede) => {
         sedesConfig[sede.plantaKey] = {
           precio: Number(sede.precio),
           stockPermitido: sede.stockPermitido,
@@ -181,7 +188,6 @@ export function ChipsView() {
           precio: editProductSedes[plantaKey].precio,
           stockPermitido: editProductSedes[plantaKey].stockPermitido,
           ventaHabilitada: editProductSedes[plantaKey].ventaHabilitada,
-          productoFacturacionId: editProductSedes[plantaKey].productoFacturacionId
         }))
       };
 
@@ -229,6 +235,12 @@ export function ChipsView() {
               <button className="text-xs font-bold text-blue-600 hover:underline" onClick={() => openEditModal(prod)}>Editar tipo</button>
             </div>
             <p className="mt-3 text-xs text-slate-500">Clasificación: <b>{prod.tipo}</b></p>
+            {(() => {
+              const sede = (prod.sedes || []).find((s: any) => s.plantaKey === plantaKey);
+              return sede?.precio
+                ? <p className="mt-1 text-xs font-bold text-emerald-700">Precio en esta sede: S/ {Number(sede.precio).toFixed(2)}</p>
+                : <p className="mt-1 text-xs text-amber-600">Sin precio configurado en esta sede</p>;
+            })()}
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-sm">
               <div><span className="text-slate-500">En esta sede</span><p className="text-xl font-black text-[#052A79]">{Number(prod.stockSede || 0)}</p></div>
               <div><span className="text-slate-500">Total global</span><p className="text-xl font-black text-slate-700">{Number(prod.stockTotal || 0)}</p></div>
@@ -305,7 +317,57 @@ export function ChipsView() {
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Código del tipo</label><input type="text" disabled={!!editingProductoId} value={editingProductoId ? editProductCodigo : newProductCodigo} onChange={(e) => setNewProductCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))} placeholder="Ej. SUPERCHIP" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100" /></div>
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Clasificación</label><select value={editingProductoId ? editProductTipo : newProductTipo} onChange={(e) => editingProductoId ? setEditProductTipo(e.target.value) : setNewProductTipo(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"><option value="CHIP_SERIALIZADO">Chip serializado</option><option value="ACCESORIO">Accesorio</option><option value="OTRO_PRODUCTO_FISICO">Otro producto físico</option></select></div>
             </div>
-            <div><label className="mb-1 block text-sm font-bold text-slate-700">Nombre del tipo de chip</label><input type="text" value={editingProductoId ? editProductName : newProductName} onChange={(e) => editingProductoId ? setEditProductName(e.target.value) : setNewProductName(e.target.value)} placeholder="Ej. Superchip GNV" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" /></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div><label className="mb-1 block text-sm font-bold text-slate-700">Nombre del tipo de chip</label><input type="text" value={editingProductoId ? editProductName : newProductName} onChange={(e) => editingProductoId ? setEditProductName(e.target.value) : setNewProductName(e.target.value)} placeholder="Ej. Superchip GNV" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" /></div>
+              <div>
+                <label className="mb-1 block text-sm font-bold text-slate-700">Producto Fiscal Vinculado</label>
+                <select value={editingProductoId ? editProductProductoFacturacionId : newProductProductoFacturacionId} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : ''; if (editingProductoId) setEditProductProductoFacturacionId(v); else setNewProductProductoFacturacionId(v); }} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+                  <option value="">Ninguno (No se podrá vender)</option>
+                  {productosFiscales.map(pf => <option key={pf.id} value={pf.id}>{pf.codigo_sku} - {pf.descripcion}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">Debe tener unidad NIU o ZZ e IGV 10.</p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="mb-3 text-sm font-bold text-amber-800">Precio en esta sede ({plantaNombre})</p>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-slate-600">S/</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={editingProductoId
+                    ? (editProductSedes[plantaKey]?.precio ?? '')
+                    : (newProductSedes[plantaKey]?.precio ?? '')}
+                  onChange={(e) => {
+                    const precio = parseFloat(e.target.value) || 0;
+                    if (editingProductoId) {
+                      setEditProductSedes(prev => ({
+                        ...prev,
+                        [plantaKey]: {
+                          precio,
+                          stockPermitido: prev[plantaKey]?.stockPermitido ?? true,
+                          ventaHabilitada: prev[plantaKey]?.ventaHabilitada ?? true,
+                          productoFacturacionId: prev[plantaKey]?.productoFacturacionId,
+                        }
+                      }));
+                    } else {
+                      setNewProductSedes(prev => ({
+                        ...prev,
+                        [plantaKey]: {
+                          precio,
+                          stockPermitido: prev[plantaKey]?.stockPermitido ?? true,
+                          ventaHabilitada: prev[plantaKey]?.ventaHabilitada ?? true,
+                        }
+                      }));
+                    }
+                  }}
+                  className="w-36 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+                <p className="text-xs text-amber-700">Este precio se usará al calcular el total en la venta de chips.</p>
+              </div>
+            </div>
           </div>
           <div className="flex justify-end gap-3 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-5"><button onClick={() => { setShowProductModal(false); setEditingProductoId(null); }} disabled={savingProduct} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200">Cancelar</button><button onClick={editingProductoId ? handleEditarProducto : handleCrearProducto} disabled={savingProduct || (editingProductoId ? !editProductName : (!newProductName || !newProductCodigo))} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-blue-700 disabled:opacity-50">{savingProduct ? 'Guardando...' : 'Guardar'}</button></div>
         </div>

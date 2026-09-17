@@ -36,6 +36,7 @@ export function PagoStep({
   descuento = 0,
   resumenComercial,
   maestrosPago,
+  labelTarifaOriginal = "Certificado:",
   condicionPago,
   onCondicionPagoChange,
 }: PagoStepProps) {
@@ -207,7 +208,7 @@ export function PagoStep({
             <h4 className="font-bold text-[#052a79] mb-6 uppercase tracking-wider">Resumen de Cuenta</h4>
             
             <div className="space-y-4">
-              <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">Certificado:</span><span className="font-bold text-slate-700">S/ {tarifaOriginal.toFixed(2)}</span></div>
+              <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">{labelTarifaOriginal}</span><span className="font-bold text-slate-700">S/ {tarifaOriginal.toFixed(2)}</span></div>
               {descuento > 0 && <div className="flex justify-between items-center"><span className="text-emerald-700 font-semibold">Descuento certificado:</span><span className="font-black text-emerald-700">- S/ {descuento.toFixed(2)}</span></div>}
               {resumenComercial?.requiereChip && (
                 <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">Chip y porta chip:</span><span className="font-bold text-slate-700">S/ {resumenComercial.precioChip.toFixed(2)}</span></div>
