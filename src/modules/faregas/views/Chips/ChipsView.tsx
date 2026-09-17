@@ -24,6 +24,7 @@ export function ChipsView() {
   const [modo, setModo] = useState<'INGRESO' | 'TRANSFERENCIA'>('INGRESO');
   const [destino, setDestino] = useState('');
   const [buscar, setBuscar] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('TODOS');
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,7 +53,7 @@ export function ChipsView() {
     try {
       const [r, l, prods, cat] = await Promise.all([
         faregasChipsApi.resumen(selectedProductId === '' ? undefined : Number(selectedProductId)),
-        faregasChipsApi.listar({ buscar }),
+        faregasChipsApi.listar({ buscar, estado: filtroEstado === 'TODOS' ? undefined : filtroEstado }),
         faregasChipsApi.listarProductosInventariables(),
         faregasChipsApi.catalogosProductosInventariables()
       ]);
@@ -67,12 +68,12 @@ export function ChipsView() {
     } catch (error: unknown) {
       setError(errorMessage(error));
     }
-  }, [buscar, selectedProductId]);
+  }, [buscar, filtroEstado, selectedProductId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void cargar(), buscar ? 250 : 0);
     return () => window.clearTimeout(timer);
-  }, [buscar, cargar]);
+  }, [buscar, filtroEstado, cargar]);
 
   const confirmar = async () => {
     setError(''); setMensaje('');
@@ -272,9 +273,20 @@ export function ChipsView() {
         <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-end">
             <div><h2 className="font-bold">Unidades registradas</h2><p className="mt-1 text-xs text-slate-500">Todos los tipos ubicados actualmente en {plantaNombre}.</p></div>
-            <label className="relative sm:ml-auto sm:w-72"><span className="mb-1 block text-xs font-bold text-slate-600">Buscar por código de chip</span><Search className="absolute bottom-2.5 left-3 h-4 w-4 text-slate-400" /><input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Ej. CHIP001" className="w-full rounded border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" /></label>
+            <div className="flex flex-col sm:flex-row gap-3 sm:ml-auto w-full sm:w-auto">
+              <label className="relative w-full sm:w-48"><span className="mb-1 block text-xs font-bold text-slate-600">Estado</span>
+                <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="w-full rounded border border-slate-300 py-[7px] px-3 text-sm focus:border-blue-500 focus:outline-none">
+                  <option value="TODOS">Todos</option>
+                  <option value="DISPONIBLE">Disponibles</option>
+                  <option value="RESERVADO">Reservados</option>
+                  <option value="VENDIDO">Vendidos</option>
+                  <option value="BAJA">Bajas</option>
+                </select>
+              </label>
+              <label className="relative w-full sm:w-72"><span className="mb-1 block text-xs font-bold text-slate-600">Buscar por código de chip</span><Search className="absolute bottom-2.5 left-3 h-4 w-4 text-slate-400" /><input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Ej. CHIP001" className="w-full rounded border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" /></label>
+            </div>
           </div>
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>{modo === 'TRANSFERENCIA' && <th className="w-10 p-3"></th>}<th className="p-3">Código del chip</th><th className="p-3">Tipo</th><th className="p-3">Estado</th><th className="p-3">Sede</th><th className="p-3">Ingreso</th><th className="p-3">Último movimiento</th></tr></thead><tbody>{chips.map(c => <tr key={c.id} className="border-t border-slate-100">{modo === 'TRANSFERENCIA' && <td className="p-3"><input type="checkbox" disabled={c.estado !== 'DISPONIBLE' || Number(c.producto_inventariable_id) !== Number(selectedProductId)} checked={scan.split('\n').some(numero => numero.trim() === c.numero_chip)} onChange={e => { if (e.target.checked) { setScan(prev => prev ? `${prev}\n${c.numero_chip}` : c.numero_chip); } else { setScan(prev => prev.split('\n').map(x => x.trim()).filter(x => x && x !== c.numero_chip).join('\n')); } }} className="rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]" /></td>}<td className="p-3 font-mono font-bold">{c.numero_chip}</td><td className="p-3">{c.producto_nombre}</td><td className="p-3">{c.estado}</td><td className="p-3">{c.planta_nombre}</td><td className="p-3">{new Date(c.creado_en).toLocaleString()}</td><td className="p-3">{c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleString() : '-'}</td></tr>)}{!chips.length && <tr><td colSpan={modo === 'TRANSFERENCIA' ? 7 : 6} className="p-10 text-center text-slate-400">No se encontraron chips con ese código.</td></tr>}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>{modo === 'TRANSFERENCIA' && <th className="w-10 p-3"></th>}<th className="p-3">Código del chip</th><th className="p-3">Tipo</th><th className="p-3">Estado</th><th className="p-3">Sede</th><th className="p-3">Ingreso</th><th className="p-3">Último movimiento</th></tr></thead><tbody>{chips.map(c => <tr key={c.id} className="border-t border-slate-100">{modo === 'TRANSFERENCIA' && <td className="p-3"><input type="checkbox" disabled={c.estado !== 'DISPONIBLE' || Number(c.producto_inventariable_id) !== Number(selectedProductId)} checked={scan.split('\n').some(numero => numero.trim() === c.numero_chip)} onChange={e => { if (e.target.checked) { setScan(prev => prev ? `${prev}\n${c.numero_chip}` : c.numero_chip); } else { setScan(prev => prev.split('\n').map(x => x.trim()).filter(x => x && x !== c.numero_chip).join('\n')); } }} className="rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]" /></td>}<td className="p-3 font-mono font-bold">{c.numero_chip}</td><td className="p-3">{c.producto_nombre}</td><td className="p-3"><span className={`inline-block rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${c.estado === 'DISPONIBLE' ? 'bg-emerald-100 text-emerald-800' : c.estado === 'RESERVADO' ? 'bg-amber-100 text-amber-800' : c.estado === 'VENDIDO' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{c.estado}</span></td><td className="p-3">{c.planta_nombre}</td><td className="p-3">{new Date(c.creado_en).toLocaleString()}</td><td className="p-3">{c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleString() : '-'}</td></tr>)}{!chips.length && <tr><td colSpan={modo === 'TRANSFERENCIA' ? 7 : 6} className="p-10 text-center text-slate-400">No se encontraron chips con ese código.</td></tr>}</tbody></table></div>
         </section>
       </div>
     </>}
