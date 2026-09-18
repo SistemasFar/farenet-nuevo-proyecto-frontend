@@ -118,7 +118,7 @@ export function CajaStep({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <section className="space-y-4">
         <div>
           <h4 className="text-sm font-bold capitalize tracking-wider text-slate-700">1. Selecciona el Servicio</h4>
@@ -133,15 +133,15 @@ export function CajaStep({
             onChange={(event) => setBusqueda(event.target.value)}
             placeholder="Buscar servicio..."
             aria-label="Buscar servicio"
-            className="h-11 w-full rounded-xl border-2 border-slate-200 bg-white pl-12 pr-4 text-sm font-semibold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0"
+            className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white pl-12 pr-4 text-sm font-semibold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0"
           />
         </div>
 
         {catalogo && catalogo.categorias.length > 0 && (
           <div className="flex flex-wrap gap-2" aria-label="Categorías de servicio">
-            <button type="button" onClick={() => setCategoriaActiva('TODOS')} className={`rounded-full border px-4 py-2 text-xs font-black transition ${categoriaActiva === 'TODOS' ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>TODOS</button>
+            <button type="button" onClick={() => setCategoriaActiva('TODOS')} className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition ${categoriaActiva === 'TODOS' ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>TODOS</button>
             {catalogo.categorias.map((categoria) => (
-              <button key={categoria.codigo} type="button" onClick={() => setCategoriaActiva(categoria.codigo)} className={`rounded-full border px-4 py-2 text-xs font-black capitalize transition ${categoriaActiva === categoria.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>{categoria.nombre}</button>
+              <button key={categoria.codigo} type="button" onClick={() => setCategoriaActiva(categoria.codigo)} className={`rounded-full border px-3 py-1.5 text-[11px] font-black capitalize transition ${categoriaActiva === categoria.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>{categoria.nombre}</button>
             ))}
           </div>
         )}
@@ -161,25 +161,25 @@ export function CajaStep({
         ) : servicios.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-600">No se encontraron servicios con los filtros seleccionados.</div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(280px,1fr))] lg:gap-5">
             {servicios.map(({ servicio, categoria }) => {
               const seleccionado = servicio.tarifa.codigo === formCaja.tarifaCodigo;
               return (
-                <button key={servicio.id} type="button" onClick={() => seleccionarServicio(servicio)} aria-pressed={seleccionado} className={`relative min-h-44 rounded-2xl border-2 p-5 text-left transition-all duration-200 ${seleccionado ? 'border-[#052a79] bg-[#052a79]/5 shadow-md' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-[#052a79]/40 hover:shadow-sm'}`}>
-                  {seleccionado && <CheckCircle className="absolute right-4 top-4 h-6 w-6 text-[#052a79]" />}
-                  <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 text-xs font-black capitalize tracking-wider text-[#052a79]">{categoria.nombre}</span>
-                  <h5 className="mt-5 pr-8 text-base font-black text-slate-800">{servicio.nombre}</h5>
+                <button key={servicio.id} type="button" onClick={() => seleccionarServicio(servicio)} aria-pressed={seleccionado} className={`relative rounded-[14px] border-2 py-2.5 px-3 sm:px-3.5 text-left transition-all duration-200 ${seleccionado ? 'border-[#052a79] bg-[#052a79]/5 shadow-sm' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-[#052a79]/40 hover:shadow-sm'}`}>
+                  {seleccionado && <CheckCircle className="absolute right-3 top-3 h-5 w-5 text-[#052a79]" />}
+                  <span className="inline-flex rounded text-[10px] bg-blue-50 px-2 py-0.5 font-black capitalize tracking-wider text-[#052a79]">{categoria.nombre}</span>
+                  <h5 className="mt-1.5 pr-6 text-[13px] font-black text-slate-800 leading-snug">{servicio.nombre}</h5>
                   {servicio.tarifa.requiereChip && (
-                    <div className="mt-4 space-y-1 rounded-lg bg-slate-50 p-2 text-xs font-semibold text-slate-600">
-                      <div className="flex justify-between gap-3"><span>Certificado</span><span>S/ {servicio.tarifa.precio.toFixed(2)}</span></div>
-                      <div className="flex justify-between gap-3"><span>{servicio.tarifa.chip?.nombre || 'Chip'}</span><span>S/ {Number(servicio.tarifa.chip?.precio || 0).toFixed(2)}</span></div>
+                    <div className="mt-2 space-y-0.5 rounded border border-slate-100 bg-slate-50 p-1.5 text-[11px] font-semibold text-slate-500">
+                      <div className="flex justify-between gap-2"><span>Certificado</span><span>S/ {servicio.tarifa.precio.toFixed(2)}</span></div>
+                      <div className="flex justify-between gap-2"><span>{servicio.tarifa.chip?.nombre || 'Chip'}</span><span>S/ {Number(servicio.tarifa.chip?.precio || 0).toFixed(2)}</span></div>
                     </div>
                   )}
-                  <div className="mt-4 flex items-end justify-between gap-3">
-                    <span className="text-[11px] font-semibold text-slate-400">{servicio.codigo}</span>
+                  <div className="mt-2 flex items-end justify-between gap-2">
+                    <span className="text-[10px] font-semibold text-slate-400">{servicio.codigo}</span>
                     <div className="text-right">
-                      <span className="block text-xl font-black text-[#052a79]">S/ {servicio.tarifa.importeTotal.toFixed(2)}</span>
-                      {servicio.tarifa.requiereChip && <span className="mt-1 block text-[10px] font-black capitalize text-emerald-700">Incluye chip</span>}
+                      <span className="block text-lg font-black text-[#052a79] leading-none">S/ {servicio.tarifa.importeTotal.toFixed(2)}</span>
+                      {servicio.tarifa.requiereChip && <span className="mt-1 block text-[10px] font-black capitalize text-emerald-700 leading-none">Incluye chip</span>}
                     </div>
                   </div>
                 </button>
@@ -189,30 +189,30 @@ export function CajaStep({
         )}
       </section>
 
-      {seleccion?.servicio.requiere_vehiculo && (
-        <section className="space-y-4 border-t border-slate-100 pt-6">
-          <h4 className="text-sm font-bold capitalize tracking-wider text-slate-700">2. Datos Básicos</h4>
-          <div className="grid grid-cols-1 gap-6 max-w-md">
-            <div className="space-y-2">
-              <label className="text-xs font-bold capitalize tracking-wider text-slate-500">Placa de Rodaje</label>
-              <input type="text" className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => { onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() })); }} maxLength={7} />
-            </div>
+      {seleccion && (
+        <section className="space-y-4 border-t border-slate-100 pt-5">
+          {seleccion.servicio.requiere_vehiculo && (
+            <h4 className="text-sm font-bold capitalize tracking-wider text-slate-700">2. Datos Básicos</h4>
+          )}
+          <div className="flex flex-col sm:flex-row items-end justify-between gap-4">
+            {seleccion.servicio.requiere_vehiculo ? (
+              <div className="w-full sm:max-w-xs space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Placa de Rodaje</label>
+                <input type="text" className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => { onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() })); }} maxLength={7} />
+              </div>
+            ) : <div />}
+
+            <button
+              type="button"
+              onClick={() => void onConsultar()}
+              disabled={consultando || (seleccion.servicio.requiere_vehiculo && (!formCaja.placa))}
+              className="flex w-full sm:w-auto min-w-[180px] items-center justify-center gap-2 rounded-xl bg-[#052a79] px-6 h-[42px] text-xs font-black text-white shadow-sm transition hover:bg-[#041d54] disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              <Search className="h-4 w-4" />
+              {consultando ? 'CONSULTANDO…' : consultaRealizada ? 'CONSULTAR NUEVAMENTE' : 'CONSULTAR'}
+            </button>
           </div>
         </section>
-      )}
-
-      {seleccion && (
-        <div className="flex justify-end border-t border-slate-100 pt-5">
-          <button
-            type="button"
-            onClick={() => void onConsultar()}
-            disabled={consultando || (seleccion.servicio.requiere_vehiculo && (!formCaja.placa))}
-            className="flex min-w-40 items-center justify-center gap-2 rounded-lg bg-[#052a79] px-6 py-3 text-xs font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            <Search className="h-4 w-4" />
-            {consultando ? 'CONSULTANDO…' : consultaRealizada ? 'CONSULTAR NUEVAMENTE' : 'CONSULTAR'}
-          </button>
-        </div>
       )}
 
       {seleccion && consultaRealizada && (

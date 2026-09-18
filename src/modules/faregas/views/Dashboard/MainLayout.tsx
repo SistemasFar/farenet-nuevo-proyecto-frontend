@@ -68,6 +68,13 @@ export function MainLayout({
   else if (path.startsWith('/auditoria') || path.startsWith('/faregas/auditoria')) activeMenu = 'auditoria';
   else if (path.startsWith('/configuracion') || path.startsWith('/faregas/configuracion')) activeMenu = 'configuracion';
   else if (path.startsWith('/faregas/chips')) activeMenu = 'chips';
+  
+
+  const isCertificadoWizard =
+    path.startsWith('/faregas/nuevo-certificado') ||
+    /^\/faregas\/certificados\/[^/]+\/continuar\/?$/.test(path);
+
+  if (isCertificadoWizard) activeMenu = 'nuevo_certificado';
 
   const contextValue: MainLayoutContext = {
     user,
@@ -78,8 +85,9 @@ export function MainLayout({
     , plantasDisponibles
   };
 
+
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans antialiased overflow-hidden">
+    <div className="fixed inset-0 flex bg-slate-100 font-sans antialiased overflow-hidden">
       <Sidebar
         isFaregas={true}
         collapsed={sidebarCollapsed}
@@ -89,7 +97,7 @@ export function MainLayout({
         onMouseEnterSidebar={() => setSidebarHover(true)}
         onMouseLeaveSidebar={() => setSidebarHover(false)}
       />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <Header
           user={user}
           plantaName={plantaNombre}
@@ -102,7 +110,9 @@ export function MainLayout({
           isFaregas={true}
         />
 
-        <main className="flex-1 overflow-y-auto p-6 bg-slate-50 transition-all duration-300">
+        <main className={`flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-0 transition-all duration-300 ${
+          isCertificadoWizard ? 'bg-white' : 'bg-slate-50'
+        }`}>
           <Outlet context={contextValue} />
         </main>
       </div>

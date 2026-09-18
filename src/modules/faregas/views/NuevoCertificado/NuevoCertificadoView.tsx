@@ -1474,11 +1474,11 @@ export function NuevoCertificadoView() {
   }
 
   return (
-    <div className="w-full min-h-[calc(100vh-10rem)] bg-white rounded-2xl shadow-xl border-t-[4px] border-solid border-t-[#f59e0b] overflow-hidden flex flex-col" style={{ borderImage: "linear-gradient(to right, #fde047 0%, #f59e0b 50%, #b45309 100%) 1" }}>
+    <div className="w-full bg-white rounded-2xl shadow-xl border-t-[4px] border-solid border-t-[#f59e0b] overflow-hidden flex flex-col" style={{ borderImage: "linear-gradient(to right, #fde047 0%, #f59e0b 50%, #b45309 100%) 1" }}>
 
       {/* Header / Stepper */}
-      <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-6">
-        <div className="flex items-center gap-3 mb-6">
+      <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-4 sm:px-6">
+        <div className="flex items-center gap-3 mb-3">
           <button
             type="button"
             onClick={salirAlInicio}
@@ -1487,7 +1487,7 @@ export function NuevoCertificadoView() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-black text-slate-800 capitalize tracking-tight">
+          <h2 className="text-lg font-black text-slate-800 capitalize tracking-tight">
             Nuevo Certificado
           </h2>
           {certificadoId && (
@@ -1523,12 +1523,12 @@ export function NuevoCertificadoView() {
                 title={index < minimumEditableStepIndex ? 'Este paso ya no es editable porque el pago fue confirmado' : index < currentStepIndex ? `Volver a ${step.label}` : index === currentStepIndex ? 'Paso actual' : 'Complete el paso anterior'}
               >
                 <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
                     isCompleted ? 'bg-gold-3d shadow-sm border-none' :
                       'bg-white text-slate-400 border-2 border-slate-200'
                     }`}
                 >
-                  {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
+                  {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : <StepIcon className="w-4 h-4" />}
                 </div>
                 <span className={`text-xs font-bold capitalize tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
                   {step.label}
@@ -1540,7 +1540,7 @@ export function NuevoCertificadoView() {
       </div>
 
       {/* Content Area */}
-      <div className="p-8">
+      <div className="p-5 sm:p-6 lg:p-8">
         {STEPS[currentStepIndex].id === 'datos_iniciales' && (
           <CajaStep
             key={plantaSeleccionada}
