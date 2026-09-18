@@ -117,7 +117,7 @@ export function PrevisualizacionCertificadoStep({ certificadoId }: Previsualizac
         <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
           <div className="flex items-center gap-2 bg-slate-900 px-6 py-4 text-white">
             <Eye className="h-5 w-5 text-amber-400" />
-            <h3 className="text-sm font-bold uppercase tracking-wider">Previsualización de Certificado (Borrador)</h3>
+            <h3 className="text-sm font-bold capitalize tracking-wider">Previsualización de Certificado (Borrador)</h3>
           </div>
           <div className="flex-1 overflow-hidden bg-slate-100 p-4">
             <iframe

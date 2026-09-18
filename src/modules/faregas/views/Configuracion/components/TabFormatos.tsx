@@ -77,7 +77,7 @@ export default function TabFormatos() {
           : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-gray-200 bg-white text-xs uppercase text-gray-500">
+                <thead className="border-b border-gray-200 bg-white text-xs capitalize text-gray-500">
                   <tr>
                     <th className="px-4 py-3">Código</th>
                     <th className="px-4 py-3">Nombre</th>
@@ -160,7 +160,7 @@ export default function TabFormatos() {
                 <input required maxLength={50} value={codigo}
                   onChange={(e) => setCodigo(e.target.value.toUpperCase().replace(/\s+/g, '_'))}
                   placeholder={formatoPadreParaCrear ? `EJ: ${formatoPadreParaCrear.codigo}_VAR` : "EJ: TALLER_INSPECCION"}
-                  className="w-full rounded-lg border p-2 uppercase" />
+                  className="w-full rounded-lg border p-2 capitalize" />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Nombre</label>

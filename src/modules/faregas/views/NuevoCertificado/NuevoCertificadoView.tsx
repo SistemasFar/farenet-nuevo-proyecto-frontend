@@ -1487,7 +1487,7 @@ export function NuevoCertificadoView() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+          <h2 className="text-xl font-black text-slate-800 capitalize tracking-tight">
             Nuevo Certificado
           </h2>
           {certificadoId && (
@@ -1530,7 +1530,7 @@ export function NuevoCertificadoView() {
                 >
                   {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                 </div>
-                <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
+                <span className={`text-xs font-bold capitalize tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
                   {step.label}
                 </span>
               </button>

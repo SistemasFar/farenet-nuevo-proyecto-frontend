@@ -128,10 +128,10 @@ export function Header({
           </button>
 
           <div className="leading-tight min-w-0">
-            <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-0.5 opacity-90">
+            <div className="text-[10px] font-bold text-slate-300 capitalize tracking-widest mb-0.5 opacity-90">
               {empresaSeleccionada ? `${empresaSeleccionada.nombre} [${empresaSeleccionada.key}]` : 'EMPRESA NO SELECCIONADA'}
             </div>
-            <div className="text-lg font-black tracking-wide text-gold-3d uppercase truncate">
+            <div className="text-lg font-black tracking-wide text-gold-3d capitalize truncate">
               SEDE ACTIVA: {plantaName || 'SIN SEDE'}
             </div>
 
@@ -167,7 +167,7 @@ export function Header({
             {dropdownOpen && (
               <div className="absolute right-0 mt-3 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl z-50">
                 <div className="px-3 py-2 border-b border-slate-100 mb-3">
-                  <span className="block text-xs font-bold text-slate-400 uppercase">
+                  <span className="block text-xs font-bold text-slate-400 capitalize">
                     Operador
                   </span>
 
@@ -176,14 +176,14 @@ export function Header({
                   </span>
 
                   {user?.perfilId && (
-                    <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase text-blue-700">
+                    <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold capitalize text-blue-700">
                       {user.perfilId}
                     </span>
                   )}
                 </div>
 
                 <div className="mb-3">
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+                  <label className="block text-[11px] font-bold text-slate-500 capitalize mb-1">
                     Sede Operativa
                   </label>
 

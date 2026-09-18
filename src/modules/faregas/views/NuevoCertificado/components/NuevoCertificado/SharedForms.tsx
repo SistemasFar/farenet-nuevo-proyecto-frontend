@@ -85,7 +85,7 @@ export const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, e
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50">
-          <h2 className="text-sm font-bold text-slate-800 uppercase">Agregar Nuevo: {title}</h2>
+          <h2 className="text-sm font-bold text-slate-800 capitalize">Agregar Nuevo: {title}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
             <XCircle size={20} />
           </button>
@@ -98,7 +98,7 @@ export const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, e
           )}
           {error && <p className="text-xs text-red-500 font-semibold bg-red-50 p-2 rounded-lg">{error}</p>}
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Valor</label>
+            <label className="text-[10px] font-bold text-slate-500 capitalize">Valor</label>
             <input
               type="text"
               autoFocus
@@ -173,7 +173,7 @@ export const InputField = ({ label, name, formData, setFormData, type = "text", 
   return (
     <div className="flex flex-col gap-1.5 md:col-span-1">
       <div className="flex items-center justify-between">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && '*'}</label>
+        <label className="text-[10px] font-bold text-slate-500 capitalize">{label} {required && '*'}</label>
         {onAddNuevo && !disabled && (
           <button
             type="button"

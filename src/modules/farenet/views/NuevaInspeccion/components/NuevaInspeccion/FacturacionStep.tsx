@@ -164,7 +164,7 @@ export function FacturacionStep({
         
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
           <div>
-            <h3 className="text-lg font-black text-[#052a79] uppercase">Datos del Recibo</h3>
+            <h3 className="text-lg font-black text-[#052a79] capitalize">Datos del Recibo</h3>
             <p className="text-xs font-semibold text-slate-500 mt-1">Complete los datos para la facturación</p>
           </div>
           <button 

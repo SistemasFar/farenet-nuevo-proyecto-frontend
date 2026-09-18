@@ -123,7 +123,7 @@ export function PropietarioStep({
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-black text-[#052a79] uppercase">Datos del Propietario / Cliente</h3>
+        <h3 className="text-sm font-black text-[#052a79] capitalize">Datos del Propietario / Cliente</h3>
         <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 transition">
           <input
             type="checkbox"

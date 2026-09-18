@@ -136,7 +136,7 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
           <Tag className="h-5 w-5" />
         </div>
         <div>
-          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-800">Descuentos y Convenios</h4>
+          <h4 className="text-sm font-bold capitalize tracking-wider text-slate-800">Descuentos y Convenios</h4>
           <p className="text-xs font-semibold text-slate-500">Consulta uno de los códigos vinculados en Administración de Descuentos</p>
         </div>
       </div>
@@ -145,7 +145,7 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
         <div className="flex-1">
           <input
             type="text"
-            className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:bg-white focus:ring-0 placeholder:normal-case placeholder:font-medium disabled:opacity-50"
+            className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 font-bold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:bg-white focus:ring-0 placeholder:normal-case placeholder:font-medium disabled:opacity-50"
             placeholder="Ingresa el código de descuento..."
             value={codigo}
             onChange={(e) => setCodigo(e.target.value.toUpperCase())}
@@ -180,7 +180,7 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
           <div className="relative z-10">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
               <div>
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-[#052a79]/10 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-[#052a79] mb-2">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-[#052a79]/10 px-2.5 py-1 text-xs font-black capitalize tracking-wider text-[#052a79] mb-2">
                   <CheckCircle2 className="h-3.5 w-3.5" /> {resultadoConsulta.tipo} VÁLIDO
                 </span>
                 <h5 className="text-lg font-black text-slate-800">{resultadoConsulta.nombre}</h5>
@@ -191,7 +191,7 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
                 )}
               </div>
               <div className="text-right flex flex-col items-end">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Nuevo Total a Pagar</span>
+                <span className="text-xs font-bold capitalize tracking-wider text-slate-500">Nuevo Total a Pagar</span>
                 <span className="text-3xl font-black text-[#052a79]">S/ {resultadoConsulta.importeFinal.toFixed(2)}</span>
                 <span className="text-xs font-semibold text-emerald-600 line-through decoration-red-500/50 ml-1">
                   Antes S/ {resultadoConsulta.tarifaOriginal.toFixed(2)}
@@ -202,12 +202,12 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
             <div className="flex items-center justify-between border-t border-[#052a79]/10 pt-4 mt-2">
               <div className="flex gap-4">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase text-slate-500">Descuento</span>
+                  <span className="text-[10px] font-bold capitalize text-slate-500">Descuento</span>
                   <span className="text-sm font-black text-emerald-600">- S/ {resultadoConsulta.importeDescuento.toFixed(2)}</span>
                 </div>
                 {resultadoConsulta.usosDisponibles < 100 && (
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase text-slate-500">Usos Restantes</span>
+                    <span className="text-[10px] font-bold capitalize text-slate-500">Usos Restantes</span>
                     <span className="text-sm font-bold text-slate-700">{resultadoConsulta.usosDisponibles}</span>
                   </div>
                 )}

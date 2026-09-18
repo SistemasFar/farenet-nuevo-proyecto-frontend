@@ -315,7 +315,7 @@ export function ConsolidacionLegacyPanel({
   }
 
   // ─── BOTONES LEGACY (Mock) ────────────────────────────────────────────────
-  const btnLegacyClass = "px-3 py-2 text-xs font-bold uppercase rounded border shadow-sm flex items-center justify-center gap-1 transition-opacity";
+  const btnLegacyClass = "px-3 py-2 text-xs font-bold capitalize rounded border shadow-sm flex items-center justify-center gap-1 transition-opacity";
   const btnDisabled = "bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed opacity-70";
 
   const handleFocusObservacion = () => {
@@ -377,15 +377,15 @@ export function ConsolidacionLegacyPanel({
         <div className="flex flex-col lg:flex-row justify-between items-start mb-8 text-xs md:text-sm gap-8">
           <div className="space-y-6 w-full lg:w-1/3">
             <div>
-              <div className="text-[10px] text-slate-500 mb-1 uppercase font-semibold">VEHICULO</div>
+              <div className="text-[10px] text-slate-500 mb-1 capitalize font-semibold">VEHICULO</div>
               <div className="font-bold text-slate-800">{vehiculo?.placa || ''} - {vehiculo?.marca || ''} - {vehiculo?.modelo || ''}</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 mb-1 uppercase font-semibold">CONCEPTO</div>
+              <div className="text-[10px] text-slate-500 mb-1 capitalize font-semibold">CONCEPTO</div>
               <div className="font-bold text-slate-800">{comprobante?.concepto || ''}</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 mb-1 uppercase font-semibold">TOTAL PAGADO</div>
+              <div className="text-[10px] text-slate-500 mb-1 capitalize font-semibold">TOTAL PAGADO</div>
               <div className="font-bold text-slate-800">S/. {comprobante?.importetotal || comprobante?.total || '0.00'}</div>
             </div>
           </div>
@@ -437,7 +437,7 @@ export function ConsolidacionLegacyPanel({
         {/* WHITE BORDERED BLOCK */}
         <div className="border border-slate-200 bg-white mb-8 shadow-sm">
            <div className="flex flex-col md:flex-row border-b border-slate-200">
-             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">* TIPO INSPECCIÓN:</div>
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] capitalize">* TIPO INSPECCIÓN:</div>
              <div className="w-full md:w-3/4 p-2">
                <select disabled className="w-full border border-slate-200 p-2 text-xs bg-slate-50 text-slate-500 outline-none">
                  <option>{estadoLinea.certificacion?.tipoInspeccion || 'ORDINARIA - COMPLEMENTARIA'}</option>
@@ -446,7 +446,7 @@ export function ConsolidacionLegacyPanel({
            </div>
            
            <div className="flex flex-col md:flex-row border-b border-slate-200">
-             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">* TIPO CERTIFICADO:</div>
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] capitalize">* TIPO CERTIFICADO:</div>
              <div className="w-full md:w-3/4 p-2">
                <select disabled className="w-full border border-slate-200 p-2 text-xs bg-slate-50 text-slate-500 outline-none">
                  <option>{estadoLinea.certificacion?.tipoCertificado || 'TRANSPORTE PUBLICO DE PERSONAS EN TAXI'}</option>
@@ -455,7 +455,7 @@ export function ConsolidacionLegacyPanel({
            </div>
            
            <div className="flex flex-col md:flex-row border-b border-slate-200">
-             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">* TIPO AUTORIZACIÓN:</div>
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] capitalize">* TIPO AUTORIZACIÓN:</div>
              <div className="w-full md:w-3/4 p-2">
                <select disabled className="w-full border border-slate-200 p-2 text-xs bg-slate-50 text-slate-500 outline-none">
                  <option>{estadoLinea.certificacion?.tipoAutorizacion || 'TAXI INDEPENDIENTE'}</option>
@@ -464,7 +464,7 @@ export function ConsolidacionLegacyPanel({
            </div>
            
            <div className="flex flex-col md:flex-row border-b border-slate-200 bg-slate-50">
-             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">* INGENIERO CERTIFICADOR:</div>
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] capitalize">* INGENIERO CERTIFICADOR:</div>
              <div className="w-full md:w-3/4 p-2">
                <select 
                   className="w-full border border-slate-300 p-2 text-xs bg-white focus:border-[#204080] outline-none"
@@ -489,7 +489,7 @@ export function ConsolidacionLegacyPanel({
            </div>
            
            <div className="flex flex-col md:flex-row border-b border-slate-200">
-             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] uppercase">OBSERVACION:</div>
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-[#204080] capitalize">OBSERVACION:</div>
              <div className="w-full md:w-3/4 p-2">
                <input 
                   id="observacionTextarea"
@@ -504,8 +504,8 @@ export function ConsolidacionLegacyPanel({
            </div>
            
            <div className="flex flex-col md:flex-row border-b border-slate-200 bg-slate-50/50">
-             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest">USUARIO CERTIFICA:</div>
-             <div className="w-full md:w-3/4 p-3 text-[10px] md:text-xs font-black text-[#204080] uppercase tracking-wider">
+             <div className="w-full md:w-1/4 p-3 flex items-center text-[10px] md:text-xs font-bold text-slate-500 capitalize tracking-widest">USUARIO CERTIFICA:</div>
+             <div className="w-full md:w-3/4 p-3 text-[10px] md:text-xs font-black text-[#204080] capitalize tracking-wider">
                {usuarioActual?.nombreCompleto || usuarioActual?.username || usuarioActual?.usuario || ''}
              </div>
            </div>
@@ -538,39 +538,39 @@ export function ConsolidacionLegacyPanel({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10 mb-10 px-0 md:px-4">
            <div className="flex flex-col gap-2.5">
               <button 
-                className={`${puedeConsolidar ? 'bg-[#7a9cc6] hover:bg-[#6080b0] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                className={`${puedeConsolidar ? 'bg-[#7a9cc6] hover:bg-[#6080b0] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                 disabled={!puedeConsolidar || consolidando}
                 onClick={handleConsolidar}
               >
                 {consolidando ? 'Guardando...' : 'Consolidar'}
               </button>
               <button 
-                className={`${puedeAnular ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                className={`${puedeAnular ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                 disabled={!puedeAnular || consolidando} 
                 onClick={() => setModalAnularInspeccionOpen(true)}
               >
                 Anular Inspección
               </button>
-              <button className="bg-[#103070] hover:bg-[#0c2455] text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors cursor-not-allowed opacity-80" disabled>Reimprimir Certificado</button>
+              <button className="bg-[#103070] hover:bg-[#0c2455] text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors cursor-not-allowed opacity-80" disabled>Reimprimir Certificado</button>
            </div>
            
            <div className="flex flex-col gap-2.5">
               <button 
-                className={`${(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                className={`${(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                 disabled={!(modo === 'HISTORICO_CONSOLIDADO' && (resultadoOperacion?.nrodocumentocertificado || estadoLinea.inspeccion?.nrodocumentocertificado || estadoLinea.certificado?.nrodocumentocertificado)) || consolidando} 
                 onClick={handleVisualizar}
               >
                 Visualizar
               </button>
               <button 
-                className={`${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                className={`${modo === 'HISTORICO_CONSOLIDADO' ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                 disabled={modo !== 'HISTORICO_CONSOLIDADO' || consolidando} 
                 onClick={handleVisualizarInforme}
               >
                 Visualizar Informe
               </button>
               <button 
-                className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                 disabled={!puedeEditarCamposPreparacion} 
                 onClick={() => setModalReciboOpen(true)}
               >
@@ -580,14 +580,14 @@ export function ConsolidacionLegacyPanel({
            
            <div className="flex flex-col gap-2.5">
               <button 
-                className={`${puedeCambiarObservacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                className={`${puedeCambiarObservacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                 disabled={!puedeCambiarObservacion} 
                 onClick={() => setModalErrorImpresionOpen(true)}
               >
                 Error Impresion
               </button>
               <button 
-                className={`${puedeCambiarObservacion || puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                className={`${puedeCambiarObservacion || puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                 disabled={!puedeCambiarObservacion && !puedeEditarCamposPreparacion} 
                 onClick={puedeCambiarObservacion ? handleCambiarObservacion : handleFocusObservacion}
               >
@@ -603,14 +603,14 @@ export function ConsolidacionLegacyPanel({
              <div className="border-t border-slate-300 pt-6 flex flex-col md:flex-row gap-6 px-0 md:px-4">
                 <div className="flex flex-col gap-2.5 w-full md:w-1/3">
                    <button 
-                     className={`${isConsolidada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     className={`${isConsolidada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                      onClick={() => isConsolidada && console.log('Pendiente de migración')}
                      disabled={!isConsolidada}
                    >
                      Registro Vehiculo MTC
                    </button>
                    <button 
-                     className={`${isAnulada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     className={`${isAnulada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                      onClick={() => isAnulada && setModalRegistroResultadosOpen(true)}
                      disabled={!isAnulada}
                    >
@@ -619,14 +619,14 @@ export function ConsolidacionLegacyPanel({
                 </div>
                 <div className="flex flex-col gap-2.5 w-full md:w-1/3">
                    <button 
-                     className={`${isConsolidada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     className={`${isConsolidada ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                      onClick={() => isConsolidada && setModalPolizaOpen(true)}
                      disabled={!isConsolidada}
                    >
                      Registro Póliza MTC
                    </button>
                    <button 
-                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                      onClick={() => puedeEditarCamposPreparacion && setModalLineaOpen(true)}
                      disabled={!puedeEditarCamposPreparacion}
                    >
@@ -635,14 +635,14 @@ export function ConsolidacionLegacyPanel({
                 </div>
                 <div className="flex flex-col gap-2.5 w-full md:w-1/3">
                    <button 
-                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                      onClick={() => puedeEditarCamposPreparacion && setModalMotorOpen(true)}
                      disabled={!puedeEditarCamposPreparacion}
                    >
                      Cambio Motor
                    </button>
                    <button 
-                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold uppercase rounded-sm shadow-sm transition-colors`}
+                     className={`${puedeEditarCamposPreparacion ? 'bg-[#103070] hover:bg-[#0c2455] cursor-pointer' : 'bg-slate-300 cursor-not-allowed'} text-white py-2.5 text-xs font-bold capitalize rounded-sm shadow-sm transition-colors`}
                      onClick={() => puedeEditarCamposPreparacion && setModalFirmaOpen(true)}
                      disabled={!puedeEditarCamposPreparacion}
                    >

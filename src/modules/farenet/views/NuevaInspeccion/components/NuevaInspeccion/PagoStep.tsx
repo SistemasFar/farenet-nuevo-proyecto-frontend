@@ -70,7 +70,7 @@ export function PagoStep({
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-bold text-[#052a79] uppercase border-b border-amber-200/60 pb-2">
+      <h3 className="text-lg font-bold text-[#052a79] capitalize border-b border-amber-200/60 pb-2">
         Registro de Pago
       </h3>
 
@@ -78,11 +78,11 @@ export function PagoStep({
       {!descuentoObj?.isCuponidad && !isReinspeccionGratuita && descuentoObj?.tipodescuento_key !== 'corte' && (
         <div className="grid grid-cols-2 gap-6 mb-8">
           <div className="bg-[#f4f9ff] border-2 border-[#052a79] rounded-2xl p-6 text-center shadow-sm">
-            <h3 className="text-sm font-black text-[#052a79] uppercase tracking-wider mb-2">Monto Total a Pagar</h3>
+            <h3 className="text-sm font-black text-[#052a79] capitalize tracking-wider mb-2">Monto Total a Pagar</h3>
             <p className="text-4xl font-black text-[#052a79]">S/ {precioTotal.toFixed(2)}</p>
           </div>
           <div className={`border-2 rounded-2xl p-6 text-center shadow-sm transition-colors ${montoPendiente > 0 ? 'bg-red-50 border-red-500' : 'bg-green-50 border-green-500'}`}>
-            <h3 className={`text-sm font-black uppercase tracking-wider mb-2 ${montoPendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>Monto Pendiente</h3>
+            <h3 className={`text-sm font-black capitalize tracking-wider mb-2 ${montoPendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>Monto Pendiente</h3>
             <p className={`text-4xl font-black ${montoPendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>S/ {montoPendiente.toFixed(2)}</p>
           </div>
         </div>
@@ -91,36 +91,36 @@ export function PagoStep({
       {/* Pestañas de Método de Pago y Formulario */}
       {descuentoObj?.isCuponidad ? (
         <div className="bg-green-100 border-2 border-green-500 rounded-xl p-8 mb-8 text-center shadow-sm">
-          <h2 className="text-3xl font-black text-green-700 uppercase tracking-wide flex items-center justify-center gap-3">
+          <h2 className="text-3xl font-black text-green-700 capitalize tracking-wide flex items-center justify-center gap-3">
              ✅ PAGADO EN CUPONIDAD
           </h2>
           <div className="mt-4 bg-white/60 inline-block px-6 py-2 rounded-lg border border-green-300">
-            <p className="text-sm font-bold text-green-800 uppercase mb-1">CÓDIGO DEL CUPÓN VALIDADO:</p>
+            <p className="text-sm font-bold text-green-800 capitalize mb-1">CÓDIGO DEL CUPÓN VALIDADO:</p>
             <p className="text-2xl font-black text-green-900 tracking-wider">
               {descuentoObj.documentoBusqueda || descuentoObj.uuid}
             </p>
           </div>
-          <p className="text-sm font-bold text-green-600 mt-4 uppercase">
+          <p className="text-sm font-bold text-green-600 mt-4 capitalize">
             La tarifa plana ya fue cancelada. Haga clic en el botón Siguiente Paso.
           </p>
         </div>
       ) : isReinspeccionGratuita ? (
         <div className="bg-green-100 border-2 border-green-500 rounded-xl p-8 mb-8 text-center shadow-sm">
-          <h2 className="text-2xl font-black text-green-700 uppercase tracking-wide">REINSPECCIÓN APLICADA</h2>
-          <p className="text-lg font-bold text-green-600 mt-2 uppercase">NO TIENE MONTO QUE PAGAR</p>
+          <h2 className="text-2xl font-black text-green-700 capitalize tracking-wide">REINSPECCIÓN APLICADA</h2>
+          <p className="text-lg font-bold text-green-600 mt-2 capitalize">NO TIENE MONTO QUE PAGAR</p>
         </div>
       ) : descuentoObj?.tipodescuento_key === 'corte' ? (
         <div className="bg-green-100 border-2 border-green-500 rounded-xl p-8 mb-8 text-center shadow-sm">
-          <h2 className="text-3xl font-black text-green-700 uppercase tracking-wide flex items-center justify-center gap-3">
+          <h2 className="text-3xl font-black text-green-700 capitalize tracking-wide flex items-center justify-center gap-3">
             ✅ CORTESÍA APLICADA
           </h2>
           <div className="mt-4 bg-white/60 inline-block px-6 py-2 rounded-lg border border-green-300">
-            <p className="text-sm font-bold text-green-800 uppercase mb-1">PROMOCIÓN / MOTIVO:</p>
+            <p className="text-sm font-bold text-green-800 capitalize mb-1">PROMOCIÓN / MOTIVO:</p>
             <p className="text-2xl font-black text-green-900 tracking-wider">
               {descuentoObj.campana || descuentoObj.nombre || 'Cortesía General'}
             </p>
           </div>
-          <p className="text-sm font-bold text-green-600 mt-4 uppercase">
+          <p className="text-sm font-bold text-green-600 mt-4 capitalize">
             NO TIENE MONTO QUE PAGAR. Haga clic en el botón Siguiente Paso.
           </p>
         </div>
@@ -155,13 +155,13 @@ export function PagoStep({
     
           {/* Formulario de Pago */}
           <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
-            <h3 className="text-sm font-black text-slate-800 uppercase mb-4">Detalles del Pago: {pagoTab}</h3>
+            <h3 className="text-sm font-black text-slate-800 capitalize mb-4">Detalles del Pago: {pagoTab}</h3>
     
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
           {pagoTab === 'TARJETA' && (
             <>
               <div className="flex flex-col gap-1.5 md:col-span-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Tipo Tarjeta</label>
+                <label className="text-[10px] font-bold text-slate-500 capitalize">Tipo Tarjeta</label>
                 <Select
                   options={maestrosPago?.tarjetas?.map((t: any) => ({ value: t.key, label: t.nombre })) || []}
                   value={maestrosPago?.tarjetas?.map((t: any) => ({ value: t.key, label: t.nombre })).find((o: any) => o.value === formPago.tarjetaKey) || null}
@@ -172,11 +172,11 @@ export function PagoStep({
                 />
               </div>
               <div className="flex flex-col gap-1.5 md:col-span-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Nro. Operación</label>
+                <label className="text-[10px] font-bold text-slate-500 capitalize">Nro. Operación</label>
                 <input type="text" value={formPago.nroOperacion} onChange={(e) => setFormPago({ ...formPago, nroOperacion: e.target.value.replace(/[^0-9]/g, '') })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-amber-500" />
               </div>
               <div className="flex flex-col gap-1.5 md:col-span-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Últimos 4 Dígitos</label>
+                <label className="text-[10px] font-bold text-slate-500 capitalize">Últimos 4 Dígitos</label>
                 <input
                   type="text"
                   maxLength={4}
@@ -215,7 +215,7 @@ export function PagoStep({
           {pagoTab === 'BANCO' && (
             <>
               <div className="flex flex-col gap-1.5 md:col-span-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Banco (*)</label>
+                <label className="text-[10px] font-bold text-slate-500 capitalize">Banco (*)</label>
                 <Select
                   options={maestrosPago?.entidadesFinancieras?.map((t: any) => ({ value: t.key, label: t.nombre })) || []}
                   value={maestrosPago?.entidadesFinancieras?.map((t: any) => ({ value: t.key, label: t.nombre })).find((o: any) => o.value === formPago.entidadFinancieraKey) || null}
@@ -225,7 +225,7 @@ export function PagoStep({
                 />
               </div>
               <div className="flex flex-col gap-1.5 md:col-span-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Cuenta Corriente (*)</label>
+                <label className="text-[10px] font-bold text-slate-500 capitalize">Cuenta Corriente (*)</label>
                 <Select
                   options={maestrosPago?.cuentasCorrientes?.filter((c: any) => c.entidadfinanciera_key === formPago.entidadFinancieraKey).map((t: any) => ({ value: t.key, label: t.nombre })) || []}
                   value={maestrosPago?.cuentasCorrientes?.map((t: any) => ({ value: t.key, label: t.nombre })).find((o: any) => o.value === formPago.cuentaCorrienteKey) || null}
@@ -236,7 +236,7 @@ export function PagoStep({
                 />
               </div>
               <div className="flex flex-col gap-1.5 md:col-span-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Nro. Operación (*)</label>
+                <label className="text-[10px] font-bold text-slate-500 capitalize">Nro. Operación (*)</label>
                 <input
                   type="text"
                   maxLength={20}
@@ -247,7 +247,7 @@ export function PagoStep({
                 <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">Ingrese el N° indicado en el voucher.</p>
               </div>
               <div className="flex flex-col gap-1.5 md:col-span-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase">Fecha Depósito (*)</label>
+                <label className="text-[10px] font-bold text-slate-500 capitalize">Fecha Depósito (*)</label>
                 <input
                   type="date"
                   max={new Date().toISOString().split('T')[0]}
@@ -260,7 +260,7 @@ export function PagoStep({
           )}
 
           <div className="flex flex-col gap-1.5 md:col-span-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Importe (S/) (*)</label>
+            <label className="text-[10px] font-bold text-slate-500 capitalize">Importe (S/) (*)</label>
             <input
               type="text"
               value={formPago.importe}
@@ -279,7 +279,7 @@ export function PagoStep({
             <button
               onClick={handleAgregarPago}
               disabled={montoPendiente <= 0 && editingPagoIndex === null}
-              className="w-full px-4 py-2.5 rounded-lg font-black text-white bg-[#052a79] hover:bg-blue-900 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed uppercase text-sm h-[42px]"
+              className="w-full px-4 py-2.5 rounded-lg font-black text-white bg-[#052a79] hover:bg-blue-900 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed capitalize text-sm h-[42px]"
             >
               {editingPagoIndex !== null ? 'ACTUALIZAR' : 'AGREGAR'}
             </button>
@@ -301,7 +301,7 @@ export function PagoStep({
       {!descuentoObj?.isCuponidad && !isReinspeccionGratuita && descuentoObj?.tipodescuento_key !== 'corte' && pagosAgregados.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-[#f4f9ff] text-[#052a79] text-xs uppercase font-black">
+            <thead className="bg-[#f4f9ff] text-[#052a79] text-xs capitalize font-black">
               <tr>
                 <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3">Detalle</th>

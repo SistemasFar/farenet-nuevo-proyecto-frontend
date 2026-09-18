@@ -131,7 +131,7 @@ export default function TabDocumentosFacturacion() {
 
       <div className="overflow-x-auto rounded-xl border">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-100 text-left text-xs uppercase text-slate-600"><tr><th className="p-3">Fecha</th><th className="p-3">Comprobante</th><th className="p-3">Cliente</th><th className="p-3">Empresa / sede</th><th className="p-3">Total</th><th className="p-3">Estado</th><th className="p-3">Acciones</th></tr></thead>
+          <thead className="bg-slate-100 text-left text-xs capitalize text-slate-600"><tr><th className="p-3">Fecha</th><th className="p-3">Comprobante</th><th className="p-3">Cliente</th><th className="p-3">Empresa / sede</th><th className="p-3">Total</th><th className="p-3">Estado</th><th className="p-3">Acciones</th></tr></thead>
           <tbody>
             {loading && <tr><td colSpan={7} className="p-10 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>}
             {!loading && documentos.length === 0 && <tr><td colSpan={7} className="p-10 text-center text-slate-500">No se encontraron comprobantes.</td></tr>}

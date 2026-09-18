@@ -59,7 +59,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
       <div className="absolute top-5 right-5 z-20">
         <button 
           onClick={onLogout}
-          className="text-sm text-white/80 hover:text-white font-semibold uppercase tracking-wider transition"
+          className="text-sm text-white/80 hover:text-white font-semibold capitalize tracking-wider transition"
         >
           Cerrar Sesión
         </button>
@@ -105,7 +105,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
                   </div>
                 )}
                 
-                <h2 className="text-2xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] uppercase text-center mt-5">
+                <h2 className="text-2xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] capitalize text-center mt-5">
                   {empresa.nombre}
                 </h2>
                 <span className="text-xs text-white/80 font-bold mt-1 tracking-wider">
@@ -113,7 +113,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
                 </span>
 
                 <div 
-                  className="mt-6 w-full flex items-center justify-center gap-2 rounded-xl bg-gold-3d py-3 text-white text-sm font-black uppercase tracking-wider transition disabled:opacity-50"
+                  className="mt-6 w-full flex items-center justify-center gap-2 rounded-xl bg-gold-3d py-3 text-white text-sm font-black capitalize tracking-wider transition disabled:opacity-50"
                 >
                   {loading ? 'Ingresando...' : 'Ingresar'}
                 </div>
@@ -131,7 +131,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
         <div className="mt-8 text-center">
           <button
             onClick={onLogout}
-            className="text-white/60 hover:text-white/90 text-sm font-bold uppercase tracking-wider transition-colors"
+            className="text-white/60 hover:text-white/90 text-sm font-bold capitalize tracking-wider transition-colors"
           >
             Volver al login
           </button>

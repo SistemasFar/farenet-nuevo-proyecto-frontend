@@ -124,7 +124,7 @@ export function SeleccionPlantaView({
               <button
                 type="submit"
                 disabled={loading || plantas.length === 0}
-                className="w-full rounded-xl bg-gold-3d py-3 text-sm font-black uppercase tracking-wider shadow-lg transition disabled:opacity-50"
+                className="w-full rounded-xl bg-gold-3d py-3 text-sm font-black capitalize tracking-wider shadow-lg transition disabled:opacity-50"
               >
                 {loading ? 'Confirmando...' : 'Confirmar Sede'}
               </button>

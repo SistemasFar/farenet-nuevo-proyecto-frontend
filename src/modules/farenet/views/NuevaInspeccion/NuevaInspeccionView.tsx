@@ -812,7 +812,7 @@ export function NuevaInspeccionView() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+          <h2 className="text-xl font-black text-slate-800 capitalize tracking-tight">
             Nueva Inspección
           </h2>
         </div>
@@ -840,7 +840,7 @@ export function NuevaInspeccionView() {
                 >
                   {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                 </div>
-                <span className={`text-xs font-bold uppercase tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
+                <span className={`text-xs font-bold capitalize tracking-wider mt-1 ${isActive ? 'text-[#052a79]' : isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400'}`}>
                   {step.label}
                 </span>
               </div>
@@ -967,12 +967,12 @@ export function NuevaInspeccionView() {
 
           <div className="flex flex-col items-end gap-1.5">
             {currentStepIndex === 2 && !isVehiculoValid && (
-              <p className="text-[10px] text-red-500 font-bold uppercase">
+              <p className="text-[10px] text-red-500 font-bold capitalize">
                 Falta completar campos en Datos, SOAT o Propietario
               </p>
             )}
             {currentStepIndex === 3 && !isFacturacionValid && (
-              <p className="text-[10px] text-red-500 font-bold uppercase">
+              <p className="text-[10px] text-red-500 font-bold capitalize">
                 Falta completar campos de facturación
               </p>
             )}

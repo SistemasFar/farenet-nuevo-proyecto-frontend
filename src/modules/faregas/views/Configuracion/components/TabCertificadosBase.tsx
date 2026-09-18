@@ -157,7 +157,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
 
                 <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.5fr)]">
                   <section>
-                    <h4 className="mb-2 text-xs font-bold uppercase text-slate-500">Productos fiscales</h4>
+                    <h4 className="mb-2 text-xs font-bold capitalize text-slate-500">Productos fiscales</h4>
                     {productosCategoria.length === 0 ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Esta categoría todavía no tiene productos fiscales.</div> : (
                       <div className="grid gap-2 sm:grid-cols-2">{productosCategoria.map((producto) => {
                         const servicioVinculado = servicioDeProducto(producto);
@@ -181,7 +181,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
                   </section>
 
                   <section>
-                    <h4 className="mb-2 text-xs font-bold uppercase text-slate-500">Operaciones, certificado y sedes</h4>
+                    <h4 className="mb-2 text-xs font-bold capitalize text-slate-500">Operaciones, certificado y sedes</h4>
                     {serviciosCategoria.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No hay una operación configurada. La categoría y sus productos existen, pero todavía no están disponibles en ninguna sede.</div> : (
                       <div className="space-y-2">{serviciosCategoria.map((servicio) => {
                         const sedesServicio = sedesActivasDe(servicio.id);

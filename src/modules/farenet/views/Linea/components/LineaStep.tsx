@@ -271,7 +271,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
     return (
       <div className="flex flex-col gap-2 p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-700 text-sm uppercase">{titulo}</span>
+          <span className="font-bold text-slate-700 text-sm capitalize">{titulo}</span>
           {isListo ? (
             <span className="flex items-center gap-1 text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded">
               <CheckCircle2 className="w-3 h-3" /> LISTO
@@ -337,7 +337,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
           </div>
           <div className="w-full md:w-64 bg-slate-800 text-white p-5 rounded-xl shadow-sm flex flex-col justify-center items-center relative overflow-hidden">
              <Settings className="w-24 h-24 absolute -right-4 -bottom-4 text-white opacity-5" />
-             <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Avance</span>
+             <span className="text-sm font-bold text-slate-400 capitalize tracking-widest">Avance</span>
              <span className="text-4xl font-black mt-1">{avanceCompletadas} <span className="text-xl text-slate-400 font-medium">/ {avanceMostradoTotal}</span></span>
              <button onClick={onRefresh} className="mt-3 text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-2 transition-colors">
                <RefreshCw className="w-3 h-3" /> Refrescar
@@ -427,7 +427,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-fade-in">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-800 capitalize tracking-tight flex items-center gap-2">
                 Foto: {modalFoto.titulo}
               </h2>
               <button onClick={() => setModalFoto({ ...modalFoto, open: false })} className="text-slate-400 hover:text-slate-600">

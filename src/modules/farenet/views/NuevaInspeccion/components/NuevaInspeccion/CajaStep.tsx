@@ -499,7 +499,7 @@ export function CajaStep({
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-bold text-[#052a79] uppercase border-b border-amber-200/60 pb-2">
+      <h3 className="text-lg font-bold text-[#052a79] capitalize border-b border-amber-200/60 pb-2">
         Datos de Caja
       </h3>
 
@@ -524,7 +524,7 @@ export function CajaStep({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Placa *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Tipo de Placa *</label>
               <Select
                 options={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })) || []}
                 value={maestros?.tiposPlaca.map((tp: any) => ({ value: tp.id, label: tp.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoPlaca?.toString()) || null}
@@ -537,7 +537,7 @@ export function CajaStep({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Placa *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Placa *</label>
               <input
                 type="text"
                 name="placa"
@@ -551,14 +551,14 @@ export function CajaStep({
                   }
                 }}
                 placeholder="Ej: ABC-123"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition capitalize"
                 maxLength={getPlacaMaxLength()}
                 disabled={isReadOnly || isConsultado || isLockedForReinspeccion}
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Concepto *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Concepto *</label>
               <Select
                 options={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })) || []}
                 value={maestros?.conceptos.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })).find((o: any) => o.value?.toString() === formCaja.concepto?.toString()) || null}
@@ -571,7 +571,7 @@ export function CajaStep({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Categoría *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Categoría *</label>
               <Select
                 options={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })) || []}
                 value={maestros?.categorias.map((c: any) => ({ value: c.key, label: c.nombre })).find((o: any) => o.value?.toString() === formCaja.categoria?.toString()) || null}
@@ -584,7 +584,7 @@ export function CajaStep({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo de Inspección *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Tipo de Inspección *</label>
               <Select
                 options={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })) || []}
                 value={maestros?.tiposInspeccion.map((ti: any) => ({ value: ti.key, label: ti.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoInspeccion?.toString()) || null}
@@ -597,7 +597,7 @@ export function CajaStep({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Certificado *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Tipo Certificado *</label>
               <Select
                 options={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })) || []}
                 value={maestros?.tiposCertificado.map((tc: any) => ({ value: tc.key, label: tc.abreviacion || tc.nombre })).find((o: any) => o.value?.toString() === formCaja.tipoCertificado?.toString()) || null}
@@ -610,7 +610,7 @@ export function CajaStep({
             </div>
 
             <div className="flex flex-col gap-1.5 md:col-span-2">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Tipo Autorización</label>
               <Select
                 options={[
                   { value: '', label: 'NINGUNO / EN BLANCO' },
@@ -636,7 +636,7 @@ export function CajaStep({
           type="button"
           onClick={handleConsultar}
           disabled={isReadOnly}
-          className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold shadow-md border transition uppercase tracking-wide ${isReadOnly ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed' : 'bg-[#052a79] text-white hover:bg-blue-900 border-[#052a79]'}`}
+          className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold shadow-md border transition capitalize tracking-wide ${isReadOnly ? 'bg-slate-300 text-slate-500 border-slate-300 cursor-not-allowed' : 'bg-[#052a79] text-white hover:bg-blue-900 border-[#052a79]'}`}
         >
           <Search className="w-4 h-4" />
           Consultar
@@ -655,7 +655,7 @@ export function CajaStep({
             setIsLockedForReinspeccion(false);
           }}
           disabled={isReadOnly}
-          className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold shadow-sm transition uppercase tracking-wide ${isReadOnly ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border border-red-200 text-red-600 hover:bg-red-50'}`}
+          className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold shadow-sm transition capitalize tracking-wide ${isReadOnly ? 'bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white border border-red-200 text-red-600 hover:bg-red-50'}`}
         >
           <XCircle className="w-4 h-4" />
           Anular
@@ -668,7 +668,7 @@ export function CajaStep({
             <Search className={`w-5 h-5 ${isReinspeccionAplica ? 'text-green-700' : 'text-red-600'}`} />
           </div>
           <div>
-            <h4 className={`font-black uppercase text-sm ${isReinspeccionAplica ? 'text-green-800' : 'text-red-800'}`}>
+            <h4 className={`font-black capitalize text-sm ${isReinspeccionAplica ? 'text-green-800' : 'text-red-800'}`}>
               {isReinspeccionAplica ? 'Inspección Vinculada' : 'Aviso de Reinspección'}
             </h4>
             <p className={`font-bold text-xs ${isReinspeccionAplica ? 'text-green-700' : 'text-red-700'}`}>
@@ -681,7 +681,7 @@ export function CajaStep({
       {isConsultado && !isReinspeccionGratuita && (
         <div className="mt-4 p-4 rounded-lg bg-[#f2cc11] border-2 border-[#e0bc0d] shadow-md">
           <div className="flex items-center gap-3 mb-3">
-            <h4 className="text-[#052a79] font-black uppercase text-sm drop-shadow-sm">
+            <h4 className="text-[#052a79] font-black capitalize text-sm drop-shadow-sm">
               Buscar descuentos por: Código / DNI / RUC / Placa
             </h4>
           </div>
@@ -706,7 +706,7 @@ export function CajaStep({
               type="button" 
               onClick={(e) => handleBuscarDescuentos(e)} 
               disabled={isReadOnly || isConsultado || !formCaja.placa || !formCaja.tipoPlaca || isLockedForReinspeccion}
-              className={`text-white px-6 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 uppercase ${(formCaja.descuentoObj?.isCuponidad || isLockedForReinspeccion) ? 'bg-slate-400 cursor-not-allowed opacity-80' : 'bg-[#052a79] hover:bg-blue-900'}`}
+              className={`text-white px-6 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 capitalize ${(formCaja.descuentoObj?.isCuponidad || isLockedForReinspeccion) ? 'bg-slate-400 cursor-not-allowed opacity-80' : 'bg-[#052a79] hover:bg-blue-900'}`}
             >
               <Search className="w-3 h-3" /> Buscar
             </button>
@@ -717,7 +717,7 @@ export function CajaStep({
       {showDescuentosModal && (
         <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200 shadow-inner">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
-            <h3 className="text-[#052a79] font-bold text-sm uppercase flex items-center gap-2">
+            <h3 className="text-[#052a79] font-bold text-sm capitalize flex items-center gap-2">
               <Search className="w-4 h-4" /> Promociones Disponibles
             </h3>
             <button onClick={() => setShowDescuentosModal(false)} className="text-slate-400 hover:text-red-500 transition-colors" title="Cerrar">
@@ -733,7 +733,7 @@ export function CajaStep({
               return (
                 <div key={desc.id || `${desc.source_table}-${desc.source_id}`} className={`flex items-center justify-between p-3 rounded border transition-all group ${isApplied ? 'border-green-500 bg-green-50 shadow-md ring-1 ring-green-400' : 'border-slate-200 bg-white hover:border-amber-400 hover:shadow-sm'}`}>
                   <div className="flex-1 pr-4">
-                    <p className={`font-bold text-xs uppercase leading-tight transition-colors ${isApplied ? 'text-green-800' : 'text-[#052a79] group-hover:text-amber-600'}`}>
+                    <p className={`font-bold text-xs capitalize leading-tight transition-colors ${isApplied ? 'text-green-800' : 'text-[#052a79] group-hover:text-amber-600'}`}>
                       {desc.campana}
                       {isApplied && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-200 text-green-800">ACTIVO</span>}
                     </p>
@@ -745,14 +745,14 @@ export function CajaStep({
                     {isApplied ? (
                       <button
                         onClick={() => quitarDescuento()}
-                        className="font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm bg-red-500 hover:bg-red-600 text-white"
+                        className="font-bold px-4 py-2 rounded text-xs capitalize transition-colors shadow-sm bg-red-500 hover:bg-red-600 text-white"
                       >
                         Quitar
                       </button>
                     ) : (
                       <button
                         onClick={() => aplicarDescuento(desc)}
-                        className="font-bold px-4 py-2 rounded text-xs uppercase transition-colors shadow-sm bg-amber-400 hover:bg-amber-500 text-amber-950"
+                        className="font-bold px-4 py-2 rounded text-xs capitalize transition-colors shadow-sm bg-amber-400 hover:bg-amber-500 text-amber-950"
                       >
                         Aplicar
                       </button>
@@ -768,11 +768,11 @@ export function CajaStep({
       {isConsultado && !isReinspeccionGratuita && (
         <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-3">
-            <h3 className="text-sm font-black text-[#052a79] uppercase tracking-wide">Resumen de Pago</h3>
+            <h3 className="text-sm font-black text-[#052a79] capitalize tracking-wide">Resumen de Pago</h3>
           </div>
           <div className="p-5 bg-white grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
             <div className="flex flex-col gap-1.5 md:col-span-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">Documento</label>
+              <label className="text-[10px] font-bold text-slate-500 capitalize">Documento</label>
               <Select
                 options={maestros?.tiposDocumento?.map((td: any) => ({ value: td.key, label: td.nombre })) || []}
                 value={maestros?.tiposDocumento?.map((td: any) => ({ value: td.key, label: td.nombre })).find((o: any) => o.value === documentoPago) || null}
@@ -785,19 +785,19 @@ export function CajaStep({
               />
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">Base Imponible (S/)</label>
+              <label className="text-[10px] font-bold text-slate-500 capitalize">Base Imponible (S/)</label>
               <input type="text" readOnly value={(precioSubtotal > 0 ? (precioSubtotal - descuento) / 1.18 : 0).toFixed(2)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 text-right outline-none" />
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">IGV 18% (S/)</label>
+              <label className="text-[10px] font-bold text-slate-500 capitalize">IGV 18% (S/)</label>
               <input type="text" readOnly value={(precioSubtotal > 0 ? (precioSubtotal - descuento) - ((precioSubtotal - descuento) / 1.18) : 0).toFixed(2)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 text-right outline-none" />
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">Dscto. (S/)</label>
+              <label className="text-[10px] font-bold text-slate-500 capitalize">Dscto. (S/)</label>
               <input type="text" readOnly value={descuento.toFixed(2)} className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-600 text-right outline-none" />
             </div>
             <div className="flex flex-col gap-1.5 md:col-span-1">
-              <label className="text-[10px] font-black text-[#052a79] uppercase">Total (S/)</label>
+              <label className="text-[10px] font-black text-[#052a79] capitalize">Total (S/)</label>
               <input type="text" readOnly value={precioTotal.toFixed(2)} className="w-full rounded-lg border-2 border-[#052a79] bg-[#f4f9ff] px-3 py-2 text-lg font-black text-[#052a79] text-right outline-none shadow-inner" />
             </div>
           </div>
@@ -805,13 +805,13 @@ export function CajaStep({
           {formCaja.descuentoObj?.isCuponidad && (
             <div className="bg-amber-50 px-5 py-3 border-t border-amber-200 flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <div className="bg-amber-500 text-white font-black text-[10px] px-2 py-1 rounded-sm uppercase tracking-wider">CUPONIDAD</div>
+                <div className="bg-amber-500 text-white font-black text-[10px] px-2 py-1 rounded-sm capitalize tracking-wider">CUPONIDAD</div>
                 <span className="text-amber-900 font-bold text-sm">
                   Código Aplicado: <span className="font-black bg-white px-2 py-0.5 rounded border border-amber-300 ml-1">{formCaja.descuentoObj.documentoBusqueda || formCaja.descuentoObj.uuid}</span>
                 </span>
               </div>
               <div className="text-right flex flex-col items-end">
-                <p className="text-xs font-bold text-amber-800 uppercase mb-1">Tipo de Descuento:</p>
+                <p className="text-xs font-bold text-amber-800 capitalize mb-1">Tipo de Descuento:</p>
                 
                 {(!formCaja.descuentoObj.tipopagodescuento_key || formCaja.descuentoObj.tipopagodescuento_key === 'MON') && (
                   <p className="text-sm font-black text-amber-900">
@@ -844,7 +844,7 @@ export function CajaStep({
       {isConsultado && isReinspeccionGratuita && (
         <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           <div className="bg-green-50 p-5 text-center">
-            <h3 className="text-lg font-black text-green-700 uppercase">Reinspección 100% Gratuita</h3>
+            <h3 className="text-lg font-black text-green-700 capitalize">Reinspección 100% Gratuita</h3>
             <p className="text-green-600 text-sm font-bold mt-1">El monto a pagar es S/ 0.00. Puede continuar al siguiente paso sin requerir pago ni comprobante.</p>
           </div>
         </div>
@@ -856,7 +856,7 @@ export function CajaStep({
             type="button"
             onClick={() => setShowAnularModal(true)}
             disabled={isReadOnly}
-            className={`rounded-lg px-6 py-2.5 text-xs font-bold border transition uppercase tracking-wide ${isReadOnly ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 shadow-sm'}`}
+            className={`rounded-lg px-6 py-2.5 text-xs font-bold border transition capitalize tracking-wide ${isReadOnly ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 shadow-sm'}`}
           >
             ANULAR
           </button>

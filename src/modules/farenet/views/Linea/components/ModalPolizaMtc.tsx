@@ -64,7 +64,7 @@ export function ModalPolizaMtc({ nroInspeccion, onClose, onRefresh }: ModalPoliz
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-md p-4">
       <div className="bg-white rounded shadow-lg max-w-md w-full animate-fade-in-up">
         <div className="flex justify-between items-center bg-slate-100 p-4 border-b border-slate-200 rounded-t">
-          <h3 className="font-bold text-slate-700 uppercase tracking-wide">Registro Póliza MTC</h3>
+          <h3 className="font-bold text-slate-700 capitalize tracking-wide">Registro Póliza MTC</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
           </button>
@@ -104,7 +104,7 @@ export function ModalPolizaMtc({ nroInspeccion, onClose, onRefresh }: ModalPoliz
             <label className="block text-xs font-bold text-slate-600 mb-1">Nro Póliza / SOAT</label>
             <input
               type="text"
-              className="w-full border border-slate-300 rounded p-2 text-sm focus:ring-2 focus:ring-blue-200 uppercase"
+              className="w-full border border-slate-300 rounded p-2 text-sm focus:ring-2 focus:ring-blue-200 capitalize"
               value={form.nroPoliza}
               onChange={(e) => setForm({ ...form, nroPoliza: e.target.value.toUpperCase() })}
             />

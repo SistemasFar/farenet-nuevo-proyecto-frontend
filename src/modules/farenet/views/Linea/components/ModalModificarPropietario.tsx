@@ -182,7 +182,7 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
         
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
-          <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2">
+          <h2 className="text-lg font-bold text-slate-800 capitalize tracking-tight flex items-center gap-2">
             Modificar Propietario (Certificado)
           </h2>
           <button onClick={handleCancelar} className="text-slate-400 hover:text-slate-600">
@@ -212,13 +212,13 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {!formData.sinDni && (
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">DNI / RUC</label>
+                <label className="block text-xs font-bold text-slate-600 capitalize mb-1">DNI / RUC</label>
                 <input 
                   type="text" 
                   name="nroDocumento"
                   value={formData.nroDocumento}
                   onChange={handleInputChange}
-                  className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                  className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 capitalize"
                 />
               </div>
             )}
@@ -226,43 +226,43 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
             {!formData.sinDni && (
               <>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Razón Social (Si es Empresa)</label>
+                  <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Razón Social (Si es Empresa)</label>
                   <input 
                     type="text" 
                     name="razonSocial"
                     value={formData.razonSocial}
                     onChange={handleInputChange}
-                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 capitalize"
                   />
                   <p className="text-[10px] text-slate-500 mt-1 italic">Ubigeo pendiente de selección por maestro.</p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nombres</label>
+                  <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nombres</label>
                   <input 
                     type="text" 
                     name="nombres"
                     value={formData.nombres}
                     onChange={handleInputChange}
-                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 capitalize"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Apellidos</label>
+                  <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Apellidos</label>
                   <input 
                     type="text" 
                     name="apellidos"
                     value={formData.apellidos}
                     onChange={handleInputChange}
-                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                    className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 capitalize"
                   />
                 </div>
               </>
             )}
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">País</label>
+              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">País</label>
               <select 
                 name="pais"
                 value={formData.pais}
@@ -277,7 +277,7 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Departamento</label>
+              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Departamento</label>
               <select 
                 name="departamento"
                 value={formData.departamento}
@@ -292,7 +292,7 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Provincia</label>
+              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Provincia</label>
               <select 
                 name="provincia"
                 value={formData.provincia}
@@ -308,7 +308,7 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Distrito</label>
+              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Distrito</label>
               <select 
                 name="distrito"
                 value={formData.distrito}
@@ -324,18 +324,18 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Dirección</label>
+              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Dirección</label>
               <input 
                 type="text" 
                 name="direccion"
                 value={formData.direccion}
                 onChange={handleInputChange}
-                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 uppercase"
+                className="w-full border border-slate-300 rounded p-2 text-sm bg-white focus:ring-2 focus:ring-blue-200 capitalize"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Email</label>
+              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Email</label>
               <input 
                 type="email" 
                 name="email"
@@ -346,7 +346,7 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Teléfono</label>
+              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Teléfono</label>
               <input 
                 type="tel" 
                 name="telefono"
@@ -363,14 +363,14 @@ export function ModalModificarPropietario({ isOpen, onClose, datosIniciales, nro
           <button 
             onClick={handleCancelar} 
             disabled={loading}
-            className="px-4 py-2 border border-slate-300 rounded font-bold text-sm text-slate-600 hover:bg-slate-50 uppercase disabled:opacity-50"
+            className="px-4 py-2 border border-slate-300 rounded font-bold text-sm text-slate-600 hover:bg-slate-50 capitalize disabled:opacity-50"
           >
             Cancelar
           </button>
           <button 
             onClick={handleAceptar} 
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition-colors uppercase disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-white rounded font-bold text-sm flex items-center gap-2 hover:bg-blue-700 transition-colors capitalize disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Aceptar

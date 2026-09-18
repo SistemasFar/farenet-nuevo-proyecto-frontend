@@ -332,14 +332,14 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
               <h3 className="font-bold text-slate-800">Variables FAREGAS</h3>
               <p className="mt-1 text-xs text-slate-500">Selecciona texto o deja el cursor en una celda vacía y elige una variable.</p>
               <label className="mt-3 flex items-center gap-2 rounded border border-slate-300 px-2"><Search size={15} className="text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar placa, taller, fecha…" className="w-full py-2 text-sm outline-none" /></label>
-              {loadingVariables ? <p className="py-8 text-center text-sm text-slate-500">Cargando variables…</p> : <div className="mt-4 space-y-5">{Object.entries(groupedVariables).map(([group, items]) => <section key={group}><h4 className="mb-2 border-b pb-1 text-xs font-bold uppercase text-slate-700">{group}</h4><div className="space-y-1">{items.map((variable) => <button key={variable.key} type="button" disabled={!editable} onMouseDown={(event) => { event.preventDefault(); assignVariable(variable); }} className="w-full rounded px-2 py-1.5 text-left hover:bg-blue-50 disabled:opacity-50"><span className="block text-sm font-medium text-slate-700">{variable.label}</span><span className="block font-mono text-[11px] text-slate-400">{variable.key}</span></button>)}</div></section>)}</div>}
+              {loadingVariables ? <p className="py-8 text-center text-sm text-slate-500">Cargando variables…</p> : <div className="mt-4 space-y-5">{Object.entries(groupedVariables).map(([group, items]) => <section key={group}><h4 className="mb-2 border-b pb-1 text-xs font-bold capitalize text-slate-700">{group}</h4><div className="space-y-1">{items.map((variable) => <button key={variable.key} type="button" disabled={!editable} onMouseDown={(event) => { event.preventDefault(); assignVariable(variable); }} className="w-full rounded px-2 py-1.5 text-left hover:bg-blue-50 disabled:opacity-50"><span className="block text-sm font-medium text-slate-700">{variable.label}</span><span className="block font-mono text-[11px] text-slate-400">{variable.key}</span></button>)}</div></section>)}</div>}
             </>}
 
             {panelTab === 'IMAGENES' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><h3 className="font-bold">Galería documental pendiente</h3><p className="mt-2 text-xs leading-5">El proyecto aún no tiene almacenamiento reutilizable para logos, firmas y sellos. Se implementará en la Fase C sin incrustar imágenes base64 dentro del HTML.</p></div>}
 
             {panelTab === 'PROPIEDADES' && <>
               <h3 className="font-bold text-slate-800">Propiedades</h3>
-              {activeVariable ? <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"><p className="text-xs font-bold uppercase text-amber-700">Variable</p><p className="mt-2 font-semibold">{activeVariable.label}</p><p className="mt-1 font-mono text-xs text-slate-600">{activeVariable.key}</p><p className="mt-2 text-xs"><b>Origen:</b> {activeVariable.source}</p><p className="mt-1 text-xs"><b>Fallback:</b> {activeVariable.fallback || 'Sin fallback'}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setPanelTab('VARIABLES')} className="rounded bg-blue-700 px-3 py-1.5 text-xs font-bold text-white">Cambiar</button><button type="button" disabled={!editable} onClick={removeVariable} className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50">Quitar variable</button></div></div> : inTable ? <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Seleccionaste una tabla. Sus herramientas de filas, columnas, combinación y alineación aparecen bajo la barra principal.</div> : <p className="mt-3 text-sm text-slate-500">Selecciona texto, una variable o una celda para ver sus propiedades.</p>}
+              {activeVariable ? <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"><p className="text-xs font-bold capitalize text-amber-700">Variable</p><p className="mt-2 font-semibold">{activeVariable.label}</p><p className="mt-1 font-mono text-xs text-slate-600">{activeVariable.key}</p><p className="mt-2 text-xs"><b>Origen:</b> {activeVariable.source}</p><p className="mt-1 text-xs"><b>Fallback:</b> {activeVariable.fallback || 'Sin fallback'}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setPanelTab('VARIABLES')} className="rounded bg-blue-700 px-3 py-1.5 text-xs font-bold text-white">Cambiar</button><button type="button" disabled={!editable} onClick={removeVariable} className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50">Quitar variable</button></div></div> : inTable ? <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Seleccionaste una tabla. Sus herramientas de filas, columnas, combinación y alineación aparecen bajo la barra principal.</div> : <p className="mt-3 text-sm text-slate-500">Selecciona texto, una variable o una celda para ver sus propiedades.</p>}
             </>}
           </div>
         </aside>
@@ -369,7 +369,7 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
               </button>
               {showCustomVariable && (
                 <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                  <label className="text-xs font-bold uppercase text-blue-900">Nombre de la nueva variable</label>
+                  <label className="text-xs font-bold capitalize text-blue-900">Nombre de la nueva variable</label>
                   <div className="mt-2 flex gap-2">
                     <input
                       value={customVariableName}
@@ -404,7 +404,7 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
                 <div className="space-y-5">
                   {Object.entries(groupedVariables).map(([group, items]) => (
                     <section key={group}>
-                      <h4 className="mb-2 border-b pb-1 text-xs font-bold uppercase text-slate-700">{group}</h4>
+                      <h4 className="mb-2 border-b pb-1 text-xs font-bold capitalize text-slate-700">{group}</h4>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {items.map((variable) => (
                           <button

@@ -196,14 +196,14 @@ export default function TabCorrelativos() {
       
       <div className="flex flex-col gap-3 md:flex-row md:items-end bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div className="min-w-64">
-          <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Filtrar Sede</label>
+          <label className="mb-1 block text-xs font-bold capitalize text-slate-500">Filtrar Sede</label>
           <select value={plantaKey} onChange={(e) => setPlantaKey(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm font-semibold focus:border-[#052A79] focus:outline-none">
             <option value="">Todas las Sedes</option>
             {sedes.map((item) => <option key={item.key} value={item.key}>{item.nombre}</option>)}
           </select>
         </div>
         <div className="min-w-64">
-          <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Filtrar Tipo Certificado</label>
+          <label className="mb-1 block text-xs font-bold capitalize text-slate-500">Filtrar Tipo Certificado</label>
           <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm font-semibold focus:border-[#052A79] focus:outline-none">
             <option value="">Todos los Tipos</option>
             {tipos.map((item) => <option key={item.clave} value={item.clave}>{item.nombre} — DG-{item.codigo}</option>)}
@@ -217,13 +217,13 @@ export default function TabCorrelativos() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
               <tr>
-                <th className="p-3 font-bold uppercase">Sede</th>
-                <th className="p-3 font-bold uppercase">Operación / Certificado</th>
-                <th className="p-3 font-bold uppercase text-center">Rango Asignado</th>
-                <th className="p-3 font-bold uppercase text-center">N° Actual</th>
-                <th className="p-3 font-bold uppercase text-center">Disponibles</th>
-                <th className="p-3 font-bold uppercase text-center">Estado</th>
-                <th className="p-3 font-bold uppercase text-center">Acciones</th>
+                <th className="p-3 font-bold capitalize">Sede</th>
+                <th className="p-3 font-bold capitalize">Operación / Certificado</th>
+                <th className="p-3 font-bold capitalize text-center">Rango Asignado</th>
+                <th className="p-3 font-bold capitalize text-center">N° Actual</th>
+                <th className="p-3 font-bold capitalize text-center">Disponibles</th>
+                <th className="p-3 font-bold capitalize text-center">Estado</th>
+                <th className="p-3 font-bold capitalize text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -373,10 +373,10 @@ export default function TabCorrelativos() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
-                      <th className="p-2 font-bold uppercase">Rango</th>
-                      <th className="p-2 font-bold uppercase text-center">N° Actual</th>
-                      <th className="p-2 font-bold uppercase text-center">Estado</th>
-                      <th className="p-2 font-bold uppercase text-center">Cierre</th>
+                      <th className="p-2 font-bold capitalize">Rango</th>
+                      <th className="p-2 font-bold capitalize text-center">N° Actual</th>
+                      <th className="p-2 font-bold capitalize text-center">Estado</th>
+                      <th className="p-2 font-bold capitalize text-center">Cierre</th>
                     </tr>
                   </thead>
                   <tbody>

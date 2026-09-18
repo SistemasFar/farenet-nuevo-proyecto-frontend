@@ -59,7 +59,7 @@ export const TallerStep: React.FC<TallerStepProps> = ({
       ) : Object.entries(grupos).map(([grupo, campos]) => (
         <section key={grupo} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 bg-[#f4f9ff] px-6 py-4">
-            <h3 className="text-base font-bold uppercase text-slate-800">{grupo}</h3>
+            <h3 className="text-base font-bold capitalize text-slate-800">{grupo}</h3>
             <p className="mt-1 text-xs text-slate-500">Complete los valores que aparecerán en el certificado.</p>
           </div>
           <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2 lg:grid-cols-3">
@@ -67,7 +67,7 @@ export const TallerStep: React.FC<TallerStepProps> = ({
               const esObservacion = campo.key.includes('observacion');
               return (
                 <div key={campo.key} className={`flex flex-col gap-1.5 ${esObservacion ? 'md:col-span-2' : ''}`}>
-                  <label htmlFor={`formato-${campo.key}`} className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                  <label htmlFor={`formato-${campo.key}`} className="text-xs font-bold capitalize tracking-wider text-slate-600">
                     {campo.label} {campo.requerido && <span className="text-red-500">*</span>}
                   </label>
                   {esObservacion ? (

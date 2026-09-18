@@ -211,7 +211,7 @@ export function AuditoriaView() {
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
-                        <thead className="bg-gray-50 text-xs uppercase text-gray-500"><tr>
+                        <thead className="bg-gray-50 text-xs capitalize text-gray-500"><tr>
                             <th className="px-4 py-3">Fecha</th><th className="px-4 py-3">Usuario</th><th className="px-4 py-3">Perfil</th><th className="px-4 py-3">Qué hizo</th><th className="px-4 py-3">Módulo</th><th className="px-4 py-3">Referencia</th><th className="px-4 py-3">Sede</th><th className="px-4 py-3">Resultado</th><th className="px-4 py-3">Detalle</th>
                         </tr></thead>
                         <tbody className="divide-y divide-gray-100">
@@ -257,5 +257,5 @@ function DetalleEvento({ item, cerrar }: { item: AuditoriaAccesoFaregas; cerrar:
 }
 
 function Dato({ titulo, valor }: { titulo: string; valor?: string | null }) {
-    return <div><div className="text-xs font-semibold uppercase text-gray-500">{titulo}</div><div className="mt-1 break-words text-sm text-gray-800">{valor || '-'}</div></div>;
+    return <div><div className="text-xs font-semibold capitalize text-gray-500">{titulo}</div><div className="mt-1 break-words text-sm text-gray-800">{valor || '-'}</div></div>;
 }

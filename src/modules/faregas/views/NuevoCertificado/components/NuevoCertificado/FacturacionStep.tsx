@@ -39,7 +39,7 @@ function ResumenTributario({ resumen }: { resumen: ResumenTributarioFaregas | nu
         <div className="flex items-center gap-2">
           <ReceiptText className={`h-5 w-5 ${listo ? 'text-green-700' : 'text-red-700'}`} />
           <div>
-            <h4 className="text-sm font-black uppercase text-slate-800">Resumen tributario antes de emitir</h4>
+            <h4 className="text-sm font-black capitalize text-slate-800">Resumen tributario antes de emitir</h4>
             <p className="text-xs font-medium text-slate-500">Información calculada por Faregas; no son campos editables.</p>
           </div>
         </div>
@@ -70,7 +70,7 @@ function ResumenTributario({ resumen }: { resumen: ResumenTributarioFaregas | nu
 
         <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full min-w-[760px] text-left text-xs">
-            <thead className="bg-slate-100 text-[10px] font-black uppercase text-slate-500">
+            <thead className="bg-slate-100 text-[10px] font-black capitalize text-slate-500">
               <tr>
                 <th className="p-3">Servicio / código</th>
                 <th className="p-3">Unidad</th>
@@ -352,7 +352,7 @@ export function FacturacionStep({
           <div className="rounded-xl border-2 border-blue-100 bg-blue-50/50 p-5 md:col-span-2">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 pb-3">
               <div>
-                <h4 className="text-sm font-black uppercase text-[#052a79]">Cliente del comprobante</h4>
+                <h4 className="text-sm font-black capitalize text-[#052a79]">Cliente del comprobante</h4>
                 <p className="mt-1 text-xs font-medium text-slate-500">
                   {formFacturacion.usarTitularPrincipalFac
                     ? 'Se facturará al titular principal del certificado.'
@@ -377,11 +377,11 @@ export function FacturacionStep({
               </div>
               <div className="md:col-span-2">
                 <div className="text-[11px] font-bold text-slate-500">NOMBRE / RAZÓN SOCIAL</div>
-                <div className="mt-1 font-black uppercase text-slate-800">{formFacturacion.razonSocialFac || '-'}</div>
+                <div className="mt-1 font-black capitalize text-slate-800">{formFacturacion.razonSocialFac || '-'}</div>
               </div>
               <div className="md:col-span-4">
                 <div className="text-[11px] font-bold text-slate-500">DIRECCIÓN FISCAL</div>
-                <div className="mt-1 font-bold uppercase text-slate-800">{formFacturacion.direccionFac || '-'}</div>
+                <div className="mt-1 font-bold capitalize text-slate-800">{formFacturacion.direccionFac || '-'}</div>
               </div>
               <div className="md:col-span-2">
                 <div className="text-[11px] font-bold text-slate-500">CORREO</div>

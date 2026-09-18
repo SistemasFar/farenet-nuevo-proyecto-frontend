@@ -78,7 +78,7 @@ const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existing
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50">
-          <h2 className="text-sm font-bold text-slate-800 uppercase">Agregar Nuevo: {title}</h2>
+          <h2 className="text-sm font-bold text-slate-800 capitalize">Agregar Nuevo: {title}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
             <XCircle size={20} />
           </button>
@@ -92,7 +92,7 @@ const AgregarMaestroModal = ({ isOpen, onClose, onSave, title, loading, existing
           {error && <p className="text-xs text-red-500 font-semibold bg-red-50 p-2 rounded-lg">{error}</p>}
 
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Valor</label>
+            <label className="text-[10px] font-bold text-slate-500 capitalize">Valor</label>
             <input
               type="text"
               autoFocus
@@ -194,7 +194,7 @@ export const InputField = ({ label, name, type = "text", placeholder = "", requi
   return (
     <div className="flex flex-col gap-1.5 md:col-span-1">
       <div className="flex items-center justify-between">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">{label} {required && '*'}</label>
+        <label className="text-[10px] font-bold text-slate-500 capitalize">{label} {required && '*'}</label>
         {onAddNuevo && !disabled && (
           <button
             type="button"
@@ -726,7 +726,7 @@ export function VehiculoStep({
             <FormVehiculoContext.Provider value={{ formVehiculo, setFormVehiculo }}>
               <div>
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-sm font-black text-[#052a79] uppercase">1. Datos del Vehículo</h3>
+                  <h3 className="text-sm font-black text-[#052a79] capitalize">1. Datos del Vehículo</h3>
                   {catName && <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full border border-amber-200">Categoría {catName}</span>}
                 </div>
 
@@ -738,7 +738,7 @@ export function VehiculoStep({
                   <div className="space-y-6">
                     {/* BLOQUE 1: IDENTIFICADORES Y CLASIFICACIÓN */}
                     <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
-                      <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Identificadores y Clasificación</h4>
+                      <h4 className="text-xs font-black text-slate-700 capitalize mb-3 border-b border-slate-200 pb-2">Identificadores y Clasificación</h4>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <InputField label="Categoría" name="categoria_display" overrideValue={catName} disabled={true} />
                         {hasCategoriaExtra && <InputField label="Categoría Extra" name="categoriaExtra" isSelect options={optsCategoriasExtra} />}
@@ -766,7 +766,7 @@ export function VehiculoStep({
 
                     {/* BLOQUE 2: ESPECIFICACIONES TÉCNICAS */}
                     <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
-                      <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Especificaciones Técnicas</h4>
+                      <h4 className="text-xs font-black text-slate-700 capitalize mb-3 border-b border-slate-200 pb-2">Especificaciones Técnicas</h4>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <InputField label="Año Fabricación" name="anioFabricacion" type="number" maxLength={4} minNumber={1800} maxNumber={new Date().getFullYear() + 2} />
                         <InputField label="Combustible" name="combustible" isSelect options={optsCombustibles} />
@@ -777,7 +777,7 @@ export function VehiculoStep({
 
                     {/* BLOQUE 3: CAPACIDAD Y DIMENSIONES */}
                     <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
-                      <h4 className="text-xs font-black text-slate-700 uppercase mb-3 border-b border-slate-200 pb-2">Capacidad y Dimensiones</h4>
+                      <h4 className="text-xs font-black text-slate-700 capitalize mb-3 border-b border-slate-200 pb-2">Capacidad y Dimensiones</h4>
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         {/* Asientos / Pasajeros */}
                         {hasAsientos && <InputField label="Nro Asientos" name="nroAsientos" type="number" minNumber={0} maxNumber={80} />}
@@ -839,7 +839,7 @@ export function VehiculoStep({
           return (
             <FormVehiculoContext.Provider value={{ formVehiculo, setFormVehiculo }}>
               <div>
-                <h3 className="text-sm font-black text-[#052a79] uppercase mb-4">2. SOAT</h3>
+                <h3 className="text-sm font-black text-[#052a79] capitalize mb-4">2. SOAT</h3>
 
                 <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -910,7 +910,7 @@ export function VehiculoStep({
             <FormVehiculoContext.Provider value={{ formVehiculo, setFormVehiculo }}>
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-black text-[#052a79] uppercase">3. Datos del Propietario</h3>
+                  <h3 className="text-sm font-black text-[#052a79] capitalize">3. Datos del Propietario</h3>
                   <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 transition">
                     <input
                       type="checkbox"

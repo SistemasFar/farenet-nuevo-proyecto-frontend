@@ -17,7 +17,7 @@ export function TipoConformidadStep({ formData, setFormData, onNext }: TipoConfo
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-      <h3 className="text-sm font-black text-[#052a79] uppercase mb-4">Tipo de Conformidad</h3>
+      <h3 className="text-sm font-black text-[#052a79] capitalize mb-4">Tipo de Conformidad</h3>
       
       <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl mb-6">
         <div className="grid grid-cols-1 gap-6">
@@ -32,7 +32,7 @@ export function TipoConformidadStep({ formData, setFormData, onNext }: TipoConfo
           />
           
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase">Características Registrables a Modificar *</label>
+            <label className="text-[10px] font-bold text-slate-500 capitalize">Características Registrables a Modificar *</label>
             <textarea
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79] min-h-[100px]"
               value={formData.caracteristicasRegistrables || ''}

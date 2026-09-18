@@ -101,27 +101,27 @@ export function VerificacionStep({
   return (
     <div className="space-y-6">
 
-      <h3 className="text-lg font-bold text-[#052a79] uppercase border-b border-amber-200/60 pb-2">
+      <h3 className="text-lg font-bold text-[#052a79] capitalize border-b border-amber-200/60 pb-2">
         Verificación
       </h3>
 
       {/* BANNER PRINCIPAL SUPERIOR */}
       <div className="bg-white p-4 border-2 border-[#052a79] rounded-xl flex items-center justify-around text-center shadow-sm">
         <div>
-          <span className="block text-[10px] font-bold text-slate-500 uppercase">Placa</span>
-          <span className="block text-xl font-black text-[#052a79] uppercase">{formCaja.placa || '-'}</span>
+          <span className="block text-[10px] font-bold text-slate-500 capitalize">Placa</span>
+          <span className="block text-xl font-black text-[#052a79] capitalize">{formCaja.placa || '-'}</span>
         </div>
         <div>
-          <span className="block text-[10px] font-bold text-slate-500 uppercase">Modelo</span>
-          <span className="block text-xl font-black text-[#052a79] uppercase">{formVehiculo.modelo_label || formVehiculo.modelo || '-'}</span>
+          <span className="block text-[10px] font-bold text-slate-500 capitalize">Modelo</span>
+          <span className="block text-xl font-black text-[#052a79] capitalize">{formVehiculo.modelo_label || formVehiculo.modelo || '-'}</span>
         </div>
         <div>
-          <span className="block text-[10px] font-bold text-slate-500 uppercase">Marca</span>
-          <span className="block text-xl font-black text-[#052a79] uppercase">{marcaNombre || '-'}</span>
+          <span className="block text-[10px] font-bold text-slate-500 capitalize">Marca</span>
+          <span className="block text-xl font-black text-[#052a79] capitalize">{marcaNombre || '-'}</span>
         </div>
         <div>
-          <span className="block text-[10px] font-bold text-slate-500 uppercase">Concepto Inspección</span>
-          <span className="block text-sm font-black text-[#052a79] uppercase max-w-[200px] leading-tight">{conceptoNombre || '-'}</span>
+          <span className="block text-[10px] font-bold text-slate-500 capitalize">Concepto Inspección</span>
+          <span className="block text-sm font-black text-[#052a79] capitalize max-w-[200px] leading-tight">{conceptoNombre || '-'}</span>
         </div>
       </div>
 
@@ -137,13 +137,13 @@ export function VerificacionStep({
             </div>
             <div className="p-4 flex-1 flex justify-between">
                <div className="text-xs text-slate-700 space-y-1">
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Documento: </span><span className="font-bold">{formFacturacion.nroDocFac}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Nombre/Razón Social: </span><span className="font-bold">{formFacturacion.razonSocialFac || (formFacturacion.nombresFac + ' ' + formFacturacion.apellidosFac)}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Dirección: </span><span>{formFacturacion.direccionFac}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Teléfono / Email: </span><span>{formFacturacion.telefonoFac} / {formFacturacion.emailFac}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 capitalize">Documento: </span><span className="font-bold">{formFacturacion.nroDocFac}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 capitalize">Nombre/Razón Social: </span><span className="font-bold">{formFacturacion.razonSocialFac || (formFacturacion.nombresFac + ' ' + formFacturacion.apellidosFac)}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 capitalize">Dirección: </span><span>{formFacturacion.direccionFac}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 capitalize">Teléfono / Email: </span><span>{formFacturacion.telefonoFac} / {formFacturacion.emailFac}</span></div>
                </div>
                <div className="bg-[#052a79] text-white p-4 rounded-lg text-center flex flex-col justify-center min-w-[120px]">
-                 <span className="text-[10px] font-bold uppercase">{formCaja.comprobanteSeleccionado === 'RUC' ? 'FACTURA' : 'BOLETA'}</span>
+                 <span className="text-[10px] font-bold capitalize">{formCaja.comprobanteSeleccionado === 'RUC' ? 'FACTURA' : 'BOLETA'}</span>
                  <span className="text-2xl font-black">S/ {precioTotal.toFixed(2)}</span>
                  <span className="text-[10px] font-bold">Contado</span>
                </div>
@@ -157,29 +157,29 @@ export function VerificacionStep({
             </div>
             <div className="p-4 flex-1">
                <div className="text-xs text-slate-700 mb-2">
-                 <span className="font-bold text-[10px] text-slate-400 uppercase">Propietario: </span>
+                 <span className="font-bold text-[10px] text-slate-400 capitalize">Propietario: </span>
                  <span className="font-bold">{formFacturacion.nombresFac} {formFacturacion.apellidosFac}</span>
                </div>
                <div className="grid grid-cols-3 gap-x-2 gap-y-3 text-[10px] text-slate-600">
-                  <div><span className="block font-bold text-slate-400 uppercase">Categoría</span><span className="font-bold uppercase text-slate-800">{formCaja.categoria}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Combustible</span><span className="font-bold uppercase text-slate-800">{combustibleNombre}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Asientos / Pasajeros</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroAsientos} / {formVehiculo.nroPasajeros}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Categoría</span><span className="font-bold capitalize text-slate-800">{formCaja.categoria}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Combustible</span><span className="font-bold capitalize text-slate-800">{combustibleNombre}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Asientos / Pasajeros</span><span className="font-bold capitalize text-slate-800">{formVehiculo.nroAsientos} / {formVehiculo.nroPasajeros}</span></div>
                   
-                  <div><span className="block font-bold text-slate-400 uppercase">Marca</span><span className="font-bold uppercase text-slate-800">{marcaNombre}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Nro. Serie</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroSerie}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Largo/Ancho/Alto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.longitud} / {formVehiculo.ancho} / {formVehiculo.altura}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Marca</span><span className="font-bold capitalize text-slate-800">{marcaNombre}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Nro. Serie</span><span className="font-bold capitalize text-slate-800">{formVehiculo.nroSerie}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Largo/Ancho/Alto</span><span className="font-bold capitalize text-slate-800">{formVehiculo.longitud} / {formVehiculo.ancho} / {formVehiculo.altura}</span></div>
 
-                  <div><span className="block font-bold text-slate-400 uppercase">Modelo</span><span className="font-bold uppercase text-slate-800">{formVehiculo.modelo_label || formVehiculo.modelo || '-'}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Nro. Motor</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroMotor || '-'}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Color</span><span className="font-bold uppercase text-slate-800">{formVehiculo.color_label || formVehiculo.color || '-'}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Modelo</span><span className="font-bold capitalize text-slate-800">{formVehiculo.modelo_label || formVehiculo.modelo || '-'}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Nro. Motor</span><span className="font-bold capitalize text-slate-800">{formVehiculo.nroMotor || '-'}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Color</span><span className="font-bold capitalize text-slate-800">{formVehiculo.color_label || formVehiculo.color || '-'}</span></div>
 
-                  <div><span className="block font-bold text-slate-400 uppercase">Año Fab.</span><span className="font-bold uppercase text-slate-800">{formVehiculo.anioFabricacion}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Carrocería</span><span className="font-bold uppercase text-slate-800">{carroceriaNombre}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Peso Neto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.pesoSeco}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Año Fab.</span><span className="font-bold capitalize text-slate-800">{formVehiculo.anioFabricacion}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Carrocería</span><span className="font-bold capitalize text-slate-800">{carroceriaNombre}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Peso Neto</span><span className="font-bold capitalize text-slate-800">{formVehiculo.pesoSeco}</span></div>
 
-                  <div><span className="block font-bold text-slate-400 uppercase">Kilometraje</span><span className="font-bold uppercase text-slate-800">{formVehiculo.kilometraje}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Ejes / Ruedas</span><span className="font-bold uppercase text-slate-800">{formVehiculo.nroEjes} / {formVehiculo.nroRuedas}</span></div>
-                  <div><span className="block font-bold text-slate-400 uppercase">Peso Bruto</span><span className="font-bold uppercase text-slate-800">{formVehiculo.pesoBruto}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Kilometraje</span><span className="font-bold capitalize text-slate-800">{formVehiculo.kilometraje}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Ejes / Ruedas</span><span className="font-bold capitalize text-slate-800">{formVehiculo.nroEjes} / {formVehiculo.nroRuedas}</span></div>
+                  <div><span className="block font-bold text-slate-400 capitalize">Peso Bruto</span><span className="font-bold capitalize text-slate-800">{formVehiculo.pesoBruto}</span></div>
                </div>
             </div>
           </div>
@@ -191,10 +191,10 @@ export function VerificacionStep({
             </div>
               <div className="p-4 flex-1">
                  <div className="text-xs text-slate-700 space-y-1">
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Aseguradora: </span><span className="font-bold">{aseguradoraNombre || '-'}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Tipo Póliza: </span><span className="font-bold">{tipoPolizaNombre || '-'}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Nro SOAT: </span><span className="font-bold">{formVehiculo.nroSoat || '-'}</span></div>
-                 <div><span className="font-bold text-[10px] text-slate-400 uppercase">Vigencia: </span><span className="font-bold">{formVehiculo.fechaEmisionSoat} - {formVehiculo.fechaVencimientoSoat}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 capitalize">Aseguradora: </span><span className="font-bold">{aseguradoraNombre || '-'}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 capitalize">Tipo Póliza: </span><span className="font-bold">{tipoPolizaNombre || '-'}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 capitalize">Nro SOAT: </span><span className="font-bold">{formVehiculo.nroSoat || '-'}</span></div>
+                 <div><span className="font-bold text-[10px] text-slate-400 capitalize">Vigencia: </span><span className="font-bold">{formVehiculo.fechaEmisionSoat} - {formVehiculo.fechaVencimientoSoat}</span></div>
                  </div>
               </div>
           </div>
@@ -203,11 +203,11 @@ export function VerificacionStep({
 
         {/* PANEL DERECHO: Formulario de Verificación */}
         <div className="md:col-span-4 bg-[#f4f9ff] border-2 border-[#052a79]/20 rounded-xl p-5 shadow-inner">
-          <h4 className="text-sm font-black text-[#052a79] uppercase mb-4 text-center">Datos de Operación</h4>
+          <h4 className="text-sm font-black text-[#052a79] capitalize mb-4 text-center">Datos de Operación</h4>
           
           <div className="space-y-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Inspección *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Tipo Inspección *</label>
               <Select
                 options={maestrosVerif?.tiposInspeccion?.map((t: any) => ({ value: t.key, label: t.nombre })) || []}
                 value={maestrosVerif?.tiposInspeccion?.map((t: any) => ({ value: t.key, label: t.nombre })).find((o: any) => o.value?.toString() === formVerificacion.tipoInspeccion?.toString()) || null}
@@ -217,7 +217,7 @@ export function VerificacionStep({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Certificado *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Tipo Certificado *</label>
               <Select
                 options={maestrosVerif?.tiposCertificado?.map((t: any) => ({ value: t.key, label: t.nombre })) || []}
                 value={maestrosVerif?.tiposCertificado?.map((t: any) => ({ value: t.key, label: t.nombre })).find((o: any) => o.value?.toString() === formVerificacion.tipoCertificado?.toString()) || null}
@@ -228,7 +228,7 @@ export function VerificacionStep({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">Tipo Autorización *</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">Tipo Autorización *</label>
               <Select
                 options={maestros?.tiposAutorizacion?.map((ta: any) => ({ value: ta.key, label: ta.nombre })) || []}
                 value={maestros?.tiposAutorizacion?.map((ta: any) => ({ value: ta.key, label: ta.nombre })).find((o: any) => o.value?.toString() === formVerificacion.tipoAutorizacion?.toString()) || null}
@@ -241,7 +241,7 @@ export function VerificacionStep({
             <div className="my-4 border-t-2 border-dashed border-slate-300"></div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-black text-amber-600 uppercase">Línea de Inspección *</label>
+              <label className="text-xs font-black text-amber-600 capitalize">Línea de Inspección *</label>
               <Select
                 options={lineas?.map((l: any) => ({ value: l.key, label: l.nombre })) || []}
                 value={lineas?.map((l: any) => ({ value: l.key, label: l.nombre })).find((o: any) => o.value?.toString() === formVerificacion.linea?.toString()) || null}

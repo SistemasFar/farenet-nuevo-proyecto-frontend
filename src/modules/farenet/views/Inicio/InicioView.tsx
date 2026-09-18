@@ -64,7 +64,7 @@ const obtenerClaseBadge = (valor?: string | null): string => {
 function BadgeEstado({ value }: { value?: string | null }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${obtenerClaseBadge(
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold capitalize tracking-wide ${obtenerClaseBadge(
         value
       )}`}
     >
@@ -281,7 +281,7 @@ export function InicioView() {
       <div className="bg-white rounded-lg shadow border border-slate-200 p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-100 gap-4">
           <div>
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">
+            <h3 className="text-sm font-bold text-slate-700 capitalize tracking-wider">
               Panel principal de operación ({total})
             </h3>
             <p className="text-xs text-slate-400 mt-1">
@@ -311,7 +311,7 @@ export function InicioView() {
         </div>
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
           <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+            <label className="block text-[11px] font-bold text-slate-500 capitalize mb-1">
               Buscar
             </label>
 
@@ -351,14 +351,14 @@ export function InicioView() {
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
+            <p className="text-[11px] font-bold text-slate-400 capitalize">
               Total registros
             </p>
             <p className="text-xl font-bold text-slate-700">{total}</p>
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
+            <p className="text-[11px] font-bold text-slate-400 capitalize">
               Página actual
             </p>
             <p className="text-xl font-bold text-slate-700">
@@ -367,7 +367,7 @@ export function InicioView() {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
+            <p className="text-[11px] font-bold text-slate-400 capitalize">
               Mostrando
             </p>
             <p className="text-xl font-bold text-slate-700">
@@ -376,7 +376,7 @@ export function InicioView() {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
+            <p className="text-[11px] font-bold text-slate-400 capitalize">
               Registros por página
             </p>
             <select
@@ -393,7 +393,7 @@ export function InicioView() {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase">
+            <p className="text-[11px] font-bold text-slate-400 capitalize">
               Línea
             </p>
             <select
@@ -420,7 +420,7 @@ export function InicioView() {
 
         <div className="mt-6 overflow-hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="min-w-[1400px] w-full border-collapse text-sm">
-            <thead className="bg-[#0033a0] text-xs uppercase text-white font-semibold tracking-wider">
+            <thead className="bg-[#0033a0] text-xs capitalize text-white font-semibold tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left">
                   N° Inspección

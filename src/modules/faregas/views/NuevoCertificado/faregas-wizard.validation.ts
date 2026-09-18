@@ -47,7 +47,6 @@ export const validarDatosIniciales = (caja: Record<string, any>) => {
   agregarFaltantes(errores, caja, [
     ['tarifaCodigo', 'el servicio'],
     ['placa', 'la placa'],
-    ['categoria', 'la categoría vehicular'],
   ]);
   if (caja.tipoCertificado !== 'CONFORMIDAD' && vacio(caja.modalidadCertificado)) {
     errores.push('Seleccione si el certificado es inicial o anual.');
@@ -102,8 +101,7 @@ export const validarExpedienteTecnico = ({
   ];
 
   if (vacio(caja.placa)) errores.push('Complete la placa.');
-  if (vacio(caja.categoria)) errores.push('Complete la categoría vehicular.');
-  if (vacio(vehiculo.vin) && vacio(vehiculo.serieChasis)) errores.push('Complete el VIN o la serie de chasis.');
+    if (vacio(vehiculo.vin) && vacio(vehiculo.serieChasis)) errores.push('Complete el VIN o la serie de chasis.');
   agregarFaltantes(errores, vehiculo, base);
 
   if (tipoCertificado === 'GNV_ANUAL' || tipoCertificado === 'GLP_ANUAL' || tipoCertificado === 'CONFORMIDAD') {

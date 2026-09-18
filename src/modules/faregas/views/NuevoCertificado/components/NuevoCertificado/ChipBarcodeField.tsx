@@ -108,7 +108,7 @@ export function ChipBarcodeField({ value, certificadoId, onChange }: ChipBarcode
             }}
             maxLength={15}
             autoComplete="off"
-            className={`w-full rounded-lg border-2 py-2 pl-10 pr-3 font-mono font-bold uppercase text-slate-800 outline-none transition-colors ${color}`}
+            className={`w-full rounded-lg border-2 py-2 pl-10 pr-3 font-mono font-bold capitalize text-slate-800 outline-none transition-colors ${color}`}
             placeholder="ESCANEE EL CHIP"
           />
         </div>

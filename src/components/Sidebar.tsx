@@ -412,7 +412,7 @@ export function Sidebar({
                     </span>
 
                     {!collapsed && (
-                      <span className="truncate uppercase tracking-wide text-xs">
+                      <span className="truncate capitalize tracking-wide text-xs">
                         {item.label}
                       </span>
                     )}

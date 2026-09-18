@@ -10,11 +10,11 @@ export function CaracteristicasFinalesStep({ formData, setFormData, onNext }: Ca
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-      <h3 className="text-sm font-black text-[#052a79] uppercase mb-4">Características Finales del Vehículo</h3>
+      <h3 className="text-sm font-black text-[#052a79] capitalize mb-4">Características Finales del Vehículo</h3>
       
       <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl mb-6">
         <div className="flex flex-col gap-1.5 mb-6">
-          <label className="text-[10px] font-bold text-slate-500 uppercase">Descripción de Características Finales *</label>
+          <label className="text-[10px] font-bold text-slate-500 capitalize">Descripción de Características Finales *</label>
           <textarea
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79] min-h-[150px]"
             value={formData.caracteristicasFinales || ''}

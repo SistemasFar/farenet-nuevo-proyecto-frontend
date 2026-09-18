@@ -148,7 +148,7 @@ export function VerificacionStep({
           <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-200">
             <FileCheck2 className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-3xl font-black text-green-800 uppercase tracking-tight mb-2">
+          <h2 className="text-3xl font-black text-green-800 capitalize tracking-tight mb-2">
             Certificado Emitido
           </h2>
           <p className="text-green-600 font-medium mb-8">
@@ -158,16 +158,16 @@ export function VerificacionStep({
           <div className="bg-white rounded-xl border border-green-100 p-6 inline-block min-w-[300px] shadow-sm">
             <div className="space-y-4 text-left">
               <div>
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Número de Certificado</div>
+                <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Número de Certificado</div>
                 <div className="text-2xl font-black text-[#052a79]">{emisionResult.numero_certificado}</div>
               </div>
               <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                 <div>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Estado</div>
+                  <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Estado</div>
                   <div className="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded inline-block">{emisionResult.estado}</div>
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha Emisión</div>
+                  <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Fecha Emisión</div>
                   <div className="text-sm font-bold text-slate-700">{new Date(emisionResult.fecha_emision).toLocaleDateString()}</div>
                 </div>
               </div>
@@ -223,7 +223,7 @@ export function VerificacionStep({
             <button 
               onClick={handleEmitir}
               disabled={isEmitting}
-              className={`${isEmitting ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'} text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 uppercase tracking-wide`}
+              className={`${isEmitting ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'} text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 capitalize tracking-wide`}
             >
               {isEmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
               {isEmitting ? 'EMITIENDO...' : 'EMITIR CERTIFICADO'}
@@ -252,7 +252,7 @@ export function VerificacionStep({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {Object.keys(erroresPorSeccion).map(sec => (
               <div key={sec} className="bg-white p-4 rounded-lg border border-red-100 shadow-sm">
-                <h5 className="font-bold text-red-700 uppercase tracking-wide text-xs mb-3 border-b border-red-50 pb-2">{sec}</h5>
+                <h5 className="font-bold text-red-700 capitalize tracking-wide text-xs mb-3 border-b border-red-50 pb-2">{sec}</h5>
                 <ul className="space-y-2">
                   {erroresPorSeccion[sec].map((err: any, idx: number) => (
                     <li key={idx} className="flex items-start gap-2 text-sm text-slate-700">
@@ -284,44 +284,44 @@ export function VerificacionStep({
         {/* RESUMEN GENERAL Y VEHÍCULO */}
         <div className="space-y-6">
           <div className="bg-white border-2 border-slate-200 rounded-2xl p-6">
-            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 pb-2 border-b">1. Resumen General</h4>
+            <h4 className="text-sm font-bold text-slate-700 capitalize tracking-wider mb-4 pb-2 border-b">1. Resumen General</h4>
             <div className="grid grid-cols-2 gap-y-3 text-sm">
               <div className="text-slate-500 font-semibold">Tipo:</div>
-              <div className="font-bold text-slate-800 uppercase">{tipoCertificado}</div>
+              <div className="font-bold text-slate-800 capitalize">{tipoCertificado}</div>
               {tipoCertificado !== 'CONFORMIDAD' && (
                 <>
                   <div className="text-slate-500 font-semibold">Modalidad:</div>
-                  <div className="font-bold text-slate-800 uppercase">{formGlp.modalidad || formGnv.modalidad || formCaja.modalidadCertificado || '-'}</div>
+                  <div className="font-bold text-slate-800 capitalize">{formGlp.modalidad || formGnv.modalidad || formCaja.modalidadCertificado || '-'}</div>
                 </>
               )}
               <div className="text-slate-500 font-semibold">Placa:</div>
-              <div className="font-bold text-[#052a79] text-lg uppercase">{formCaja.placa}</div>
+              <div className="font-bold text-[#052a79] text-lg capitalize">{formCaja.placa}</div>
               <div className="text-slate-500 font-semibold">Categoría:</div>
-              <div className="font-bold text-slate-800 uppercase">{formCaja.categoria}</div>
+              <div className="font-bold text-slate-800 capitalize">{formCaja.categoria}</div>
               <div className="text-slate-500 font-semibold">Estado:</div>
-              <div className="font-bold text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded inline-block w-max">BORRADOR</div>
+              <div className="font-bold text-slate-500 capitalize bg-slate-100 px-2 py-0.5 rounded inline-block w-max">BORRADOR</div>
             </div>
           </div>
 
           <div className="bg-white border-2 border-slate-200 rounded-2xl p-6">
-            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 pb-2 border-b">2. Datos Básicos del Vehículo</h4>
+            <h4 className="text-sm font-bold text-slate-700 capitalize tracking-wider mb-4 pb-2 border-b">2. Datos Básicos del Vehículo</h4>
             <div className="grid grid-cols-2 gap-y-3 text-sm">
               <div className="text-slate-500 font-semibold">Marca:</div>
-              <div className="font-bold text-slate-800 uppercase">{formVehiculo.marca || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize">{formVehiculo.marca || '-'}</div>
               <div className="text-slate-500 font-semibold">Modelo:</div>
-              <div className="font-bold text-slate-800 uppercase">{formVehiculo.modelo || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize">{formVehiculo.modelo || '-'}</div>
               <div className="text-slate-500 font-semibold">VIN:</div>
-              <div className="font-bold text-slate-800 uppercase">{formVehiculo.vin || formVehiculo.serieChasis || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize">{formVehiculo.vin || formVehiculo.serieChasis || '-'}</div>
               <div className="text-slate-500 font-semibold">N° Motor:</div>
-              <div className="font-bold text-slate-800 uppercase">{formVehiculo.numeroMotor || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize">{formVehiculo.numeroMotor || '-'}</div>
               <div className="text-slate-500 font-semibold">Combustible:</div>
-              <div className="font-bold text-slate-800 uppercase">{formVehiculo.combustible || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize">{formVehiculo.combustible || '-'}</div>
             </div>
           </div>
 
           {/* DATOS ESPECÍFICOS SEGÚN TIPO */}
           <div className="bg-blue-50 border-2 border-blue-100 rounded-2xl p-6">
-            <h4 className="text-sm font-bold text-[#052a79] uppercase tracking-wider mb-4 pb-2 border-b border-blue-200">
+            <h4 className="text-sm font-bold text-[#052a79] capitalize tracking-wider mb-4 pb-2 border-b border-blue-200">
               3. Especificaciones {tipoCertificado}
             </h4>
             
@@ -329,9 +329,9 @@ export function VerificacionStep({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-y-3 text-sm">
                   <div className="text-slate-500 font-semibold">Propietario:</div>
-                  <div className="font-bold text-slate-800 uppercase">{formPropietario.nombre || '-'}</div>
+                  <div className="font-bold text-slate-800 capitalize">{formPropietario.nombre || '-'}</div>
                   <div className="text-slate-500 font-semibold">Vigencia Hasta:</div>
-                  <div className="font-bold text-slate-800 uppercase">{formGlp.fechaVigencia || '-'}</div>
+                  <div className="font-bold text-slate-800 capitalize">{formGlp.fechaVigencia || '-'}</div>
                 </div>
                 <div className="text-xs bg-white p-3 rounded border border-blue-100">
                   <div className="font-bold text-slate-700 mb-1">Componentes:</div>
@@ -347,9 +347,9 @@ export function VerificacionStep({
             {tipoCertificado === 'GNV_ANUAL' && (
               <div className="grid grid-cols-2 gap-y-3 text-sm">
                 <div className="text-slate-500 font-semibold">Vigencia Hasta:</div>
-                <div className="font-bold text-slate-800 uppercase">{formGnv.fechaVigencia || '-'}</div>
+                <div className="font-bold text-slate-800 capitalize">{formGnv.fechaVigencia || '-'}</div>
                 <div className="text-slate-500 font-semibold">Observaciones:</div>
-                <div className="font-bold text-slate-800 uppercase">{formGnv.observaciones || 'NINGUNA'}</div>
+                <div className="font-bold text-slate-800 capitalize">{formGnv.observaciones || 'NINGUNA'}</div>
               </div>
             )}
 
@@ -357,13 +357,13 @@ export function VerificacionStep({
               <div className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-y-3">
                   <div className="text-slate-500 font-semibold">Razón Social:</div>
-                  <div className="font-bold text-slate-800 uppercase">{formConformidad.razonSocial || '-'}</div>
+                  <div className="font-bold text-slate-800 capitalize">{formConformidad.razonSocial || '-'}</div>
                   <div className="text-slate-500 font-semibold">Tipo:</div>
-                  <div className="font-bold text-slate-800 uppercase">{formConformidad.tipoConformidad || '-'}</div>
+                  <div className="font-bold text-slate-800 capitalize">{formConformidad.tipoConformidad || '-'}</div>
                 </div>
                 <div className="text-xs bg-white p-3 rounded border border-blue-100">
                   <div className="font-bold text-slate-700 mb-1">Motivo:</div>
-                  <div className="text-slate-600 uppercase">{formConformidad.motivo || '-'}</div>
+                  <div className="text-slate-600 capitalize">{formConformidad.motivo || '-'}</div>
                 </div>
               </div>
             )}
@@ -373,25 +373,25 @@ export function VerificacionStep({
         {/* FACTURACIÓN Y PAGOS */}
         <div className="space-y-6">
           <div className="bg-white border-2 border-slate-200 rounded-2xl p-6">
-            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 pb-2 border-b">4. Facturación</h4>
+            <h4 className="text-sm font-bold text-slate-700 capitalize tracking-wider mb-4 pb-2 border-b">4. Facturación</h4>
             <div className="grid grid-cols-2 gap-y-3 text-sm">
               <div className="text-slate-500 font-semibold">Comprobante:</div>
-              <div className="font-bold text-slate-800 uppercase">{facturacion?.nroComprobante || formFacturacion.tipoDocFac || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize">{facturacion?.nroComprobante || formFacturacion.tipoDocFac || '-'}</div>
               <div className="text-slate-500 font-semibold">Estado SUNAT:</div>
-              <div className={`font-bold uppercase ${facturacionSimulada ? 'text-blue-700' : 'text-green-700'}`}>
+              <div className={`font-bold capitalize ${facturacionSimulada ? 'text-blue-700' : 'text-green-700'}`}>
                 {facturacionSimulada ? 'NO ENVIADO (SIMULACIÓN)' : facturacion?.estado || '-'}
               </div>
               <div className="text-slate-500 font-semibold">DNI/RUC:</div>
-              <div className="font-bold text-slate-800 uppercase">{formFacturacion.nroDocFac || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize">{formFacturacion.nroDocFac || '-'}</div>
               <div className="text-slate-500 font-semibold">Cliente:</div>
-              <div className="font-bold text-slate-800 uppercase col-span-2">{formFacturacion.razonSocialFac || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize col-span-2">{formFacturacion.razonSocialFac || '-'}</div>
               <div className="text-slate-500 font-semibold">Dirección:</div>
-              <div className="font-bold text-slate-800 uppercase col-span-2">{formFacturacion.direccionFac || '-'}</div>
+              <div className="font-bold text-slate-800 capitalize col-span-2">{formFacturacion.direccionFac || '-'}</div>
             </div>
           </div>
 
           <div className="bg-white border-2 border-slate-200 rounded-2xl p-6">
-            <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 pb-2 border-b">5. Pago Registrado</h4>
+            <h4 className="text-sm font-bold text-slate-700 capitalize tracking-wider mb-4 pb-2 border-b">5. Pago Registrado</h4>
             {pagosAgregados.length === 0 ? (
               <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200">
                 <AlertCircle className="w-5 h-5" />
@@ -408,7 +408,7 @@ export function VerificacionStep({
                   ))}
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t">
-                  <span className="font-bold text-slate-700 uppercase">Total Pagado:</span>
+                  <span className="font-bold text-slate-700 capitalize">Total Pagado:</span>
                   <span className="font-black text-[#052a79] text-lg">S/ {totalPagado.toFixed(2)}</span>
                 </div>
               </div>

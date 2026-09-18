@@ -82,7 +82,7 @@ export function CertificateChipSection({ certificadoId }: { certificadoId?: numb
             onChange={(event) => { setNumero(normalizar(event.target.value)); setError(''); }}
             onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void guardar(); } }}
             disabled={seleccion.chip?.estado === 'VENDIDO'}
-            className="h-11 w-full rounded-xl border-2 border-blue-200 bg-white pl-10 pr-3 font-mono font-bold uppercase outline-none focus:border-[#052a79] disabled:bg-slate-100"
+            className="h-11 w-full rounded-xl border-2 border-blue-200 bg-white pl-10 pr-3 font-mono font-bold capitalize outline-none focus:border-[#052a79] disabled:bg-slate-100"
             placeholder="ESCANEAR O ESCRIBIR"
             autoComplete="off"
           />

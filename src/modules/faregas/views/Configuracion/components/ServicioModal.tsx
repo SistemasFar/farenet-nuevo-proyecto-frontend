@@ -245,7 +245,7 @@ export function ServicioModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-5 flex items-start justify-between gap-4">
-          <div><p className="text-xs font-bold uppercase tracking-wide text-blue-600">{categoria.codigo} · {categoria.nombre}</p><h3 className="mt-1 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Configurar nueva operaci�n' : 'Configurar operaci�n'}</h3><p className="mt-1 text-sm text-slate-500">Define el comportamiento, el formato y las sedes usando la misma configuraci�n oficial de Tarifas por sede.</p></div>
+          <div><p className="text-xs font-bold capitalize tracking-wide text-blue-600">{categoria.codigo} · {categoria.nombre}</p><h3 className="mt-1 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Configurar nueva operaci�n' : 'Configurar operaci�n'}</h3><p className="mt-1 text-sm text-slate-500">Define el comportamiento, el formato y las sedes usando la misma configuraci�n oficial de Tarifas por sede.</p></div>
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 font-bold text-slate-500 hover:bg-slate-100">✕</button>
         </div>
         {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
@@ -253,7 +253,7 @@ export function ServicioModal({
           <section className="rounded-xl border border-slate-200 p-4">
             <h4 className="mb-3 font-bold text-slate-800">1. Identidad de la operaci�n</h4>
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-sm font-semibold text-slate-700">C�digo t�cnico<input required disabled={mode === 'EDIT'} value={codigo} onChange={(event) => setCodigo(event.target.value)} className="mt-1 w-full rounded-lg border p-2 uppercase disabled:bg-slate-100" /></label>
+              <label className="text-sm font-semibold text-slate-700">C�digo t�cnico<input required disabled={mode === 'EDIT'} value={codigo} onChange={(event) => setCodigo(event.target.value)} className="mt-1 w-full rounded-lg border p-2 capitalize disabled:bg-slate-100" /></label>
               <label className="text-sm font-semibold text-slate-700">Nombre<input required value={nombre} onChange={(event) => setNombre(event.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
             </div>
           </section>

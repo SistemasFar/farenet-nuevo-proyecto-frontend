@@ -39,7 +39,7 @@ export function ReservaChipAdicional({ certificadoId }: ReservaChipAdicionalProp
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm mt-4">
       <div className="flex items-center gap-2 mb-4">
         <Tag className="h-5 w-5 text-[#f59e0b]" />
-        <h4 className="text-sm font-bold uppercase tracking-wider text-slate-700">Adicionales</h4>
+        <h4 className="text-sm font-bold capitalize tracking-wider text-slate-700">Adicionales</h4>
       </div>
       
       <div className="flex items-center gap-3 mb-4">

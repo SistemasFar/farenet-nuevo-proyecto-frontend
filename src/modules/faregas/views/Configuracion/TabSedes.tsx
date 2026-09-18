@@ -124,7 +124,7 @@ export default function TabSedes() {
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="bg-gray-50 text-xs capitalize text-gray-500">
                 <tr>
                   <th className="px-4 py-3">Código</th>
                   <th className="px-4 py-3">Nombre</th>

@@ -223,7 +223,7 @@ export default function InspeccionesView() {
                 value={placa}
                 onChange={(e) => setPlaca(e.target.value)}
                 placeholder="ABC123"
-                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm uppercase outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm capitalize outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
@@ -295,7 +295,7 @@ export default function InspeccionesView() {
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-[1400px] w-full border-collapse text-sm">
-            <thead className="bg-[#0033a0] text-xs uppercase text-white font-semibold tracking-wider">
+            <thead className="bg-[#0033a0] text-xs capitalize text-white font-semibold tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left">N° Inspección</th>
                 <th className="px-4 py-3 text-left">Fecha y hora</th>

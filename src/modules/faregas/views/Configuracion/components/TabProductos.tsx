@@ -249,7 +249,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           : error ? <div className="py-10 text-center text-red-500">{error}</div>
           : <div className="max-h-[58vh] overflow-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 border-b border-gray-200 bg-white text-xs uppercase text-gray-500"><tr><th className="px-3 py-3">SKU / producto</th><th className="px-3 py-3">Datos fiscales</th><th className="px-3 py-3">Uso operativo</th><th className="px-3 py-3 text-center">Sedes activas</th><th className="px-3 py-3 text-right">Precio referencia</th><th className="px-3 py-3 text-center">Estado</th><th className="px-3 py-3 text-center">Acciones</th></tr></thead>
+              <thead className="sticky top-0 border-b border-gray-200 bg-white text-xs capitalize text-gray-500"><tr><th className="px-3 py-3">SKU / producto</th><th className="px-3 py-3">Datos fiscales</th><th className="px-3 py-3">Uso operativo</th><th className="px-3 py-3 text-center">Sedes activas</th><th className="px-3 py-3 text-right">Precio referencia</th><th className="px-3 py-3 text-center">Estado</th><th className="px-3 py-3 text-center">Acciones</th></tr></thead>
               <tbody className="divide-y divide-gray-100">{filtrados.map((producto) => {
                 const vinculacion = vinculaciones.get(producto.id);
                 return <tr key={producto.id} className="hover:bg-gray-50">

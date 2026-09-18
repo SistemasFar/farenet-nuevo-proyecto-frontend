@@ -121,7 +121,7 @@ export function LineaView() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+          <h2 className="text-xl font-black text-slate-800 capitalize tracking-tight">
             Línea de Inspección
           </h2>
           <p className="text-sm text-slate-500 font-medium ml-4 border-l border-slate-300 pl-4">
@@ -157,7 +157,7 @@ export function LineaView() {
                 >
                   {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                 </div>
-                <span className={`text-xs font-bold uppercase tracking-wider mt-1 transition-colors ${isActive ? 'text-[#052a79]' : 
+                <span className={`text-xs font-bold capitalize tracking-wider mt-1 transition-colors ${isActive ? 'text-[#052a79]' : 
 isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400 group-hover:text-[#052a79]'}`}>
                   {step.label}
                 </span>
@@ -223,7 +223,7 @@ isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400 group-hover:text-[
         <div className="flex justify-between items-center max-w-5xl mx-auto">
           <button
             onClick={() => navigate('/inicio')}
-            className="px-6 py-2 border-2 border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-100 uppercase text-sm transition-colors"
+            className="px-6 py-2 border-2 border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-100 capitalize text-sm transition-colors"
           >
             Cancelar / Volver
           </button>
@@ -232,14 +232,14 @@ isCompleted ? 'text-gold-3d drop-shadow-sm' : 'text-slate-400 group-hover:text-[
             <button
               onClick={handleAnterior}
               disabled={currentStep === 0}
-              className={`px-6 py-2 font-bold rounded-lg uppercase text-sm transition-colors ${currentStep === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'border-2 border-[#052a79] text-[#052a79] hover:bg-blue-50'}`}
+              className={`px-6 py-2 font-bold rounded-lg capitalize text-sm transition-colors ${currentStep === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'border-2 border-[#052a79] text-[#052a79] hover:bg-blue-50'}`}
             >
               Anterior
             </button>
             <button
               onClick={handleSiguiente}
               disabled={currentStep === STEPS.length - 1}
-              className={`px-8 py-2 font-bold rounded-lg uppercase text-sm transition-colors ${currentStep === STEPS.length - 1 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-[#052a79] text-white hover:bg-[#041d54]'}`}
+              className={`px-8 py-2 font-bold rounded-lg capitalize text-sm transition-colors ${currentStep === STEPS.length - 1 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-[#052a79] text-white hover:bg-[#041d54]'}`}
             >
               Siguiente
             </button>

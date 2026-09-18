@@ -91,7 +91,7 @@ export const ModalRegistroResultados: React.FC<ModalRegistroResultadosProps> = (
                 value={placaNueva}
                 onChange={(e) => setPlacaNueva(e.target.value.toUpperCase())}
                 placeholder="Ej: ABC-123"
-                className="w-full border border-gray-300 rounded-lg p-2.5 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors outline-none bg-white uppercase"
+                className="w-full border border-gray-300 rounded-lg p-2.5 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors outline-none bg-white capitalize"
                 disabled={isLoading}
               />
             </div>
@@ -103,7 +103,7 @@ export const ModalRegistroResultados: React.FC<ModalRegistroResultadosProps> = (
                 value={inspeccionNueva}
                 onChange={(e) => setInspeccionNueva(e.target.value.toUpperCase())}
                 placeholder="Ej: INS-201-000000000"
-                className="w-full border border-gray-300 rounded-lg p-2.5 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors outline-none bg-white uppercase"
+                className="w-full border border-gray-300 rounded-lg p-2.5 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors outline-none bg-white capitalize"
                 disabled={isLoading}
               />
             </div>

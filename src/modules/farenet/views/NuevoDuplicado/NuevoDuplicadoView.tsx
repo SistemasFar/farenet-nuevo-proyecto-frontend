@@ -138,7 +138,7 @@ export function NuevoDuplicadoView() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-xl font-black text-[#052a79] uppercase tracking-wide">DUPLICADO CERTIFICADO</h2>
+          <h2 className="text-xl font-black text-[#052a79] capitalize tracking-wide">DUPLICADO CERTIFICADO</h2>
         </div>
       </div>
 
@@ -147,19 +147,19 @@ export function NuevoDuplicadoView() {
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="flex flex-col gap-1.5 lg:col-span-4">
-              <label className="text-xs font-bold text-slate-600 uppercase">* PLACA - MOTOR</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">* PLACA - MOTOR</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={form.placa}
                   onChange={(e) => setForm({ ...form, placa: e.target.value.toUpperCase() })}
                   placeholder="Ej: ABC-123"
-                  className="w-full lg:w-1/4 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition uppercase"
+                  className="w-full lg:w-1/4 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-200/50 outline-none transition capitalize"
                   maxLength={10}
                 />
                 <button
                   type="button"
-                  className="px-4 py-2 bg-[#052a79] text-white rounded-lg text-xs font-bold transition flex items-center gap-2 uppercase hover:bg-blue-900"
+                  className="px-4 py-2 bg-[#052a79] text-white rounded-lg text-xs font-bold transition flex items-center gap-2 capitalize hover:bg-blue-900"
                   onClick={async () => {
                     if (!form.placa || form.placa.length < 6) return Swal.fire('Error', 'Ingrese una placa válida', 'error');
                     Swal.fire({ title: 'Buscando', text: 'Buscando inspección aprobada...', allowOutsideClick: false });
@@ -185,7 +185,7 @@ export function NuevoDuplicadoView() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">* CONCEPTO</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">* CONCEPTO</label>
               <Select
                 options={maestros?.conceptos?.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })) || []}
                 value={maestros?.conceptos?.map((c: any) => ({ value: c.key, label: c.abreviatura || c.nombre })).find((o: any) => String(o.value) === String(form.concepto)) || null}
@@ -198,7 +198,7 @@ export function NuevoDuplicadoView() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">* TIPO DE CONTADO</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">* TIPO DE CONTADO</label>
               <Select
                 options={maestros?.pagos?.map((c: any) => ({ value: c.key, label: c.nombre })) || []}
                 value={maestros?.pagos?.map((c: any) => ({ value: c.key, label: c.nombre })).find((o: any) => String(o.value) === String(form.tipoContado)) || null}
@@ -211,7 +211,7 @@ export function NuevoDuplicadoView() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">* TIPO DOCUMENTO</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">* TIPO DOCUMENTO</label>
               <Select
                 options={maestros?.documentos?.map((c: any) => ({ value: c.key, label: c.nombre })) || []}
                 value={maestros?.documentos?.map((c: any) => ({ value: c.key, label: c.nombre })).find((o: any) => String(o.value) === String(form.tipoDocumento)) || null}
@@ -224,7 +224,7 @@ export function NuevoDuplicadoView() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase">MOTIVO DUPLICADO</label>
+              <label className="text-xs font-bold text-slate-600 capitalize">MOTIVO DUPLICADO</label>
               <Select
                 options={motivos}
                 value={motivos.find((o: any) => o.value === form.motivoDuplicado) || null}
@@ -242,23 +242,23 @@ export function NuevoDuplicadoView() {
         <div className="bg-slate-50 p-6 border-t border-slate-200">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">SUBTOTAL</span>
+              <span className="text-[10px] font-bold text-slate-500 capitalize tracking-wider mb-1">SUBTOTAL</span>
               <span className="text-lg font-black text-[#052a79]">{formatCurrency(precios.subtotal)}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">DESCUENTO</span>
+              <span className="text-[10px] font-bold text-slate-500 capitalize tracking-wider mb-1">DESCUENTO</span>
               <span className="text-lg font-black text-[#052a79]">{formatCurrency(precios.descuento)}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">BASE IMPONIBLE</span>
+              <span className="text-[10px] font-bold text-slate-500 capitalize tracking-wider mb-1">BASE IMPONIBLE</span>
               <span className="text-lg font-black text-[#052a79]">{formatCurrency(precios.baseImponible)}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">IGV 18%</span>
+              <span className="text-[10px] font-bold text-slate-500 capitalize tracking-wider mb-1">IGV 18%</span>
               <span className="text-lg font-black text-[#052a79]">{formatCurrency(precios.igv)}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">TOTAL</span>
+              <span className="text-[10px] font-bold text-slate-500 capitalize tracking-wider mb-1">TOTAL</span>
               <span className="text-lg font-black text-amber-500">{formatCurrency(precios.total)}</span>
             </div>
           </div>
@@ -268,14 +268,14 @@ export function NuevoDuplicadoView() {
         <div className="p-6 bg-white border-t border-slate-200 flex flex-col sm:flex-row gap-3">
           <button 
             type="button" 
-            className="flex-1 py-3 bg-slate-400 hover:bg-slate-500 text-white rounded-lg font-bold text-sm uppercase transition flex items-center justify-center gap-2"
+            className="flex-1 py-3 bg-slate-400 hover:bg-slate-500 text-white rounded-lg font-bold text-sm capitalize transition flex items-center justify-center gap-2"
           >
             <UserCog className="w-4 h-4" /> Cambiar cliente
           </button>
           
           <button 
             type="button" 
-            className="flex-1 py-3 bg-slate-400 hover:bg-slate-500 text-white rounded-lg font-bold text-sm uppercase transition flex items-center justify-center gap-2"
+            className="flex-1 py-3 bg-slate-400 hover:bg-slate-500 text-white rounded-lg font-bold text-sm capitalize transition flex items-center justify-center gap-2"
           >
             <ShieldCheck className="w-4 h-4" /> Actualizar Poliza
           </button>
@@ -283,7 +283,7 @@ export function NuevoDuplicadoView() {
           <button 
             type="button" 
             onClick={handleGuardar}
-            className="flex-1 py-3 bg-[#052a79] hover:bg-blue-900 text-white rounded-lg font-bold text-sm uppercase transition flex items-center justify-center gap-2"
+            className="flex-1 py-3 bg-[#052a79] hover:bg-blue-900 text-white rounded-lg font-bold text-sm capitalize transition flex items-center justify-center gap-2"
           >
             <Save className="w-4 h-4" /> Guardar
           </button>

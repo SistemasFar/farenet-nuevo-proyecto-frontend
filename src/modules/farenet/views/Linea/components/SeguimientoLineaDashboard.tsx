@@ -84,11 +84,11 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+            <h1 className="text-xl font-black text-slate-800 capitalize tracking-tight flex items-center gap-2">
               Seguimiento de Línea <span className="text-amber-600">#{nroInspeccion}</span>
             </h1>
             <p className="text-sm font-medium text-slate-500">
-              Placa: <span className="text-slate-800 uppercase bg-slate-100 px-1.5 py-0.5 rounded border">{vehiculo?.placa || '-'}</span> • 
+              Placa: <span className="text-slate-800 capitalize bg-slate-100 px-1.5 py-0.5 rounded border">{vehiculo?.placa || '-'}</span> • 
               Categoría: <span className="text-slate-800">{vehiculo?.categoriaNombre || '-'}</span> • 
               Combustible: <span className="text-slate-800">{vehiculo?.combustibleNombre || '-'}</span>
             </p>
@@ -96,11 +96,11 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
         </div>
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end mr-4">
-            <span className="text-xs font-bold text-slate-400 uppercase">Posición</span>
+            <span className="text-xs font-bold text-slate-400 capitalize">Posición</span>
             <span className="text-lg font-black text-blue-600">{estado.posicionActual}</span>
           </div>
           <div className="flex flex-col items-end mr-4">
-            <span className="text-xs font-bold text-slate-400 uppercase">Preliminar</span>
+            <span className="text-xs font-bold text-slate-400 capitalize">Preliminar</span>
             <span className={`text-lg font-black ${estado.resultadoPreliminar === 'A' ? 'text-green-600' : 'text-red-600'}`}>{estado.resultadoPreliminar}</span>
           </div>
           <button onClick={fetchEstado} disabled={loading} className="p-2 hover:bg-blue-50 text-blue-600 rounded transition-colors flex items-center gap-2 border border-blue-200 bg-white shadow-sm font-medium text-sm">
@@ -131,7 +131,7 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
             </div>
             <div>
               <p className="text-2xl font-black text-slate-800">{obligatorias?.length || 0}</p>
-              <p className="text-xs font-bold text-slate-500 uppercase">Obligatorias</p>
+              <p className="text-xs font-bold text-slate-500 capitalize">Obligatorias</p>
             </div>
           </div>
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
@@ -140,7 +140,7 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
             </div>
             <div>
               <p className="text-2xl font-black text-slate-800">{recibidas?.length || 0}</p>
-              <p className="text-xs font-bold text-slate-500 uppercase">Recibidas</p>
+              <p className="text-xs font-bold text-slate-500 capitalize">Recibidas</p>
             </div>
           </div>
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
@@ -149,7 +149,7 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
             </div>
             <div>
               <p className="text-2xl font-black text-slate-800">{faltantes?.length || 0}</p>
-              <p className="text-xs font-bold text-slate-500 uppercase">Faltantes</p>
+              <p className="text-xs font-bold text-slate-500 capitalize">Faltantes</p>
             </div>
           </div>
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-4">
@@ -158,7 +158,7 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
             </div>
             <div>
               <p className="text-2xl font-black text-slate-800">{noAplicables?.length || 0}</p>
-              <p className="text-xs font-bold text-slate-500 uppercase">No Aplicables</p>
+              <p className="text-xs font-bold text-slate-500 capitalize">No Aplicables</p>
             </div>
           </div>
         </div>
@@ -168,11 +168,11 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
             <div className="bg-amber-50 border-b border-amber-100 p-3 px-4 flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-amber-600" />
-              <h3 className="font-bold text-amber-800 uppercase tracking-tight">Pruebas Faltantes</h3>
+              <h3 className="font-bold text-amber-800 capitalize tracking-tight">Pruebas Faltantes</h3>
             </div>
             <div className="p-0 overflow-auto max-h-[300px]">
               <table className="w-full text-sm text-left text-slate-600">
-                <thead className="text-xs text-slate-500 bg-slate-50 sticky top-0 uppercase font-bold border-b">
+                <thead className="text-xs text-slate-500 bg-slate-50 sticky top-0 capitalize font-bold border-b">
                   <tr>
                     <th className="px-4 py-2">Prueba</th>
                     <th className="px-4 py-2">Tipo Máquina</th>
@@ -186,7 +186,7 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
                         <td className="px-4 py-3 font-semibold text-slate-800">{f.nombre}</td>
                         <td className="px-4 py-3 font-mono text-xs">{f.tipomaquinaKey}</td>
                         <td className="px-4 py-3">
-                          <span className="bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded text-[10px] uppercase">Pendiente</span>
+                          <span className="bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded text-[10px] capitalize">Pendiente</span>
                         </td>
                       </tr>
                     ))
@@ -204,11 +204,11 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
             <div className="bg-green-50 border-b border-green-100 p-3 px-4 flex items-center gap-2">
               <FileCheck className="w-5 h-5 text-green-600" />
-              <h3 className="font-bold text-green-800 uppercase tracking-tight">Pruebas Recibidas</h3>
+              <h3 className="font-bold text-green-800 capitalize tracking-tight">Pruebas Recibidas</h3>
             </div>
             <div className="p-0 overflow-auto max-h-[300px]">
               <table className="w-full text-sm text-left text-slate-600">
-                <thead className="text-xs text-slate-500 bg-slate-50 sticky top-0 uppercase font-bold border-b">
+                <thead className="text-xs text-slate-500 bg-slate-50 sticky top-0 capitalize font-bold border-b">
                   <tr>
                     <th className="px-4 py-2">Prueba</th>
                     <th className="px-4 py-2 text-center">Res</th>
@@ -244,11 +244,11 @@ export function SeguimientoLineaDashboard({ nroInspeccion, onBack, onIrConsolida
           <div className="mt-8 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="bg-slate-100 border-b border-slate-200 p-3 px-4 flex items-center gap-2">
               <XCircle className="w-5 h-5 text-slate-500" />
-              <h3 className="font-bold text-slate-700 uppercase tracking-tight">Pruebas No Aplicables</h3>
+              <h3 className="font-bold text-slate-700 capitalize tracking-tight">Pruebas No Aplicables</h3>
             </div>
             <div className="p-0 overflow-auto">
               <table className="w-full text-sm text-left text-slate-600">
-                <thead className="text-xs text-slate-500 bg-slate-50 uppercase font-bold border-b">
+                <thead className="text-xs text-slate-500 bg-slate-50 capitalize font-bold border-b">
                   <tr>
                     <th className="px-4 py-2">Prueba</th>
                     <th className="px-4 py-2">Motivo</th>

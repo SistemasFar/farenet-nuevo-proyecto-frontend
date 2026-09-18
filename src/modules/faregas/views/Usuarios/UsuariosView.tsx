@@ -360,7 +360,7 @@ export function UsuariosView() {
             <div className="flex justify-center items-center h-32 text-gray-500 text-sm">Cargando...</div>
           ) : (
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+              <thead className="bg-gray-50 text-xs capitalize text-gray-500">
                 {activeTab === 'usuarios' ? (
                   <tr>
                     <th className="px-4 py-3">Usuario</th>
@@ -543,13 +543,13 @@ export function UsuariosView() {
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Cuenta</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Username <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Username <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                             minLength={3} pattern="^[a-zA-Z0-9_.-]+$" title="El usuario debe tener al menos 3 caracteres y no contener espacios"
                                             value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} disabled={modalMode === 'editar'} />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Tipo de Usuario <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Tipo de Usuario <span className="text-red-500">*</span></label>
                                         <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
                                             value={formData.user_type} onChange={e => setFormData({ ...formData, user_type: e.target.value })}>
                                             <option value="USER">Normal (USER)</option>
@@ -566,7 +566,7 @@ export function UsuariosView() {
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Identidad</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Tipo de Documento <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Tipo de Documento <span className="text-red-500">*</span></label>
                                         <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
                                             value={formData.tipoDocumentoKey} onChange={e => setFormData({ ...formData, tipoDocumentoKey: e.target.value })}>
                                             <option value="">Seleccione...</option>
@@ -574,7 +574,7 @@ export function UsuariosView() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nro Documento <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nro Documento <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                             minLength={8} maxLength={15} pattern="^[0-9a-zA-Z]+$" title="Ingrese un número de documento válido (sin guiones ni espacios)"
                                             value={formData.nroDocumento} onChange={e => setFormData({ ...formData, nroDocumento: e.target.value })} />
@@ -584,13 +584,13 @@ export function UsuariosView() {
                                 {formData.tipoDocumentoKey !== '06' ? (
                                     <div className="grid grid-cols-2 gap-4 mb-4">
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nombres <span className="text-red-500">*</span></label>
+                                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nombres <span className="text-red-500">*</span></label>
                                             <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                                 minLength={2} pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$" title="Solo letras y espacios (min. 2 caracteres)"
                                                 value={formData.nombres} onChange={e => setFormData({ ...formData, nombres: e.target.value })} />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Apellidos <span className="text-red-500">*</span></label>
+                                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Apellidos <span className="text-red-500">*</span></label>
                                             <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                                 minLength={2} pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$" title="Solo letras y espacios (min. 2 caracteres)"
                                                 value={formData.apellidos} onChange={e => setFormData({ ...formData, apellidos: e.target.value })} />
@@ -598,7 +598,7 @@ export function UsuariosView() {
                                     </div>
                                 ) : (
                                     <div className="mb-4">
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Razón Social <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Razón Social <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                             minLength={3} title="Ingrese una razón social válida (min. 3 caracteres)"
                                             value={formData.nombreRazonSocial} onChange={e => setFormData({ ...formData, nombreRazonSocial: e.target.value })} />
@@ -611,12 +611,12 @@ export function UsuariosView() {
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Seguridad</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Contraseña {modalMode === 'editar' && '(opcional)'}</label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Contraseña {modalMode === 'editar' && '(opcional)'}</label>
                                         <input type="password" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
                                             value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Confirmar Contraseña</label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Confirmar Contraseña</label>
                                         <input type="password" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
                                             value={formData.confirmPassword} onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} />
                                     </div>
@@ -637,7 +637,7 @@ export function UsuariosView() {
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Ubicación y Contacto</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">País <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">País <span className="text-red-500">*</span></label>
                                         <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
                                             value={formData.paisKey} onChange={e => handlePaisChange(e.target.value)}>
                                             <option value="">Seleccione...</option>
@@ -645,7 +645,7 @@ export function UsuariosView() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Departamento <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Departamento <span className="text-red-500">*</span></label>
                                         <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
                                             value={formData.departamentoKey} onChange={e => handleDepartamentoChange(e.target.value)} disabled={!formData.paisKey}>
                                             <option value="">Seleccione...</option>
@@ -655,7 +655,7 @@ export function UsuariosView() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Provincia <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Provincia <span className="text-red-500">*</span></label>
                                         <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
                                             value={formData.provinciaKey} onChange={e => handleProvinciaChange(e.target.value)} disabled={!formData.departamentoKey}>
                                             <option value="">Seleccione...</option>
@@ -663,7 +663,7 @@ export function UsuariosView() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Distrito <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Distrito <span className="text-red-500">*</span></label>
                                         <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
                                             value={formData.distritoKey} onChange={e => setFormData({ ...formData, distritoKey: e.target.value })} disabled={!formData.provinciaKey}>
                                             <option value="">Seleccione...</option>
@@ -672,26 +672,26 @@ export function UsuariosView() {
                                     </div>
                                 </div>
                                 <div className="mb-4">
-                                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Dirección <span className="text-red-500">*</span></label>
+                                    <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Dirección <span className="text-red-500">*</span></label>
                                     <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                         minLength={5} title="Ingrese una dirección válida (min. 5 caracteres)"
                                         value={formData.direccion} onChange={e => setFormData({ ...formData, direccion: e.target.value })} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Teléfono <span className="text-red-500">*</span></label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Teléfono <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                             minLength={6} pattern="^[0-9+\-\s]+$" title="Ingrese un número de teléfono válido"
                                             value={formData.telefono} onChange={e => setFormData({ ...formData, telefono: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Email</label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Email</label>
                                         <input type="email" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
                                             value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Persona de Contacto {formData.tipoDocumentoKey === '06' && <span className="text-red-500">*</span>}</label>
+                                    <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Persona de Contacto {formData.tipoDocumentoKey === '06' && <span className="text-red-500">*</span>}</label>
                                     <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
                                         required={formData.tipoDocumentoKey === '06'} minLength={formData.tipoDocumentoKey === '06' ? 3 : undefined} title="Ingrese el nombre del contacto (min. 3 caracteres)"
                                         value={formData.personaContacto} onChange={e => setFormData({ ...formData, personaContacto: e.target.value })} />
@@ -702,7 +702,7 @@ export function UsuariosView() {
                             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Perfil y Sedes</h3>
                                 <div className="mb-4">
-                                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Perfil <span className="text-red-500">*</span></label>
+                                    <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Perfil <span className="text-red-500">*</span></label>
                                     <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
                                         value={formData.perfil_id} onChange={e => handlePerfilUsuarioChange(e.target.value)}>
                                         {perfiles.map(p => <option key={p.clave} value={p.clave}>{p.nombre}</option>)}
@@ -711,14 +711,14 @@ export function UsuariosView() {
                                 <div>
                                     {formData.perfil_id === 'SISTEMAS' ? (
                                     <>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Asignadas</label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Asignadas</label>
                                         <div className="text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded p-3 text-center">
                                         ACCESO A TODAS LAS SEDES
                                         </div>
                                     </>
                                     ) : (
                                     <>
-                                        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles para este Perfil</label>
+                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Disponibles para este Perfil</label>
                                         <div className="mb-2">
                                         <label className="flex items-center gap-2 text-sm cursor-pointer">
                                             <input type="checkbox"
@@ -758,12 +758,12 @@ export function UsuariosView() {
                     <>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Clave</label>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Clave</label>
                             <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required disabled={modalMode === 'editar'}
                                 value={formData.clave || ''} onChange={e => setFormData({ ...formData, clave: e.target.value.toUpperCase() })} />
                             </div>
                             <div>
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Nombre</label>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nombre</label>
                             <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                 value={formData.nombre || ''} onChange={e => setFormData({ ...formData, nombre: e.target.value })} />
                             </div>
@@ -775,7 +775,7 @@ export function UsuariosView() {
                         </div>
 
                         <div className="border-t pt-4 mt-4">
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Sedes Disponibles</label>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Disponibles</label>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {plantas.map(p => {
                                 const isSistemas = formData.clave === 'SISTEMAS';
@@ -800,7 +800,7 @@ export function UsuariosView() {
                         </div>
 
                         <div className="border-t pt-4 mt-4">
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Módulos / Menú</label>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Módulos / Menú</label>
                             <div className="grid grid-cols-2 gap-2">
                             {permisos.map(p => {
                                 const isSistemas = formData.clave === 'SISTEMAS';

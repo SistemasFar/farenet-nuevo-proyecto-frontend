@@ -115,7 +115,7 @@ export function PagoStep({
                 {pagoTab !== 'EFECTIVO' && (
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">N° OPERACIÓN / REFERENCIA</label>
-                    <input type="text" name="nroOperacion" value={formPago.nroOperacion || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: 123456" />
+                    <input type="text" name="nroOperacion" value={formPago.nroOperacion || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: 123456" />
                   </div>
                 )}
               </div>
@@ -124,7 +124,7 @@ export function PagoStep({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TARJETA</label>
-                    <select name="tarjetaKey" value={formPago.tarjetaKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
+                    <select name="tarjetaKey" value={formPago.tarjetaKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0">
                       <option value="">-- SELECCIONAR --</option>
                       {(maestrosPago?.tarjetas || []).map((tarjeta) => (
                         <option key={tarjeta.key} value={tarjeta.key}>{tarjeta.nombre}</option>
@@ -134,7 +134,7 @@ export function PagoStep({
                   {!tarjetaSinDigitos && (
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1">ÚLTIMOS 4 DÍGITOS</label>
-                      <input type="text" name="digitosTarjeta" value={formPago.digitosTarjeta || ''} onChange={handleInput} maxLength={4} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0" placeholder="****" />
+                      <input type="text" name="digitosTarjeta" value={formPago.digitosTarjeta || ''} onChange={handleInput} maxLength={4} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0" placeholder="****" />
                     </div>
                   )}
                 </div>
@@ -144,7 +144,7 @@ export function PagoStep({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">ENTIDAD FINANCIERA</label>
-                    <select name="entidadFinancieraKey" value={formPago.entidadFinancieraKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
+                    <select name="entidadFinancieraKey" value={formPago.entidadFinancieraKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0">
                       <option value="">-- SELECCIONAR --</option>
                       {(maestrosPago?.entidadesFinancieras || []).map((entidad) => (
                         <option key={entidad.key} value={entidad.key}>{entidad.nombre}</option>
@@ -153,7 +153,7 @@ export function PagoStep({
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">CUENTA CORRIENTE</label>
-                    <select name="cuentaCorrienteKey" value={formPago.cuentaCorrienteKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl uppercase font-bold focus:border-[#f59e0b] focus:ring-0">
+                    <select name="cuentaCorrienteKey" value={formPago.cuentaCorrienteKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0">
                       <option value="">-- SELECCIONAR --</option>
                       {cuentasFiltradas.map((cuenta) => (
                         <option key={cuenta.key} value={cuenta.key}>{cuenta.nombre}</option>
@@ -178,7 +178,7 @@ export function PagoStep({
           </div>
 
           <div className="bg-white border-2 border-slate-200 rounded-2xl p-6">
-            <h4 className="text-sm font-bold text-slate-700 uppercase mb-4">Pagos Registrados</h4>
+            <h4 className="text-sm font-bold text-slate-700 capitalize mb-4">Pagos Registrados</h4>
             {pagosAgregados.length === 0 ? (
               <p className="text-slate-400 text-sm italic">No hay pagos registrados.</p>
             ) : (
@@ -187,7 +187,7 @@ export function PagoStep({
                   <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
                     <div>
                       <p className="font-bold text-slate-800">{p.tipo} {p.tarjetaKey ? `- ${p.tarjetaKey}` : ''}</p>
-                      <p className="text-xs text-slate-500 uppercase">{p.nroOperacion ? `Operación: ${p.nroOperacion}` : 'Sin referencia'}</p>
+                      <p className="text-xs text-slate-500 capitalize">{p.nroOperacion ? `Operación: ${p.nroOperacion}` : 'Sin referencia'}</p>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="font-bold text-[#052a79] text-lg">S/ {parseFloat(p.importe).toFixed(2)}</span>
@@ -205,7 +205,7 @@ export function PagoStep({
         {/* PANEL DERECHO: RESUMEN */}
         <div className="lg:col-span-1">
           <div className="bg-[#f4f9ff] border-2 border-[#052a79]/10 rounded-2xl p-6 sticky top-6">
-            <h4 className="font-bold text-[#052a79] mb-6 uppercase tracking-wider">Resumen de Cuenta</h4>
+            <h4 className="font-bold text-[#052a79] mb-6 capitalize tracking-wider">Resumen de Cuenta</h4>
             
             <div className="space-y-4">
               <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">{labelTarifaOriginal}</span><span className="font-bold text-slate-700">S/ {tarifaOriginal.toFixed(2)}</span></div>
@@ -224,20 +224,20 @@ export function PagoStep({
               </div>
               <div className="h-px bg-slate-200 my-4" />
               <div className="flex justify-between items-center">
-                <span className="text-slate-600 font-bold uppercase text-sm">Falta Pagar:</span>
+                <span className="text-slate-600 font-bold capitalize text-sm">Falta Pagar:</span>
                 <span className={`font-black text-2xl ${pendiente <= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   S/ {Math.max(0, pendiente).toFixed(2)}
                 </span>
               </div>
             </div>
             {pendiente > 0 ? (
-              <p className={`text-xs font-bold text-center mt-6 uppercase ${condicionPago === 'CREDITO' ? 'text-blue-600' : 'text-red-500'}`}>
+              <p className={`text-xs font-bold text-center mt-6 capitalize ${condicionPago === 'CREDITO' ? 'text-blue-600' : 'text-red-500'}`}>
                 {condicionPago === 'CREDITO'
                   ? 'El saldo pendiente se registrará en cuotas'
                   : 'Debe completar el saldo para continuar'}
               </p>
             ) : (
-              <div className="mt-6 bg-green-100 text-green-700 text-xs font-bold p-3 rounded-lg text-center uppercase border border-green-200">
+              <div className="mt-6 bg-green-100 text-green-700 text-xs font-bold p-3 rounded-lg text-center capitalize border border-green-200">
                 Monto Completo
               </div>
             )}

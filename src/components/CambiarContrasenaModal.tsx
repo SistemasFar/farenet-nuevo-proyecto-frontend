@@ -81,7 +81,7 @@ export const CambiarContrasenaModal: React.FC<CambiarContrasenaModalProps> = ({
 
           <div className="space-y-4">
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+              <label className="block text-[11px] font-bold text-slate-500 capitalize mb-1">
                 Contraseña Actual
               </label>
               <input
@@ -95,7 +95,7 @@ export const CambiarContrasenaModal: React.FC<CambiarContrasenaModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+              <label className="block text-[11px] font-bold text-slate-500 capitalize mb-1">
                 Nueva Contraseña
               </label>
               <input
@@ -109,7 +109,7 @@ export const CambiarContrasenaModal: React.FC<CambiarContrasenaModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+              <label className="block text-[11px] font-bold text-slate-500 capitalize mb-1">
                 Confirmar Nueva Contraseña
               </label>
               <input

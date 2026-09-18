@@ -229,7 +229,7 @@ export function ChipsView() {
           <section key={prod.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="font-bold uppercase text-[#052A79]">{prod.nombre}</h2>
+                <h2 className="font-bold capitalize text-[#052A79]">{prod.nombre}</h2>
                 <p className="mt-1 font-mono text-xs text-slate-500">{prod.codigo}</p>
               </div>
               <button className="text-xs font-bold text-blue-600 hover:underline" onClick={() => openEditModal(prod)}>Editar tipo</button>
@@ -259,15 +259,15 @@ export function ChipsView() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="p-3">Código</th><th className="p-3">Tipo de chip</th><th className="p-3 text-center">Disponibles</th><th className="p-3 text-center">Reservados</th><th className="p-3 text-center">Vendidos</th><th className="p-3 text-center">Bajas</th><th className="p-3 text-center">Total</th></tr></thead>
+            <thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr><th className="p-3">Código</th><th className="p-3">Tipo de chip</th><th className="p-3 text-center">Disponibles</th><th className="p-3 text-center">Reservados</th><th className="p-3 text-center">Vendidos</th><th className="p-3 text-center">Bajas</th><th className="p-3 text-center">Total</th></tr></thead>
             <tbody>{productos.map((prod) => <tr key={prod.id} onClick={() => setSelectedProductId(prod.id)} className={`cursor-pointer border-t border-slate-100 hover:bg-blue-50 ${Number(selectedProductId) === prod.id ? 'bg-blue-50' : ''}`}><td className="p-3 font-mono font-bold">{prod.codigo}</td><td className="p-3 font-medium">{prod.nombre}</td><td className="p-3 text-center font-bold text-emerald-700">{Number(prod.disponiblesSede || 0)}</td><td className="p-3 text-center font-bold text-amber-700">{Number(prod.reservadosSede || 0)}</td><td className="p-3 text-center">{Number(prod.vendidosSede || 0)}</td><td className="p-3 text-center text-red-700">{Number(prod.bajasSede || 0)}</td><td className="p-3 text-center text-lg font-black text-[#052A79]">{Number(prod.stockSede || 0)}</td></tr>)}</tbody>
           </table>
         </div>
       </section>
 
       <div>
-        <p className="mb-2 text-xs font-bold uppercase text-slate-500">Resumen del tipo seleccionado: {resumen.productoNombre || '-'}</p>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{cards.map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="text-xs font-bold uppercase text-slate-500">{label}</div><div className="mt-1 text-2xl font-black text-[#052A79]">{value}</div></div>)}</div>
+        <p className="mb-2 text-xs font-bold capitalize text-slate-500">Resumen del tipo seleccionado: {resumen.productoNombre || '-'}</p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{cards.map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="text-xs font-bold capitalize text-slate-500">{label}</div><div className="mt-1 text-2xl font-black text-[#052A79]">{value}</div></div>)}</div>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
@@ -302,7 +302,7 @@ export function ChipsView() {
               <label className="relative w-full sm:w-72"><span className="mb-1 block text-xs font-bold text-slate-600">Buscar por código de chip</span><Search className="absolute bottom-2.5 left-3 h-4 w-4 text-slate-400" /><input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Ej. CHIP001" className="w-full rounded border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" /></label>
             </div>
           </div>
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr>{modo === 'TRANSFERENCIA' && <th className="w-10 p-3"></th>}<th className="p-3">Código del chip</th><th className="p-3">Tipo</th><th className="p-3">Estado</th><th className="p-3">Sede</th><th className="p-3">Ingreso</th><th className="p-3">Último movimiento</th></tr></thead><tbody>{chips.map(c => <tr key={c.id} className="border-t border-slate-100">{modo === 'TRANSFERENCIA' && <td className="p-3"><input type="checkbox" disabled={c.estado !== 'DISPONIBLE' || Number(c.producto_inventariable_id) !== Number(selectedProductId)} checked={scan.split('\n').some(numero => numero.trim() === c.numero_chip)} onChange={e => { if (e.target.checked) { setScan(prev => prev ? `${prev}\n${c.numero_chip}` : c.numero_chip); } else { setScan(prev => prev.split('\n').map(x => x.trim()).filter(x => x && x !== c.numero_chip).join('\n')); } }} className="rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]" /></td>}<td className="p-3 font-mono font-bold">{c.numero_chip}</td><td className="p-3">{c.producto_nombre}</td><td className="p-3"><span className={`inline-block rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${c.estado === 'DISPONIBLE' ? 'bg-emerald-100 text-emerald-800' : c.estado === 'RESERVADO' ? 'bg-amber-100 text-amber-800' : c.estado === 'VENDIDO' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{c.estado}</span></td><td className="p-3">{c.planta_nombre}</td><td className="p-3">{new Date(c.creado_en).toLocaleString()}</td><td className="p-3">{c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleString() : '-'}</td></tr>)}{!chips.length && <tr><td colSpan={modo === 'TRANSFERENCIA' ? 7 : 6} className="p-10 text-center text-slate-400">No se encontraron chips con ese código.</td></tr>}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr>{modo === 'TRANSFERENCIA' && <th className="w-10 p-3"></th>}<th className="p-3">Código del chip</th><th className="p-3">Tipo</th><th className="p-3">Estado</th><th className="p-3">Sede</th><th className="p-3">Ingreso</th><th className="p-3">Último movimiento</th></tr></thead><tbody>{chips.map(c => <tr key={c.id} className="border-t border-slate-100">{modo === 'TRANSFERENCIA' && <td className="p-3"><input type="checkbox" disabled={c.estado !== 'DISPONIBLE' || Number(c.producto_inventariable_id) !== Number(selectedProductId)} checked={scan.split('\n').some(numero => numero.trim() === c.numero_chip)} onChange={e => { if (e.target.checked) { setScan(prev => prev ? `${prev}\n${c.numero_chip}` : c.numero_chip); } else { setScan(prev => prev.split('\n').map(x => x.trim()).filter(x => x && x !== c.numero_chip).join('\n')); } }} className="rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]" /></td>}<td className="p-3 font-mono font-bold">{c.numero_chip}</td><td className="p-3">{c.producto_nombre}</td><td className="p-3"><span className={`inline-block rounded px-2 py-1 text-[10px] font-bold capitalize tracking-wider ${c.estado === 'DISPONIBLE' ? 'bg-emerald-100 text-emerald-800' : c.estado === 'RESERVADO' ? 'bg-amber-100 text-amber-800' : c.estado === 'VENDIDO' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{c.estado}</span></td><td className="p-3">{c.planta_nombre}</td><td className="p-3">{new Date(c.creado_en).toLocaleString()}</td><td className="p-3">{c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleString() : '-'}</td></tr>)}{!chips.length && <tr><td colSpan={modo === 'TRANSFERENCIA' ? 7 : 6} className="p-10 text-center text-slate-400">No se encontraron chips con ese código.</td></tr>}</tbody></table></div>
         </section>
       </div>
     </>}
@@ -414,7 +414,7 @@ function TabVentas({ plantaKey, productos, chipsList, onVentaExitosa, setShowVen
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="w-full whitespace-nowrap text-left text-xs text-slate-600">
-            <thead className="bg-slate-50 uppercase text-slate-500">
+            <thead className="bg-slate-50 capitalize text-slate-500">
               <tr>
                 <th className="px-4 py-3 font-bold">N° VENTA</th>
                 <th className="px-4 py-3 font-bold">FECHA Y HORA</th>

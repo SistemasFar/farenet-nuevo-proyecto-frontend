@@ -142,7 +142,7 @@ export function LoginView({
             <button
                 type="submit"
                 disabled={loading}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gold-3d py-3 text-sm font-black uppercase tracking-wider transition disabled:opacity-50"
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gold-3d py-3 text-sm font-black capitalize tracking-wider transition disabled:opacity-50"
               >
               {loading ? 'Procesando...' : 'Ok'}
             </button>

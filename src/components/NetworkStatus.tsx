@@ -208,7 +208,7 @@ export function NetworkStatus() {
         <div className="absolute right-0 mt-3 w-80 rounded-2xl bg-white text-slate-800 shadow-2xl border border-slate-200 p-4 z-50">
           <div className="flex items-start justify-between border-b border-slate-100 pb-3 mb-3">
             <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+              <p className="text-xs font-bold text-slate-400 capitalize tracking-wide">
                 Conectividad de Red
               </p>
 

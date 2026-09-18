@@ -67,11 +67,11 @@ const obtenerClaseBadge = (valor?: string | null): string => {
 function BadgeEstado({ value }: { value?: string | null }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${obtenerClaseBadge(
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold capitalize tracking-wide ${obtenerClaseBadge(
         value
       )}`}
     >
-      {normalizarTexto(value)}
+      {normalizarTexto(value)?.toLowerCase()}
     </span>
   );
 }
@@ -417,7 +417,7 @@ export function InicioView() {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79] md:col-span-2"
           />
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase text-gray-500">Desde</span>
+            <span className="text-xs font-semibold capitalize text-gray-500">Desde</span>
             <input
               type="date"
               value={filtros.fechaDesde}
@@ -427,7 +427,7 @@ export function InicioView() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold uppercase text-gray-500">Hasta</span>
+            <span className="text-xs font-semibold capitalize text-gray-500">Hasta</span>
             <input
               type="date"
               value={filtros.fechaHasta}
@@ -459,14 +459,14 @@ export function InicioView() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase text-gray-500">
+          <p className="text-xs font-semibold capitalize text-gray-500">
             Total registros
           </p>
           <p className="text-lg font-bold text-gray-800">{total}</p>
         </div>
 
         <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase text-gray-500">
+          <p className="text-xs font-semibold capitalize text-gray-500">
             Página actual
           </p>
           <p className="text-lg font-bold text-gray-800">
@@ -475,7 +475,7 @@ export function InicioView() {
         </div>
 
         <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase text-gray-500">
+          <p className="text-xs font-semibold capitalize text-gray-500">
             Mostrando
           </p>
           <p className="text-lg font-bold text-gray-800">
@@ -484,7 +484,7 @@ export function InicioView() {
         </div>
 
         <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="mb-1 text-xs font-semibold uppercase text-gray-500">
+          <p className="mb-1 text-xs font-semibold capitalize text-gray-500">
             Registros por página
           </p>
           <select
@@ -501,7 +501,7 @@ export function InicioView() {
         </div>
 
         <div className="flex flex-col justify-center rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="mb-1 text-xs font-semibold uppercase text-gray-500">
+          <p className="mb-1 text-xs font-semibold capitalize text-gray-500">
             Estado de Certificado
           </p>
           <select
@@ -537,7 +537,7 @@ export function InicioView() {
 
         <div className="flex-1 overflow-x-auto">
           <table className="hidden md:table min-w-[1400px] w-full border-collapse text-sm">
-            <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+            <thead className="bg-gray-50 text-xs font-semibold capitalize text-gray-500">
               <tr>
                 <th className="px-4 py-3 text-left">
                   N° Inspección
@@ -613,7 +613,7 @@ export function InicioView() {
                       className="text-slate-700 transition-colors hover:bg-slate-50"
                     >
                       <td className={`px-4 py-3 font-semibold whitespace-nowrap text-blue-700`}>
-                        BORRADOR #{ins.id}
+                        Borrador #{ins.id}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-slate-500" title={ins.fechaActualizacion ? `Última actualización: ${formatearFecha(ins.fechaActualizacion)}` : undefined}>
                         {formatearFecha(ins.fechaCreacion)}
@@ -624,8 +624,8 @@ export function InicioView() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         {normalizarTexto(ins.clienteDocumento)}
                       </td>
-                      <td className="px-4 py-3 min-w-[220px]">
-                        {normalizarTexto(ins.clienteNombre)}
+                      <td className="px-4 py-3 min-w-[220px] capitalize">
+                        {normalizarTexto(ins.clienteNombre)?.toLowerCase()}
                       </td>
                       <td className="px-4 py-3 min-w-[180px]">
                         {normalizarTexto(ins.conceptoVehicular)}
@@ -731,15 +731,15 @@ export function InicioView() {
                   
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="block text-[10px] font-semibold text-slate-500 uppercase">Placa</span>
+                      <span className="block text-[10px] font-semibold text-slate-500 capitalize">Placa</span>
                       <span className="font-bold text-slate-800">{normalizarTexto(ins.placa)}</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] font-semibold text-slate-500 uppercase">Estado</span>
+                      <span className="block text-[10px] font-semibold text-slate-500 capitalize">Estado</span>
                       <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-[10px] font-bold tracking-wide text-amber-700">{etapa}</span>
                     </div>
                     <div className="col-span-2">
-                      <span className="block text-[10px] font-semibold text-slate-500 uppercase">Cliente</span>
+                      <span className="block text-[10px] font-semibold text-slate-500 capitalize">Cliente</span>
                       <span className="text-slate-700 text-xs">{normalizarTexto(ins.clienteNombre)}</span>
                     </div>
                   </div>
@@ -838,7 +838,7 @@ export function InicioView() {
             <div className="flex items-center justify-between bg-slate-900 px-6 py-4 text-white">
               <div className="flex items-center gap-2">
                 <Eye className="h-5 w-5 text-amber-400" />
-                <h3 className="text-sm font-bold uppercase tracking-wider">Certificado de Inspección</h3>
+                <h3 className="text-sm font-bold capitalize tracking-wider">Certificado de Inspección</h3>
               </div>
               <button 
                 onClick={() => setPreviewModalId(null)} 

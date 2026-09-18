@@ -118,7 +118,7 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
               <p className="text-sm text-slate-600">Se creará un formato HTML dinámico vacío y se asignará únicamente a esta operación. Las versiones se administran después desde Editar formato.</p>
               <input aria-label="Código del formato" placeholder="CÓDIGO" value={nuevoCodigo}
                 onChange={(event) => setNuevoCodigo(event.target.value)} maxLength={50}
-                className="w-full rounded-lg border p-2 uppercase" required />
+                className="w-full rounded-lg border p-2 capitalize" required />
               <input aria-label="Nombre del formato" placeholder="Nombre" value={nuevoNombre}
                 onChange={(event) => setNuevoNombre(event.target.value)} maxLength={150}
                 className="w-full rounded-lg border p-2" required />

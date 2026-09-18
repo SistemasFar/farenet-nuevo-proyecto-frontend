@@ -132,7 +132,7 @@ export default function TabCategorias() {
           : (
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-gray-200 bg-white text-xs uppercase text-gray-500">
+                <thead className="border-b border-gray-200 bg-white text-xs capitalize text-gray-500">
                   <tr>
                     <th className="px-4 py-3">Código</th>
                     <th className="px-4 py-3">Nombre</th>
@@ -182,7 +182,7 @@ export default function TabCategorias() {
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Código</label>
                 <input required maxLength={50} disabled={mode === 'EDIT'} value={actual.codigo || ''}
                   onChange={(event) => setActual({ ...actual, codigo: event.target.value.toUpperCase().replace(/\s+/g, '_') })}
-                  className="w-full rounded-lg border p-2 uppercase disabled:bg-slate-100" />
+                  className="w-full rounded-lg border p-2 capitalize disabled:bg-slate-100" />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Nombre</label>

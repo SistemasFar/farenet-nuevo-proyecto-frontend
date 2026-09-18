@@ -36,7 +36,7 @@ export function TitularesList({
     setTitulares(prev => [
       ...prev,
       {
-        _uuid: crypto.randomUUID(),
+        _uuid: Math.random().toString(36).substring(2) + Date.now().toString(36),
         titularId: null,
         orden: nextOrden,
         clienteId: null,
@@ -182,9 +182,9 @@ export function TitularesList({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-        <h4 className="text-sm font-bold text-[#052a79] uppercase tracking-wider">C. Titulares y Datos de Facturación</h4>
+        <h4 className="text-sm font-bold text-[#052a79] capitalize tracking-wider">C. Dueño del Vehículo y Pago</h4>
         <button type="button" onClick={handleAdd} className="flex items-center gap-1 text-xs font-bold text-white bg-[#052a79] hover:bg-[#041d54] px-3 py-1.5 rounded-lg transition-colors">
-          <Plus className="w-4 h-4" /> Agregar Titular
+          <Plus className="w-4 h-4" /> Agregar Dueño
         </button>
       </div>
 
@@ -199,12 +199,12 @@ export function TitularesList({
             </button>
           </div>
           
-          <h5 className="font-bold text-slate-700 mb-3 text-sm">TITULAR {index + 1} {index === 0 && '(PRINCIPAL)'}</h5>
+          <h5 className="font-bold text-slate-700 mb-3 text-sm">DUEÑO {index + 1} {index === 0 && '(PRINCIPAL)'}</h5>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DOC.</label>
-              <select value={t.tipoDocumento} onChange={(e) => handleChange(t._uuid, 'tipoDocumento', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors">
+              <select value={t.tipoDocumento} onChange={(e) => handleChange(t._uuid, 'tipoDocumento', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors">
                 <option value="DNI">DNI</option>
                 <option value="RUC">RUC</option>
                 <option value="CE">CE</option>
@@ -214,7 +214,7 @@ export function TitularesList({
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">NRO. DOCUMENTO</label>
               <div className="flex gap-2">
-                <input value={t.nroDocumento} onChange={(e) => handleChange(t._uuid, 'nroDocumento', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+                <input value={t.nroDocumento} onChange={(e) => handleChange(t._uuid, 'nroDocumento', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
                 <button type="button" onClick={() => handleSearch(t._uuid, t.tipoDocumento, t.nroDocumento)} className="bg-slate-200 hover:bg-slate-300 px-3 rounded-lg transition-colors flex items-center justify-center h-[42px]">
                   <Search className="w-5 h-5 text-slate-600" />
                 </button>
@@ -222,11 +222,11 @@ export function TitularesList({
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-500 mb-1">NOMBRE / RAZÓN SOCIAL</label>
-              <input value={t.nombreRazonSocial} onChange={(e) => handleChange(t._uuid, 'nombreRazonSocial', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              <input value={t.nombreRazonSocial} onChange={(e) => handleChange(t._uuid, 'nombreRazonSocial', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
             </div>
             <div className="md:col-span-4">
               <label className="block text-xs font-bold text-slate-500 mb-1">DIRECCIÓN</label>
-              <input value={t.direccion} onChange={(e) => handleChange(t._uuid, 'direccion', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors" />
+              <input value={t.direccion} onChange={(e) => handleChange(t._uuid, 'direccion', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
             </div>
           </div>
         </div>
@@ -234,7 +234,7 @@ export function TitularesList({
       
       {titulares.length === 0 && (
         <div className="text-center text-slate-400 py-6 text-sm font-semibold bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
-          No hay titulares. Haga clic en "Agregar Titular" para registrar uno.
+          No hay dueños. Haga clic en "Agregar Dueño" para registrar uno.
         </div>
       )}
 
@@ -245,7 +245,7 @@ export function TitularesList({
               <ReceiptText className="h-5 w-5" />
             </div>
             <div>
-              <h5 className="text-sm font-black uppercase text-[#052a79]">Datos para facturación</h5>
+              <h5 className="text-sm font-black capitalize text-[#052a79]">Datos para facturación</h5>
               <p className="text-xs font-medium text-slate-600">Se utilizarán posteriormente para emitir la boleta o factura.</p>
             </div>
           </div>
@@ -256,14 +256,14 @@ export function TitularesList({
               onChange={(event) => handleFacturacionChange('usarTitularPrincipalFac', event.target.checked)}
               className="h-4 w-4 accent-[#052a79]"
             />
-            FACTURAR AL TITULAR PRINCIPAL
+            FACTURAR AL DUEÑO PRINCIPAL
           </label>
         </div>
 
         <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-4">
           {formFacturacion.usarTitularPrincipalFac && !titulares.length && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 md:col-span-4">
-              Agregue el titular principal para completar automáticamente los datos de facturación.
+              Agregue el dueño principal para completar automáticamente los datos de facturación.
             </div>
           )}
 
@@ -307,7 +307,7 @@ export function TitularesList({
               readOnly={formFacturacion.usarTitularPrincipalFac}
               onChange={(event) => handleFacturacionChange('razonSocialFac', event.target.value)}
               maxLength={100}
-              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold uppercase text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
+              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold capitalize text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
             />
           </div>
 
@@ -318,7 +318,7 @@ export function TitularesList({
               readOnly={formFacturacion.usarTitularPrincipalFac}
               onChange={(event) => handleFacturacionChange('direccionFac', event.target.value)}
               maxLength={100}
-              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold uppercase text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
+              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold capitalize text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
             />
           </div>
 
@@ -344,8 +344,8 @@ export function TitularesList({
 
           <div className="rounded-lg border border-blue-100 bg-white px-4 py-3 text-xs font-medium text-slate-600 md:col-span-4">
             {formFacturacion.usarTitularPrincipalFac
-              ? 'El documento, nombre y dirección se mantienen sincronizados con el titular principal.'
-              : 'La boleta o factura se emitirá a una persona o empresa diferente del titular del certificado.'}
+              ? 'El documento, nombre y dirección se mantienen sincronizados con el dueño principal.'
+              : 'La boleta o factura se emitirá a una persona o empresa diferente del dueño del vehículo.'}
           </div>
         </div>
       </div>

@@ -12,7 +12,7 @@ const Card = ({ label, value, tone = 'slate' }: { label: string; value: number |
     amber: 'border-amber-200 bg-amber-50 text-amber-800',
     red: 'border-red-200 bg-red-50 text-red-800'
   };
-  return <div className={`rounded-xl border p-4 ${colors[tone]}`}><div className="text-xs font-bold uppercase opacity-70">{label}</div><div className="mt-1 text-2xl font-black">{value}</div></div>;
+  return <div className={`rounded-xl border p-4 ${colors[tone]}`}><div className="text-xs font-bold capitalize opacity-70">{label}</div><div className="mt-1 text-2xl font-black">{value}</div></div>;
 };
 
 type Checklist = {
@@ -117,7 +117,7 @@ export default function NubefactReadinessPanel({ plantaKey, plantaNombre }: { pl
           ['Entorno', 'PRODUCCION'],
           ['Serie factura', serieFactura?.serie || 'NO CONFIGURADA'],
           ['Serie boleta', serieBoleta?.serie || 'NO CONFIGURADA']
-        ].map(([label, value]) => <div key={label} className="rounded-lg bg-white p-3"><span className="block text-xs font-bold uppercase text-slate-500">{label}</span><strong className="mt-1 block text-slate-800">{value}</strong></div>)}
+        ].map(([label, value]) => <div key={label} className="rounded-lg bg-white p-3"><span className="block text-xs font-bold capitalize text-slate-500">{label}</span><strong className="mt-1 block text-slate-800">{value}</strong></div>)}
       </div>
     </section>
 

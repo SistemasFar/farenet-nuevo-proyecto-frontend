@@ -79,11 +79,11 @@ export default function ModalVisualizarRecibo({ nroInspeccion, onClose }: ModalV
               {/* Header Card */}
               <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">Nro. Comprobante</div>
+                  <div className="text-xs font-bold text-indigo-400 capitalize tracking-wider mb-1">Nro. Comprobante</div>
                   <div className="text-xl font-black text-indigo-900">{recibo.nroComprobante}</div>
                 </div>
                 <div className="text-left sm:text-right">
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha Emisión</div>
+                  <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Fecha Emisión</div>
                   <div className="text-sm font-bold text-slate-700">
                     {new Date(recibo.fecha).toLocaleString('es-PE')}
                   </div>
@@ -94,7 +94,7 @@ export default function ModalVisualizarRecibo({ nroInspeccion, onClose }: ModalV
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
                 <div className="bg-white border border-slate-200 rounded-xl p-4">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Datos del Cliente</h4>
+                  <h4 className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-3">Datos del Cliente</h4>
                   <div className="space-y-3">
                     <div>
                       <div className="text-xs text-slate-500 mb-0.5">DNI / RUC</div>
@@ -108,7 +108,7 @@ export default function ModalVisualizarRecibo({ nroInspeccion, onClose }: ModalV
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-xl p-4">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Detalle del Servicio</h4>
+                  <h4 className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-3">Detalle del Servicio</h4>
                   <div className="space-y-3">
                     <div>
                       <div className="text-xs text-slate-500 mb-0.5">Concepto</div>
@@ -131,7 +131,7 @@ export default function ModalVisualizarRecibo({ nroInspeccion, onClose }: ModalV
 
               {/* Total Card */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-between items-center">
-                <div className="text-sm font-bold text-slate-500 uppercase">Importe Total</div>
+                <div className="text-sm font-bold text-slate-500 capitalize">Importe Total</div>
                 <div className="text-2xl font-black text-slate-800">
                   S/ {Number(recibo.importeTotal).toFixed(2)}
                 </div>
@@ -140,10 +140,10 @@ export default function ModalVisualizarRecibo({ nroInspeccion, onClose }: ModalV
               {/* Pagos */}
               {recibo.pagos && recibo.pagos.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Registro de Pagos</h4>
+                  <h4 className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-3">Registro de Pagos</h4>
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <table className="w-full text-sm text-left">
-                      <thead className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 uppercase">
+                      <thead className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 capitalize">
                         <tr>
                           <th className="px-4 py-3 font-semibold">Forma Pago</th>
                           <th className="px-4 py-3 font-semibold">Operación</th>
@@ -178,7 +178,7 @@ export default function ModalVisualizarRecibo({ nroInspeccion, onClose }: ModalV
         <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-xl flex justify-end">
           <button 
             onClick={onClose}
-            className="px-6 py-2.5 bg-slate-800 text-white text-sm font-bold uppercase rounded-lg shadow-sm hover:bg-slate-900 transition-colors"
+            className="px-6 py-2.5 bg-slate-800 text-white text-sm font-bold capitalize rounded-lg shadow-sm hover:bg-slate-900 transition-colors"
           >
             Cerrar
           </button>

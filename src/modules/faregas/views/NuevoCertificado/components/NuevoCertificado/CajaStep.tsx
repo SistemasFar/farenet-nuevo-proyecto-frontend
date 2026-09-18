@@ -121,7 +121,7 @@ export function CajaStep({
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <section className="space-y-4">
         <div>
-          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-700">1. Selecciona el Servicio</h4>
+          <h4 className="text-sm font-bold capitalize tracking-wider text-slate-700">1. Selecciona el Servicio</h4>
           <p className="mt-1 text-xs text-slate-500">Catálogo disponible para {catalogo?.sede.nombre || plantaNombre}.</p>
         </div>
 
@@ -141,7 +141,7 @@ export function CajaStep({
           <div className="flex flex-wrap gap-2" aria-label="Categorías de servicio">
             <button type="button" onClick={() => setCategoriaActiva('TODOS')} className={`rounded-full border px-4 py-2 text-xs font-black transition ${categoriaActiva === 'TODOS' ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>TODOS</button>
             {catalogo.categorias.map((categoria) => (
-              <button key={categoria.codigo} type="button" onClick={() => setCategoriaActiva(categoria.codigo)} className={`rounded-full border px-4 py-2 text-xs font-black uppercase transition ${categoriaActiva === categoria.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>{categoria.nombre}</button>
+              <button key={categoria.codigo} type="button" onClick={() => setCategoriaActiva(categoria.codigo)} className={`rounded-full border px-4 py-2 text-xs font-black capitalize transition ${categoriaActiva === categoria.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>{categoria.nombre}</button>
             ))}
           </div>
         )}
@@ -167,7 +167,7 @@ export function CajaStep({
               return (
                 <button key={servicio.id} type="button" onClick={() => seleccionarServicio(servicio)} aria-pressed={seleccionado} className={`relative min-h-44 rounded-2xl border-2 p-5 text-left transition-all duration-200 ${seleccionado ? 'border-[#052a79] bg-[#052a79]/5 shadow-md' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-[#052a79]/40 hover:shadow-sm'}`}>
                   {seleccionado && <CheckCircle className="absolute right-4 top-4 h-6 w-6 text-[#052a79]" />}
-                  <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 text-xs font-black uppercase tracking-wider text-[#052a79]">{categoria.nombre}</span>
+                  <span className="inline-flex rounded-md bg-blue-50 px-2.5 py-1 text-xs font-black capitalize tracking-wider text-[#052a79]">{categoria.nombre}</span>
                   <h5 className="mt-5 pr-8 text-base font-black text-slate-800">{servicio.nombre}</h5>
                   {servicio.tarifa.requiereChip && (
                     <div className="mt-4 space-y-1 rounded-lg bg-slate-50 p-2 text-xs font-semibold text-slate-600">
@@ -179,7 +179,7 @@ export function CajaStep({
                     <span className="text-[11px] font-semibold text-slate-400">{servicio.codigo}</span>
                     <div className="text-right">
                       <span className="block text-xl font-black text-[#052a79]">S/ {servicio.tarifa.importeTotal.toFixed(2)}</span>
-                      {servicio.tarifa.requiereChip && <span className="mt-1 block text-[10px] font-black uppercase text-emerald-700">Incluye chip</span>}
+                      {servicio.tarifa.requiereChip && <span className="mt-1 block text-[10px] font-black capitalize text-emerald-700">Incluye chip</span>}
                     </div>
                   </div>
                 </button>
@@ -191,18 +191,11 @@ export function CajaStep({
 
       {seleccion?.servicio.requiere_vehiculo && (
         <section className="space-y-4 border-t border-slate-100 pt-6">
-          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-700">2. Datos Básicos</h4>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <h4 className="text-sm font-bold capitalize tracking-wider text-slate-700">2. Datos Básicos</h4>
+          <div className="grid grid-cols-1 gap-6 max-w-md">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Placa de Rodaje</label>
-              <input type="text" className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => { onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() })); }} maxLength={7} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Categoría Vehicular</label>
-              <select className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" value={formCaja.categoria} onChange={(event) => { onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, categoria: event.target.value })); }}>
-                <option value="">-- Seleccionar --</option>
-                {['M1', 'M2', 'M3', 'N1', 'N2', 'N3', 'O1', 'O2', 'O3', 'O4'].map((categoria) => <option key={categoria} value={categoria}>{categoria}</option>)}
-              </select>
+              <label className="text-xs font-bold capitalize tracking-wider text-slate-500">Placa de Rodaje</label>
+              <input type="text" className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => { onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() })); }} maxLength={7} />
             </div>
           </div>
         </section>
@@ -213,7 +206,7 @@ export function CajaStep({
           <button
             type="button"
             onClick={() => void onConsultar()}
-            disabled={consultando || (seleccion.servicio.requiere_vehiculo && (!formCaja.placa || !formCaja.categoria))}
+            disabled={consultando || (seleccion.servicio.requiere_vehiculo && (!formCaja.placa))}
             className="flex min-w-40 items-center justify-center gap-2 rounded-lg bg-[#052a79] px-6 py-3 text-xs font-black text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             <Search className="h-4 w-4" />
@@ -225,7 +218,7 @@ export function CajaStep({
       {seleccion && consultaRealizada && (
         <>
           <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-            <h4 className="mb-4 text-sm font-bold uppercase tracking-wider text-[#052a79]">Servicio Seleccionado</h4>
+            <h4 className="mb-4 text-sm font-bold capitalize tracking-wider text-[#052a79]">Servicio Seleccionado</h4>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div><span className="block text-xs font-semibold text-blue-600">Servicio</span><span className="font-bold text-slate-800">{seleccion.servicio.nombre}</span></div>
               <div><span className="block text-xs font-semibold text-blue-600">Categoría</span><span className="font-bold text-slate-800">{seleccion.categoria.nombre}</span></div>
