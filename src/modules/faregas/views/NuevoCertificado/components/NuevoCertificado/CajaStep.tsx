@@ -69,16 +69,9 @@ export function CajaStep({
         setError('');
 
         setFormCaja((actual) => {
-          const seleccionSigueDisponible = nuevoCatalogo.categorias.some((categoria) =>
-            categoria.servicios.some((servicio) => servicio.tarifa.codigo === actual.tarifaCodigo));
-          if (!actual.tarifaCodigo || seleccionSigueDisponible) return actual;
-          return {
-            ...actual,
-            servicioCodigo: '',
-            tarifaCodigo: '',
-            tipoCertificado: '',
-            modalidadCertificado: '',
-          };
+          // FIX: Ya no borramos la tarifaCodigo agresivamente si no esta en el catalogo
+          // para proteger los borradores antiguos en previsualizacion.
+          return actual;
         });
       })
       .catch((err: unknown) => {
