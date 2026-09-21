@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validarFormularioFormatoDinamico } from './faregas-wizard.validation';
+import { validarDatosFacturacionBasica, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 
 describe('formulario dinámico del certificado', () => {
   it('valida únicamente las variables requeridas por el formato', () => {
@@ -21,5 +21,35 @@ describe('formulario dinámico del certificado', () => {
     ];
 
     expect(validarFormularioFormatoDinamico(campos, { 'taller.nombre': 'TALLER PRUEBA' })).toEqual([]);
+  });
+});
+
+describe('datos básicos de facturación', () => {
+  const facturacionValida = {
+    tipoDocFac: 'BOLETA',
+    nroDocFac: '74045612',
+    razonSocialFac: 'GRACE IBARRA',
+    direccionFac: 'AV. PRINCIPAL 123',
+    emailFac: 'grace@example.com',
+    telefonoFac: '987654321',
+  };
+
+  it('exige el correo electrónico de facturación', () => {
+    expect(validarDatosFacturacionBasica({ ...facturacionValida, emailFac: '' }))
+      .toContain('Complete el correo electrónico de facturación.');
+  });
+
+  it('rechaza un correo electrónico incompleto', () => {
+    expect(validarDatosFacturacionBasica({ ...facturacionValida, emailFac: 'grace@' }))
+      .toContain('El correo de facturación no tiene un formato válido.');
+  });
+
+  it('exige el teléfono de facturación', () => {
+    expect(validarDatosFacturacionBasica({ ...facturacionValida, telefonoFac: '' }))
+      .toContain('Complete el teléfono de facturación.');
+  });
+
+  it('acepta los datos cuando el correo tiene un formato válido', () => {
+    expect(validarDatosFacturacionBasica(facturacionValida)).toEqual([]);
   });
 });

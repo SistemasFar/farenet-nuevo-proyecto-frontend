@@ -7,9 +7,10 @@ export const customSelectStyles = {
   control: (base: any, state: any) => ({
     ...base,
     borderRadius: '0.5rem',
-    borderColor: state.isFocused ? '#f59e0b' : '#cbd5e1',
-    boxShadow: state.isFocused ? '0 0 0 2px rgba(253, 230, 138, 0.5)' : 'none',
-    '&:hover': { borderColor: state.isFocused ? '#f59e0b' : '#cbd5e1' },
+    borderColor: state.isFocused ? '#174f91' : '#d7e2ef',
+    boxShadow: state.isFocused ? '0 0 0 3px rgba(23, 79, 145, 0.1)' : 'none',
+    '&:hover': { borderColor: state.isFocused ? '#174f91' : '#b8c9dc' },
+    backgroundColor: state.isDisabled ? '#f5f5f5' : '#ffffff',
     minHeight: '38px',
     fontSize: '0.75rem',
     fontWeight: '600'

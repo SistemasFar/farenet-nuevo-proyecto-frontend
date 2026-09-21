@@ -17,6 +17,67 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Nuevo Certificado: los controles editables se ven activos y los estados
+   funcionalmente bloqueados conservan una apariencia neutra diferenciada. */
+.faregas-certificate-wizard
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(:disabled):not([readonly]),
+.faregas-certificate-wizard select:not(:disabled),
+.faregas-certificate-wizard textarea:not(:disabled):not([readonly]) {
+  background-color: #ffffff;
+  border-color: #d7e2ef;
+  color: #0f2747;
+}
+
+.faregas-certificate-wizard label {
+  color: #3b5d87;
+}
+
+.faregas-certificate-wizard
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):disabled,
+.faregas-certificate-wizard
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"])[readonly],
+.faregas-certificate-wizard select:disabled,
+.faregas-certificate-wizard textarea:disabled,
+.faregas-certificate-wizard textarea[readonly] {
+  background-color: #f5f5f5;
+  border-color: #d4d4d4;
+  color: #525252;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.faregas-certificate-wizard input::placeholder,
+.faregas-certificate-wizard textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.faregas-certificate-wizard
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(:disabled):not([readonly]):focus,
+.faregas-certificate-wizard select:not(:disabled):focus,
+.faregas-certificate-wizard textarea:not(:disabled):not([readonly]):focus {
+  background-color: #ffffff;
+  border-color: #174f91;
+  box-shadow: 0 0 0 3px rgba(23, 79, 145, 0.1);
+}
+
+/* Administración de usuarios: misma apariencia blanca y estados neutros. */
+.faregas-user-form input:not([type="checkbox"]):not([type="radio"]):not(:disabled),
+.faregas-user-form select:not(:disabled),
+.faregas-user-form textarea:not(:disabled) {
+  background-color: #ffffff;
+}
+
+.faregas-user-form input:not([type="checkbox"]):not([type="radio"]):disabled,
+.faregas-user-form select:disabled,
+.faregas-user-form textarea:disabled {
+  background-color: #f5f5f5;
+  border-color: #d4d4d4;
+  color: #525252;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 /* --- TEMA DORADO 3D (FARENET PREMIUM) --- */
 @layer utilities {
   .bg-gold-3d {

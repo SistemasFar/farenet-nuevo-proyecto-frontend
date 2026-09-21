@@ -21,6 +21,7 @@ interface PagoStepProps {
   maestrosPago?: MaestrosPagoResponse['data'] | null;
   condicionPago: 'CONTADO' | 'CREDITO';
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
+  compact?: boolean;
 }
 
 export function PagoStep({
@@ -39,6 +40,7 @@ export function PagoStep({
   labelTarifaOriginal = "Certificado:",
   condicionPago,
   onCondicionPagoChange,
+  compact = false,
 }: PagoStepProps) {
 
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
@@ -61,8 +63,8 @@ export function PagoStep({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+    <div className={`${compact ? 'space-y-4' : 'space-y-8'} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
+      <div className={`flex items-center gap-3 border-b border-slate-200 ${compact ? 'pb-3' : 'pb-4'}`}>
         <div className="bg-[#052a79]/10 p-2.5 rounded-xl">
           <CreditCard className="w-6 h-6 text-[#052a79]" />
         </div>
@@ -74,11 +76,11 @@ export function PagoStep({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className={`grid grid-cols-1 lg:grid-cols-3 ${compact ? 'gap-5' : 'gap-8'}`}>
         
         {/* PANEL IZQUIERDO: INGRESAR PAGO */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="rounded-2xl border-2 border-slate-200 bg-white p-5">
+        <div className={`lg:col-span-2 ${compact ? 'space-y-4' : 'space-y-6'}`}>
+          <div className={`rounded-2xl border-2 border-slate-200 bg-white ${compact ? 'p-4' : 'p-5'}`}>
             <label className="mb-2 block text-xs font-bold text-slate-500">CONDICIÓN DE PAGO</label>
             <select
               value={condicionPago}
@@ -106,8 +108,8 @@ export function PagoStep({
               ))}
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <div className={`${compact ? 'space-y-4 p-4' : 'space-y-6 p-6'}`}>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">MONTO (S/)</label>
                   <input type="number" name="importe" value={formPago.importe || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-lg focus:border-[#f59e0b] focus:ring-0" placeholder="0.00" />
@@ -121,7 +123,7 @@ export function PagoStep({
               </div>
 
               {pagoTab === 'TARJETA' && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TARJETA</label>
                     <select name="tarjetaKey" value={formPago.tarjetaKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0">
@@ -177,8 +179,8 @@ export function PagoStep({
             </div>
           </div>
 
-          <div className="bg-white border-2 border-slate-200 rounded-2xl p-6">
-            <h4 className="text-sm font-bold text-slate-700 capitalize mb-4">Pagos Registrados</h4>
+          <div className={`rounded-2xl border-2 border-slate-200 bg-white ${compact ? 'p-4' : 'p-6'}`}>
+            <h4 className={`text-sm font-bold text-slate-700 capitalize ${compact ? 'mb-2' : 'mb-4'}`}>Pagos Registrados</h4>
             {pagosAgregados.length === 0 ? (
               <p className="text-slate-400 text-sm italic">No hay pagos registrados.</p>
             ) : (
@@ -204,10 +206,10 @@ export function PagoStep({
 
         {/* PANEL DERECHO: RESUMEN */}
         <div className="lg:col-span-1">
-          <div className="bg-[#f4f9ff] border-2 border-[#052a79]/10 rounded-2xl p-6 sticky top-6">
-            <h4 className="font-bold text-[#052a79] mb-6 capitalize tracking-wider">Resumen de Cuenta</h4>
+          <div className={`sticky top-6 rounded-2xl border-2 border-[#052a79]/10 bg-[#f4f9ff] ${compact ? 'p-4' : 'p-6'}`}>
+            <h4 className={`font-bold text-[#052a79] capitalize tracking-wider ${compact ? 'mb-4' : 'mb-6'}`}>Resumen de Cuenta</h4>
             
-            <div className="space-y-4">
+            <div className={compact ? 'space-y-3' : 'space-y-4'}>
               <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">{labelTarifaOriginal}</span><span className="font-bold text-slate-700">S/ {tarifaOriginal.toFixed(2)}</span></div>
               {descuento > 0 && <div className="flex justify-between items-center"><span className="text-emerald-700 font-semibold">Descuento certificado:</span><span className="font-black text-emerald-700">- S/ {descuento.toFixed(2)}</span></div>}
               {resumenComercial?.requiereChip && (
@@ -222,7 +224,7 @@ export function PagoStep({
                 <span className="text-slate-500 font-semibold">Pagado:</span>
                 <span className="text-green-600 font-bold text-lg">S/ {pagado.toFixed(2)}</span>
               </div>
-              <div className="h-px bg-slate-200 my-4" />
+              <div className={`h-px bg-slate-200 ${compact ? 'my-3' : 'my-4'}`} />
               <div className="flex justify-between items-center">
                 <span className="text-slate-600 font-bold capitalize text-sm">Falta Pagar:</span>
                 <span className={`font-black text-2xl ${pendiente <= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -231,13 +233,13 @@ export function PagoStep({
               </div>
             </div>
             {pendiente > 0 ? (
-              <p className={`text-xs font-bold text-center mt-6 capitalize ${condicionPago === 'CREDITO' ? 'text-blue-600' : 'text-red-500'}`}>
+              <p className={`text-xs font-bold text-center capitalize ${compact ? 'mt-4' : 'mt-6'} ${condicionPago === 'CREDITO' ? 'text-blue-600' : 'text-red-500'}`}>
                 {condicionPago === 'CREDITO'
                   ? 'El saldo pendiente se registrará en cuotas'
                   : 'Debe completar el saldo para continuar'}
               </p>
             ) : (
-              <div className="mt-6 bg-green-100 text-green-700 text-xs font-bold p-3 rounded-lg text-center capitalize border border-green-200">
+              <div className={`${compact ? 'mt-4' : 'mt-6'} rounded-lg border border-green-200 bg-green-100 p-3 text-center text-xs font-bold capitalize text-green-700`}>
                 Monto Completo
               </div>
             )}

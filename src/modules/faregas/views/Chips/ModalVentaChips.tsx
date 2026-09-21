@@ -114,18 +114,18 @@ export function ModalVentaChips({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-6xl rounded-2xl bg-white shadow-xl my-8">
-        <div className="flex items-center justify-between border-b border-slate-100 p-5">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-2 backdrop-blur-sm sm:p-4 lg:p-6">
+      <div className="my-2 w-full max-w-[1400px] rounded-2xl bg-white shadow-xl sm:my-4">
+        <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:px-5">
           <h2 className="text-xl font-bold text-slate-900">Venta Directa de Chips</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
         </div>
         
-        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-8 border-b border-slate-100">
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-5 border-b border-slate-100 p-4 sm:p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] xl:gap-6">
+          <div className="space-y-3">
             <h3 className="font-bold text-sm text-slate-700 border-b pb-2">1. Datos de Facturación</h3>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block text-sm font-bold text-slate-700">Comprobante
                 <select value={tipoComprobante} onChange={e => {
                   setTipoComprobante(e.target.value);
@@ -153,12 +153,12 @@ export function ModalVentaChips({
             </label>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h3 className="font-bold text-sm text-slate-700 border-b pb-2">2. Chips a vender</h3>
             <p className="text-xs text-slate-500">Escanee los chips disponibles. El precio se calculará automáticamente según la tarifa configurada para la sede.</p>
-            <ChipScannerInput value={scan} onChange={setScan} />
+            <ChipScannerInput value={scan} onChange={setScan} rows={5} />
             
-            <div className="mt-4 rounded-xl bg-slate-50 p-4 border border-slate-200">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-600">Chips válidos escaneados:</span>
                 <span className="font-bold">{parsed.validos.length}</span>
@@ -169,7 +169,7 @@ export function ModalVentaChips({
           </div>
         </div>
 
-        <div className="p-5">
+        <div className="p-4 sm:p-5">
           <PagoStep
             pagoTab={pagoTab}
             setPagoTab={setPagoTab}
@@ -183,12 +183,13 @@ export function ModalVentaChips({
             maestrosPago={maestrosPago}
             condicionPago={condicionPago}
             onCondicionPagoChange={setCondicionPago}
+            compact
           />
         </div>
 
-        <div className="flex justify-end gap-3 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-5">
-          <button onClick={onClose} disabled={loading} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200">Cancelar</button>
-          <button onClick={handleSubmit} disabled={loading || parsed.validos.length === 0} className="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+        <div className="flex flex-col-reverse justify-end gap-3 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-4 sm:flex-row">
+          <button onClick={onClose} disabled={loading} className="w-full rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 sm:w-auto">Cancelar</button>
+          <button onClick={handleSubmit} disabled={loading || parsed.validos.length === 0} className="w-full rounded-lg bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50 sm:w-auto">
             {loading ? 'Procesando...' : 'Confirmar Venta y Emitir'}
           </button>
         </div>

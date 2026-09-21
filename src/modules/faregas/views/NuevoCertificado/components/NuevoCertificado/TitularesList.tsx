@@ -189,7 +189,7 @@ export function TitularesList({
       </div>
 
       {titulares.map((t, index) => (
-        <div key={t._uuid} className="bg-slate-50 p-4 rounded-xl border border-slate-200 relative">
+        <div key={t._uuid} className="bg-white p-4 rounded-xl border border-slate-200 relative">
           <div className="absolute top-4 right-4 flex items-center gap-2">
             <span className="text-xs font-bold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
               {t.titularId ? 'GUARDADO' : 'NUEVO'} | ORDEN {t.orden}
@@ -238,8 +238,8 @@ export function TitularesList({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border-2 border-blue-200 bg-blue-50/40">
-        <div className="flex flex-col gap-3 border-b border-blue-200 bg-blue-50 p-4 md:flex-row md:items-center md:justify-between">
+      <div className="overflow-hidden rounded-xl border-2 border-blue-200 bg-white">
+        <div className="flex flex-col gap-3 border-b border-blue-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-[#052a79] p-2 text-white">
               <ReceiptText className="h-5 w-5" />
@@ -323,9 +323,13 @@ export function TitularesList({
           </div>
 
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-bold text-slate-500">CORREO ELECTRÓNICO (OPCIONAL)</label>
+            <label className="mb-1 block text-xs font-bold text-slate-500">
+              CORREO ELECTRÓNICO <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
             <input
               type="email"
+              required
+              aria-required="true"
               value={formFacturacion.emailFac}
               onChange={(event) => handleFacturacionChange('emailFac', event.target.value)}
               className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]"
@@ -333,8 +337,13 @@ export function TitularesList({
           </div>
 
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-bold text-slate-500">TELÉFONO (OPCIONAL)</label>
+            <label className="mb-1 block text-xs font-bold text-slate-500">
+              TELÉFONO <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
             <input
+              type="tel"
+              required
+              aria-required="true"
               value={formFacturacion.telefonoFac}
               onChange={(event) => handleFacturacionChange('telefonoFac', event.target.value)}
               maxLength={30}

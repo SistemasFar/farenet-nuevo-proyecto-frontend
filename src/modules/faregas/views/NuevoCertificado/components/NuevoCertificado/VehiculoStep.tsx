@@ -430,7 +430,7 @@ export function VehiculoStep({
               </div>
             )}
 
-            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div className="bg-white p-4 rounded-lg border border-slate-200">
               <h5 className="font-bold text-slate-700 mb-3">COMPONENTES INSTALADOS GLP</h5>
               <div className="grid grid-cols-7 gap-2 text-xs font-bold text-slate-500 capitalize mb-2">
                 <div>Componente</div>
@@ -725,7 +725,7 @@ export function VehiculoStep({
               </div>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+            <div className="bg-white p-4 rounded-lg border border-slate-200">
               <h5 className="font-bold text-slate-700 mb-3">CARACTERÍSTICAS REGISTRABLES Y MOTIVO</h5>
               <div className="space-y-4">
                 <div>

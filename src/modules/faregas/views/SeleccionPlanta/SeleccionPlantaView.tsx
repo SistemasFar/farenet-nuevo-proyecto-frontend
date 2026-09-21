@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { PlantaAsignada } from '@/types/auth';
 import bgFarenet from '@/assets/images/farenet1.png';
 
@@ -14,10 +14,23 @@ export function SeleccionPlantaView({
   onCancel
 }: SeleccionPlantaViewProps) {
   const isFaregas = true;
+  const unicaPlanta = plantas.length === 1 ? plantas[0] : null;
 
-  const [selectedKey, setSelectedKey] = useState('');
+  const [selectedKey, setSelectedKey] = useState(() => unicaPlanta?.key ?? '');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (plantas.length === 1) {
+      setSelectedKey(plantas[0].key);
+      setError(null);
+      return;
+    }
+
+    setSelectedKey((currentKey) =>
+      plantas.some((planta) => planta.key === currentKey) ? currentKey : ''
+    );
+  }, [plantas]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -67,20 +80,22 @@ export function SeleccionPlantaView({
           )}
 
           <h2 className="mt-2 text-lg font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
-            Seleccionar Sede
+            {unicaPlanta ? 'Sede asignada' : 'Seleccionar Sede'}
           </h2>
         </div>
 
         <div className="w-full rounded-xl bg-white/10 backdrop-blur-md border border-white/20 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
           <form onSubmit={handleSubmit} className="space-y-4">
             <p className="text-xs text-slate-200 text-center font-medium drop-shadow-sm">
-              Elige la sede desde la que vas a operar en esta sesión.
+              {unicaPlanta
+                ? 'Ingresarás a FAREGAS con la siguiente sede.'
+                : 'Elige la sede desde la que vas a operar en esta sesión.'}
             </p>
 
             {plantas.length === 0 && (
               <div className="rounded bg-red-500/20 backdrop-blur-sm p-3 text-center border-l-4 border-red-500">
                 <p className="text-xs font-semibold text-red-200">
-                  No tienes sedes asignadas para operar.
+                  No tienes sedes asignadas para FAREGAS. Contacta con un administrador.
                 </p>
               </div>
             )}
@@ -93,32 +108,38 @@ export function SeleccionPlantaView({
               </div>
             )}
 
-            <div>
-              <select
-                value={selectedKey}
-                disabled={loading || plantas.length === 0}
-                onChange={(e) => {
-                  setSelectedKey(e.target.value);
-                  setError(null);
-                }}
-                className="w-full rounded border border-white/10 bg-white/15 px-4 py-3 text-sm text-white outline-none transition focus:border-white/30 focus:bg-white/25 cursor-pointer appearance-none disabled:opacity-50"
-                style={{ colorScheme: 'dark' }}
-              >
-                <option value="" className="text-slate-800 bg-white">
-                  -- Seleccionar Sede --
-                </option>
-
-                {plantas.map((planta) => (
-                  <option
-                    key={planta.key}
-                    value={planta.key}
-                    className="text-slate-800 bg-white"
-                  >
-                    {planta.nombre}
+            {unicaPlanta ? (
+              <div className="w-full rounded border border-white/10 bg-white/15 px-4 py-3 text-center">
+                <p className="text-sm font-bold text-white">{unicaPlanta.nombre}</p>
+              </div>
+            ) : plantas.length > 1 ? (
+              <div>
+                <select
+                  value={selectedKey}
+                  disabled={loading}
+                  onChange={(e) => {
+                    setSelectedKey(e.target.value);
+                    setError(null);
+                  }}
+                  className="w-full rounded border border-white/10 bg-white/15 px-4 py-3 text-sm text-white outline-none transition focus:border-white/30 focus:bg-white/25 cursor-pointer appearance-none disabled:opacity-50"
+                  style={{ colorScheme: 'dark' }}
+                >
+                  <option value="" className="text-slate-800 bg-white">
+                    -- Seleccionar Sede --
                   </option>
-                ))}
-              </select>
-            </div>
+
+                  {plantas.map((planta) => (
+                    <option
+                      key={planta.key}
+                      value={planta.key}
+                      className="text-slate-800 bg-white"
+                    >
+                      {planta.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
 
             <div className="space-y-2 pt-2">
               <button
@@ -126,7 +147,9 @@ export function SeleccionPlantaView({
                 disabled={loading || plantas.length === 0}
                 className="w-full rounded-xl bg-gold-3d py-3 text-sm font-black capitalize tracking-wider shadow-lg transition disabled:opacity-50"
               >
-                {loading ? 'Confirmando...' : 'Confirmar Sede'}
+                {loading
+                  ? (unicaPlanta ? 'Iniciando...' : 'Confirmando...')
+                  : (unicaPlanta ? 'Iniciar Sesión' : 'Confirmar Sede')}
               </button>
 
               <button

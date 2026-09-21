@@ -1474,7 +1474,7 @@ export function NuevoCertificadoView() {
   }
 
   return (
-    <div className="w-full bg-white rounded-2xl shadow-xl border-t-[4px] border-solid border-t-[#f59e0b] overflow-hidden flex flex-col" style={{ borderImage: "linear-gradient(to right, #fde047 0%, #f59e0b 50%, #b45309 100%) 1" }}>
+    <div className="faregas-certificate-wizard w-full bg-white rounded-2xl shadow-xl border-t-[4px] border-solid border-t-[#f59e0b] overflow-hidden flex flex-col" style={{ borderImage: "linear-gradient(to right, #fde047 0%, #f59e0b 50%, #b45309 100%) 1" }}>
 
       {/* Header / Stepper */}
       <div className="bg-[#f4f9ff] border-b border-[#052a79]/10 p-4 sm:px-6">

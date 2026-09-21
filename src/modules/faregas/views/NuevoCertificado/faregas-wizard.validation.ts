@@ -74,7 +74,10 @@ export const validarDatosFacturacionBasica = (facturacion: Record<string, any>) 
   }
   if (vacio(facturacion.razonSocialFac)) errores.push('Complete el nombre o razón social de facturación.');
   if (vacio(facturacion.direccionFac)) errores.push('Complete la dirección fiscal.');
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (vacio(facturacion.telefonoFac)) errores.push('Complete el teléfono de facturación.');
+  if (!email) {
+    errores.push('Complete el correo electrónico de facturación.');
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errores.push('El correo de facturación no tiene un formato válido.');
   }
   return errores;

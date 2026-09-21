@@ -8,13 +8,13 @@ export const parseChipScan = (text:string) => {
   }); return {validos,duplicados,errores};
 };
 
-export function ChipScannerInput({value,onChange}:{value:string;onChange:(value:string)=>void}){
+export function ChipScannerInput({value,onChange,rows=7}:{value:string;onChange:(value:string)=>void;rows?:number}){
   const ref=useRef<HTMLTextAreaElement>(null); const result=useMemo(()=>parseChipScan(value),[value]);
   return <div className="space-y-2">
-    <textarea ref={ref} autoFocus value={value} onChange={e=>onChange(e.target.value)} rows={7}
+    <textarea ref={ref} autoFocus value={value} onChange={e=>onChange(e.target.value)} rows={rows}
       placeholder={'Escanee un chip y presione Enter\nCHIP001\nCHIP002'}
       className="w-full rounded-lg border border-slate-300 p-3 font-mono text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" />
-    <div className="flex gap-3 text-xs font-semibold">
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold">
       <span className="text-emerald-700">Válidos: {result.validos.length}</span>
       <span className="text-amber-700">Duplicados: {result.duplicados.length}</span>
       <span className="text-red-700">Errores: {result.errores.length}</span>

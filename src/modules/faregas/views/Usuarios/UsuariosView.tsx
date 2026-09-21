@@ -101,6 +101,7 @@ export function UsuariosView() {
         direccion: usuario.direccion || '',
         email: usuario.email || '',
         telefono: usuario.telefono || '',
+        // Se conserva solo para no borrar el dato histórico al editar.
         personaContacto: usuario.personaContacto || ''
       });
     } else {
@@ -127,8 +128,7 @@ export function UsuariosView() {
         distritoKey: '',
         direccion: '',
         email: '',
-        telefono: '',
-        personaContacto: ''
+        telefono: ''
       });
     }
     setShowModal(true);
@@ -532,14 +532,14 @@ export function UsuariosView() {
                 } catch (err: any) {
                     setError(err.message || 'Error al guardar perfil');
                 }
-                }} className="space-y-6">
+                }} className="faregas-user-form space-y-6">
                 
                 {activeTab === 'usuarios' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* COLUMNA IZQUIERDA */}
                         <div className="space-y-6">
                             {/* SECCIÓN CUENTA */}
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div className="bg-white p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Cuenta</h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -562,7 +562,7 @@ export function UsuariosView() {
                             </div>
 
                             {/* SECCIÓN IDENTIDAD */}
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div className="bg-white p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Identidad</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
@@ -607,7 +607,7 @@ export function UsuariosView() {
                             </div>
 
                             {/* SECCIÓN SEGURIDAD */}
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div className="bg-white p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Seguridad</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
@@ -633,7 +633,7 @@ export function UsuariosView() {
                         {/* COLUMNA DERECHA */}
                         <div className="space-y-6">
                             {/* SECCIÓN UBICACIÓN Y CONTACTO */}
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div className="bg-white p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Ubicación y Contacto</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
@@ -690,16 +690,10 @@ export function UsuariosView() {
                                             value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Persona de Contacto {formData.tipoDocumentoKey === '06' && <span className="text-red-500">*</span>}</label>
-                                    <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
-                                        required={formData.tipoDocumentoKey === '06'} minLength={formData.tipoDocumentoKey === '06' ? 3 : undefined} title="Ingrese el nombre del contacto (min. 3 caracteres)"
-                                        value={formData.personaContacto} onChange={e => setFormData({ ...formData, personaContacto: e.target.value })} />
-                                </div>
                             </div>
 
                             {/* SECCIÓN PERFIL Y SEDES */}
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div className="bg-white p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Perfil y Sedes</h3>
                                 <div className="mb-4">
                                     <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Perfil <span className="text-red-500">*</span></label>
