@@ -36,7 +36,13 @@ export const faregasCertificadosApi = {
     method: 'PATCH'
   }),
   obtenerTipos: () => fetchWithToken('/certificados/tipos'),
-  obtenerVehiculo: (placa: string) => fetchWithToken(`/clientes/vehiculo/${encodeURIComponent(placa)}`),
+  obtenerVehiculo: (placa: string, excludeCertificadoId?: number | null, tipoCertificado?: string) => {
+    const params = new URLSearchParams();
+    if (excludeCertificadoId) params.set('excludeCertificadoId', String(excludeCertificadoId));
+    if (tipoCertificado) params.set('tipoCertificado', tipoCertificado);
+    const query = params.size > 0 ? `?${params.toString()}` : '';
+    return fetchWithToken(`/clientes/vehiculo/${encodeURIComponent(placa)}${query}`);
+  },
   obtenerBorradores: (page = 1, pageSize = 10, search = '', fechaDesde = '', fechaHasta = '', estado = '') => {
     const params = new URLSearchParams({
       page: String(page),
@@ -65,6 +71,10 @@ export const faregasCertificadosApi = {
     body: JSON.stringify(data)
   }),
   guardarVehiculoBorrador: (id: number, data: VehiculoBorradorFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/vehiculo`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  confirmarVehiculoBorrador: (id: number, data: VehiculoBorradorFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/vehiculo/confirmar`, {
     method: 'PUT',
     body: JSON.stringify(data)
   }),

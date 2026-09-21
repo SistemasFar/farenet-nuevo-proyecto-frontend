@@ -35,7 +35,7 @@ interface VehiculoStepProps {
   onRemoveTitular?: (titular: TitularState) => Promise<void>;
   catalogoVerificaciones?: any;
   talleres?: any[];
-  vehiculoOrigen?: 'FARENET' | 'BORRADOR' | 'MANUAL';
+  vehiculoOrigen?: 'FARENET' | 'FAREGAS' | 'MIXTO' | 'BORRADOR' | 'MANUAL';
   maestrosVehiculo?: any;
 }
 
@@ -233,7 +233,7 @@ export function VehiculoStep({
         </h4>
         <div className="mb-4 flex justify-end">
           <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black text-[#052a79]">
-            ORIGEN: {vehiculoOrigen}{vehiculoOrigen === 'FARENET' ? ' (EDITABLE)' : ''}
+            ORIGEN: {vehiculoOrigen}{['FARENET', 'FAREGAS', 'MIXTO'].includes(vehiculoOrigen) ? ' (EDITABLE)' : ''}
           </span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

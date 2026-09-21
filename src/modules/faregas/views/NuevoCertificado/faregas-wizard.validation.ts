@@ -168,8 +168,9 @@ export const validarExpedienteTecnico = ({
       ['cargaUtil', 'la carga útil'], ['anioModelo', 'el año modelo'],
       ['formulaRodante', 'la fórmula rodante'], ['potencia', 'la potencia'],
     ]);
+    if (vacio(conformidad.tipoConformidad)) { errores.push('Seleccione el tipo de conformidad.'); }
     agregarFaltantes(errores, conformidad, [
-      ['tipoConformidad', 'el tipo de conformidad'], ['tipoTramite', 'el tipo de trámite'],
+      ['tipoTramite', 'el tipo de trámite'],
       ['caracteristicaRegistrable', 'la característica registrable'], ['motivo', 'el motivo'],
       ['descripcion', 'la descripción'], ['usoOriginalVehiculo', 'el uso original del vehículo'],
     ]);
@@ -177,3 +178,5 @@ export const validarExpedienteTecnico = ({
 
   return [...new Set(errores)];
 };
+
+

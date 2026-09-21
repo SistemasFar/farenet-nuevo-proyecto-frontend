@@ -62,7 +62,7 @@ export function NetworkStatus() {
   useEffect(() => {
     checkNetwork();
 
-    const interval = window.setInterval(checkNetwork, 8000);
+    const interval = window.setInterval(checkNetwork, 30000);
 
     window.addEventListener('online', checkNetwork);
     window.addEventListener('offline', checkNetwork);

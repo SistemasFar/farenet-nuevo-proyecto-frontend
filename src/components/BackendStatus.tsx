@@ -40,7 +40,7 @@ export function BackendStatus() {
   useEffect(() => {
     checkBackend();
 
-    const interval = window.setInterval(checkBackend, 8000);
+    const interval = window.setInterval(checkBackend, 30000);
 
     return () => {
       window.clearInterval(interval);

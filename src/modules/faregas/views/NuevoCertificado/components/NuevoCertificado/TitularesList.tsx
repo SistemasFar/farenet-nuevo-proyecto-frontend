@@ -143,7 +143,7 @@ export function TitularesList({
       let normalizado = value.toUpperCase();
       if (field === 'emailFac') normalizado = value.trim().toLowerCase();
       if (field === 'nroDocFac') normalizado = value.replace(/\D/g, '').slice(0, 11);
-      if (field === 'telefonoFac') normalizado = value.replace(/[^0-9+()\-\s]/g, '').slice(0, 30);
+      if (field === 'telefonoFac') normalizado = value.replace(/\D/g, '').slice(0, 9);
       return { ...prev, [field]: normalizado };
     });
   };
@@ -346,7 +346,7 @@ export function TitularesList({
               aria-required="true"
               value={formFacturacion.telefonoFac}
               onChange={(event) => handleFacturacionChange('telefonoFac', event.target.value)}
-              maxLength={30}
+              maxLength={9}
               className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]"
             />
           </div>
@@ -361,3 +361,4 @@ export function TitularesList({
     </div>
   );
 }
+

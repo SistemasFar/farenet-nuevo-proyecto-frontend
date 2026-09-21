@@ -252,7 +252,7 @@ export function NuevoCertificadoView() {
   const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
   const [talleres, setTalleres] = useState<any[]>([]);
   const [isEmitido, setIsEmitido] = useState(false);
-  const [vehiculoOrigen, setVehiculoOrigen] = useState<'FARENET' | 'BORRADOR' | 'MANUAL'>('MANUAL');
+  const [vehiculoOrigen, setVehiculoOrigen] = useState<'FARENET' | 'FAREGAS' | 'MIXTO' | 'BORRADOR' | 'MANUAL'>('MANUAL');
   const [expedienteError, setExpedienteError] = useState('');
   const [formVehiculo, setFormVehiculo] = useState<FormVehiculoState>({
     clase: '', marca: '', modelo: '', version: '', carroceria: '', marcaCarroceria: '', placaNueva: '',
@@ -285,20 +285,47 @@ export function NuevoCertificadoView() {
     if (!formFacturacion.usarTitularPrincipalFac || !titularPrincipal) return;
 
     const tipoComprobante = titularPrincipal.tipoDocumento === 'RUC' ? 'FACTURA' : 'BOLETA';
-    setFormFacturacion((prev) => {
-      const sincronizada = {
-        ...prev,
-        tipoDocFac: tipoComprobante,
-        nroDocFac: titularPrincipal.nroDocumento,
-        razonSocialFac: titularPrincipal.nombreRazonSocial,
-        direccionFac: titularPrincipal.direccion,
-      };
-      const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
-        && prev.nroDocFac === sincronizada.nroDocFac
-        && prev.razonSocialFac === sincronizada.razonSocialFac
-        && prev.direccionFac === sincronizada.direccionFac;
-      return sinCambios ? prev : sincronizada;
-    });
+    
+    let emailFac = '';
+    let telefonoFac = '';
+    
+    const sincronizarContacto = async () => {
+      if (titularPrincipal.nroDocumento) {
+        try {
+          const response = await faregasClientesApi.autocompletarPersona(titularPrincipal.tipoDocumento, titularPrincipal.nroDocumento);
+          const persona = response?.data;
+          if (persona) {
+            emailFac = persona.correo || persona.email || '';
+            telefonoFac = persona.telefono || '';
+          }
+        } catch (e) {
+          // Fallback silencioso
+        }
+      }
+      
+      setFormFacturacion((prev) => {
+        const sincronizada = {
+          ...prev,
+          tipoDocFac: tipoComprobante,
+          nroDocFac: titularPrincipal.nroDocumento,
+          razonSocialFac: titularPrincipal.nombreRazonSocial,
+          direccionFac: titularPrincipal.direccion,
+        };
+        
+        if (emailFac) sincronizada.emailFac = emailFac;
+        if (telefonoFac) sincronizada.telefonoFac = telefonoFac;
+
+        const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
+          && prev.nroDocFac === sincronizada.nroDocFac
+          && prev.razonSocialFac === sincronizada.razonSocialFac
+          && prev.direccionFac === sincronizada.direccionFac
+          && prev.emailFac === sincronizada.emailFac
+          && prev.telefonoFac === sincronizada.telefonoFac;
+        return sinCambios ? prev : sincronizada;
+      });
+    };
+    
+    sincronizarContacto();
   }, [formFacturacion.usarTitularPrincipalFac, titularPrincipal]);
 
   const construirPayloadFacturacion = () => ({
@@ -312,6 +339,7 @@ export function NuevoCertificadoView() {
     fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
     medioPago: medioPagoCalculado || null,
     cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
+    usarTitularPrincipalFac: formFacturacion.usarTitularPrincipalFac,
   });
 
 
@@ -640,10 +668,10 @@ export function NuevoCertificadoView() {
 
 
 
-  const consultarVehiculoFarenet = async () => {
+  const consultarVehiculoFarenet = async (excludeCertificadoId?: number | null) => {
     if (!formCaja.placa.trim()) return;
     try {
-      const response = await faregasCertificadosApi.obtenerVehiculo(formCaja.placa.trim());
+      const response = await faregasCertificadosApi.obtenerVehiculo(formCaja.placa.trim(), excludeCertificadoId, formCaja.tipoCertificado);
       if (response?.data) {
         const placaEncontrada = textValue(response.data.placa) || formCaja.placa.trim().toUpperCase();
         const categoriaEncontrada = textValue(response.data.categoriaKey ?? response.data.categoria);
@@ -653,7 +681,8 @@ export function NuevoCertificadoView() {
           placa: placaEncontrada,
           categoria: categoriaEncontrada || prev.categoria,
         }));
-        setVehiculoOrigen('FARENET');
+        const origen = response.data.origen;
+        setVehiculoOrigen(origen === 'FAREGAS' || origen === 'MIXTO' ? origen : 'FARENET');
 
         if (response.data.titularesFaregas && response.data.titularesFaregas.length > 0) {
           setTitulares(response.data.titularesFaregas.map((t: any) => mapTitularBorrador({ ...t, id: null })));
@@ -721,10 +750,32 @@ export function NuevoCertificadoView() {
           }));
         }
 
+        if (response.data.conformidadFaregas) {
+          const conformidad = response.data.conformidadFaregas;
+          const tieneValor = (value) =>
+            value !== null &&
+            value !== undefined &&
+            (typeof value !== 'string' || value.trim() !== '');
+
+          setFormConformidad((prev) => ({
+            ...prev,
+            tipoConformidad: tieneValor(conformidad.tipo_conformidad) ? conformidad.tipo_conformidad : prev.tipoConformidad,
+            tipoTramite: tieneValor(conformidad.tipo_tramite) ? conformidad.tipo_tramite : prev.tipoTramite,
+            caracteristicaRegistrable: tieneValor(conformidad.caracteristica_registrable) ? conformidad.caracteristica_registrable : prev.caracteristicaRegistrable,
+            motivo: tieneValor(conformidad.motivo) ? conformidad.motivo : prev.motivo,
+            usoOriginalVehiculo: tieneValor(conformidad.uso_original_vehiculo) ? conformidad.uso_original_vehiculo : prev.usoOriginalVehiculo,
+            descripcion: tieneValor(conformidad.descripcion) ? conformidad.descripcion : prev.descripcion,
+          }));
+        }
+
         Swal.fire({
           icon: 'success',
           title: 'Vehículo encontrado',
-          text: 'Los datos se autocompletaron desde Farenet y pueden editarse.',
+          text: origen === 'FAREGAS'
+            ? 'Los datos se recuperaron desde Faregas y pueden editarse.'
+            : origen === 'MIXTO'
+              ? 'Los datos de Faregas se completaron con información disponible en Farenet.'
+              : 'Los datos se autocompletaron desde Farenet y pueden editarse.',
           timer: 1800,
           showConfirmButton: false,
         });
@@ -769,7 +820,7 @@ export function NuevoCertificadoView() {
         });
       }
 
-      await consultarVehiculoFarenet();
+      await consultarVehiculoFarenet(idBorrador);
       const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
       aplicarResumenComercial(tarifaResponse.data);
       setCurrentStepIndex(0);
@@ -860,8 +911,11 @@ export function NuevoCertificadoView() {
     }
   };
 
-  const guardarExpedienteTecnico = async (idBorrador: number) => {
-    await faregasCertificadosApi.guardarVehiculoBorrador(idBorrador, {
+  const guardarExpedienteTecnico = async (idBorrador: number, confirmarMaestro = false) => {
+    const guardarVehiculo = confirmarMaestro
+      ? faregasCertificadosApi.confirmarVehiculoBorrador
+      : faregasCertificadosApi.guardarVehiculoBorrador;
+    await guardarVehiculo(idBorrador, {
       placa: formCaja.placa || formVehiculo.placaNueva || null,
       categoria: formCaja.categoria || null,
       clase: formVehiculo.clase || null,
@@ -900,8 +954,8 @@ export function NuevoCertificadoView() {
     await guardarTitularesBorrador(idBorrador);
   };
 
-  const guardarPasoVehiculo = async (idBorrador: number) => {
-    await guardarExpedienteTecnico(idBorrador);
+  const guardarPasoVehiculo = async (idBorrador: number, confirmarMaestro = false) => {
+    await guardarExpedienteTecnico(idBorrador, confirmarMaestro);
     if (formCaja.tipoCertificado === 'GNV_ANUAL') {
       await faregasCertificadosApi.guardarGnv(idBorrador, {
         tallerAutorizadoId: formGnv.tallerAutorizadoId || null,
@@ -1124,7 +1178,7 @@ export function NuevoCertificadoView() {
         setIsSavingStep(true);
         try {
           if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
-          else await guardarPasoVehiculo(certificadoId);
+          else await guardarPasoVehiculo(certificadoId, true);
           if (formFacturacion.condicionPagoFac === 'CONTADO') {
             const facturacionGuardada = await faregasCertificadosApi.guardarFacturacion(
               certificadoId,
