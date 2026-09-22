@@ -156,6 +156,7 @@ export function NuevoCertificadoView() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [furthestStepIndex, setFurthestStepIndex] = useState(0);
   const [minimumEditableStepIndex, setMinimumEditableStepIndex] = useState(0);
+  const [certificadoEstado, setCertificadoEstado] = useState('BORRADOR');
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState('');
@@ -420,6 +421,7 @@ export function NuevoCertificadoView() {
         const res = await faregasCertificadosApi.obtenerBorradorCompleto(certificadoId);
         if (res?.data) {
           // Hidratar estado del borrador
+          setCertificadoEstado(res.data.estado || 'BORRADOR');
           if (res.data.tipo?.clave) {
             setFormCaja(prev => ({
               ...prev,
@@ -631,7 +633,7 @@ export function NuevoCertificadoView() {
   };
 
   useEffect(() => {
-    if (currentStepIndex === 0 && !maestros) {
+    if ((currentStepIndex === 0 || (currentStepIndex === 2 && formCaja.tipo_flujo !== 'TALLER_INSPECCION')) && !maestros) {
       cargarMaestros();
     } else if (currentStepIndex === 1 && !maestrosPago) {
       cargarMaestrosPago();
@@ -1066,7 +1068,7 @@ export function NuevoCertificadoView() {
     return () => window.clearTimeout(timer);
     // Los objetos representan el bloque completo que se está editando.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, currentStepIndex, formVehiculo, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores, titulares]);
+  }, [certificadoId, loading, currentStepIndex, formCaja.categoria, formVehiculo, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores, titulares]);
 
   useEffect(() => {
     if (!certificadoId || loading || currentStepIndex !== 1 || precioTotal <= 0) return;
@@ -1498,6 +1500,37 @@ export function NuevoCertificadoView() {
     }
   };
 
+  const puedeAnularBorrador = Boolean(certificadoId)
+    && certificadoEstado === 'BORRADOR'
+    && currentStepIndex <= indicePaso('PREVISUALIZACION');
+
+  const anularBorrador = async () => {
+    if (!certificadoId || !puedeAnularBorrador) return;
+    const confirmacion = await Swal.fire({
+      icon: 'warning',
+      title: '¿Deseas anular este certificado?',
+      text: 'Esta acción conservará el registro pero ya no podrá continuarse.',
+      showCancelButton: true,
+      confirmButtonText: 'ANULAR BORRADOR',
+      cancelButtonText: 'CANCELAR',
+      confirmButtonColor: '#dc2626',
+    });
+    if (!confirmacion.isConfirmed) return;
+
+    setIsSavingStep(true);
+    try {
+      await autosaveQueueRef.current.catch(() => undefined);
+      await faregasCertificadosApi.anularBorrador(certificadoId);
+      setCertificadoEstado('ANULADO');
+      await Swal.fire('Borrador anulado', 'El certificado se conservó con estado ANULADO.', 'success');
+      navigate('/faregas/inicio');
+    } catch (e: any) {
+      await Swal.fire('No se pudo anular', e.message || 'No se pudo anular el certificado.', 'error');
+    } finally {
+      setIsSavingStep(false);
+    }
+  };
+
   useEffect(() => {
     const advertirSalida = (event: BeforeUnloadEvent) => {
       if (!isSavingStep && !saveError) return;
@@ -1658,6 +1691,9 @@ export function NuevoCertificadoView() {
               talleres={talleres}
               vehiculoOrigen={vehiculoOrigen}
               maestrosVehiculo={maestrosVehiculo}
+              categoriaVehicular={formCaja.categoria}
+              categoriasVehiculares={maestros?.categorias || []}
+              onCategoriaVehicularChange={(categoria) => setFormCaja((prev) => ({ ...prev, categoria }))}
             />
           </>
         )}
@@ -1733,16 +1769,28 @@ export function NuevoCertificadoView() {
 
       {/* FOOTER ACTIONS */}
       <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
-        {currentStepIndex > 0 && !isEmitido ? (
-          <button
-            type="button"
-            onClick={irPasoAnterior}
-            disabled={isSavingStep}
-            className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
-          >
-            {isSavingStep ? 'Guardando…' : 'Atrás'}
-          </button>
-        ) : <div></div>}
+        <div className="flex items-center gap-2">
+          {currentStepIndex > 0 && !isEmitido && (
+            <button
+              type="button"
+              onClick={irPasoAnterior}
+              disabled={isSavingStep}
+              className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+            >
+              {isSavingStep ? 'Guardando…' : 'Atrás'}
+            </button>
+          )}
+          {puedeAnularBorrador && (
+            <button
+              type="button"
+              onClick={anularBorrador}
+              disabled={isSavingStep}
+              className="rounded-lg border border-red-300 bg-white px-5 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50 transition"
+            >
+              ANULAR BORRADOR
+            </button>
+          )}
+        </div>
 
         <div className="flex flex-col items-end gap-1.5">
           {currentStepIndex === STEPS.length - 1 ? (
@@ -1753,9 +1801,9 @@ export function NuevoCertificadoView() {
             <button
               type="button"
               onClick={irSiguientePaso}
-              disabled={isSavingStep || (currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || !formCaja.categoria || (formCaja.tipoCertificado !== 'CONFORMIDAD' && !formCaja.modalidadCertificado)))}
+              disabled={isSavingStep || (currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || (formCaja.tipoCertificado !== 'CONFORMIDAD' && !formCaja.modalidadCertificado)))}
               className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                ${(isSavingStep || (currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || !formCaja.categoria || (formCaja.tipoCertificado !== 'CONFORMIDAD' && !formCaja.modalidadCertificado))))
+                ${(isSavingStep || (currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || (formCaja.tipoCertificado !== 'CONFORMIDAD' && !formCaja.modalidadCertificado))))
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-gold-3d hover:-translate-y-0.5'
                 }`}

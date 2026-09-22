@@ -4,6 +4,7 @@ import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { TitularesList, type TitularState } from './TitularesList';
 import React, { useEffect } from 'react';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
+import type { MaestroOption } from '@/types/maestros';
 import {
   formatVIN,
   formatAlfanumerico,
@@ -37,6 +38,9 @@ interface VehiculoStepProps {
   talleres?: any[];
   vehiculoOrigen?: 'FARENET' | 'FAREGAS' | 'MIXTO' | 'BORRADOR' | 'MANUAL';
   maestrosVehiculo?: any;
+  categoriaVehicular: string;
+  categoriasVehiculares: MaestroOption[];
+  onCategoriaVehicularChange: (categoria: string) => void;
 }
 
 export function VehiculoStep({
@@ -60,7 +64,10 @@ export function VehiculoStep({
   catalogoVerificaciones,
   talleres,
   vehiculoOrigen = 'MANUAL',
-  maestrosVehiculo
+  maestrosVehiculo,
+  categoriaVehicular,
+  categoriasVehiculares,
+  onCategoriaVehicularChange
 }: VehiculoStepProps) {
   
   // Initialize verificaciones based on catalog
@@ -280,6 +287,19 @@ export function VehiculoStep({
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">CLASE VEHICULAR</label>
             <input name="clase" value={formVehiculo.clase || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">CATEGORÍA</label>
+            <select
+              value={categoriaVehicular || ''}
+              onChange={(event) => onCategoriaVehicularChange(event.target.value)}
+              className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 transition-colors"
+            >
+              <option value="">-- SELECCIONAR --</option>
+              {categoriasVehiculares.map((categoria) => (
+                <option key={categoria.key} value={categoria.key}>{categoria.nombre}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">CARROCERÍA</label>

@@ -66,6 +66,9 @@ export const faregasCertificadosApi = {
     method: 'PATCH',
     body: JSON.stringify({ pasoActual })
   }),
+  anularBorrador: (id: number) => fetchWithToken(`/certificados/borradores/${id}/anular`, {
+    method: 'PATCH'
+  }),
   guardarTaller: (id: number, data: GuardarTallerFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/snapshot`, {
     method: 'PUT',
     body: JSON.stringify(data)
