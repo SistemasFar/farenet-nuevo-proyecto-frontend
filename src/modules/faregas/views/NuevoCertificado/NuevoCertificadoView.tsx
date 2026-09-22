@@ -128,8 +128,15 @@ const mapVehiculoBorrador = (vehiculo: any): Partial<FormVehiculoState> => ({
   salidasEmergencia: textValue(vehiculo.salidas_emergencia ?? vehiculo.salidasEmergencia),
 });
 
+const generarIdTemporal = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
+
 const mapTitularBorrador = (titular: any): TitularState => ({
-  _uuid: crypto.randomUUID(),
+  _uuid: generarIdTemporal(),
   titularId: titular.id ? Number(titular.id) : null,
   orden: Number(titular.orden),
   clienteId: titular.cliente_id ? Number(titular.cliente_id) : null,
