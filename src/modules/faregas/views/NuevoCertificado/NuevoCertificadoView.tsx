@@ -422,6 +422,7 @@ export function NuevoCertificadoView() {
         if (res?.data) {
           // Hidratar estado del borrador
           setCertificadoEstado(res.data.estado || 'BORRADOR');
+          setIsEmitido(res.data.estado === 'EMITIDO');
           if (res.data.tipo?.clave) {
             setFormCaja(prev => ({
               ...prev,
@@ -1162,6 +1163,12 @@ export function NuevoCertificadoView() {
             });
         const errores = [
           ...erroresExpediente,
+          ...(formCaja.tipo_flujo !== 'TALLER_INSPECCION'
+            && formVehiculo.anioModelo
+            && formVehiculo.anioFabricacion
+            && Number(formVehiculo.anioModelo) > Number(formVehiculo.anioFabricacion)
+            ? ['El Año Modelo no puede ser mayor que el Año de Fabricación.']
+            : []),
           ...validarDatosFacturacionBasica(formFacturacion),
         ];
         if (mostrarErroresPaso(errores)) return;
@@ -1752,7 +1759,10 @@ export function NuevoCertificadoView() {
         {STEPS[currentStepIndex].id === 'verificacion' && (
           <VerificacionStep
             certificadoId={certificadoId}
-            onEmisionExitosa={() => setIsEmitido(true)}
+            onEmisionExitosa={() => {
+              setCertificadoEstado('EMITIDO');
+              setIsEmitido(true);
+            }}
             tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
             formCaja={formCaja}
             formVehiculo={formVehiculo}
@@ -1794,7 +1804,16 @@ export function NuevoCertificadoView() {
 
         <div className="flex flex-col items-end gap-1.5">
           {currentStepIndex === STEPS.length - 1 ? (
-            !isEmitido ? <span className="text-xs font-semibold text-slate-500">Revise la validación y emita desde el panel superior.</span> : <span className="text-xs font-bold text-green-700">Certificado emitido.</span>
+            <div className="flex items-center gap-3">
+              {facturacion?.enlacePdf && (
+                <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
+                  VER COMPROBANTE
+                </a>
+              )}
+              <button type="button" onClick={() => navigate('/faregas/inicio')} className="rounded-lg bg-gold-3d px-6 py-2.5 text-xs font-black transition shadow-sm">
+                IR A INICIO
+              </button>
+            </div>
           ) : currentStepIndex === 0 && !isConsultado ? (
             <span className="text-xs font-semibold text-slate-500">Complete los datos y presione Consultar.</span>
           ) : (
