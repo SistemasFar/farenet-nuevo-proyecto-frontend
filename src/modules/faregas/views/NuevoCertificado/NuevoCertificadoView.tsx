@@ -1029,19 +1029,7 @@ export function NuevoCertificadoView() {
         fechaDeposito: pago.fechaDeposito || null,
       })),
     });
-    const pagosGuardados = response.data?.pagos || [];
     aplicarResumenComercial(response.data);
-    setPagosAgregados(pagosGuardados.map((pago: any): PagoAgregado => ({
-      id: pago.id,
-      tipo: String(pago.tipoContadoKey || '').toUpperCase() as PagoAgregado['tipo'],
-      importe: Number(pago.importe).toFixed(2),
-      tarjetaKey: pago.tarjetaKey || '',
-      nroOperacion: pago.nroOperacionBanco || pago.nroOperacionTarjeta || '',
-      digitosTarjeta: pago.digitosTarjeta || '',
-      cuentaCorrienteKey: pago.cuentaCorrienteKey || '',
-      entidadFinancieraKey: pago.entidadFinancieraKey || '',
-      fechaDeposito: textValue(pago.fechdeposito).slice(0, 10),
-    })));
     setLastSavedAt(new Date());
   };
 
