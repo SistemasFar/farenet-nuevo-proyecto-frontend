@@ -166,10 +166,6 @@ export function InicioView() {
   const [error, setError] = useState('');
   const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
 
-  const [previewModalId, setPreviewModalId] = useState<number | null>(null);
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -347,21 +343,6 @@ export function InicioView() {
       await Swal.fire('No se pudo consultar', err instanceof Error ? err.message : 'No se pudo obtener el comprobante.', 'error');
     } finally {
       setAccionEnProceso(null);
-    }
-  };
-
-  const verPreview = async (id: number) => {
-    setPreviewModalId(id);
-    setPreviewHtml(null);
-    setPreviewLoading(true);
-    try {
-      const response = await faregasCertificadosApi.obtenerPrevisualizacion(id);
-      setPreviewHtml(response?.data?.html || null);
-    } catch {
-      await Swal.fire('Error', 'No se pudo cargar la previsualización del certificado', 'error');
-      setPreviewModalId(null);
-    } finally {
-      setPreviewLoading(false);
     }
   };
 
@@ -646,14 +627,10 @@ export function InicioView() {
                   Nombres / Razón Social
                 </th>
                 <th className="px-4 py-3 text-left">
-                  Concepto vehicular
-                </th>
-
-                <th className="px-4 py-3 text-left">
-                  Estado actual
+                  Tipo de Certificado
                 </th>
                 <th className="px-4 py-3 text-left">
-                  Resultado
+                  Comprobante
                 </th>
                 <th className="px-4 py-3 text-left">
                   Estado certificado
@@ -689,12 +666,10 @@ export function InicioView() {
 
               {!loading &&
                 borradores.map((ins) => {
-                  const etapa = PASO_PANEL[ins.pasoActual || ''] || 'Datos iniciales';
                   const anulacionPendiente = esAnulacionPendiente(ins);
                   const anulacionAceptada = esAnulacionAceptada(ins);
                   const accionesCongeladas = anulacionPendiente || anulacionAceptada;
                   const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
-                  const certificadoEmitido = ins.estado === 'EMITIDO';
                   const comprobanteAceptado = esResumenComprobanteOperable(ins);
                   const comprobantePotencial = tieneEtapaTributaria(ins);
                   // Los controles permanecen visibles aunque el resumen todavía no se haya
@@ -739,12 +714,6 @@ export function InicioView() {
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold tracking-wide text-amber-700">
-                          {etapa}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 whitespace-nowrap">
                         <BadgeEstado value={resultadoVisible(ins)} />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -752,32 +721,6 @@ export function InicioView() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center align-middle" onClick={(event) => event.stopPropagation()}>
                         <div className="flex h-full flex-wrap items-center justify-center gap-1.5">
-                          {certificadoEmitido && (
-                            <button
-                              type="button"
-                              onClick={() => abrirRegistro(ins)}
-                              className="rounded-md border border-gray-300 bg-white p-1.5 text-gray-600 transition-colors hover:bg-gray-100"
-                              title="Ver historial del certificado"
-                            >
-                              <Eye size={16} />
-                            </button>
-
-                          )}
-                          {certificadoEditable && (
-                            <button
-                              type="button"
-                              onClick={() => void verPreview(ins.id)}
-                              className="rounded-md border border-amber-200 bg-amber-50 p-1.5 text-amber-600 transition-colors hover:bg-amber-100"
-                              title="Ver Previsualización"
-                            >
-                              <Eye size={16} />
-                            </button>
-                          )}
-                          {!certificadoEditable && !certificadoEmitido && (
-                            <button type="button" onClick={() => abrirRegistro(ins)}
-                              className="rounded-md border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-100"
-                              title="Consultar registro en solo lectura"><Eye size={16} /></button>
-                          )}
                           {puedeVerComprobante && (
                             <button
                               type="button"
@@ -1005,39 +948,6 @@ export function InicioView() {
         </div>
       </div>
 
-      {previewModalId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
-          <div className="flex h-[90vh] w-[900px] max-w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between bg-slate-900 px-6 py-4 text-white">
-              <div className="flex items-center gap-2">
-                <Eye className="h-5 w-5 text-amber-400" />
-                <h3 className="text-sm font-bold capitalize tracking-wider">Certificado de Inspección</h3>
-              </div>
-              <button 
-                onClick={() => setPreviewModalId(null)} 
-                className="rounded-full bg-white/10 p-1.5 text-slate-300 hover:bg-white/20 hover:text-white transition-colors"
-                title="Cerrar"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 bg-slate-100 p-4">
-              {previewLoading ? (
-                <div className="flex h-full items-center justify-center gap-3 font-semibold text-slate-600">
-                  <span className="animate-spin text-2xl text-[#052a79]">⚙️</span>
-                  Cargando certificado...
-                </div>
-              ) : (
-                <iframe 
-                  srcDoc={previewHtml || ''} 
-                  className="h-full w-full rounded-xl border border-slate-300 bg-white shadow-inner" 
-                  title="Certificado FAREGAS"
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
