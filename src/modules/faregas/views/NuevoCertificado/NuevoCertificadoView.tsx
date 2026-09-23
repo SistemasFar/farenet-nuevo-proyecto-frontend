@@ -20,7 +20,7 @@ import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep
 import { PrevisualizacionCertificadoStep } from './components/NuevoCertificado/PrevisualizacionCertificadoStep';
 import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
-import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { validarDatosFacturacionBasica, validarDatosIniciales, validarExpedienteTecnico, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { calcularMedioPago } from './faregas-facturacion.utils';
@@ -156,6 +156,7 @@ const mapVerificacionBorrador = (verificacion: any) => ({
 
 export function NuevoCertificadoView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { plantaKey: plantaSeleccionada, plantaNombre } = useOutletContext<MainLayoutContext>();
   const { id } = useParams<{ id?: string }>();
   const [certificadoId, setCertificadoId] = useState<number | undefined>(id ? parseInt(id, 10) : undefined);
@@ -163,7 +164,8 @@ export function NuevoCertificadoView() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [furthestStepIndex, setFurthestStepIndex] = useState(0);
   const [minimumEditableStepIndex, setMinimumEditableStepIndex] = useState(0);
-  const [certificadoEstado, setCertificadoEstado] = useState('BORRADOR');
+  const [certificadoEstado, setCertificadoEstado] = useState(id ? 'CARGANDO' : 'BORRADOR');
+  const soloLectura = new URLSearchParams(location.search).get('vista') === 'consulta' || certificadoEstado !== 'BORRADOR';
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState('');
@@ -559,7 +561,7 @@ export function NuevoCertificadoView() {
           }
 
           const pasoRecuperado = indicePaso(res.data.pasoActual);
-          setCurrentStepIndex(pasoRecuperado);
+          setCurrentStepIndex(res.data.estado === 'BORRADOR' && new URLSearchParams(location.search).get('vista') !== 'consulta' ? pasoRecuperado : indicePaso('VERIFICACION_EMISION'));
           setFurthestStepIndex(pasoRecuperado);
           setMinimumEditableStepIndex(pasoRecuperado >= 3 ? 3 : 0);
           setIsConsultado(true);
@@ -568,12 +570,13 @@ export function NuevoCertificadoView() {
         }
       } catch (error) {
         console.error("Error al cargar borrador FAREGAS:", error);
+        setError('No se pudo cargar el registro. Vuelva al inicio e inténtelo de nuevo.');
       } finally {
         setLoading(false);
       }
     };
     cargarBorrador();
-  }, [certificadoId]);
+  }, [certificadoId, location.search]);
 
   const cargarMaestros = async () => {
     try {
@@ -1064,7 +1067,7 @@ export function NuevoCertificadoView() {
 
   // Autosave por bloques, serializado y con debounce para no guardar por tecla.
   useEffect(() => {
-    if (!certificadoId || loading || currentStepIndex !== 2) return;
+    if (!certificadoId || loading || soloLectura || currentStepIndex !== 2) return;
     const timer = window.setTimeout(() => {
       if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
         if (!formatoFormulario) return;
@@ -1076,16 +1079,16 @@ export function NuevoCertificadoView() {
     return () => window.clearTimeout(timer);
     // Los objetos representan el bloque completo que se está editando.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, currentStepIndex, formCaja.categoria, formVehiculo, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores, titulares]);
+  }, [certificadoId, loading, soloLectura, currentStepIndex, formCaja.categoria, formVehiculo, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores, titulares]);
 
   useEffect(() => {
-    if (!certificadoId || loading || currentStepIndex !== 1 || precioTotal <= 0) return;
+    if (!certificadoId || loading || soloLectura || currentStepIndex !== 1 || precioTotal <= 0) return;
     const timer = window.setTimeout(() => {
       void encolarAutosave(() => guardarPasoPagos(certificadoId)).catch(() => undefined);
     }, 1200);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, currentStepIndex, pagosAgregados, precioTotal]);
+  }, [certificadoId, loading, soloLectura, currentStepIndex, pagosAgregados, precioTotal]);
 
   const eliminarTitularBorrador = async (titular: TitularState) => {
     if (!certificadoId || !titular.titularId) return;
@@ -1325,6 +1328,10 @@ export function NuevoCertificadoView() {
   const irPasoAnterior = () => irAtrasOStep(currentStepIndex - 1);
 
   const navegarConFlecha = React.useEffectEvent((direccion: 'ANTERIOR' | 'SIGUIENTE') => {
+    if (soloLectura) {
+      setCurrentStepIndex((actual) => Math.max(0, Math.min(STEPS.length - 1, actual + (direccion === 'SIGUIENTE' ? 1 : -1))));
+      return;
+    }
     if (direccion === 'SIGUIENTE') {
       void irSiguientePaso();
     } else {
@@ -1577,14 +1584,14 @@ export function NuevoCertificadoView() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h2 className="text-lg font-black text-slate-800 capitalize tracking-tight">
-            Nuevo Certificado
+            {soloLectura ? 'Consulta de Certificado' : 'Nuevo Certificado'}
           </h2>
           {certificadoId && (
             <div className="ml-auto flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-sm">
-              {isSavingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#052a79]" /> : <Save className={`h-3.5 w-3.5 ${saveError ? 'text-red-600' : 'text-green-600'}`} />}
-              <span>BORRADOR #{certificadoId}</span>
+              {soloLectura ? <Eye className="h-3.5 w-3.5 text-[#052a79]" /> : isSavingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#052a79]" /> : <Save className={`h-3.5 w-3.5 ${saveError ? 'text-red-600' : 'text-green-600'}`} />}
+              <span>{soloLectura ? certificadoEstado : 'BORRADOR'} #{certificadoId}</span>
               <span className="text-slate-300">|</span>
-              <span className={saveError ? 'text-red-600' : ''}>{isSavingStep ? 'GUARDANDO…' : saveError ? 'ERROR AL GUARDAR' : lastSavedAt ? `GUARDADO ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'CARGADO'}</span>
+              <span className={saveError ? 'text-red-600' : ''}>{soloLectura ? 'SOLO LECTURA' : isSavingStep ? 'GUARDANDO…' : saveError ? 'ERROR AL GUARDAR' : lastSavedAt ? `GUARDADO ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'CARGADO'}</span>
             </div>
           )}
         </div>
@@ -1606,10 +1613,10 @@ export function NuevoCertificadoView() {
               <button
                 key={step.id}
                 type="button"
-                onClick={() => irAtrasOStep(index)}
-                disabled={index >= currentStepIndex || index < minimumEditableStepIndex || isSavingStep}
-                className={`flex flex-col items-center gap-2 bg-[#f4f9ff] px-2 ${index < currentStepIndex && index >= minimumEditableStepIndex && !isSavingStep ? 'cursor-pointer' : 'cursor-default'}`}
-                title={index < minimumEditableStepIndex ? 'Este paso ya no es editable porque el pago fue confirmado' : index < currentStepIndex ? `Volver a ${step.label}` : index === currentStepIndex ? 'Paso actual' : 'Complete el paso anterior'}
+                onClick={() => soloLectura ? setCurrentStepIndex(index) : irAtrasOStep(index)}
+                disabled={!soloLectura && (index >= currentStepIndex || index < minimumEditableStepIndex || isSavingStep)}
+                className={`flex flex-col items-center gap-2 bg-[#f4f9ff] px-2 ${soloLectura || (index < currentStepIndex && index >= minimumEditableStepIndex && !isSavingStep) ? 'cursor-pointer' : 'cursor-default'}`}
+                title={soloLectura ? `Consultar ${step.label}` : index < minimumEditableStepIndex ? 'Este paso ya no es editable porque el pago fue confirmado' : index < currentStepIndex ? `Volver a ${step.label}` : index === currentStepIndex ? 'Paso actual' : 'Complete el paso anterior'}
               >
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
@@ -1630,6 +1637,10 @@ export function NuevoCertificadoView() {
 
       {/* Content Area */}
       <div className="p-5 sm:p-6 lg:p-8">
+        {soloLectura && <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800">Consulta de solo lectura. Puede recorrer todos los pasos sin modificar el registro.</p>}
+        <fieldset disabled={soloLectura} className="m-0 min-w-0 w-full border-0 p-0"
+          onClickCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}
+          onSubmitCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}>
         {STEPS[currentStepIndex].id === 'datos_iniciales' && (
           <CajaStep
             key={plantaSeleccionada}
@@ -1760,12 +1771,21 @@ export function NuevoCertificadoView() {
             onEditarDatosCliente={() => setCurrentStepIndex(2)}
           />
         )}
-        {STEPS[currentStepIndex].id === 'previsualizacion' && (
+        {STEPS[currentStepIndex].id === 'previsualizacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
+          <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no tiene un certificado emitido para previsualizar.</p>
+        )}
+        {STEPS[currentStepIndex].id === 'previsualizacion' && (!soloLectura || certificadoEstado === 'EMITIDO') && (
           <PrevisualizacionCertificadoStep certificadoId={certificadoId} />
         )}
-        {STEPS[currentStepIndex].id === 'verificacion' && (
+        </fieldset>
+        {STEPS[currentStepIndex].id === 'verificacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
+          <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no llegó a emitirse.</p>
+        )}
+        {STEPS[currentStepIndex].id === 'verificacion' && (!soloLectura || certificadoEstado === 'EMITIDO') && (
           <VerificacionStep
             certificadoId={certificadoId}
+            certificadoEstado={certificadoEstado}
+            soloLectura={soloLectura}
             onEmisionExitosa={() => {
               setCertificadoEstado('EMITIDO');
               setIsEmitido(true);
@@ -1787,7 +1807,7 @@ export function NuevoCertificadoView() {
       {/* FOOTER ACTIONS */}
       <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          {currentStepIndex > 0 && !isEmitido && (
+          {currentStepIndex > 0 && !isEmitido && !soloLectura && (
             <button
               type="button"
               onClick={irPasoAnterior}
@@ -1797,7 +1817,7 @@ export function NuevoCertificadoView() {
               {isSavingStep ? 'Guardando…' : 'Atrás'}
             </button>
           )}
-          {puedeAnularBorrador && (
+          {puedeAnularBorrador && !soloLectura && (
             <button
               type="button"
               onClick={anularBorrador}
@@ -1810,7 +1830,9 @@ export function NuevoCertificadoView() {
         </div>
 
         <div className="flex flex-col items-end gap-1.5">
-          {currentStepIndex === STEPS.length - 1 ? (
+          {soloLectura ? (
+            <button type="button" onClick={salirAlInicio} className="rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">VOLVER AL INICIO</button>
+          ) : currentStepIndex === STEPS.length - 1 ? (
             <div className="flex items-center gap-3">
               {facturacion?.enlacePdf && (
                 <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">

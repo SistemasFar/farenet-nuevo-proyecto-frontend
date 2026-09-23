@@ -13,6 +13,8 @@ interface BorradorPanel {
   id: number;
   fechaCreacion?: string;
   fechaActualizacion?: string;
+  fechaEmision?: string | null;
+  numeroCertificado?: string | null;
   placa?: string;
   clienteDocumento?: string;
   clienteNombre?: string;
@@ -28,6 +30,8 @@ interface BorradorPanel {
   anulacionId?: number | null;
   estadoAnulacion?: string | null;
   descripcionAnulacion?: string | null;
+  anulacionEnPlazo?: boolean;
+  anulacionHastaMs?: string | number | null;
 }
 
 const normalizarTexto = (valor?: string | null): string => {
@@ -157,6 +161,7 @@ export function InicioView() {
   const perfilId = String(user?.perfilId || (user as { perfil_id?: string } | null)?.perfil_id || '').toUpperCase();
   const tienePermisoNotaCredito = perfilId === 'SISTEMAS' || permisos.includes('FAREGAS_NOTA_CREDITO');
   const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
+  const [ahoraMs, setAhoraMs] = useState(Date.now);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
@@ -203,6 +208,7 @@ export function InicioView() {
         filtrosRef.current.estado
       );
       setBorradores(response.data || []);
+      setAhoraMs(Date.now());
       setTotal(Number(response.total || 0));
       setPage(Number(response.page || _paginaConsulta));
       setPageSize(pageSizeConsulta);
@@ -223,6 +229,16 @@ export function InicioView() {
     cargarInspecciones(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantaSeleccionada]);
+
+  useEffect(() => {
+    const siguienteVencimiento = borradores
+      .map((item) => Number(item.anulacionHastaMs))
+      .filter((valor) => Number.isFinite(valor) && valor > ahoraMs)
+      .sort((a, b) => a - b)[0];
+    if (!siguienteVencimiento) return;
+    const timer = window.setTimeout(() => setAhoraMs(Date.now()), Math.max(0, siguienteVencimiento - Date.now() + 1));
+    return () => window.clearTimeout(timer);
+  }, [borradores, ahoraMs]);
   const handleFiltroChange = (
     field: keyof FiltrosPanel,
     value: string
@@ -347,6 +363,11 @@ export function InicioView() {
     } finally {
       setPreviewLoading(false);
     }
+  };
+
+  const abrirRegistro = (ins: BorradorPanel) => {
+    const editable = ins.estado === 'BORRADOR' && !esAnulacionPendiente(ins) && !esAnulacionAceptada(ins);
+    navigate(`/faregas/certificados/${ins.id}/continuar${editable ? '' : '?vista=consulta'}`);
   };
 
   const anularComprobante = async (certificadoId: number) => {
@@ -582,6 +603,7 @@ export function InicioView() {
             <option value="TODOS">Todos los estados</option>
             <option value="BORRADOR">Borrador</option>
             <option value="EMITIDO">Emitido</option>
+            <option value="ANULADO">Anulado</option>
           </select>
         </div>
       </div>
@@ -612,7 +634,7 @@ export function InicioView() {
                   N° Inspección
                 </th>
                 <th className="px-4 py-3 text-left">
-                  Fecha y hora
+                  Fecha de emisión / creación
                 </th>
                 <th className="px-4 py-3 text-left">
                   Placa
@@ -679,28 +701,29 @@ export function InicioView() {
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
                   // de abrir/enviar algo, por lo que no debilita la validación tributaria.
                   const puedeVerComprobante = comprobantePotencial;
-                  const puedeAnular = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas;
+                  const puedeAnular = (comprobanteAceptado || comprobantePotencial) && ins.anulacionEnPlazo === true && Number(ins.anulacionHastaMs) > ahoraMs && !accionesCongeladas;
                   const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
 
                   return (
                     <tr
                       key={ins.id}
-                      className={`text-slate-700 transition-colors hover:bg-slate-50 ${certificadoEditable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-[#052A79]' : ''}`}
-                      onClick={certificadoEditable ? () => navigate(`/faregas/certificados/${ins.id}/continuar`) : undefined}
-                      onKeyDown={certificadoEditable ? (event) => {
+                      className="cursor-pointer text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#052A79]"
+                      onClick={() => abrirRegistro(ins)}
+                      onKeyDown={(event) => {
                         if (event.key === 'Enter' && event.target === event.currentTarget) {
-                          navigate(`/faregas/certificados/${ins.id}/continuar`);
+                          abrirRegistro(ins);
                         }
-                      } : undefined}
-                      tabIndex={certificadoEditable ? 0 : undefined}
-                      role={certificadoEditable ? 'link' : undefined}
-                      aria-label={certificadoEditable ? `Abrir borrador ${ins.id}` : undefined}
+                      }}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={certificadoEditable ? `Continuar borrador ${ins.id}` : `Consultar registro ${ins.id} en solo lectura`}
                     >
                       <td className={`px-4 py-3 font-semibold whitespace-nowrap text-blue-700`}>
                         Borrador #{ins.id}
+                        {ins.numeroCertificado && <span className="block text-[10px] font-medium text-slate-500">{ins.numeroCertificado}</span>}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-500" title={ins.fechaActualizacion ? `Última actualización: ${formatearFecha(ins.fechaActualizacion)}` : undefined}>
-                        {formatearFecha(ins.fechaCreacion)}
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500" title={ins.estado === 'EMITIDO' ? 'Fecha de emisión del certificado' : 'Fecha de creación del registro'}>
+                        {ins.estado === 'EMITIDO' && ins.fechaEmision ? ins.fechaEmision : formatearFecha(ins.fechaCreacion)}
                       </td>
                       <td className="px-4 py-3 font-bold whitespace-nowrap">
                         {normalizarTexto(ins.placa)}
@@ -732,9 +755,9 @@ export function InicioView() {
                           {certificadoEmitido && (
                             <button
                               type="button"
-                              onClick={() => void verPreview(ins.id)}
+                              onClick={() => abrirRegistro(ins)}
                               className="rounded-md border border-gray-300 bg-white p-1.5 text-gray-600 transition-colors hover:bg-gray-100"
-                              title="Ver Certificado"
+                              title="Ver historial del certificado"
                             >
                               <Eye size={16} />
                             </button>
@@ -749,6 +772,11 @@ export function InicioView() {
                             >
                               <Eye size={16} />
                             </button>
+                          )}
+                          {!certificadoEditable && !certificadoEmitido && (
+                            <button type="button" onClick={() => abrirRegistro(ins)}
+                              className="rounded-md border border-gray-300 bg-white p-1.5 text-gray-600 hover:bg-gray-100"
+                              title="Consultar registro en solo lectura"><Eye size={16} /></button>
                           )}
                           {puedeVerComprobante && (
                             <button
@@ -825,30 +853,30 @@ export function InicioView() {
               const anulacionAceptada = esAnulacionAceptada(ins);
               const accionesCongeladas = anulacionPendiente || anulacionAceptada;
               const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
-              const certificadoEmitido = ins.estado === 'EMITIDO';
               const comprobanteAceptado = esResumenComprobanteOperable(ins);
               const comprobantePotencial = tieneEtapaTributaria(ins);
               const puedeVerComprobante = comprobantePotencial;
-              const puedeAnular = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas;
+              const puedeAnular = (comprobanteAceptado || comprobantePotencial) && ins.anulacionEnPlazo === true && Number(ins.anulacionHastaMs) > ahoraMs && !accionesCongeladas;
               const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
               return (
                 <div
                   key={ins.id}
-                  className={`p-4 flex flex-col gap-3 bg-white ${certificadoEditable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-[#052A79]' : ''}`}
-                  onClick={certificadoEditable ? () => navigate(`/faregas/certificados/${ins.id}/continuar`) : undefined}
-                  onKeyDown={certificadoEditable ? (event) => {
+                  className="cursor-pointer flex flex-col gap-3 bg-white p-4 focus-visible:outline-2 focus-visible:outline-[#052A79]"
+                  onClick={() => abrirRegistro(ins)}
+                  onKeyDown={(event) => {
                     if (event.key === 'Enter' && event.target === event.currentTarget) {
-                      navigate(`/faregas/certificados/${ins.id}/continuar`);
+                      abrirRegistro(ins);
                     }
-                  } : undefined}
-                  tabIndex={certificadoEditable ? 0 : undefined}
-                  role={certificadoEditable ? 'link' : undefined}
-                  aria-label={certificadoEditable ? `Abrir borrador ${ins.id}` : undefined}
+                  }}
+                  tabIndex={0}
+                  role="link"
+                  aria-label={certificadoEditable ? `Continuar borrador ${ins.id}` : `Consultar registro ${ins.id} en solo lectura`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="font-bold text-blue-700">BORRADOR #{ins.id}</div>
-                      <div className="text-xs text-slate-500">{formatearFecha(ins.fechaCreacion)}</div>
+                      {ins.numeroCertificado && <div className="text-xs text-slate-600">{ins.numeroCertificado}</div>}
+                      <div className="text-xs text-slate-500">{ins.estado === 'EMITIDO' && ins.fechaEmision ? ins.fechaEmision : formatearFecha(ins.fechaCreacion)}</div>
                     </div>
                     <BadgeEstado value={estadoCertificadoVisible(ins)} />
                   </div>
@@ -874,15 +902,15 @@ export function InicioView() {
                     </div>
                   </div>
 
-                  {(certificadoEmitido || puedeVerComprobante) && (
+                  {(!certificadoEditable || puedeVerComprobante) && (
                     <div className="pt-3 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
-                      {certificadoEmitido && (
+                      {!certificadoEditable && (
                         <button
                           type="button"
-                          onClick={() => void verPreview(ins.id)}
+                          onClick={() => abrirRegistro(ins)}
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-[#052A79] transition-colors hover:bg-blue-100"
                         >
-                          <Eye size={16} /> Ver Certificado
+                          <Eye size={16} /> Ver historial
                         </button>
                       )}
                       {puedeVerComprobante && (

@@ -131,6 +131,8 @@ export interface FacturacionFaregas {
   enlaceXml: NullableText;
   enlaceCdr: NullableText;
   intentos: number;
+  anulacionEnPlazo?: boolean;
+  anulacionHastaMs?: number | null;
 }
 
 export interface ResumenTributarioItemFaregas {
@@ -225,6 +227,8 @@ export interface NotaElectronicaFaregas {
   importeTotal: number;
   estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR' | 'ANULADO';
   enlacePdf: NullableText;
+  anulacionEnPlazo?: boolean;
+  anulacionHastaMs?: number | null;
 }
 
 export interface AnulacionElectronicaFaregas {

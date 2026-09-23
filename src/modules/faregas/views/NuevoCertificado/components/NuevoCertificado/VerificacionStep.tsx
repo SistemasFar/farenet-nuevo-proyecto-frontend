@@ -1,6 +1,6 @@
 
-import { useState, useEffect } from 'react';
-import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Printer, RefreshCw } from 'lucide-react';
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
 import Swal from 'sweetalert2';
@@ -8,6 +8,8 @@ import type { FacturacionFaregas } from '../../../../types/faregas-api';
 
 interface VerificacionStepProps {
   certificadoId?: number;
+  certificadoEstado?: string;
+  soloLectura?: boolean;
   onEmisionExitosa?: () => void;
   tipoCertificado: TipoCertificadoFaregas;
   formCaja: any;
@@ -29,6 +31,8 @@ interface ValidacionEmisionResult {
 
 export function VerificacionStep({
   certificadoId,
+  certificadoEstado,
+  soloLectura = false,
   onEmisionExitosa,
   tipoCertificado,
   formCaja,
@@ -48,7 +52,44 @@ export function VerificacionStep({
   const [validacionResult, setValidacionResult] = useState<ValidacionEmisionResult | null>(null);
   const [isEmitting, setIsEmitting] = useState(false);
   const [emisionResult, setEmisionResult] = useState<{ numero_certificado: string; fecha_emision: string; estado: string } | null>(null);
+  const [certificadoHtml, setCertificadoHtml] = useState<string | null>(null);
+  const [isLoadingCertificado, setIsLoadingCertificado] = useState(certificadoEstado === 'EMITIDO');
+  const [certificadoError, setCertificadoError] = useState('');
+  const certificadoFrameRef = useRef<HTMLIFrameElement>(null);
   const facturacionSimulada = validacionResult?.modoFacturacion === 'SIMULACION';
+  const entornoFacturacion = String(facturacion?.entornoFacturador || '').trim().toUpperCase();
+  const comprobanteDemoGenerado = entornoFacturacion === 'DEMO'
+    && facturacion?.estado === 'PENDIENTE_SUNAT'
+    && Boolean(facturacion?.nroComprobante)
+    && Boolean(facturacion?.enlacePdf || facturacion?.enlaceXml);
+  const comprobanteProduccionAceptado = facturacion?.estado === 'ACEPTADO' && facturacion?.aceptadaSunat === true;
+  const facturacionOperable = facturacionSimulada || comprobanteDemoGenerado || comprobanteProduccionAceptado;
+
+  const cargarCertificadoFinal = async () => {
+    if (!certificadoId) return;
+    setIsLoadingCertificado(true);
+    setCertificadoError('');
+    try {
+      const response = await faregasCertificadosApi.obtenerPrevisualizacion(certificadoId);
+      const html = response?.data?.html || null;
+      if (!html) throw new Error('CERTIFICADO_SIN_CONTENIDO');
+      setCertificadoHtml(html);
+    } catch (error: unknown) {
+      setCertificadoError(error instanceof Error ? error.message : 'No se pudo cargar el certificado emitido.');
+    } finally {
+      setIsLoadingCertificado(false);
+    }
+  };
+
+  const imprimirCertificado = () => {
+    const ventana = certificadoFrameRef.current?.contentWindow;
+    if (!ventana) {
+      void Swal.fire('Impresión', 'El certificado todavía no está listo para imprimir.', 'info');
+      return;
+    }
+    ventana.focus();
+    ventana.print();
+  };
 
   const validar = async () => {
     if (!certificadoId) return;
@@ -65,10 +106,37 @@ export function VerificacionStep({
   };
 
   useEffect(() => {
-    if (certificadoId && !emisionResult) {
-      validar();
+    if (certificadoId && certificadoEstado === 'EMITIDO') {
+      let vigente = true;
+
+      void Promise.resolve().then(async () => {
+        if (!vigente) return;
+        setIsLoadingCertificado(true);
+        setCertificadoError('');
+        try {
+          const response = await faregasCertificadosApi.obtenerPrevisualizacion(certificadoId);
+          const html = response?.data?.html || null;
+          if (!html) throw new Error('CERTIFICADO_SIN_CONTENIDO');
+          if (vigente) setCertificadoHtml(html);
+        } catch (error: unknown) {
+          if (vigente) {
+            setCertificadoError(error instanceof Error ? error.message : 'No se pudo cargar el certificado emitido.');
+          }
+        } finally {
+          if (vigente) setIsLoadingCertificado(false);
+        }
+      });
+
+      return () => {
+        vigente = false;
+      };
     }
-  }, [certificadoId, emisionResult]);
+    if (certificadoId && !emisionResult) {
+      void Promise.resolve().then(() => validar());
+    }
+    // `validar` se ejecuta sólo cuando cambia el certificado o su estado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [certificadoId, certificadoEstado, emisionResult]);
 
   const handleEmitir = () => {
     if (!certificadoId || !validacionResult?.valido || isEmitting) return;
@@ -94,6 +162,7 @@ export function VerificacionStep({
             fecha_emision: response.data.fecha_emision || new Date().toISOString(),
             estado: response.data.estado || 'EMITIDO'
           });
+          await cargarCertificadoFinal();
           Swal.fire(
             '¡Éxito!',
             facturacionSimulada
@@ -141,7 +210,7 @@ export function VerificacionStep({
     return acc;
   }, {});
 
-  if (emisionResult) {
+  if (emisionResult || certificadoEstado === 'EMITIDO') {
     return (
       <div className="space-y-6 animate-in zoom-in duration-500">
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-10 text-center shadow-lg">
@@ -159,20 +228,70 @@ export function VerificacionStep({
             <div className="space-y-4 text-left">
               <div>
                 <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Número de Certificado</div>
-                <div className="text-2xl font-black text-[#052a79]">{emisionResult.numero_certificado}</div>
+                <div className="text-2xl font-black text-[#052a79]">{emisionResult?.numero_certificado || 'CERTIFICADO EMITIDO'}</div>
               </div>
               <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                 <div>
                   <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Estado</div>
-                  <div className="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded inline-block">{emisionResult.estado}</div>
+                  <div className="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded inline-block">{emisionResult?.estado || 'EMITIDO'}</div>
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Fecha Emisión</div>
-                  <div className="text-sm font-bold text-slate-700">{new Date(emisionResult.fecha_emision).toLocaleDateString()}</div>
+                  <div className="text-sm font-bold text-slate-700">{emisionResult?.fecha_emision ? new Date(emisionResult.fecha_emision).toLocaleDateString() : '—'}</div>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+          <div className="flex flex-col gap-3 bg-[#052a79] px-5 py-4 text-white sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-black">Certificado de inspección emitido</h3>
+              <p className="text-xs text-blue-100">Documento final listo para imprimir.</p>
+            </div>
+            <div className="flex gap-2">
+              {!soloLectura && (
+                <button
+                  type="button"
+                  onClick={() => void cargarCertificadoFinal()}
+                  disabled={isLoadingCertificado}
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-xs font-bold hover:bg-white/20 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoadingCertificado ? 'animate-spin' : ''}`} /> Actualizar
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={imprimirCertificado}
+                disabled={!certificadoHtml || isLoadingCertificado}
+                className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-xs font-black text-slate-900 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Printer className="h-4 w-4" /> Imprimir certificado
+              </button>
+            </div>
+          </div>
+
+          {isLoadingCertificado && (
+            <div className="flex min-h-[50vh] items-center justify-center gap-3 bg-slate-100 font-semibold text-slate-600">
+              <Loader2 className="h-6 w-6 animate-spin text-[#052a79]" /> Cargando certificado final...
+            </div>
+          )}
+          {!isLoadingCertificado && certificadoError && (
+            <div className="m-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+              No se pudo cargar el certificado: {certificadoError}
+            </div>
+          )}
+          {!isLoadingCertificado && certificadoHtml && (
+            <div className="bg-slate-100 p-4">
+              <iframe
+                ref={certificadoFrameRef}
+                srcDoc={certificadoHtml}
+                title="Certificado de inspección emitido"
+                className="h-[75vh] w-full rounded-xl border border-slate-300 bg-white shadow-inner"
+              />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -189,7 +308,7 @@ export function VerificacionStep({
             <p className="text-sm text-blue-700">Puedes emitir el certificado para realizar pruebas. El comprobante no será enviado ni marcado como aceptado por Nubefact/SUNAT.</p>
           </div>
         </div>
-      ) : (!facturacion || facturacion.estado !== 'ACEPTADO' || !facturacion.aceptadaSunat) && (
+      ) : !facturacionOperable && (
         <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm mb-6 flex items-start gap-3">
           <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0" />
           <div>
