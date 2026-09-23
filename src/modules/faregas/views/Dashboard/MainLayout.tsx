@@ -67,6 +67,7 @@ export function MainLayout({
   else if (path.startsWith('/maestros/descuentos') || path.startsWith('/faregas/descuentos')) activeMenu = 'descuentos';
   else if (path.startsWith('/auditoria') || path.startsWith('/faregas/auditoria')) activeMenu = 'auditoria';
   else if (path.startsWith('/configuracion') || path.startsWith('/faregas/configuracion')) activeMenu = 'configuracion';
+  else if (path.startsWith('/faregas/facturacion')) activeMenu = 'facturacion';
   else if (path.startsWith('/faregas/chips')) activeMenu = 'chips';
   
 

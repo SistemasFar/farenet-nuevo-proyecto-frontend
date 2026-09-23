@@ -22,6 +22,7 @@ import { NuevoCertificadoView as FaregasNuevoCertificadoView } from './modules/f
 import { UsuariosView as FaregasUsuariosView } from './modules/faregas/views/Usuarios/UsuariosView';
 import { AuditoriaView as FaregasAuditoriaView } from './modules/faregas/views/Auditoria/AuditoriaView';
 import { FaregasConfiguracionView } from './modules/faregas/views/Configuracion/FaregasConfiguracionView';
+import { FaregasFacturacionView } from './modules/faregas/views/Facturacion/FaregasFacturacionView';
 import { DescuentosView as FaregasDescuentosView } from './modules/faregas/views/Descuentos/DescuentosView';
 import { ChipsView as FaregasChipsView } from './modules/faregas/views/Chips/ChipsView';
 
@@ -606,6 +607,21 @@ export default function App() {
                 } 
               />
               <Route path="configuracion" element={<FaregasConfiguracionView />} />
+              <Route
+                path="facturacion"
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    const pId = String(fUser?.perfilId || fUser?.perfil_id || '').toLowerCase();
+                    return userPerms.includes('MENU_FACTURACION') || pId === 'sistemas' ? (
+                      <FaregasFacturacionView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                }
+              />
               <Route
                 path="chips"
                 element={

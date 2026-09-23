@@ -1,18 +1,14 @@
 import { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import TabSedes from './TabSedes';
 import TabCatalogo from './components/TabCatalogo';
 import TabTarifas from './components/TabTarifas';
-import TabFacturacion from './components/TabFacturacion';
 import TabEmpresas from './components/TabEmpresas';
 import TabCorrelativos from './components/TabCorrelativos';
 
-type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'FACTURACION' | 'EMPRESAS' | 'CORRELATIVOS';
+type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'EMPRESAS' | 'CORRELATIVOS';
 
 export function FaregasConfiguracionView() {
   const [activeTab, setActiveTab] = useState<ConfigTab>('SEDES');
-  const { plantaKey, plantaNombre } = useOutletContext<MainLayoutContext>();
   
   
   let fUser: { permisos?: string[] } = {};
@@ -42,7 +38,6 @@ export function FaregasConfiguracionView() {
   if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES' });
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
   if (hasTarifas) tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
-  if (hasSeries) tabs.push({ id: 'FACTURACION', label: 'FACTURACIÓN' });
   if (hasCorrelativos) tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });
   if (hasEmpresas) tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
@@ -93,7 +88,6 @@ export function FaregasConfiguracionView() {
               />
             )}
             {tabVisible === 'TARIFAS' && hasTarifas && <TabTarifas />}
-            {tabVisible === 'FACTURACION' && hasSeries && <TabFacturacion plantaKey={plantaKey} plantaNombre={plantaNombre} />}
             {tabVisible === 'CORRELATIVOS' && hasCorrelativos && <TabCorrelativos />}
             {tabVisible === 'EMPRESAS' && hasEmpresas && <TabEmpresas />}
           </div>

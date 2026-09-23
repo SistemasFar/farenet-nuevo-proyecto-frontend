@@ -4,9 +4,8 @@ import { faregasCertificadosApi } from '../../services/faregas-certificados.api'
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import type { FacturacionFaregas } from '../../types/faregas-api';
-import { permisosSession } from '@/services/api';
 import Swal from 'sweetalert2';
-import { FileText, FileEdit, Edit, Eye, Ban } from 'lucide-react';
+import { FileText, FileEdit, Eye, Ban, RefreshCw } from 'lucide-react';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
@@ -23,8 +22,12 @@ interface BorradorPanel {
   estadoPago?: string;
   estadoFacturacion?: string;
   aceptadaSunat?: boolean | null;
+  entornoFacturador?: string | null;
   enlacePdf?: string | null;
   nroComprobante?: string | null;
+  anulacionId?: number | null;
+  estadoAnulacion?: string | null;
+  descripcionAnulacion?: string | null;
 }
 
 const normalizarTexto = (valor?: string | null): string => {
@@ -102,10 +105,57 @@ const filtrosDelDia = (): FiltrosPanel => {
   return { busqueda: '', estado: 'TODOS', fechaDesde: hoy, fechaHasta: hoy };
 };
 
+const esComprobanteOperable = (facturacion: Pick<FacturacionFaregas, 'estado' | 'aceptadaSunat' | 'entornoFacturador' | 'enlacePdf' | 'enlaceXml' | 'nroComprobante'>) => {
+  const entorno = String(facturacion.entornoFacturador || '').trim().toUpperCase();
+  const aceptadoProduccion = facturacion.estado === 'ACEPTADO' && facturacion.aceptadaSunat === true;
+  const generadoDemo = entorno === 'DEMO'
+    && facturacion.estado === 'PENDIENTE_SUNAT'
+    && Boolean(facturacion.nroComprobante)
+    && Boolean(facturacion.enlacePdf || facturacion.enlaceXml);
+  return aceptadoProduccion || generadoDemo;
+};
+
+const esResumenComprobanteOperable = (item: BorradorPanel) => {
+  const entorno = String(item.entornoFacturador || '').trim().toUpperCase();
+  const estado = String(item.estadoFacturacion || '').trim().toUpperCase();
+  return (estado === 'ACEPTADO' && item.aceptadaSunat === true)
+    || (entorno === 'DEMO' && estado === 'PENDIENTE_SUNAT' && Boolean(item.nroComprobante) && Boolean(item.enlacePdf));
+};
+
+const tieneEtapaTributaria = (item: BorradorPanel) => Boolean(
+  item.estadoFacturacion
+  || item.nroComprobante
+  || item.enlacePdf
+  || ['PREVISUALIZACION', 'VERIFICACION_EMISION'].includes(String(item.pasoActual || '').toUpperCase())
+);
+
+const esAnulacionPendiente = (item: BorradorPanel) => ['BORRADOR', 'PENDIENTE']
+  .includes(String(item.estadoAnulacion || '').trim().toUpperCase());
+
+const esAnulacionAceptada = (item: BorradorPanel) => (
+  String(item.estadoAnulacion || '').trim().toUpperCase() === 'ACEPTADO'
+);
+
+const resultadoVisible = (item: BorradorPanel) => {
+  const estado = String(item.estadoAnulacion || '').trim().toUpperCase();
+  if (estado === 'BORRADOR' || estado === 'PENDIENTE') return 'Pendiente de revisión';
+  if (estado === 'ACEPTADO') return 'Anulación aceptada';
+  if (estado === 'RECHAZADO') return 'Anulación rechazada';
+  if (estado === 'ERROR') return 'Error de anulación';
+  return 'Pendiente';
+};
+
+const estadoCertificadoVisible = (item: BorradorPanel) => {
+  if (esAnulacionPendiente(item)) return 'Pendiente de anulación';
+  if (esAnulacionAceptada(item)) return 'Anulado';
+  return item.estado;
+};
+
 export function InicioView() {
   const navigate = useNavigate();
-  const { plantaKey: plantaSeleccionada } = useOutletContext<MainLayoutContext>();
-  const tienePermisoNotaCredito = permisosSession.obtener().includes('FAREGAS_NOTA_CREDITO');
+  const { plantaKey: plantaSeleccionada, permisos, user } = useOutletContext<MainLayoutContext>();
+  const perfilId = String(user?.perfilId || (user as { perfil_id?: string } | null)?.perfil_id || '').toUpperCase();
+  const tienePermisoNotaCredito = perfilId === 'SISTEMAS' || permisos.includes('FAREGAS_NOTA_CREDITO');
   const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -257,13 +307,13 @@ export function InicioView() {
     return facturacion as FacturacionFaregas & { enlacePdf: string };
   };
 
-  const comprobarComprobanteAceptado = async (certificadoId: number) => {
+  const comprobarComprobanteOperable = async (certificadoId: number) => {
     const facturacion = await obtenerFacturacion(certificadoId);
-    if (!facturacion || facturacion.estado !== 'ACEPTADO' || facturacion.aceptadaSunat !== true) {
+    if (!facturacion || !esComprobanteOperable(facturacion)) {
       await Swal.fire({
         icon: 'info',
         title: 'Acción no disponible',
-        text: 'La operación tributaria requiere que la boleta o factura esté aceptada por SUNAT.',
+        text: 'En PRODUCCIÓN se requiere aceptación de SUNAT. En DEMO se requiere que NubeFact haya generado el comprobante y sus archivos.',
         confirmButtonColor: '#052A79',
       });
       return null;
@@ -291,7 +341,7 @@ export function InicioView() {
     try {
       const response = await faregasCertificadosApi.obtenerPrevisualizacion(id);
       setPreviewHtml(response?.data?.html || null);
-    } catch (e) {
+    } catch {
       await Swal.fire('Error', 'No se pudo cargar la previsualización del certificado', 'error');
       setPreviewModalId(null);
     } finally {
@@ -302,7 +352,7 @@ export function InicioView() {
   const anularComprobante = async (certificadoId: number) => {
     try {
       setAccionEnProceso(certificadoId);
-      const facturacion = await comprobarComprobanteAceptado(certificadoId);
+      const facturacion = await comprobarComprobanteOperable(certificadoId);
       if (!facturacion) return;
       const confirmacion = await Swal.fire({
         icon: 'warning',
@@ -324,8 +374,27 @@ export function InicioView() {
         motivo: String(confirmacion.value).trim(),
       });
       await Swal.fire('Solicitud registrada', 'La anulación fue enviada. Su aceptación debe consultarse posteriormente.', 'success');
+      await cargarInspecciones(page, pageSize);
     } catch (err) {
       await Swal.fire('No se pudo anular', err instanceof Error ? err.message : 'La solicitud de anulación falló.', 'error');
+    } finally {
+      setAccionEnProceso(null);
+    }
+  };
+
+  const consultarAnulacion = async (certificadoId: number, anulacionId: number) => {
+    try {
+      setAccionEnProceso(certificadoId);
+      await faregasCertificadosApi.consultarAnulacionElectronica(certificadoId, anulacionId);
+      await cargarInspecciones(page, pageSize);
+      await Swal.fire({
+        icon: 'info',
+        title: 'Estado actualizado',
+        text: 'Se consultó la solicitud en NubeFact. El panel muestra ahora el último estado informado.',
+        confirmButtonColor: '#052A79',
+      });
+    } catch (err) {
+      await Swal.fire('No se pudo consultar', err instanceof Error ? err.message : 'No se pudo actualizar la anulación.', 'error');
     } finally {
       setAccionEnProceso(null);
     }
@@ -334,7 +403,7 @@ export function InicioView() {
   const crearNotaCredito = async (certificadoId: number) => {
     try {
       setAccionEnProceso(certificadoId);
-      const facturacion = await comprobarComprobanteAceptado(certificadoId);
+      const facturacion = await comprobarComprobanteOperable(certificadoId);
       if (!facturacion) return;
       const totalOriginal = Number(facturacion.importeTotal);
       const formulario = await Swal.fire({
@@ -599,18 +668,33 @@ export function InicioView() {
               {!loading &&
                 borradores.map((ins) => {
                   const etapa = PASO_PANEL[ins.pasoActual || ''] || 'Datos iniciales';
-                  const certificadoEditable = ins.estado === 'BORRADOR';
+                  const anulacionPendiente = esAnulacionPendiente(ins);
+                  const anulacionAceptada = esAnulacionAceptada(ins);
+                  const accionesCongeladas = anulacionPendiente || anulacionAceptada;
+                  const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
                   const certificadoEmitido = ins.estado === 'EMITIDO';
-                  const estadoFacturacion = String(ins.estadoFacturacion || '').toUpperCase();
-                  const comprobanteAceptado = (estadoFacturacion === 'ACEPTADO' && ins.aceptadaSunat === true) || estadoFacturacion === 'PENDIENTE_SUNAT';
-                  const puedeVerComprobante = Boolean(ins.enlacePdf);
-                  const puedeAnular = comprobanteAceptado;
-                  const puedeCrearNotaCredito = comprobanteAceptado; // ignorando permiso por ahora
+                  const comprobanteAceptado = esResumenComprobanteOperable(ins);
+                  const comprobantePotencial = tieneEtapaTributaria(ins);
+                  // Los controles permanecen visibles aunque el resumen todavía no se haya
+                  // refrescado. Cada acción vuelve a consultar la facturación completa antes
+                  // de abrir/enviar algo, por lo que no debilita la validación tributaria.
+                  const puedeVerComprobante = comprobantePotencial;
+                  const puedeAnular = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas;
+                  const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
 
                   return (
                     <tr
                       key={ins.id}
-                      className="text-slate-700 transition-colors hover:bg-slate-50"
+                      className={`text-slate-700 transition-colors hover:bg-slate-50 ${certificadoEditable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-[#052A79]' : ''}`}
+                      onClick={certificadoEditable ? () => navigate(`/faregas/certificados/${ins.id}/continuar`) : undefined}
+                      onKeyDown={certificadoEditable ? (event) => {
+                        if (event.key === 'Enter' && event.target === event.currentTarget) {
+                          navigate(`/faregas/certificados/${ins.id}/continuar`);
+                        }
+                      } : undefined}
+                      tabIndex={certificadoEditable ? 0 : undefined}
+                      role={certificadoEditable ? 'link' : undefined}
+                      aria-label={certificadoEditable ? `Abrir borrador ${ins.id}` : undefined}
                     >
                       <td className={`px-4 py-3 font-semibold whitespace-nowrap text-blue-700`}>
                         Borrador #{ins.id}
@@ -638,21 +722,21 @@ export function InicioView() {
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <BadgeEstado value="Pendiente" />
+                        <BadgeEstado value={resultadoVisible(ins)} />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <BadgeEstado value={ins.estado} />
+                        <BadgeEstado value={estadoCertificadoVisible(ins)} />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-center align-middle">
+                      <td className="px-4 py-3 whitespace-nowrap text-center align-middle" onClick={(event) => event.stopPropagation()}>
                         <div className="flex h-full flex-wrap items-center justify-center gap-1.5">
-                          {(certificadoEditable || certificadoEmitido) && (
+                          {certificadoEmitido && (
                             <button
                               type="button"
-                              onClick={() => certificadoEmitido ? void verPreview(ins.id) : navigate(`/faregas/certificados/${ins.id}/continuar`)}
+                              onClick={() => void verPreview(ins.id)}
                               className="rounded-md border border-gray-300 bg-white p-1.5 text-gray-600 transition-colors hover:bg-gray-100"
-                              title={certificadoEmitido ? 'Ver Certificado' : 'Continuar editando'}
+                              title="Ver Certificado"
                             >
-                              {certificadoEmitido ? <Eye size={16} /> : <Edit size={16} />}
+                              <Eye size={16} />
                             </button>
 
                           )}
@@ -675,6 +759,23 @@ export function InicioView() {
                               className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
                             ><FileText size={16} /></button>
                           )}
+                          {anulacionPendiente && ins.anulacionId && (
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === ins.id}
+                              onClick={() => void consultarAnulacion(ins.id, Number(ins.anulacionId))}
+                              title="Consultar estado de anulación"
+                              className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                            ><RefreshCw size={16} className={accionEnProceso === ins.id ? 'animate-spin' : ''} /></button>
+                          )}
+                          {accionesCongeladas && (
+                            <button
+                              type="button"
+                              disabled
+                              title="Anulación en revisión: las acciones tributarias están bloqueadas"
+                              className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
+                            ><Ban size={16} /></button>
+                          )}
                           {puedeAnular && (
                             <button
                               type="button"
@@ -691,6 +792,14 @@ export function InicioView() {
                               onClick={() => void crearNotaCredito(ins.id)}
                               title="Crear nota de crédito"
                               className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[#052A79] hover:bg-violet-100 disabled:opacity-50"
+                            ><FileEdit size={16} /></button>
+                          )}
+                          {accionesCongeladas && tienePermisoNotaCredito && (
+                            <button
+                              type="button"
+                              disabled
+                              title="No se puede crear una nota mientras la anulación esté activa"
+                              className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
                             ><FileEdit size={16} /></button>
                           )}
                         </div>
@@ -712,22 +821,43 @@ export function InicioView() {
             )}
             {!loading && borradores.map((ins) => {
               const etapa = PASO_PANEL[ins.pasoActual || ''] || 'Datos iniciales';
-              const certificadoEditable = ins.estado === 'BORRADOR';
+              const anulacionPendiente = esAnulacionPendiente(ins);
+              const anulacionAceptada = esAnulacionAceptada(ins);
+              const accionesCongeladas = anulacionPendiente || anulacionAceptada;
+              const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
               const certificadoEmitido = ins.estado === 'EMITIDO';
-              const estadoFacturacion = String(ins.estadoFacturacion || '').toUpperCase();
-              const comprobanteAceptado = estadoFacturacion === 'ACEPTADO' && ins.aceptadaSunat === true;
-              const puedeVerComprobante = Boolean(ins.enlacePdf);
-              const puedeAnular = comprobanteAceptado;
-              const puedeCrearNotaCredito = comprobanteAceptado && tienePermisoNotaCredito;
+              const comprobanteAceptado = esResumenComprobanteOperable(ins);
+              const comprobantePotencial = tieneEtapaTributaria(ins);
+              const puedeVerComprobante = comprobantePotencial;
+              const puedeAnular = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas;
+              const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
               return (
-                <div key={ins.id} className="p-4 flex flex-col gap-3 bg-white">
+                <div
+                  key={ins.id}
+                  className={`p-4 flex flex-col gap-3 bg-white ${certificadoEditable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-[#052A79]' : ''}`}
+                  onClick={certificadoEditable ? () => navigate(`/faregas/certificados/${ins.id}/continuar`) : undefined}
+                  onKeyDown={certificadoEditable ? (event) => {
+                    if (event.key === 'Enter' && event.target === event.currentTarget) {
+                      navigate(`/faregas/certificados/${ins.id}/continuar`);
+                    }
+                  } : undefined}
+                  tabIndex={certificadoEditable ? 0 : undefined}
+                  role={certificadoEditable ? 'link' : undefined}
+                  aria-label={certificadoEditable ? `Abrir borrador ${ins.id}` : undefined}
+                >
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="font-bold text-blue-700">BORRADOR #{ins.id}</div>
                       <div className="text-xs text-slate-500">{formatearFecha(ins.fechaCreacion)}</div>
                     </div>
-                    <BadgeEstado value={ins.estado} />
+                    <BadgeEstado value={estadoCertificadoVisible(ins)} />
                   </div>
+
+                  {anulacionPendiente && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                      Pendiente de revisión · las acciones tributarias están congeladas.
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
@@ -744,27 +874,37 @@ export function InicioView() {
                     </div>
                   </div>
 
-                  <div className="pt-3 flex flex-wrap gap-2">
-                    {(certificadoEditable || certificadoEmitido) && (
-                      <button
-                        type="button"
-                        onClick={() => certificadoEmitido ? void verPreview(ins.id) : navigate(`/faregas/certificados/${ins.id}/continuar`)}
-                        className={`flex-1 flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${certificadoEmitido ? 'border-blue-300 bg-blue-50 text-[#052A79] hover:bg-blue-100' : 'border-yellow-400 bg-yellow-50 text-yellow-800 hover:bg-yellow-100'}`}
-                      >
-                        {certificadoEmitido ? <><Eye size={16} /> Ver Certificado</> : <><Edit size={16} className="text-yellow-600" /> Continuar editando</>}
-                      </button>
-                    )}
-                    {puedeVerComprobante && (
-                      <button
-                        type="button"
-                        disabled={accionEnProceso === ins.id}
-                        onClick={() => void verComprobante(ins.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
-                      ><FileText size={16} /> PDF</button>
-                    )}
-                  </div>
-                  {(puedeAnular || puedeCrearNotaCredito) && (
-                    <div className="flex flex-wrap gap-2">
+                  {(certificadoEmitido || puedeVerComprobante) && (
+                    <div className="pt-3 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
+                      {certificadoEmitido && (
+                        <button
+                          type="button"
+                          onClick={() => void verPreview(ins.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-[#052A79] transition-colors hover:bg-blue-100"
+                        >
+                          <Eye size={16} /> Ver Certificado
+                        </button>
+                      )}
+                      {puedeVerComprobante && (
+                        <button
+                          type="button"
+                          disabled={accionEnProceso === ins.id}
+                          onClick={() => void verComprobante(ins.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
+                        ><FileText size={16} /> PDF</button>
+                      )}
+                    </div>
+                  )}
+                  {(puedeAnular || puedeCrearNotaCredito || accionesCongeladas) && (
+                    <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
+                      {anulacionPendiente && ins.anulacionId && (
+                        <button
+                          type="button"
+                          disabled={accionEnProceso === ins.id}
+                          onClick={() => void consultarAnulacion(ins.id, Number(ins.anulacionId))}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                        ><RefreshCw size={16} className={accionEnProceso === ins.id ? 'animate-spin' : ''} /> Consultar anulación</button>
+                      )}
                       {puedeAnular && (
                         <button
                           type="button"
@@ -780,6 +920,11 @@ export function InicioView() {
                           onClick={() => void crearNotaCredito(ins.id)}
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                         ><FileEdit size={16} /> Nota de Crédito</button>
+                      )}
+                      {accionesCongeladas && (
+                        <button type="button" disabled className="flex-1 rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-400">
+                          Acciones congeladas
+                        </button>
                       )}
                     </div>
                   )}

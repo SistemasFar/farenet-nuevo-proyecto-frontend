@@ -21,6 +21,19 @@ const estadoClass = (estado: string) => {
   return 'bg-slate-100 text-slate-700';
 };
 
+const anulacionPresentacion = (documento: DocumentoFacturacionAdmin) => {
+  const estado = String(documento.estadoAnulacion || '').toUpperCase();
+  if (!estado) return { texto: 'Sin solicitud', clase: 'bg-slate-100 text-slate-600' };
+  if (estado === 'BORRADOR' || estado === 'PENDIENTE') {
+    return { texto: 'Pendiente de anulación', clase: 'bg-amber-100 text-amber-700' };
+  }
+  if (estado === 'ACEPTADO') {
+    return { texto: documento.entornoFacturador === 'DEMO' ? 'Anulación DEMO procesada' : 'Anulado', clase: 'bg-green-100 text-green-700' };
+  }
+  if (estado === 'RECHAZADO') return { texto: 'Anulación rechazada', clase: 'bg-red-100 text-red-700' };
+  return { texto: 'Error de anulación', clase: 'bg-red-100 text-red-700' };
+};
+
 interface DetalleState {
   documento: DocumentoFacturacionAdmin;
   intentos: OperacionFacturacionAdmin[];
@@ -108,6 +121,20 @@ export default function TabDocumentosFacturacion() {
     }
   };
 
+  const consultarAnulacion = async (documento: DocumentoFacturacionAdmin) => {
+    if (!documento.anulacionId) return;
+    setProcesandoId(documento.id);
+    try {
+      await faregasCertificadosApi.consultarAnulacionElectronica(documento.certificadoId, documento.anulacionId);
+      await cargar();
+      await Swal.fire('Anulación consultada', 'El estado fue actualizado con la respuesta disponible en NubeFact/SUNAT.', 'success');
+    } catch (error: unknown) {
+      await Swal.fire('No se pudo consultar', error instanceof Error ? error.message : 'No se pudo actualizar la anulación.', 'error');
+    } finally {
+      setProcesandoId(null);
+    }
+  };
+
   const plantasFiltradas = filtros.empresaKey
     ? plantas.filter((planta) => planta.empresaKey === filtros.empresaKey)
     : plantas;
@@ -116,14 +143,14 @@ export default function TabDocumentosFacturacion() {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        Consulta administrativa de comprobantes. Esta pantalla nunca muestra rutas, tokens ni respuestas completas del proveedor.
+        Consulta administrativa de comprobantes y anulaciones para DEMO y PRODUCCIÓN. En producción la confirmación final corresponde a SUNAT; esta pantalla nunca muestra rutas, tokens ni respuestas completas del proveedor.
       </div>
 
       <div className="grid gap-3 rounded-xl border bg-slate-50 p-4 md:grid-cols-3 xl:grid-cols-6">
         <input value={filtros.texto || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, texto: e.target.value }))} placeholder="Comprobante, cliente, DNI/RUC o placa" className="rounded-lg border p-2.5 md:col-span-2" />
         <select value={filtros.empresaKey || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, empresaKey: e.target.value, plantaKey: '' }))} className="rounded-lg border bg-white p-2.5"><option value="">Todas las empresas</option>{empresas.map((empresa) => <option key={empresa.key} value={empresa.key}>{empresa.nombre}</option>)}</select>
         <select value={filtros.plantaKey || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, plantaKey: e.target.value }))} className="rounded-lg border bg-white p-2.5"><option value="">Todas las sedes autorizadas</option>{plantasFiltradas.map((planta) => <option key={planta.key} value={planta.key}>{planta.nombre}</option>)}</select>
-        <select value={filtros.estado || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, estado: e.target.value }))} className="rounded-lg border bg-white p-2.5"><option value="">Todos los estados</option>{['BORRADOR', 'PENDIENTE', 'PENDIENTE_SUNAT', 'ACEPTADO', 'RECHAZADO', 'ERROR', 'ANULADO'].map((estado) => <option key={estado}>{estado}</option>)}</select>
+        <select value={filtros.estado || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, estado: e.target.value }))} className="rounded-lg border bg-white p-2.5"><option value="">Todos los estados</option><option value="PENDIENTE_ANULACION">Pendiente de anulación</option><option value="ANULADO">Anulado</option><option value="ANULACION_RECHAZADA">Anulación rechazada/error</option>{['BORRADOR', 'PENDIENTE', 'PENDIENTE_SUNAT', 'ACEPTADO', 'RECHAZADO', 'ERROR'].map((estado) => <option key={estado}>{estado}</option>)}</select>
         <div className="flex gap-2"><button type="button" onClick={buscar} className="flex-1 rounded-lg bg-[#052a79] px-3 py-2 font-bold text-white">BUSCAR</button><button type="button" onClick={limpiar} className="rounded-lg border px-3 py-2 font-bold">LIMPIAR</button></div>
         <input type="date" value={filtros.fechaDesde || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value }))} className="rounded-lg border p-2.5" />
         <input type="date" value={filtros.fechaHasta || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value }))} className="rounded-lg border p-2.5" />
@@ -131,11 +158,14 @@ export default function TabDocumentosFacturacion() {
 
       <div className="overflow-x-auto rounded-xl border">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-100 text-left text-xs capitalize text-slate-600"><tr><th className="p-3">Fecha</th><th className="p-3">Comprobante</th><th className="p-3">Cliente</th><th className="p-3">Empresa / sede</th><th className="p-3">Total</th><th className="p-3">Estado</th><th className="p-3">Acciones</th></tr></thead>
+          <thead className="bg-slate-100 text-left text-xs capitalize text-slate-600"><tr><th className="p-3">Fecha</th><th className="p-3">Comprobante</th><th className="p-3">Cliente</th><th className="p-3">Empresa / sede</th><th className="p-3">Total</th><th className="p-3">Estado</th><th className="p-3">Anulación</th><th className="p-3">Acciones</th></tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={7} className="p-10 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>}
-            {!loading && documentos.length === 0 && <tr><td colSpan={7} className="p-10 text-center text-slate-500">No se encontraron comprobantes.</td></tr>}
-            {!loading && documentos.map((documento) => (
+            {loading && <tr><td colSpan={8} className="p-10 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>}
+            {!loading && documentos.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-slate-500">No se encontraron comprobantes.</td></tr>}
+            {!loading && documentos.map((documento) => {
+              const anulacion = anulacionPresentacion(documento);
+              const anulacionPendiente = ['BORRADOR', 'PENDIENTE'].includes(String(documento.estadoAnulacion || '').toUpperCase());
+              return (
               <tr key={documento.id} className="border-t align-top">
                 <td className="p-3">{fechaLocal(documento.fechaCreacion)}</td>
                 <td className="p-3"><div className="font-bold">{documento.nroComprobante || 'SIN NÚMERO'}</div><div className="text-xs text-slate-500">{documento.tipoComprobante} · Cert. {documento.certificadoId}</div></td>
@@ -143,9 +173,11 @@ export default function TabDocumentosFacturacion() {
                 <td className="p-3"><div>{documento.empresaNombre}</div><div className="text-xs text-slate-500">{documento.plantaNombre}</div></td>
                 <td className="p-3 font-bold">S/ {documento.importeTotal.toFixed(2)}</td>
                 <td className="p-3"><span className={`rounded-full px-2 py-1 text-xs font-bold ${estadoClass(documento.estado)}`}>{documento.estado}</span><div className="mt-1 text-xs text-slate-500">{documento.intentos} intento(s)</div></td>
-                <td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void verDetalle(documento.id)} className="text-blue-700 underline">Detalle</button><button type="button" onClick={() => navigate(`/faregas/certificados/${documento.certificadoId}/continuar`)} className="text-blue-700 underline">Certificado</button>{documento.enlacePdf && <a href={documento.enlacePdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-700 underline">PDF <ExternalLink className="h-3 w-3" /></a>}{['ERROR', 'PENDIENTE'].includes(documento.estado) && <button disabled={procesandoId === documento.id} type="button" onClick={() => void reintentar(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className="h-3 w-3" /> Reintentar</button>}</div></td>
+                <td className="p-3"><span className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-bold ${anulacion.clase}`}>{anulacion.texto}</span>{documento.fechaSolicitudAnulacion && <div className="mt-1 text-xs text-slate-500">{fechaLocal(documento.fechaSolicitudAnulacion)}</div>}</td>
+                <td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void verDetalle(documento.id)} className="text-blue-700 underline">Detalle</button><button type="button" onClick={() => navigate(`/faregas/certificados/${documento.certificadoId}/continuar`)} className="text-blue-700 underline">Certificado</button>{documento.enlacePdf && <a href={documento.enlacePdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-700 underline">PDF <ExternalLink className="h-3 w-3" /></a>}{anulacionPendiente && <button disabled={procesandoId === documento.id} type="button" onClick={() => void consultarAnulacion(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className={`h-3 w-3 ${procesandoId === documento.id ? 'animate-spin' : ''}`} /> Consultar anulación</button>}{!documento.anulacionId && ['ERROR', 'PENDIENTE'].includes(documento.estado) && <button disabled={procesandoId === documento.id} type="button" onClick={() => void reintentar(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className="h-3 w-3" /> Reintentar</button>}</div></td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -160,5 +192,6 @@ export default function TabDocumentosFacturacion() {
 function DetalleModal({ detalle, onClose }: { detalle: DetalleState; onClose: () => void }) {
   const registros = [...detalle.operaciones, ...detalle.intentos]
     .sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime());
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-2xl"><div className="sticky top-0 flex items-center justify-between border-b bg-white p-5"><div><h3 className="flex items-center gap-2 text-lg font-black text-[#052a79]"><FileSearch className="h-5 w-5" /> {detalle.documento.nroComprobante || 'Comprobante sin número'}</h3><p className="text-sm text-slate-500">Historial técnico sin datos secretos</p></div><button onClick={onClose}><X /></button></div><div className="space-y-4 p-5"><div className="grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-3"><div><span className="text-xs text-slate-500">Cliente</span><p className="font-bold">{detalle.documento.cliente}</p></div><div><span className="text-xs text-slate-500">Sede</span><p className="font-bold">{detalle.documento.plantaNombre}</p></div><div><span className="text-xs text-slate-500">Estado</span><p className="font-bold">{detalle.documento.estado}</p></div></div>{detalle.documento.mensajeSunat && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{detalle.documento.mensajeSunat}</div>}<div className="overflow-x-auto rounded-xl border"><table className="min-w-full text-sm"><thead className="bg-slate-100 text-left"><tr><th className="p-3">Fecha</th><th className="p-3">Operación</th><th className="p-3">Intento</th><th className="p-3">Estado</th><th className="p-3">HTTP / error</th></tr></thead><tbody>{registros.map((registro, index) => <tr key={`${registro.operacion || 'EMITIR'}-${registro.numero_intento}-${index}`} className="border-t"><td className="p-3">{fechaLocal(registro.fecha_creacion)}</td><td className="p-3">{registro.operacion || 'EMITIR'}</td><td className="p-3">{registro.numero_intento}</td><td className="p-3">{registro.estado}</td><td className="p-3">{registro.http_status || '—'} {registro.error ? `· ${registro.error}` : ''}</td></tr>)}{registros.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-500">Sin intentos registrados.</td></tr>}</tbody></table></div><div className="flex flex-wrap gap-3">{detalle.documento.enlacePdf && <a target="_blank" rel="noreferrer" href={detalle.documento.enlacePdf} className="rounded-lg bg-[#052a79] px-4 py-2 font-bold text-white">PDF</a>}{detalle.documento.enlaceXml && <a target="_blank" rel="noreferrer" href={detalle.documento.enlaceXml} className="rounded-lg border px-4 py-2 font-bold">XML</a>}{detalle.documento.enlaceCdr && <a target="_blank" rel="noreferrer" href={detalle.documento.enlaceCdr} className="rounded-lg border px-4 py-2 font-bold">CDR</a>}</div></div></div></div>;
+  const anulacion = anulacionPresentacion(detalle.documento);
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-2xl"><div className="sticky top-0 flex items-center justify-between border-b bg-white p-5"><div><h3 className="flex items-center gap-2 text-lg font-black text-[#052a79]"><FileSearch className="h-5 w-5" /> {detalle.documento.nroComprobante || 'Comprobante sin número'}</h3><p className="text-sm text-slate-500">Historial técnico sin datos secretos</p></div><button onClick={onClose}><X /></button></div><div className="space-y-4 p-5"><div className="grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4"><div><span className="text-xs text-slate-500">Cliente</span><p className="font-bold">{detalle.documento.cliente}</p></div><div><span className="text-xs text-slate-500">Sede</span><p className="font-bold">{detalle.documento.plantaNombre}</p></div><div><span className="text-xs text-slate-500">Estado comprobante</span><p className="font-bold">{detalle.documento.estado}</p></div><div><span className="text-xs text-slate-500">Ambiente</span><p className="font-bold">{detalle.documento.entornoFacturador || '—'}</p></div></div>{detalle.documento.anulacionId && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"><div className="flex flex-wrap items-center gap-2"><span className="font-black text-slate-800">Anulación #{detalle.documento.anulacionId}</span><span className={`rounded-full px-2 py-1 text-xs font-bold ${anulacion.clase}`}>{anulacion.texto}</span></div><p className="mt-2"><span className="font-semibold">Motivo:</span> {detalle.documento.motivoAnulacion || '—'}</p>{detalle.documento.descripcionAnulacion && <p className="mt-1 text-slate-600">{detalle.documento.descripcionAnulacion}</p>}<p className="mt-1 text-xs text-slate-500">Solicitada: {fechaLocal(detalle.documento.fechaSolicitudAnulacion)}{detalle.documento.ticketAnulacionSunat ? ` · Ticket SUNAT: ${detalle.documento.ticketAnulacionSunat}` : ''}</p></div>}{detalle.documento.mensajeSunat && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{detalle.documento.mensajeSunat}</div>}<div className="overflow-x-auto rounded-xl border"><table className="min-w-full text-sm"><thead className="bg-slate-100 text-left"><tr><th className="p-3">Fecha</th><th className="p-3">Operación</th><th className="p-3">Intento</th><th className="p-3">Estado</th><th className="p-3">HTTP / error</th></tr></thead><tbody>{registros.map((registro, index) => <tr key={`${registro.operacion || 'EMITIR'}-${registro.numero_intento}-${index}`} className="border-t"><td className="p-3">{fechaLocal(registro.fecha_creacion)}</td><td className="p-3">{registro.operacion || 'EMITIR'}</td><td className="p-3">{registro.numero_intento}</td><td className="p-3">{registro.estado}</td><td className="p-3">{registro.http_status || '—'} {registro.error ? `· ${registro.error}` : ''}</td></tr>)}{registros.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-500">Sin intentos registrados.</td></tr>}</tbody></table></div><div className="flex flex-wrap gap-3">{detalle.documento.enlacePdf && <a target="_blank" rel="noreferrer" href={detalle.documento.enlacePdf} className="rounded-lg bg-[#052a79] px-4 py-2 font-bold text-white">PDF</a>}{detalle.documento.enlaceXml && <a target="_blank" rel="noreferrer" href={detalle.documento.enlaceXml} className="rounded-lg border px-4 py-2 font-bold">XML</a>}{detalle.documento.enlaceCdr && <a target="_blank" rel="noreferrer" href={detalle.documento.enlaceCdr} className="rounded-lg border px-4 py-2 font-bold">CDR</a>}</div></div></div></div>;
 }

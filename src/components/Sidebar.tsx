@@ -275,6 +275,22 @@ const menuItems: MenuItem[] = [
       </svg>
     ),
   },
+  {
+    key: 'facturacion', path: '/facturacion',
+    label: 'FACTURACIÓN',
+    permisos: ['MENU_FACTURACION'],
+    icon: (
+      <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M6 3h12a2 2 0 0 1 2 2v16l-3-1.5L14 21l-3-1.5L8 21l-4-2V5a2 2 0 0 1 2-2Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 export function Sidebar({
@@ -306,6 +322,9 @@ export function Sidebar({
       }
       if (item.key === 'configuracion') {
         return permisos.includes('MENU_CONFIGURACION');
+      }
+      if (item.key === 'facturacion') {
+        return permisos.includes('MENU_FACTURACION') || perfilId?.toLowerCase() === 'sistemas';
       }
       if (item.key === 'chips') {
         return permisos.includes('MENU_CHIPS') || permisos.includes('CHIPS_VER');

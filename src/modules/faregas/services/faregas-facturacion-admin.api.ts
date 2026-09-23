@@ -31,6 +31,14 @@ export interface DocumentoFacturacionAdmin {
   enlacePdf: string | null;
   enlaceXml: string | null;
   enlaceCdr: string | null;
+  entornoFacturador: string | null;
+  anulacionId: number | null;
+  estadoAnulacion: string | null;
+  motivoAnulacion: string | null;
+  descripcionAnulacion: string | null;
+  aceptadaAnulacionSunat: boolean | null;
+  ticketAnulacionSunat: string | null;
+  fechaSolicitudAnulacion: string | null;
   intentos: number;
   fechaUltimoIntento: string | null;
   fechaCreacion: string;
