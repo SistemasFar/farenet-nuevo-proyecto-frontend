@@ -177,13 +177,13 @@ export default function TabCorrelativos() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-4">
       <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-        <strong>Rangos de certificados por sede y operación.</strong> Cada rango se asigna a una combinación exacta, por ejemplo Independencia + GNV Inicial. La primera previsualización reserva un correlativo real y la emisión reutiliza ese mismo número.
+        <strong>Rangos de certificados por sede y operación.</strong> Cada rango se asigna a una combinación exacta, por ejemplo Independencia + GNV Inicial. La previsualización no consume correlativos; el número definitivo se asigna al emitir.
       </div>
 
       {rangosAgotados.length > 0 && (
         <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800" role="alert">
           <strong>Atención: {rangosAgotados.length === 1 ? 'hay una operación con rango agotado' : `hay ${rangosAgotados.length} operaciones con rango agotado`}.</strong>{' '}
-          Ya no se podrán reservar nuevos certificados para {rangosAgotados.map((r) => `${r.plantaNombre} / ${r.servicioNombre}`).join(', ')}. Usa <strong>Asignar nuevo rango</strong> para continuar operando.
+          Ya no se podrán emitir nuevos certificados para {rangosAgotados.map((r) => `${r.plantaNombre} / ${r.servicioNombre}`).join(', ')}. Usa <strong>Asignar nuevo rango</strong> para continuar operando.
         </div>
       )}
 
@@ -303,7 +303,7 @@ export default function TabCorrelativos() {
             <div className="p-6 space-y-4">
               <div className="bg-amber-50 text-amber-800 text-xs font-bold p-3 rounded-lg border border-amber-200 mb-2">
                 {rangoEditando && rangoEditando.rangoId && rangoEditando.nroActual != null && rangoEditando.nroInicio != null && rangoEditando.nroActual >= rangoEditando.nroInicio
-                  ? 'Si el rango ya reservó correlativos, su número inicial queda protegido. Puedes ampliar o corregir el número final, pero nunca dejarlo por debajo del número actual.'
+                  ? 'Si el rango ya asignó correlativos, su número inicial queda protegido. Puedes ampliar o corregir el número final, pero nunca dejarlo por debajo del número actual.'
                   : 'Solo puede existir un rango activo por sede y modalidad. Si ya existe uno, ciérrelo antes. Tampoco se permiten rangos numéricos cruzados con otra sede que use el mismo prefijo.'}
               </div>
               
@@ -347,7 +347,7 @@ export default function TabCorrelativos() {
                 <p className="text-xs text-slate-500">
                   {rangoEditando.nroActual != null && rangoEditando.nroInicio != null && rangoEditando.nroActual >= rangoEditando.nroInicio
                     ? `Este rango ya llegó al correlativo ${rangoEditando.nroActual}; por trazabilidad, el inicio no puede modificarse.`
-                    : 'Este rango todavía no ha reservado correlativos, por lo que puedes modificar tanto el inicio como el final.'}
+                    : 'Este rango todavía no ha asignado correlativos, por lo que puedes modificar tanto el inicio como el final.'}
                 </p>
               )}
             </div>

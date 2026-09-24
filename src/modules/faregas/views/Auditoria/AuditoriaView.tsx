@@ -34,6 +34,7 @@ const ACCIONES: Record<string, string> = {
     COMPROBANTE_EMITIDO: 'Procesó la emisión del comprobante',
     PREVISUALIZACION_CONSULTADA: 'Revisó la previsualización del certificado',
     EMISION_VALIDADA: 'Validó el certificado antes de emitirlo',
+    CERTIFICADO_NUMERO_ASIGNADO: 'Asignó el número definitivo del certificado',
     CERTIFICADO_EMITIDO: 'Emitió el certificado definitivo',
     USUARIO_CREADO: 'Creó un nuevo usuario',
     USUARIO_ACTUALIZADO: 'Actualizó un usuario',

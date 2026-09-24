@@ -149,6 +149,11 @@ const resultadoVisible = (item: BorradorPanel) => {
   return 'Pendiente';
 };
 
+const certificadoEmitidoVisible = (item: BorradorPanel) => (
+  String(item.estado || '').trim().toUpperCase() === 'EMITIDO'
+  && Boolean(String(item.numeroCertificado || '').trim())
+);
+
 const estadoCertificadoVisible = (item: BorradorPanel) => {
   if (esAnulacionPendiente(item)) return 'Pendiente de anulación';
   if (esAnulacionAceptada(item)) return 'Anulado';
@@ -612,7 +617,7 @@ export function InicioView() {
             <thead className="bg-gray-50 text-xs font-semibold capitalize text-gray-500">
               <tr>
                 <th className="px-4 py-3 text-left">
-                  N° Inspección
+                  N° Certificado
                 </th>
                 <th className="px-4 py-3 text-left">
                   Fecha de emisión / creación
@@ -694,8 +699,14 @@ export function InicioView() {
                       aria-label={certificadoEditable ? `Continuar borrador ${ins.id}` : `Consultar registro ${ins.id} en solo lectura`}
                     >
                       <td className={`px-4 py-3 font-semibold whitespace-nowrap text-blue-700`}>
-                        Borrador #{ins.id}
-                        {ins.numeroCertificado && <span className="block text-[10px] font-medium text-slate-500">{ins.numeroCertificado}</span>}
+                        {certificadoEmitidoVisible(ins) ? (
+                          ins.numeroCertificado
+                        ) : (
+                          <>
+                            Borrador #{ins.id}
+                            {ins.numeroCertificado && <span className="block text-[10px] font-medium text-slate-500">{ins.numeroCertificado}</span>}
+                          </>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-slate-500" title={ins.estado === 'EMITIDO' ? 'Fecha de emisión del certificado' : 'Fecha de creación del registro'}>
                         {ins.estado === 'EMITIDO' && ins.fechaEmision ? ins.fechaEmision : formatearFecha(ins.fechaCreacion)}
@@ -817,8 +828,12 @@ export function InicioView() {
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-bold text-blue-700">BORRADOR #{ins.id}</div>
-                      {ins.numeroCertificado && <div className="text-xs text-slate-600">{ins.numeroCertificado}</div>}
+                      {certificadoEmitidoVisible(ins) ? (
+                         <div className="font-bold text-blue-700">{ins.numeroCertificado}</div>
+                       ) : (
+                         <div className="font-bold text-blue-700">Borrador #{ins.id}</div>
+                       )}
+                      {!certificadoEmitidoVisible(ins) && ins.numeroCertificado && <div className="text-xs text-slate-600">{ins.numeroCertificado}</div>}
                       <div className="text-xs text-slate-500">{ins.estado === 'EMITIDO' && ins.fechaEmision ? ins.fechaEmision : formatearFecha(ins.fechaCreacion)}</div>
                     </div>
                     <BadgeEstado value={estadoCertificadoVisible(ins)} />
