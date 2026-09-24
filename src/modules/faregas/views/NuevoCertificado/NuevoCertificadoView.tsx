@@ -7,7 +7,7 @@ import { faregasCertificadosApi } from '../../services/faregas-certificados.api'
 import { faregasClientesApi } from '../../services/faregas-clientes.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
-import { CheckCircle2, FileText, User, CreditCard, ArrowLeft, Search, Loader2, Save, Eye } from 'lucide-react';
+import { CheckCircle2, FileText, CreditCard, ArrowLeft, Search, Loader2, Save, Eye } from 'lucide-react';
 import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
@@ -15,8 +15,7 @@ import { TallerStep } from './components/NuevoCertificado/TallerStep';
 import { CertificateChipSection } from './components/NuevoCertificado/CertificateChipSection';
 import type { FormularioFormatoDinamicoFaregas, ResumenComercialFaregas } from '../../types/faregas-api';
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
-import { FacturacionStep } from './components/NuevoCertificado/FacturacionStep';
-import { VerificacionStep } from './components/NuevoCertificado/VerificacionStep';
+import { FacturacionEmisionStep } from './components/NuevoCertificado/FacturacionEmisionStep';
 import { PrevisualizacionCertificadoStep } from './components/NuevoCertificado/PrevisualizacionCertificadoStep';
 import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
@@ -24,6 +23,7 @@ import { useLocation, useNavigate, useOutletContext, useParams } from 'react-rou
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { validarDatosFacturacionBasica, validarDatosIniciales, validarExpedienteTecnico, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { calcularMedioPago } from './faregas-facturacion.utils';
+import { indicePasoVisual as indicePaso } from './faregas-emision';
 
 
 
@@ -376,19 +376,9 @@ export function NuevoCertificadoView() {
       { id: 'pago', label: 'Pago', icon: CreditCard },
       { id: 'vehiculo', label: formCaja.tipo_flujo === 'TALLER_INSPECCION' ? 'Datos del Taller' : 'Vehículo y Datos Técnicos', icon: Search },
       { id: 'previsualizacion', label: 'Previsualización del Certificado', icon: Eye },
-      { id: 'facturacion', label: 'Facturación', icon: User },
-      { id: 'verificacion', label: 'Verificación / Emisión', icon: CheckCircle2 }
+      { id: 'facturacion', label: 'Facturación y Emisión', icon: CheckCircle2 }
     ];
   }, [formCaja.tipo_flujo]);
-
-  const indicePaso = (paso?: string) => ({
-    DATOS_INICIALES: 0,
-    PAGO: 1,
-    VEHICULO: 2,
-    PREVISUALIZACION: 3,
-    FACTURACION: 4,
-    VERIFICACION_EMISION: 5,
-  }[paso || ''] ?? 0);
 
   const persistirPaso = async (idBorrador: number, paso: PasoBorradorFaregas) => {
     await faregasCertificadosApi.actualizarPasoBorrador(idBorrador, paso);
@@ -1239,32 +1229,6 @@ export function NuevoCertificadoView() {
         } finally {
           setIsSavingStep(false);
         }
-      } else if (STEPS[currentStepIndex].id === 'facturacion') {
-        const tieneDatosFacturacion = Boolean(formFacturacion.nroDocFac?.trim() || formFacturacion.razonSocialFac?.trim() || formFacturacion.direccionFac?.trim());
-        if (tieneDatosFacturacion) {
-          if (!certificadoId) throw new Error('No existe certificado');
-          setIsSavingStep(true);
-          try {
-            const payloadFact = construirPayloadFacturacion();
-            await faregasCertificadosApi.guardarFacturacion(certificadoId, payloadFact);
-          } catch (e: any) {
-            const res = await Swal.fire({
-              title: 'Facturación Incompleta',
-              text: (e.message || 'Los datos de facturación no son válidos.') + '\n\n¿Desea omitir el guardado y avanzar a la previsualización?',
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonText: 'Sí, avanzar sin guardar',
-              cancelButtonText: 'No, corregir datos',
-            });
-            if (!res.isConfirmed) {
-              setIsSavingStep(false);
-              return; // Si no guarda, no avanza.
-            }
-          } finally {
-            setIsSavingStep(false);
-          }
-        }
-        if (certificadoId) await persistirPaso(certificadoId, 'VERIFICACION_EMISION');
       } else if (STEPS[currentStepIndex].id === 'previsualizacion' && certificadoId) {
         await persistirPaso(certificadoId, 'FACTURACION');
       }
@@ -1760,17 +1724,6 @@ export function NuevoCertificadoView() {
             }))}
           />
         )}
-        {STEPS[currentStepIndex].id === 'facturacion' && (
-          <FacturacionStep
-            certificadoId={certificadoId}
-            formFacturacion={formFacturacion}
-            setFormFacturacion={setFormFacturacion}
-            facturacion={facturacion}
-            onFacturacionChange={setFacturacion}
-            medioPago={medioPagoCalculado}
-            onEditarDatosCliente={() => setCurrentStepIndex(2)}
-          />
-        )}
         {STEPS[currentStepIndex].id === 'previsualizacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no tiene un certificado emitido para previsualizar.</p>
         )}
@@ -1778,11 +1731,11 @@ export function NuevoCertificadoView() {
           <PrevisualizacionCertificadoStep certificadoId={certificadoId} />
         )}
         </fieldset>
-        {STEPS[currentStepIndex].id === 'verificacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
+        {STEPS[currentStepIndex].id === 'facturacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no llegó a emitirse.</p>
         )}
-        {STEPS[currentStepIndex].id === 'verificacion' && (!soloLectura || certificadoEstado === 'EMITIDO') && (
-          <VerificacionStep
+        {STEPS[currentStepIndex].id === 'facturacion' && (!soloLectura || certificadoEstado === 'EMITIDO') && (
+          <FacturacionEmisionStep
             certificadoId={certificadoId}
             certificadoEstado={certificadoEstado}
             soloLectura={soloLectura}
@@ -1790,6 +1743,7 @@ export function NuevoCertificadoView() {
               setCertificadoEstado('EMITIDO');
               setIsEmitido(true);
             }}
+            onAtras={irPasoAnterior}
             tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
             formCaja={formCaja}
             formVehiculo={formVehiculo}
@@ -1799,7 +1753,11 @@ export function NuevoCertificadoView() {
             formConformidad={formConformidad}
             pagosAgregados={pagosAgregados}
             formFacturacion={formFacturacion}
+            setFormFacturacion={setFormFacturacion}
             facturacion={facturacion}
+            onFacturacionChange={setFacturacion}
+            medioPago={medioPagoCalculado}
+            onEditarDatosCliente={() => setCurrentStepIndex(2)}
           />
         )}
       </div>
@@ -1807,7 +1765,7 @@ export function NuevoCertificadoView() {
       {/* FOOTER ACTIONS */}
       <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          {currentStepIndex > 0 && !isEmitido && !soloLectura && (
+          {currentStepIndex > 0 && currentStepIndex !== STEPS.length - 1 && !isEmitido && !soloLectura && (
             <button
               type="button"
               onClick={irPasoAnterior}
@@ -1831,18 +1789,31 @@ export function NuevoCertificadoView() {
 
         <div className="flex flex-col items-end gap-1.5">
           {soloLectura ? (
-            <button type="button" onClick={salirAlInicio} className="rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">VOLVER AL INICIO</button>
-          ) : currentStepIndex === STEPS.length - 1 ? (
             <div className="flex items-center gap-3">
-              {facturacion?.enlacePdf && (
+              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && facturacion?.enlacePdf && (
                 <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
                   VER COMPROBANTE
                 </a>
               )}
-              <button type="button" onClick={() => navigate('/faregas/inicio')} className="rounded-lg bg-gold-3d px-6 py-2.5 text-xs font-black transition shadow-sm">
-                IR A INICIO
+              <button type="button" onClick={salirAlInicio} className="rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">
+                {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 ? 'IR A INICIO' : 'VOLVER AL INICIO'}
               </button>
             </div>
+          ) : currentStepIndex === STEPS.length - 1 ? (
+            (isEmitido || facturacion?.enlacePdf) ? (
+              <div className="flex items-center gap-3">
+                {facturacion?.enlacePdf && (
+                  <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
+                    VER COMPROBANTE
+                  </a>
+                )}
+                {isEmitido && (
+                  <button type="button" onClick={() => navigate('/faregas/inicio')} className="rounded-lg bg-gold-3d px-6 py-2.5 text-xs font-black transition shadow-sm">
+                    IR A INICIO
+                  </button>
+                )}
+              </div>
+            ) : null
           ) : currentStepIndex === 0 && !isConsultado ? (
             <span className="text-xs font-semibold text-slate-500">Complete los datos y presione Consultar.</span>
           ) : (

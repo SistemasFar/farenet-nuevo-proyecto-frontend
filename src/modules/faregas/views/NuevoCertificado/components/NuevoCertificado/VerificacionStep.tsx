@@ -1,10 +1,18 @@
 
-import { useState, useEffect, useRef } from 'react';
-import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Printer, RefreshCw } from 'lucide-react';
+import { forwardRef, useState, useEffect, useImperativeHandle, useRef, type RefObject } from 'react';
+import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Printer, RefreshCw, Eye } from 'lucide-react';
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
+import { ejecutarEmisionCertificado, esComprobanteOperable, type ResultadoEmisionCertificado } from '../../faregas-emision';
 import Swal from 'sweetalert2';
 import type { FacturacionFaregas } from '../../../../types/faregas-api';
+
+const mensajePrevisualizacion = (error: unknown): string => {
+  const mensaje = error instanceof Error ? error.message : '';
+  return mensaje === 'FORMATO_PREVIEW_PENDIENTE' || mensaje.includes('pendiente')
+    ? 'El formato oficial de previsualización para esta modalidad aún está pendiente.'
+    : mensaje || 'No se pudo cargar el certificado.';
+};
 
 interface VerificacionStepProps {
   certificadoId?: number;
@@ -21,6 +29,10 @@ interface VerificacionStepProps {
   pagosAgregados: any[];
   formFacturacion: any;
   facturacion: FacturacionFaregas | null;
+  resultadoEmision?: ResultadoEmisionCertificado | null;
+  variante?: 'estandar' | 'compacta';
+  mostrarAcciones?: boolean;
+  mostrarEncabezado?: boolean;
 }
 
 interface ValidacionEmisionResult {
@@ -29,7 +41,57 @@ interface ValidacionEmisionResult {
   modoFacturacion?: 'NUBEFACT' | 'SIMULACION';
 }
 
-export function VerificacionStep({
+export interface VerificacionStepHandle {
+  validar: () => Promise<ValidacionEmisionResult | null>;
+  cargarDocumento: () => Promise<void>;
+}
+
+function PreviewCertificadoCompacto({
+  html,
+  loading,
+  error,
+  frameRef,
+  onPrint,
+  mostrarImprimir,
+  emitted,
+}: {
+  html: string | null;
+  loading: boolean;
+  error: string;
+  frameRef: RefObject<HTMLIFrameElement | null>;
+  onPrint: () => void;
+  mostrarImprimir: boolean;
+  emitted: boolean;
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-[#052a79] px-4 py-3 text-white">
+        <div className="flex items-center gap-2">
+          <Eye className="h-4 w-4 text-amber-300" />
+          <div>
+            <h3 className="text-xs font-black">{emitted ? 'Documento definitivo' : 'Previsualización del certificado'}</h3>
+            <p className="text-[10px] text-blue-100">{emitted ? 'Certificado emitido y listo para imprimir.' : 'El número definitivo se asigna únicamente al emitir.'}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {!emitted && <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-800">PENDIENTE DE EMISIÓN</span>}
+          {mostrarImprimir && (
+            <button type="button" onClick={onPrint} disabled={!html || loading} className="inline-flex items-center gap-1.5 rounded-md bg-amber-400 px-2.5 py-1.5 text-[10px] font-black text-slate-900 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50">
+              <Printer className="h-3.5 w-3.5" /> IMPRIMIR CERTIFICADO
+            </button>
+          )}
+        </div>
+      </div>
+      {loading && <div className="flex min-h-[260px] items-center justify-center gap-2 bg-slate-100 text-xs font-semibold text-slate-600"><Loader2 className="h-5 w-5 animate-spin text-[#052a79]" /> Cargando documento...</div>}
+      {!loading && error && <div className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">No se pudo cargar el documento: {error}</div>}
+      {!loading && html && <div className="bg-slate-100 p-3"><iframe ref={frameRef} srcDoc={html} title={emitted ? 'Certificado FAREGAS emitido' : 'Previsualización del certificado FAREGAS'} className="h-[44vh] min-h-[320px] w-full rounded-lg border border-slate-300 bg-white shadow-inner" /></div>}
+      {!loading && !html && !error && <div className="p-6 text-center text-xs font-semibold text-slate-600">No hay un documento disponible por ahora.</div>}
+      {!emitted && !loading && html && <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-bold text-amber-800">PREVISUALIZACIÓN · PENDIENTE DE EMISIÓN</div>}
+    </section>
+  );
+}
+
+export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionStepProps>(function VerificacionStep({
   certificadoId,
   certificadoEstado,
   soloLectura = false,
@@ -43,8 +105,12 @@ export function VerificacionStep({
   formConformidad,
   pagosAgregados,
   formFacturacion,
-  facturacion
-}: VerificacionStepProps) {
+  facturacion,
+  resultadoEmision = null,
+  variante = 'estandar',
+  mostrarAcciones = true,
+  mostrarEncabezado = true,
+}, ref) {
 
   const totalPagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
 
@@ -56,14 +122,9 @@ export function VerificacionStep({
   const [isLoadingCertificado, setIsLoadingCertificado] = useState(certificadoEstado === 'EMITIDO');
   const [certificadoError, setCertificadoError] = useState('');
   const certificadoFrameRef = useRef<HTMLIFrameElement>(null);
+  const resultadoVisible = emisionResult || resultadoEmision;
   const facturacionSimulada = validacionResult?.modoFacturacion === 'SIMULACION';
-  const entornoFacturacion = String(facturacion?.entornoFacturador || '').trim().toUpperCase();
-  const comprobanteDemoGenerado = entornoFacturacion === 'DEMO'
-    && facturacion?.estado === 'PENDIENTE_SUNAT'
-    && Boolean(facturacion?.nroComprobante)
-    && Boolean(facturacion?.enlacePdf || facturacion?.enlaceXml);
-  const comprobanteProduccionAceptado = facturacion?.estado === 'ACEPTADO' && facturacion?.aceptadaSunat === true;
-  const facturacionOperable = facturacionSimulada || comprobanteDemoGenerado || comprobanteProduccionAceptado;
+  const facturacionOperable = esComprobanteOperable(facturacion, validacionResult?.modoFacturacion);
 
   const cargarCertificadoFinal = async () => {
     if (!certificadoId) return;
@@ -75,7 +136,7 @@ export function VerificacionStep({
       if (!html) throw new Error('CERTIFICADO_SIN_CONTENIDO');
       setCertificadoHtml(html);
     } catch (error: unknown) {
-      setCertificadoError(error instanceof Error ? error.message : 'No se pudo cargar el certificado emitido.');
+      setCertificadoError(mensajePrevisualizacion(error));
     } finally {
       setIsLoadingCertificado(false);
     }
@@ -91,19 +152,27 @@ export function VerificacionStep({
     ventana.print();
   };
 
-  const validar = async () => {
-    if (!certificadoId) return;
+  const validar = async (): Promise<ValidacionEmisionResult | null> => {
+    if (!certificadoId) return null;
     setIsValidating(true);
     try {
       const response = await faregasCertificadosApi.validarEmision(certificadoId);
-      setValidacionResult(response.data);
+      const resultado = response.data as ValidacionEmisionResult;
+      setValidacionResult(resultado);
+      return resultado;
     } catch (e: any) {
       console.error(e);
       Swal.fire('Error', 'No se pudo validar el certificado: ' + e.message, 'error');
+      return null;
     } finally {
       setIsValidating(false);
     }
   };
+
+  useImperativeHandle(ref, () => ({
+    validar,
+    cargarDocumento: cargarCertificadoFinal,
+  }));
 
   useEffect(() => {
     if (certificadoId && certificadoEstado === 'EMITIDO') {
@@ -114,13 +183,31 @@ export function VerificacionStep({
         setIsLoadingCertificado(true);
         setCertificadoError('');
         try {
+          try {
+            const borradorResponse = await faregasCertificadosApi.obtenerBorradorCompleto(certificadoId);
+            const borrador = borradorResponse?.data;
+            if (borrador?.estado === 'EMITIDO' && (borrador.numeroCertificado || borrador.numero_certificado)) {
+              if (vigente) {
+                const numero = borrador.numeroCertificado || borrador.numero_certificado;
+                setEmisionResult(prev => prev?.numero_certificado === numero
+                  ? prev
+                  : {
+                    numero_certificado: numero,
+                    fecha_emision: borrador.fechaEmision || borrador.fecha_emision || new Date().toISOString(),
+                    estado: 'EMITIDO',
+                  });
+              }
+            }
+          } catch {
+            // La previsualización sigue siendo recuperable aunque falle el metadato.
+          }
           const response = await faregasCertificadosApi.obtenerPrevisualizacion(certificadoId);
           const html = response?.data?.html || null;
           if (!html) throw new Error('CERTIFICADO_SIN_CONTENIDO');
           if (vigente) setCertificadoHtml(html);
         } catch (error: unknown) {
           if (vigente) {
-            setCertificadoError(error instanceof Error ? error.message : 'No se pudo cargar el certificado emitido.');
+            setCertificadoError(mensajePrevisualizacion(error));
           }
         } finally {
           if (vigente) setIsLoadingCertificado(false);
@@ -132,6 +219,7 @@ export function VerificacionStep({
       };
     }
     if (certificadoId && !emisionResult) {
+      void Promise.resolve().then(() => cargarCertificadoFinal());
       void Promise.resolve().then(() => validar());
     }
     // `validar` se ejecuta sólo cuando cambia el certificado o su estado.
@@ -139,7 +227,7 @@ export function VerificacionStep({
   }, [certificadoId, certificadoEstado, emisionResult]);
 
   const handleEmitir = () => {
-    if (!certificadoId || !validacionResult?.valido || isEmitting) return;
+    if (soloLectura || !certificadoId || !validacionResult?.valido || isEmitting) return;
 
     Swal.fire({
       title: '¿Confirmas la emisión del certificado?',
@@ -156,11 +244,11 @@ export function VerificacionStep({
       if (result.isConfirmed) {
         setIsEmitting(true);
         try {
-          const response = await faregasCertificadosApi.emitirCertificado(certificadoId);
+          const response = await ejecutarEmisionCertificado(certificadoId);
           setEmisionResult({
-            numero_certificado: response.data.numero_certificado,
-            fecha_emision: response.data.fecha_emision || new Date().toISOString(),
-            estado: response.data.estado || 'EMITIDO'
+            numero_certificado: response.numero_certificado,
+            fecha_emision: response.fecha_emision || new Date().toISOString(),
+            estado: response.estado || 'EMITIDO'
           });
           await cargarCertificadoFinal();
           Swal.fire(
@@ -210,7 +298,110 @@ export function VerificacionStep({
     return acc;
   }, {});
 
-  if (emisionResult || certificadoEstado === 'EMITIDO') {
+  if (variante === 'compacta') {
+    const erroresCompactos = (validacionResult?.errores || [])
+      .map((error: any) => String(error?.mensaje || ''))
+      .filter(Boolean);
+    const estadoTexto = isValidating
+      ? 'Validando la información del certificado...'
+      : !validacionResult
+        ? 'La validación del certificado aún no está disponible.'
+        : !validacionResult.valido
+          ? 'No se puede emitir: complete los datos pendientes.'
+          : !facturacionOperable
+            ? 'Facturación pendiente: el comprobante todavía no es operable.'
+            : facturacionSimulada
+              ? 'Listo para emitir en modo desarrollo.'
+              : 'Listo para emitir comprobante y certificado.';
+    const estadoClase = isValidating || !validacionResult
+      ? 'border-blue-200 bg-blue-50 text-blue-800'
+      : !validacionResult.valido || !facturacionOperable
+        ? 'border-amber-200 bg-amber-50 text-amber-800'
+        : 'border-green-200 bg-green-50 text-green-800';
+
+    return (
+      <div className="space-y-3 lg:col-span-1">
+        {(resultadoVisible || certificadoEstado === 'EMITIDO') && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-green-800">
+            <div className="flex items-center gap-2 text-xs font-black"><CheckCircle2 className="h-4 w-4" /> CERTIFICADO EMITIDO</div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+              <div><div className="text-[9px] font-bold text-green-700">NÚMERO</div><div className="mt-0.5 font-black text-[#052a79]">{resultadoVisible?.numero_certificado || 'CERTIFICADO EMITIDO'}</div></div>
+              <div><div className="text-[9px] font-bold text-green-700">COMPROBANTE</div><div className="mt-0.5 truncate font-black text-slate-800">{facturacion?.nroComprobante || '-'}</div></div>
+              <div><div className="text-[9px] font-bold text-green-700">ESTADO SUNAT</div><div className="mt-0.5 font-black text-slate-800">{facturacion?.estado || '-'}</div></div>
+              <div><div className="text-[9px] font-bold text-green-700">FECHA</div><div className="mt-0.5 font-semibold text-slate-700">{resultadoVisible?.fecha_emision ? new Date(resultadoVisible.fecha_emision).toLocaleDateString() : '—'}</div></div>
+            </div>
+          </div>
+        )}
+        <div className={`rounded-xl border p-3 ${estadoClase}`}>
+          <div className="flex items-start gap-2">
+            {isValidating || !validacionResult ? <Loader2 className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin" /> : !validacionResult.valido || !facturacionOperable ? <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" /> : <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />}
+            <div className="min-w-0">
+              <div className="text-xs font-black">Estado de preparación</div>
+              <p className="mt-0.5 text-[11px] font-semibold">{estadoTexto}</p>
+              {erroresCompactos.length > 0 && (
+                <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[10px]">
+                  {erroresCompactos.map((error, index) => <li key={`${error}-${index}`}>{error}</li>)}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+            <h4 className="text-xs font-black text-slate-800">Resumen del certificado</h4>
+            {!resultadoVisible && <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] font-black text-amber-800">PENDIENTE DE EMISIÓN</span>}
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px] sm:grid-cols-3">
+            <div><div className="text-[9px] font-bold text-slate-500">TIPO</div><div className="mt-0.5 font-black text-slate-800">{tipoCertificado || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">PLACA</div><div className="mt-0.5 font-black text-[#052a79]">{formCaja.placa || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">CATEGORÍA</div><div className="mt-0.5 font-black text-slate-800">{formCaja.categoria || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">MARCA</div><div className="mt-0.5 truncate font-semibold text-slate-700">{formVehiculo.marca || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">MODELO</div><div className="mt-0.5 truncate font-semibold text-slate-700">{formVehiculo.modelo || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">AÑO</div><div className="mt-0.5 font-semibold text-slate-700">{formVehiculo.anioModelo || formVehiculo.anioFabricacion || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">N° MOTOR</div><div className="mt-0.5 truncate font-semibold text-slate-700">{formVehiculo.numeroMotor || '-'}</div></div>
+            <div className="col-span-2"><div className="text-[9px] font-bold text-slate-500">N° SERIE / VIN</div><div className="mt-0.5 truncate font-semibold text-slate-700">{formVehiculo.vin || formVehiculo.serieChasis || formVehiculo.nroSerie || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">COMBUSTIBLE</div><div className="mt-0.5 truncate font-semibold text-slate-700">{formVehiculo.combustible || '-'}</div></div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="mb-2 border-b border-slate-100 pb-2"><h4 className="text-xs font-black text-slate-800">Facturación</h4></div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
+            <div><div className="text-[9px] font-bold text-slate-500">ESTADO SUNAT</div><div className="mt-0.5 font-black text-slate-800">{facturacionSimulada ? 'SIMULACIÓN' : facturacion?.estado || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">COMPROBANTE</div><div className="mt-0.5 truncate font-black text-slate-800">{facturacion?.nroComprobante || formFacturacion.tipoDocFac || '-'}</div></div>
+            <div><div className="text-[9px] font-bold text-slate-500">DNI / RUC</div><div className="mt-0.5 font-semibold text-slate-700">{formFacturacion.nroDocFac || '-'}</div></div>
+            <div className="col-span-2"><div className="text-[9px] font-bold text-slate-500">CLIENTE</div><div className="mt-0.5 truncate font-semibold text-slate-700">{formFacturacion.razonSocialFac || '-'}</div></div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2">
+            <h4 className="text-xs font-black text-slate-800">Pago registrado</h4>
+            <span className="text-sm font-black text-[#052a79]">S/ {totalPagado.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="font-semibold text-slate-500">Condición</span>
+            <span className="font-black text-slate-800">{formFacturacion.condicionPagoFac === 'CREDITO' ? 'CRÉDITO' : 'CONTADO'}</span>
+          </div>
+          {pagosAgregados.length > 0 && <div className="mt-1 truncate text-[10px] font-semibold text-slate-500">{pagosAgregados.map(pago => `${pago.tipo} S/ ${parseFloat(pago.importe || '0').toFixed(2)}`).join(' · ')}</div>}
+          {pagosAgregados.length === 0 && <div className="mt-1 text-[10px] font-semibold text-amber-700">Sin pagos registrados.</div>}
+        </section>
+
+        <PreviewCertificadoCompacto
+          html={certificadoHtml}
+          loading={isLoadingCertificado}
+          error={certificadoError}
+          frameRef={certificadoFrameRef}
+          onPrint={imprimirCertificado}
+          mostrarImprimir={Boolean(resultadoVisible || certificadoEstado === 'EMITIDO')}
+          emitted={Boolean(resultadoVisible || certificadoEstado === 'EMITIDO')}
+        />
+      </div>
+    );
+  }
+
+  if (resultadoVisible || certificadoEstado === 'EMITIDO') {
     return (
       <div className="space-y-6 animate-in zoom-in duration-500">
         <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-10 text-center shadow-lg">
@@ -228,16 +419,16 @@ export function VerificacionStep({
             <div className="space-y-4 text-left">
               <div>
                 <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Número de Certificado</div>
-                <div className="text-2xl font-black text-[#052a79]">{emisionResult?.numero_certificado || 'CERTIFICADO EMITIDO'}</div>
+                <div className="text-2xl font-black text-[#052a79]">{resultadoVisible?.numero_certificado || 'CERTIFICADO EMITIDO'}</div>
               </div>
               <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-100">
                 <div>
                   <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Estado</div>
-                  <div className="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded inline-block">{emisionResult?.estado || 'EMITIDO'}</div>
+                  <div className="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded inline-block">{resultadoVisible?.estado || 'EMITIDO'}</div>
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-400 capitalize tracking-wider mb-1">Fecha Emisión</div>
-                  <div className="text-sm font-bold text-slate-700">{emisionResult?.fecha_emision ? new Date(emisionResult.fecha_emision).toLocaleDateString() : '—'}</div>
+                  <div className="text-sm font-bold text-slate-700">{resultadoVisible?.fecha_emision ? new Date(resultadoVisible.fecha_emision).toLocaleDateString() : '—'}</div>
                 </div>
               </div>
             </div>
@@ -319,44 +510,48 @@ export function VerificacionStep({
       )}
 
       {/* HEADER DINÁMICO */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-blue-100 p-2.5 rounded-xl">
-            <CheckCircle2 className="w-6 h-6 text-blue-600" />
+      {mostrarEncabezado && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-100 p-2.5 rounded-xl">
+              <CheckCircle2 className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-800">Verificación y Emisión</h3>
+              <p className="text-sm text-slate-500">
+                Revise que todos los datos sean correctos antes de emitir.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-slate-800">Verificación y Emisión</h3>
-            <p className="text-sm text-slate-500">
-              Revise que todos los datos sean correctos antes de emitir.
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {isValidating ? (
-             <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 font-medium">
-               <Loader2 className="w-5 h-5 animate-spin" />
-               Validando información del certificado...
-             </div>
-          ) : validacionResult?.valido ? (
-            <button 
-              onClick={handleEmitir}
-              disabled={isEmitting}
-              className={`${isEmitting ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'} text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 capitalize tracking-wide`}
-            >
-              {isEmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-              {isEmitting ? 'EMITIENDO...' : 'EMITIR CERTIFICADO'}
-            </button>
-          ) : (
-            <button 
-              onClick={validar}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 text-sm"
-            >
-              <AlertCircle className="w-4 h-4" /> Volver a Validar
-            </button>
+
+          {mostrarAcciones && !soloLectura && (
+            <div className="flex items-center gap-3">
+              {isValidating ? (
+                <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200 font-medium">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Validando información del certificado...
+                </div>
+              ) : validacionResult?.valido ? (
+                <button
+                  onClick={handleEmitir}
+                  disabled={isEmitting}
+                  className={`${isEmitting ? 'bg-green-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 shadow-lg'} text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2 capitalize tracking-wide`}
+                >
+                  {isEmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                  {isEmitting ? 'EMITIENDO...' : 'EMITIR CERTIFICADO'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => void validar()}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 text-sm"
+                >
+                  <AlertCircle className="w-4 h-4" /> Volver a Validar
+                </button>
+              )}
+            </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* ERRORES DE VALIDACIÓN */}
       {!isValidating && validacionResult && !validacionResult.valido && (
@@ -397,6 +592,48 @@ export function VerificacionStep({
           </span>
         </div>
       )}
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-[#052a79] px-5 py-4 text-white">
+          <div className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-amber-300" />
+            <div>
+              <h3 className="text-sm font-black">Previsualización del Certificado</h3>
+              <p className="text-xs text-blue-100">El número definitivo se asigna únicamente al emitir.</p>
+            </div>
+          </div>
+          {!resultadoVisible && certificadoEstado !== 'EMITIDO' && (
+            <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-800">
+              PENDIENTE DE EMISIÓN
+            </span>
+          )}
+        </div>
+        {isLoadingCertificado && (
+          <div className="flex min-h-[36vh] items-center justify-center gap-3 bg-slate-100 font-semibold text-slate-600">
+            <Loader2 className="h-6 w-6 animate-spin text-[#052a79]" /> Cargando previsualización...
+          </div>
+        )}
+        {!isLoadingCertificado && certificadoError && (
+          <div className="m-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+            No se pudo cargar la previsualización: {certificadoError}
+          </div>
+        )}
+        {!isLoadingCertificado && certificadoHtml && (
+          <div className="bg-slate-100 p-4">
+            <iframe
+              ref={certificadoFrameRef}
+              srcDoc={certificadoHtml}
+              title="Previsualización del certificado FAREGAS"
+              className="h-[60vh] w-full rounded-xl border border-slate-300 bg-white shadow-inner"
+            />
+          </div>
+        )}
+        {!isLoadingCertificado && !certificadoHtml && !certificadoError && (
+          <div className="p-8 text-center text-sm font-semibold text-slate-600">
+            No hay una previsualización disponible por ahora.
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-80 pointer-events-none">
         
@@ -539,4 +776,4 @@ export function VerificacionStep({
 
     </div>
   );
-}
+});

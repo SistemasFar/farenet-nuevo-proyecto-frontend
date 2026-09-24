@@ -9,11 +9,12 @@ interface Props {
   certificadoId: number;
   facturacion: FacturacionFaregas;
   integracionDisponible: boolean;
+  soloLectura?: boolean;
 }
 
 const mensajeError = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
 
-export function DocumentosElectronicosPanel({ certificadoId, facturacion, integracionDisponible }: Props) {
+export function DocumentosElectronicosPanel({ certificadoId, facturacion, integracionDisponible, soloLectura = false }: Props) {
   const [notas, setNotas] = useState<NotaElectronicaFaregas[]>([]);
   const [anulaciones, setAnulaciones] = useState<AnulacionElectronicaFaregas[]>([]);
   const [cargando, setCargando] = useState(false);
@@ -102,13 +103,13 @@ export function DocumentosElectronicosPanel({ certificadoId, facturacion, integr
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h4 className="font-black text-slate-800">Documentos relacionados</h4><p className="text-sm text-slate-500">Consultas, notas de crédito/débito y anulaciones.</p></div>
         <div className="flex gap-2">
-          <button type="button" disabled={procesando || !integracionDisponible} onClick={consultarComprobante} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-black disabled:opacity-40"><RefreshCw className="h-4 w-4" /> CONSULTAR</button>
-          <button type="button" title={!tienePermisoNC ? 'No tienes permiso para emitir Notas de Crédito' : facturacion.estado === 'ACEPTADO' ? 'Crear una nota vinculada al comprobante aceptado' : 'La nota requiere un comprobante aceptado por SUNAT'} disabled={procesando || !integracionDisponible || facturacion.estado !== 'ACEPTADO' || !tienePermisoNC} onClick={() => { setMostrarNota(!mostrarNota); if (!mostrarNota) setNota(prev => ({ ...prev, importeTotal: String(facturacion.importeTotal) })); }} className="flex items-center gap-2 rounded-lg bg-[#052a79] px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"><FileMinus2 className="h-4 w-4" /> NUEVA NOTA</button>
-          <button type="button" title={facturacion.anulacionEnPlazo && Number(facturacion.anulacionHastaMs) > ahoraMs ? 'Anular dentro de las 24 horas posteriores a la emisión' : 'Plazo vencido: use una nota de crédito'} disabled={procesando || !integracionDisponible || facturacion.estado !== 'ACEPTADO' || facturacion.anulacionEnPlazo !== true || Number(facturacion.anulacionHastaMs) <= ahoraMs} onClick={() => anular('FACTURACION')} className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40"><RotateCcw className="h-4 w-4" /> ANULAR</button>
+          <button type="button" disabled={soloLectura || procesando || !integracionDisponible} onClick={consultarComprobante} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-black disabled:opacity-40"><RefreshCw className="h-4 w-4" /> CONSULTAR</button>
+          <button type="button" title={!tienePermisoNC ? 'No tienes permiso para emitir Notas de Crédito' : facturacion.estado === 'ACEPTADO' ? 'Crear una nota vinculada al comprobante aceptado' : 'La nota requiere un comprobante aceptado por SUNAT'} disabled={soloLectura || procesando || !integracionDisponible || facturacion.estado !== 'ACEPTADO' || !tienePermisoNC} onClick={() => { setMostrarNota(!mostrarNota); if (!mostrarNota) setNota(prev => ({ ...prev, importeTotal: String(facturacion.importeTotal) })); }} className="flex items-center gap-2 rounded-lg bg-[#052a79] px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"><FileMinus2 className="h-4 w-4" /> NUEVA NOTA</button>
+          <button type="button" title={facturacion.anulacionEnPlazo && Number(facturacion.anulacionHastaMs) > ahoraMs ? 'Anular dentro de las 24 horas posteriores a la emisión' : 'Plazo vencido: use una nota de crédito'} disabled={soloLectura || procesando || !integracionDisponible || facturacion.estado !== 'ACEPTADO' || facturacion.anulacionEnPlazo !== true || Number(facturacion.anulacionHastaMs) <= ahoraMs} onClick={() => anular('FACTURACION')} className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40"><RotateCcw className="h-4 w-4" /> ANULAR</button>
         </div>
       </div>
 
-      {mostrarNota && <div className="grid gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 md:grid-cols-4">
+      {!soloLectura && mostrarNota && <div className="grid gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 md:grid-cols-4">
         <label className="text-xs font-bold">TIPO<select value={nota.tipo} onChange={e => setNota(prev => ({ ...prev, tipo: e.target.value as 'CREDITO' | 'DEBITO' }))} className="mt-1 w-full rounded-lg border bg-white p-2"><option value="CREDITO">CRÉDITO</option><option value="DEBITO">DÉBITO</option></select></label>
         <label className="text-xs font-bold">MOTIVO
           <select value={nota.motivoCodigo} onChange={e => {
@@ -127,8 +128,8 @@ export function DocumentosElectronicosPanel({ certificadoId, facturacion, integr
 
       {cargando ? <div className="flex justify-center p-6"><Loader2 className="animate-spin" /></div> : <div className="overflow-x-auto rounded-xl border">
         <table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="p-3">DOCUMENTO</th><th className="p-3">MOTIVO</th><th className="p-3">IMPORTE</th><th className="p-3">ESTADO</th><th className="p-3">ACCIONES</th></tr></thead><tbody>
-          {notas.map(item => <tr key={`${item.tipo}-${item.id}`} className="border-t"><td className="p-3 font-bold">NOTA DE {item.tipo} · {item.nroComprobante}</td><td className="p-3">{item.sustento}</td><td className="p-3">S/ {item.importeTotal.toFixed(2)}</td><td className="p-3 font-bold">{item.estado}</td><td className="p-3"><div className="flex gap-2">{item.enlacePdf && <a href={item.enlacePdf} target="_blank" rel="noreferrer" className="text-blue-700 underline">PDF</a>}{item.estado === 'ACEPTADO' && item.anulacionEnPlazo === true && Number(item.anulacionHastaMs) > ahoraMs && <button type="button" onClick={() => anular(item.tipo, item.id)} className="text-red-600 underline">Anular</button>}</div></td></tr>)}
-          {anulaciones.map(item => <tr key={`A-${item.id}`} className="border-t bg-amber-50"><td className="p-3 font-bold">ANULACIÓN · {item.tipoDocumento}</td><td className="p-3">{item.motivo}</td><td className="p-3">—</td><td className="p-3 font-bold">{item.estado}</td><td className="p-3">{item.estado === 'PENDIENTE' && <button type="button" onClick={() => consultarAnulacion(item.id)} className="text-blue-700 underline">Consultar</button>}</td></tr>)}
+          {notas.map(item => <tr key={`${item.tipo}-${item.id}`} className="border-t"><td className="p-3 font-bold">NOTA DE {item.tipo} · {item.nroComprobante}</td><td className="p-3">{item.sustento}</td><td className="p-3">S/ {item.importeTotal.toFixed(2)}</td><td className="p-3 font-bold">{item.estado}</td><td className="p-3"><div className="flex gap-2">{item.enlacePdf && <a href={item.enlacePdf} target="_blank" rel="noreferrer" className="text-blue-700 underline">PDF</a>}{!soloLectura && item.estado === 'ACEPTADO' && item.anulacionEnPlazo === true && Number(item.anulacionHastaMs) > ahoraMs && <button type="button" onClick={() => anular(item.tipo, item.id)} className="text-red-600 underline">Anular</button>}</div></td></tr>)}
+          {anulaciones.map(item => <tr key={`A-${item.id}`} className="border-t bg-amber-50"><td className="p-3 font-bold">ANULACIÓN · {item.tipoDocumento}</td><td className="p-3">{item.motivo}</td><td className="p-3">—</td><td className="p-3 font-bold">{item.estado}</td><td className="p-3">{!soloLectura && item.estado === 'PENDIENTE' && <button type="button" onClick={() => consultarAnulacion(item.id)} className="text-blue-700 underline">Consultar</button>}</td></tr>)}
           {notas.length === 0 && anulaciones.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-500">Todavía no hay notas ni anulaciones.</td></tr>}
         </tbody></table>
       </div>}

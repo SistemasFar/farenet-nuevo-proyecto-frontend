@@ -83,7 +83,7 @@ export function PrevisualizacionCertificadoStep({ certificadoId }: Previsualizac
           </div>
           <div>
             <h3 className="text-xl font-bold text-slate-800">Previsualización del Certificado</h3>
-            <p className="text-sm text-slate-500">Revise el certificado completo antes de pasar a verificación y emisión.</p>
+            <p className="text-sm text-slate-500">Revise el certificado completo antes de continuar con la facturación y emisión.</p>
           </div>
         </div>
         {error && (
