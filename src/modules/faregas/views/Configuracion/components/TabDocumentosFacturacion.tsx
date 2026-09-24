@@ -103,6 +103,7 @@ export default function TabDocumentosFacturacion() {
   };
 
   const reintentar = async (documento: DocumentoFacturacionAdmin) => {
+    if (!documento.certificadoId) return;
     const confirmacion = await Swal.fire({
       title: '¿Reintentar el comprobante?',
       text: 'Se reutilizarán la misma serie, número y contenido. El backend bloqueará la operación si Nubefact continúa deshabilitado.',
@@ -122,7 +123,7 @@ export default function TabDocumentosFacturacion() {
   };
 
   const consultarAnulacion = async (documento: DocumentoFacturacionAdmin) => {
-    if (!documento.anulacionId) return;
+    if (!documento.anulacionId || !documento.certificadoId) return;
     setProcesandoId(documento.id);
     try {
       await faregasCertificadosApi.consultarAnulacionElectronica(documento.certificadoId, documento.anulacionId);
@@ -168,13 +169,13 @@ export default function TabDocumentosFacturacion() {
               return (
               <tr key={documento.id} className="border-t align-top">
                 <td className="p-3">{fechaLocal(documento.fechaCreacion)}</td>
-                <td className="p-3"><div className="font-bold">{documento.nroComprobante || 'SIN NÚMERO'}</div><div className="text-xs text-slate-500">{documento.tipoComprobante} · Cert. {documento.certificadoId}</div></td>
+                <td className="p-3"><div className="font-bold">{documento.nroComprobante || 'SIN NÚMERO'}</div><div className="text-xs text-slate-500">{documento.tipoComprobante} · {documento.origen === 'VENTA_CHIP' ? `Venta de Chip · Op. ${documento.operacionId}` : documento.origen === 'CERTIFICADO' ? `Cert. ${documento.certificadoId}` : 'Operación'}</div></td>
                 <td className="p-3"><div className="font-semibold">{documento.cliente}</div><div className="text-xs text-slate-500">{documento.nroDocumento} · {documento.placa || 'Sin placa'}</div></td>
                 <td className="p-3"><div>{documento.empresaNombre}</div><div className="text-xs text-slate-500">{documento.plantaNombre}</div></td>
                 <td className="p-3 font-bold">S/ {documento.importeTotal.toFixed(2)}</td>
                 <td className="p-3"><span className={`rounded-full px-2 py-1 text-xs font-bold ${estadoClass(documento.estado)}`}>{documento.estado}</span><div className="mt-1 text-xs text-slate-500">{documento.intentos} intento(s)</div></td>
                 <td className="p-3"><span className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-bold ${anulacion.clase}`}>{anulacion.texto}</span>{documento.fechaSolicitudAnulacion && <div className="mt-1 text-xs text-slate-500">{fechaLocal(documento.fechaSolicitudAnulacion)}</div>}</td>
-                <td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void verDetalle(documento.id)} className="text-blue-700 underline">Detalle</button><button type="button" onClick={() => navigate(`/faregas/certificados/${documento.certificadoId}/continuar`)} className="text-blue-700 underline">Certificado</button>{documento.enlacePdf && <a href={documento.enlacePdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-700 underline">PDF <ExternalLink className="h-3 w-3" /></a>}{anulacionPendiente && <button disabled={procesandoId === documento.id} type="button" onClick={() => void consultarAnulacion(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className={`h-3 w-3 ${procesandoId === documento.id ? 'animate-spin' : ''}`} /> Consultar anulación</button>}{!documento.anulacionId && ['ERROR', 'PENDIENTE'].includes(documento.estado) && <button disabled={procesandoId === documento.id} type="button" onClick={() => void reintentar(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className="h-3 w-3" /> Reintentar</button>}</div></td>
+                <td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void verDetalle(documento.id)} className="text-blue-700 underline">Detalle</button>{documento.certificadoId != null && <button type="button" onClick={() => navigate(`/faregas/certificados/${documento.certificadoId}/continuar`)} className="text-blue-700 underline">Certificado</button>}{documento.enlacePdf && <a href={documento.enlacePdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-700 underline">PDF <ExternalLink className="h-3 w-3" /></a>}{anulacionPendiente && <button disabled={procesandoId === documento.id} type="button" onClick={() => void consultarAnulacion(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className={`h-3 w-3 ${procesandoId === documento.id ? 'animate-spin' : ''}`} /> Consultar anulación</button>}{documento.certificadoId != null && !documento.anulacionId && ['ERROR', 'PENDIENTE'].includes(documento.estado) && <button disabled={procesandoId === documento.id} type="button" onClick={() => void reintentar(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className="h-3 w-3" /> Reintentar</button>}</div></td>
               </tr>
               );
             })}

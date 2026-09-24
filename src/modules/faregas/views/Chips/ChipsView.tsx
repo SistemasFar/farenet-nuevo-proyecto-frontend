@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { DownloadCloud, Info, Cpu, Boxes, FileText, Search } from 'lucide-react';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { faregasChipsApi, type Chip, type ChipResumen, type ProductoInventariable } from '../../services/faregas-chips.api';
-import { faregasProductosApi, type ProductoFacturacion } from '../../services/faregas-productos.api';
+import { faregasChipsApi, type Chip, type ChipResumen, type FiltrosListadoVentasChips, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
 import { ChipScannerInput, parseChipScan } from './ChipScannerInput';
+import { ModalDetalleVentaChips } from './ModalDetalleVentaChips';
 import { ModalVentaChips } from './ModalVentaChips';
 
 const empty: ChipResumen = { total: 0, disponibles: 0, reservados: 0, vendidos: 0, baja: 0, precio: 0, stockPermitido: false, ventaHabilitada: false, mappingFiscalCompleto: false };
@@ -32,14 +32,14 @@ export function ChipsView() {
   const [loading, setLoading] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showVentaModal, setShowVentaModal] = useState(false);
+  const [detalleOperacionId, setDetalleOperacionId] = useState<number | null>(null);
+  const [ventasRefreshToken, setVentasRefreshToken] = useState(0);
 
   // New Product Modal State
   const [newProductCodigo, setNewProductCodigo] = useState('');
   const [newProductName, setNewProductName] = useState('');
   const [newProductTipo, setNewProductTipo] = useState('CHIP_SERIALIZADO');
   const [savingProduct, setSavingProduct] = useState(false);
-  const [newProductProductoFacturacionId, setNewProductProductoFacturacionId] = useState<number | ''>('');
-  const [productosFiscales, setProductosFiscales] = useState<any[]>([]);
   const [newProductSedes, setNewProductSedes] = useState<Record<string, EditableSede>>({});
 
   // Edit Product Modal State
@@ -47,7 +47,6 @@ export function ChipsView() {
   const [editProductCodigo, setEditProductCodigo] = useState('');
   const [editProductName, setEditProductName] = useState('');
   const [editProductTipo, setEditProductTipo] = useState('OTRO_PRODUCTO_FISICO');
-  const [editProductProductoFacturacionId, setEditProductProductoFacturacionId] = useState<number | ''>('');
   const [editProductSedes, setEditProductSedes] = useState<Record<string, EditableSede>>({});
 
   // Selected product in Inventory tab (for scanning/transferring)
@@ -57,18 +56,16 @@ export function ChipsView() {
 
   const cargar = useCallback(async () => {
     try {
-      const [r, l, prods, cat, pf] = await Promise.all([
+      const [r, l, prods, cat] = await Promise.all([
         faregasChipsApi.resumen(selectedProductId === '' ? undefined : Number(selectedProductId)),
         faregasChipsApi.listar({ buscar, estado: filtroEstado === 'TODOS' ? undefined : filtroEstado }),
         faregasChipsApi.listarProductosInventariables(),
-        faregasChipsApi.catalogosProductosInventariables(),
-        faregasProductosApi.listar()
+        faregasChipsApi.catalogosProductosInventariables()
       ]);
       setResumen(r);
       setChips(l.items);
       setProductos(prods);
       setCatalogos(cat);
-      setProductosFiscales(pf.filter((p: any) => p.activo && p.es_para_venta));
       if (selectedProductId === '' && prods.length > 0) {
         const defaultProd = prods.find(p => p.codigo === 'CHIP') || prods[0];
         setSelectedProductId(defaultProd.id);
@@ -101,17 +98,32 @@ export function ChipsView() {
     } catch (error: unknown) { setError(errorMessage(error)); } finally { setLoading(false); }
   };
 
+  const abrirModalCrearProducto = () => {
+    setEditingProductoId(null);
+    setNewProductCodigo('');
+    setNewProductName('');
+    setNewProductTipo('CHIP_SERIALIZADO');
+    setNewProductSedes({});
+    setShowProductModal(true);
+  };
+
   const handleCrearProducto = async () => {
     try {
       setSavingProduct(true);
       if (!newProductCodigo) throw new Error('El código es obligatorio.');
       if (!newProductName) throw new Error('El nombre es obligatorio.');
 
+      const sedeConfig = newProductSedes[plantaKey];
       const payload = {
         codigo: newProductCodigo,
         nombre: newProductName,
         tipo: newProductTipo,
-        sedes: []
+        sedes: sedeConfig && (sedeConfig.precio > 0 || sedeConfig.ventaHabilitada) ? [{
+          plantaKey,
+          precio: sedeConfig.precio,
+          stockPermitido: sedeConfig.stockPermitido,
+          ventaHabilitada: sedeConfig.ventaHabilitada
+        }] : []
       };
 
       await faregasChipsApi.crearProductoInventariable(payload);
@@ -119,6 +131,7 @@ export function ChipsView() {
       setNewProductCodigo('');
       setNewProductName('');
       setNewProductTipo('CHIP_SERIALIZADO');
+      setNewProductSedes({});
       await cargar();
     } catch (error: unknown) {
       alert('Error al guardar el producto: ' + errorMessage(error));
@@ -132,7 +145,6 @@ export function ChipsView() {
     setEditProductCodigo(prod.codigo);
     setEditProductName(prod.nombre);
     setEditProductTipo(prod.tipo);
-    setEditProductProductoFacturacionId(prod.productoFacturacionId || '');
     const sedesConfig: Record<string, EditableSede> = {};
     (prod.sedes || []).forEach(s => {
       sedesConfig[s.plantaKey] = {
@@ -146,6 +158,15 @@ export function ChipsView() {
     setShowProductModal(true);
   };
 
+  const establecerVentaEnTodasLasSedes = (ventaHabilitada: boolean) => {
+    setEditProductSedes(prev => Object.fromEntries(
+      Object.entries(prev).map(([plantaKey, sede]) => [
+        plantaKey,
+        { ...sede, ventaHabilitada }
+      ])
+    ));
+  };
+
   useEffect(() => {
     if (activeTab !== 'PRODUCTOS' || !productoSolicitadoId || productoSolicitadoAtendido) return;
     const prod = productos.find((producto) => producto.id === productoSolicitadoId);
@@ -156,7 +177,6 @@ export function ChipsView() {
       setEditProductCodigo(prod.codigo);
       setEditProductName(prod.nombre);
       setEditProductTipo(prod.tipo);
-      setEditProductProductoFacturacionId(prod.productoFacturacionId || '');
       const sedesConfig: Record<string, EditableSede> = {};
       (prod.sedes || []).forEach((sede) => {
         sedesConfig[sede.plantaKey] = {
@@ -179,7 +199,6 @@ export function ChipsView() {
       const selectedKeys = Object.keys(editProductSedes);
       if (!editProductName) throw new Error('El nombre es obligatorio.');
       const payload = {
-        productoFacturacionId: editProductProductoFacturacionId === '' ? undefined : Number(editProductProductoFacturacionId),
         codigo: editProductCodigo, // included just to satisfy type, backend ignores it
         nombre: editProductName,
         tipo: editProductTipo,
@@ -188,6 +207,7 @@ export function ChipsView() {
           precio: editProductSedes[plantaKey].precio,
           stockPermitido: editProductSedes[plantaKey].stockPermitido,
           ventaHabilitada: editProductSedes[plantaKey].ventaHabilitada,
+          productoFacturacionId: editProductSedes[plantaKey].productoFacturacionId,
         }))
       };
 
@@ -201,7 +221,7 @@ export function ChipsView() {
     }
   };
 
-  const cards = [['Total', resumen.total], ['Disponibles', resumen.disponibles], ['Reservados', resumen.reservados], ['Vendidos', resumen.vendidos], ['Baja', resumen.baja]];
+  const cards = [['Total', resumen.total], ['Disponibles', resumen.disponibles], ['Reservados', resumen.reservados], ['Vendidos', resumen.vendidos]];
   
   return <div className="space-y-5">
     <div>
@@ -219,11 +239,10 @@ export function ChipsView() {
       <div className="flex flex-col justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 sm:flex-row sm:items-center">
         <div>
           <p className="font-bold">Catálogo de tipos de chip</p>
-          <p className="mt-1">Aquí solo se define la identidad física del chip. Los precios, productos fiscales y sedes del certificado se administran en Configuración.</p>
+          <p className="mt-1">Aquí se administra el tipo físico del chip, su precio y disponibilidad de venta por sede. La configuración fiscal se administra en Configuración.</p>
         </div>
-        <button onClick={() => setShowProductModal(true)} className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 font-bold text-white shadow transition hover:bg-blue-700">AGREGAR TIPO DE CHIP</button>
+        <button onClick={abrirModalCrearProducto} className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 font-bold text-white shadow transition hover:bg-blue-700">AGREGAR TIPO DE CHIP</button>
       </div>
-
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {productos.map((prod) => (
           <section key={prod.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -250,7 +269,7 @@ export function ChipsView() {
       </div>
     </div>}
 
-    {activeTab === 'VENTAS' && <TabVentas plantaKey={plantaKey} productos={productos} chipsList={chips} setShowVentaModal={setShowVentaModal} onVentaExitosa={async () => { await cargar(); }} />}
+    {activeTab === 'VENTAS' && <TabVentas setShowVentaModal={setShowVentaModal} onSelectVenta={setDetalleOperacionId} refreshToken={ventasRefreshToken} />}
     {activeTab === 'INVENTARIO' && <>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-4">
@@ -259,15 +278,15 @@ export function ChipsView() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr><th className="p-3">Código</th><th className="p-3">Tipo de chip</th><th className="p-3 text-center">Disponibles</th><th className="p-3 text-center">Reservados</th><th className="p-3 text-center">Vendidos</th><th className="p-3 text-center">Bajas</th><th className="p-3 text-center">Total</th></tr></thead>
-            <tbody>{productos.map((prod) => <tr key={prod.id} onClick={() => setSelectedProductId(prod.id)} className={`cursor-pointer border-t border-slate-100 hover:bg-blue-50 ${Number(selectedProductId) === prod.id ? 'bg-blue-50' : ''}`}><td className="p-3 font-mono font-bold">{prod.codigo}</td><td className="p-3 font-medium">{prod.nombre}</td><td className="p-3 text-center font-bold text-emerald-700">{Number(prod.disponiblesSede || 0)}</td><td className="p-3 text-center font-bold text-amber-700">{Number(prod.reservadosSede || 0)}</td><td className="p-3 text-center">{Number(prod.vendidosSede || 0)}</td><td className="p-3 text-center text-red-700">{Number(prod.bajasSede || 0)}</td><td className="p-3 text-center text-lg font-black text-[#052A79]">{Number(prod.stockSede || 0)}</td></tr>)}</tbody>
+            <thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr><th className="p-3">Código</th><th className="p-3">Tipo de chip</th><th className="p-3 text-center">Disponibles</th><th className="p-3 text-center">Reservados</th><th className="p-3 text-center">Vendidos</th><th className="p-3 text-center">Total</th></tr></thead>
+            <tbody>{productos.map((prod) => <tr key={prod.id} onClick={() => setSelectedProductId(prod.id)} className={`cursor-pointer border-t border-slate-100 hover:bg-blue-50 ${Number(selectedProductId) === prod.id ? 'bg-blue-50' : ''}`}><td className="p-3 font-mono font-bold">{prod.codigo}</td><td className="p-3 font-medium">{prod.nombre}</td><td className="p-3 text-center font-bold text-emerald-700">{Number(prod.disponiblesSede || 0)}</td><td className="p-3 text-center font-bold text-amber-700">{Number(prod.reservadosSede || 0)}</td><td className="p-3 text-center">{Number(prod.vendidosSede || 0)}</td><td className="p-3 text-center text-lg font-black text-[#052A79]">{Number(prod.stockSede || 0)}</td></tr>)}</tbody>
           </table>
         </div>
       </section>
 
       <div>
         <p className="mb-2 text-xs font-bold capitalize text-slate-500">Resumen del tipo seleccionado: {resumen.productoNombre || '-'}</p>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{cards.map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="text-xs font-bold capitalize text-slate-500">{label}</div><div className="mt-1 text-2xl font-black text-[#052A79]">{value}</div></div>)}</div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{cards.map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="text-xs font-bold capitalize text-slate-500">{label}</div><div className="mt-1 text-2xl font-black text-[#052A79]">{value}</div></div>)}</div>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
@@ -307,26 +326,19 @@ export function ChipsView() {
       </div>
     </>}
 
-    {showVentaModal && <ModalVentaChips onClose={() => setShowVentaModal(false)} onVentaExitosa={() => { alert('Venta exitosa'); cargar(); }} chipsConfig={chips} productosConfig={productos} plantaKey={plantaKey} />}
+    {detalleOperacionId !== null && <ModalDetalleVentaChips operacionId={detalleOperacionId} onClose={() => setDetalleOperacionId(null)} />}
+    {showVentaModal && <ModalVentaChips onClose={() => setShowVentaModal(false)} onVentaExitosa={() => { setVentasRefreshToken((value) => value + 1); void cargar(); }} />}
     {(showProductModal || editingProductoId) && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
         <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="text-lg font-bold text-slate-900">{editingProductoId ? 'Editar tipo de chip' : 'Agregar tipo de chip'}</h2><p className="mt-1 text-xs text-slate-500">Solo se registran los datos físicos del tipo de chip.</p></div><button onClick={() => { setShowProductModal(false); setEditingProductoId(null); }} className="text-slate-400 hover:text-slate-600">✕</button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="text-lg font-bold text-slate-900">{editingProductoId ? 'Editar tipo de chip' : 'Agregar tipo de chip'}</h2><p className="mt-1 text-xs text-slate-500">Se administran aquí los datos físicos, el precio y la venta por sede. La configuración fiscal se realiza en Configuración.</p></div><button onClick={() => { setShowProductModal(false); setEditingProductoId(null); }} className="text-slate-400 hover:text-slate-600">✕</button></div>
           <div className="space-y-4 p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Código del tipo</label><input type="text" disabled={!!editingProductoId} value={editingProductoId ? editProductCodigo : newProductCodigo} onChange={(e) => setNewProductCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))} placeholder="Ej. SUPERCHIP" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100" /></div>
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Clasificación</label><select value={editingProductoId ? editProductTipo : newProductTipo} onChange={(e) => editingProductoId ? setEditProductTipo(e.target.value) : setNewProductTipo(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"><option value="CHIP_SERIALIZADO">Chip serializado</option><option value="ACCESORIO">Accesorio</option><option value="OTRO_PRODUCTO_FISICO">Otro producto físico</option></select></div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div>
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Nombre del tipo de chip</label><input type="text" value={editingProductoId ? editProductName : newProductName} onChange={(e) => editingProductoId ? setEditProductName(e.target.value) : setNewProductName(e.target.value)} placeholder="Ej. Superchip GNV" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" /></div>
-              <div>
-                <label className="mb-1 block text-sm font-bold text-slate-700">Producto Fiscal Vinculado</label>
-                <select value={editingProductoId ? editProductProductoFacturacionId : newProductProductoFacturacionId} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : ''; if (editingProductoId) setEditProductProductoFacturacionId(v); else setNewProductProductoFacturacionId(v); }} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                  <option value="">Ninguno (No se podrá vender)</option>
-                  {productosFiscales.map(pf => <option key={pf.id} value={pf.id}>{pf.codigo_sku} - {pf.descripcion}</option>)}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">Debe tener unidad NIU o ZZ e IGV 10.</p>
-              </div>
             </div>
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
               <p className="mb-3 text-sm font-bold text-amber-800">Precio en esta sede ({plantaNombre})</p>
@@ -358,7 +370,7 @@ export function ChipsView() {
                         [plantaKey]: {
                           precio,
                           stockPermitido: prev[plantaKey]?.stockPermitido ?? true,
-                          ventaHabilitada: prev[plantaKey]?.ventaHabilitada ?? true,
+                          ventaHabilitada: prev[plantaKey]?.ventaHabilitada ?? false,
                         }
                       }));
                     }
@@ -367,6 +379,61 @@ export function ChipsView() {
                 />
                 <p className="text-xs text-amber-700">Este precio se usará al calcular el total en la venta de chips.</p>
               </div>
+              <label className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={editingProductoId
+                    ? editProductSedes[plantaKey]?.ventaHabilitada ?? false
+                    : newProductSedes[plantaKey]?.ventaHabilitada ?? false}
+                  onChange={(e) => {
+                    const ventaHabilitada = e.target.checked;
+                    if (editingProductoId) {
+                      setEditProductSedes(prev => {
+                        const sedeActual = prev[plantaKey] || { precio: 0, stockPermitido: true };
+                        return {
+                          ...prev,
+                          [plantaKey]: { ...sedeActual, ventaHabilitada }
+                        };
+                      });
+                    } else {
+                      setNewProductSedes(prev => {
+                        const sedeActual = prev[plantaKey] || { precio: 0, stockPermitido: true };
+                        return {
+                          ...prev,
+                          [plantaKey]: { ...sedeActual, ventaHabilitada }
+                        };
+                      });
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]"
+                />
+                Venta habilitada para {plantaNombre}
+              </label>
+              <p className="mt-1 text-xs text-slate-500">El cambio se aplica solo a {plantaNombre}; las demás sedes conservan su configuración.</p>
+              {editingProductoId && Object.keys(editProductSedes).length > 0 && (
+                <div className="mt-4 rounded-lg border border-blue-200 bg-white p-3">
+                  <p className="text-xs font-bold text-slate-700">
+                    Venta habilitada: {Object.values(editProductSedes).filter((sede) => sede.ventaHabilitada).length} / {Object.keys(editProductSedes).length} sedes
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => establecerVentaEnTodasLasSedes(true)}
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                    >
+                      HABILITAR EN TODAS LAS SEDES
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => establecerVentaEnTodasLasSedes(false)}
+                      className="rounded-lg bg-slate-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700"
+                    >
+                      DESHABILITAR EN TODAS LAS SEDES
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">Solo se modifica ventaHabilitada; los precios y demás datos de cada sede se conservan.</p>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex justify-end gap-3 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-5"><button onClick={() => { setShowProductModal(false); setEditingProductoId(null); }} disabled={savingProduct} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200">Cancelar</button><button onClick={editingProductoId ? handleEditarProducto : handleCrearProducto} disabled={savingProduct || (editingProductoId ? !editProductName : (!newProductName || !newProductCodigo))} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-blue-700 disabled:opacity-50">{savingProduct ? 'Guardando...' : 'Guardar'}</button></div>
@@ -379,37 +446,76 @@ export function ChipsView() {
 
 
 
-function TabVentas({ plantaKey, productos, chipsList, onVentaExitosa, setShowVentaModal }: { plantaKey: string, productos: ProductoInventariable[], chipsList: Chip[], onVentaExitosa: () => void, setShowVentaModal: (v: boolean) => void }) {
-  const [ventas, setVentas] = useState<ChipVenta[]>([]);
+function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShowVentaModal: (v: boolean) => void; onSelectVenta: (operacionId: number) => void; refreshToken: number }) {
+  const [ventas, setVentas] = useState<VentaChipOperacion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [filtrosAplicados, setFiltrosAplicados] = useState<FiltrosListadoVentasChips>({});
+  const [errorFiltros, setErrorFiltros] = useState('');
+
+  const buscar = () => {
+    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
+      setErrorFiltros('La fecha Desde no puede ser posterior a la fecha Hasta.');
+      return;
+    }
+    setErrorFiltros('');
+    setFiltrosAplicados({
+      ...(fechaDesde ? { fechaDesde } : {}),
+      ...(fechaHasta ? { fechaHasta } : {})
+    });
+  };
+
+  const limpiarFiltros = () => {
+    setFechaDesde('');
+    setFechaHasta('');
+    setErrorFiltros('');
+    setFiltrosAplicados({});
+  };
 
   useEffect(() => {
-    cargar();
-  }, []);
-
-  const cargar = async () => {
-    try {
-      setLoading(true);
-      const res = await faregasChipsApi.listarVentas();
-      if (res.success) setVentas(res.ventas);
-    } catch(e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+    let activo = true;
+    const cargar = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const response = await faregasChipsApi.listarVentas(filtrosAplicados);
+        if (activo && response.success) setVentas(response.ventas);
+      } catch (e: unknown) {
+        if (activo) setError(errorMessage(e));
+      } finally {
+        if (activo) setLoading(false);
+      }
+    };
+    void cargar();
+    return () => { activo = false; };
+  }, [refreshToken, filtrosAplicados]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 pb-2">
         <div>
           <h2 className="text-lg font-bold text-slate-800">Operaciones recientes</h2>
-          <p className="text-xs text-slate-500">Listado de chips vendidos</p>
+          <p className="text-xs text-slate-500">Listado canónico de chips vendidos</p>
         </div>
         <button onClick={() => setShowVentaModal(true)} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#041c53]">
           + Vender Chips
         </button>
       </div>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <label className="text-xs font-bold text-slate-600">Desde
+          <input type="date" value={fechaDesde} onChange={(event) => setFechaDesde(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700" />
+        </label>
+        <label className="text-xs font-bold text-slate-600">Hasta
+          <input type="date" value={fechaHasta} onChange={(event) => setFechaHasta(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700" />
+        </label>
+        <button type="button" onClick={buscar} className="rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white hover:bg-[#041c53]">BUSCAR</button>
+        <button type="button" onClick={limpiarFiltros} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">LIMPIAR</button>
+      </div>
+      {errorFiltros && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{errorFiltros}</p>}
+      {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
@@ -431,40 +537,46 @@ function TabVentas({ plantaKey, productos, chipsList, onVentaExitosa, setShowVen
                 <tr><td colSpan={8} className="p-8 text-center text-slate-500">Cargando registros...</td></tr>
               ) : ventas.length === 0 ? (
                 <tr><td colSpan={8} className="p-8 text-center text-slate-500">No se encontraron ventas.</td></tr>
-              ) : (
-                ventas.map((v) => (
-                  <tr key={v.id} className="border-t border-slate-100 hover:bg-slate-50/50 transition">
-                    <td className="px-4 py-3 font-bold text-[#052A79]">VENTA #{v.id}</td>
-                    <td className="px-4 py-3">{new Date(v.creado_en).toLocaleString()}</td>
-                    <td className="px-4 py-3 font-medium">{v.cliente_nro_documento}</td>
-                    <td className="px-4 py-3 font-medium">{v.cliente_nombre}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1 max-w-[150px]">
-                        {v.chips?.map((c, idx) => (
-                          <span key={idx} className="bg-blue-50 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-200">
-                            {c.numero_chip}
-                          </span>
-                        ))}
+              ) : ventas.map((venta) => (
+                <tr key={venta.operacionId} onClick={() => onSelectVenta(venta.operacionId)} className="cursor-pointer border-t border-slate-100 transition hover:bg-blue-50/60">
+                  <td className="px-4 py-3 font-bold text-[#052A79]">OP. #{venta.operacionId}</td>
+                  <td className="px-4 py-3">{new Date(venta.creadoEn).toLocaleString()}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <span className="mr-1 text-[10px] text-slate-400">{venta.tipoDocumentoCliente || ''}</span>
+                    {venta.documentoCliente || '—'}
+                  </td>
+                  <td className="px-4 py-3 font-medium">{venta.nombreCliente || '—'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex max-w-[180px] flex-wrap gap-1">
+                      {venta.chips.map((chip) => (
+                        <span key={chip} className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-800">{chip}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${venta.estadoVenta === 'PAGADO' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : venta.estadoVenta === 'ANULADO' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                      {venta.estadoVenta}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-black text-slate-800">S/ {venta.importeTotal.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-center">
+                    {venta.facturacion ? (
+                      <div className="space-y-1">
+                        <div className="font-bold text-slate-700">{venta.facturacion.nroComprobante || venta.facturacion.estado}</div>
+                        {venta.facturacion.enlacePdf?.trim() ? (
+                          <a href={venta.facturacion.enlacePdf} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex h-7 items-center gap-1 rounded border border-red-200 bg-red-50 px-2 text-[11px] font-bold text-red-600 transition hover:bg-red-100">
+                            <FileText size={12} /> VER COMPROBANTE
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-slate-500">{venta.facturacion.estado}</span>
+                        )}
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                        {v.venta_estado === 'COMPLETADO' ? 'Pagado' : v.venta_estado}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-black text-slate-800">S/ {Number(v.importe_total).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center">
-                      {v.enlace_pdf ? (
-                        <a href={v.enlace_pdf} target="_blank" rel="noreferrer" className="inline-flex h-7 items-center gap-1 rounded bg-red-50 px-2 text-[11px] font-bold text-red-600 transition hover:bg-red-100 border border-red-200">
-                          <FileText size={12} /> {v.nro_comprobante || 'PDF'}
-                        </a>
-                      ) : (
-                        <span className="text-[10px] text-slate-400">Sin doc.</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
+                    ) : (
+                      <span className="text-[10px] text-slate-400">SIN FACTURACIÓN</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

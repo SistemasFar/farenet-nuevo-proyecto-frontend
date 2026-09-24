@@ -14,7 +14,9 @@ const request = async <T>(path: string): Promise<T> => {
 
 export interface DocumentoFacturacionAdmin {
   id: number;
-  certificadoId: number;
+  certificadoId: number | null;
+  operacionId: number | null;
+  origen: 'CERTIFICADO' | 'VENTA_CHIP' | 'OPERACION';
   plantaKey: string;
   plantaNombre: string;
   empresaKey: string;
