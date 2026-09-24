@@ -85,7 +85,7 @@ export function UsuariosView() {
         username: usuario.username,
         perfil_id: usuario.perfil_id,
         estado: usuario.estado,
-        user_type: usuario.user_type || 'USER',
+        user_type: usuario.user_type,
         sedes: usuario.sedes ? usuario.sedes.map((s: any) => s.key) : [],
         password: '',
         confirmPassword: '',
@@ -116,7 +116,6 @@ export function UsuariosView() {
         perfil_id: perfiles.length > 0 ? perfiles[0].clave : '',
         sedes: [],
         estado: true,
-        user_type: 'USER',
         tipoDocumentoKey: '',
         nroDocumento: '',
         nombres: '',
@@ -211,15 +210,19 @@ export function UsuariosView() {
 
     setSaving(true);
     try {
+      const payloadUsuario = { ...formData };
       if (modalMode === 'crear') {
         if (!formData.password) {
           setError('Contraseña requerida');
           setSaving(false);
           return;
         }
-        await faregasUsuariosApi.crearUsuario(formData);
+        // El backend aplica el valor canónico USER cuando no se envía user_type.
+        delete payloadUsuario.user_type;
+        await faregasUsuariosApi.crearUsuario(payloadUsuario);
       } else {
-        await faregasUsuariosApi.actualizarUsuario(selectedUsername, formData);
+        // En edición se conserva el tipo original internamente; solo se oculta el selector.
+        await faregasUsuariosApi.actualizarUsuario(selectedUsername, payloadUsuario);
         if (formData.password) {
           await faregasUsuariosApi.cambiarPassword(formData.username, formData.password);
         }
@@ -541,22 +544,12 @@ export function UsuariosView() {
                             {/* SECCIÓN CUENTA */}
                             <div className="bg-white p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Cuenta</h3>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Username <span className="text-red-500">*</span></label>
                                         <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
                                             minLength={3} pattern="^[a-zA-Z0-9_.-]+$" title="El usuario debe tener al menos 3 caracteres y no contener espacios"
                                             value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} disabled={modalMode === 'editar'} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Tipo de Usuario <span className="text-red-500">*</span></label>
-                                        <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                                            value={formData.user_type} onChange={e => setFormData({ ...formData, user_type: e.target.value })}>
-                                            <option value="USER">Normal (USER)</option>
-                                            <option value="EJECUTIVO">Comercial (EJECUTIVO)</option>
-                                            <option value="FAREGAS">Faregas Histórico</option>
-                                            <option value="LOCAL">Local Histórico</option>
-                                        </select>
                                     </div>
                                 </div>
                             </div>
