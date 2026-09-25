@@ -1,7 +1,10 @@
-import { Edit, Lock, History } from 'lucide-react';
+import { Edit, Lock, History, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import Swal from 'sweetalert2';
 import { faregasCertificadosApi } from '../../../services/faregas-certificados.api';
 import { faregasSeriesApi } from '../../../services/faregas-series.api';
+
+const TAMANO_RANGO = 100;
 
 interface CorrelativoHistorial {
   id: number;
@@ -58,6 +61,7 @@ export default function TabCorrelativos() {
   const [rangoEditando, setRangoEditando] = useState<CorrelativoOperacion | null>(null);
   const [formRango, setFormRango] = useState({ plantaKey: '', tipoCertificadoClave: '', nroInicio: 1, nroMaximo: 100 });
   const [modalSaving, setModalSaving] = useState(false);
+  const [sugerenciaCargando, setSugerenciaCargando] = useState(false);
   const [historialAbierto, setHistorialAbierto] = useState<CorrelativoOperacion | null>(null);
 
   const rangosAgotados = rangos.filter((r) => r.estado === 'AGOTADO');
@@ -107,13 +111,22 @@ export default function TabCorrelativos() {
     return () => { vigente = false; };
   }, [plantaKey, tipo]);
 
+  const rangoUsado = Boolean(
+    rangoEditando && rangoEditando.nroActual != null && rangoEditando.nroInicio != null
+    && rangoEditando.nroActual >= rangoEditando.nroInicio
+  );
+
   const guardarRango = async () => {
+    if (formRango.nroMaximo - formRango.nroInicio + 1 !== TAMANO_RANGO) {
+      await Swal.fire('Rango inválido', `El rango debe tener exactamente ${TAMANO_RANGO} números: final = inicial + ${TAMANO_RANGO - 1}.`, 'warning');
+      return;
+    }
     if (formRango.nroMaximo < formRango.nroInicio) {
-      alert('El número final no puede ser menor al inicial');
+      await Swal.fire('Rango inválido', 'El número final no puede ser menor al inicial.', 'warning');
       return;
     }
     if (!formRango.plantaKey || !formRango.tipoCertificadoClave) {
-      alert('Faltan campos obligatorios');
+      await Swal.fire('Faltan campos obligatorios', 'La sede y el tipo de certificado son obligatorios.', 'warning');
       return;
     }
     try {
@@ -129,10 +142,41 @@ export default function TabCorrelativos() {
       setModal(false);
       setRangoEditando(null);
       void cargarCorrelativos();
+      await Swal.fire('Rango guardado', 'El rango de 100 números quedó activo.', 'success');
     } catch (err: unknown) {
-      alert(mensajeError(err, 'Error al guardar rango'));
+      await Swal.fire('No se pudo guardar', mensajeError(err, 'Error al guardar rango'), 'error');
     } finally {
       setModalSaving(false);
+    }
+  };
+
+  const usarSiguienteRangoDisponible = async () => {
+    try {
+      setSugerenciaCargando(true);
+      const sugerencia = await faregasCertificadosApi.sugerirSiguienteRangoCorrelativo({
+        tipo: formRango.tipoCertificadoClave.split('_')[0] === 'GLP' || formRango.tipoCertificadoClave.split('_')[0] === 'GNV'
+          ? `${formRango.tipoCertificadoClave.split('_')[0]}_ANUAL`
+          : formRango.tipoCertificadoClave,
+        plantaKey: formRango.plantaKey,
+        modalidad: formRango.tipoCertificadoClave.includes('_')
+          ? formRango.tipoCertificadoClave.split('_')[1]
+          : 'UNICA',
+        ignorarRangoId: rangoEditando?.rangoId ?? null
+      });
+      setFormRango({
+        ...formRango,
+        nroInicio: sugerencia.nroInicio,
+        nroMaximo: sugerencia.nroMaximo
+      });
+      await Swal.fire(
+        'Siguiente rango disponible',
+        `${sugerencia.nroInicio} - ${sugerencia.nroMaximo} (${sugerencia.tamano} números libres, sin cruces ni números ya emitidos)`,
+        'info'
+      );
+    } catch (err: unknown) {
+      await Swal.fire('No se pudo sugerir un rango', mensajeError(err, 'Error'), 'error');
+    } finally {
+      setSugerenciaCargando(false);
     }
   };
 
@@ -165,12 +209,25 @@ export default function TabCorrelativos() {
   };
 
   const cerrarRango = async (id: number) => {
-    if (!confirm('¿Deseas cerrar este rango activo de forma manual? Los números restantes se perderán.')) return;
+    const confirmacion = await Swal.fire({
+      title: 'Cerrar rango de correlativos',
+      text: 'El rango queda como histórico y los números restantes no se reutilizarán. Podrás asignar un rango nuevo de 100 números.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'CERRAR RANGO',
+      cancelButtonText: 'CANCELAR',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      reverseButtons: true,
+      focusCancel: true
+    });
+    if (!confirmacion.isConfirmed) return;
     try {
       await faregasCertificadosApi.cerrarRangoCorrelativo(id);
       void cargarCorrelativos();
+      await Swal.fire('Rango cerrado', 'Quedó como histórico y ya no se reutiliza.', 'success');
     } catch (err: unknown) {
-      alert(mensajeError(err, 'Error al cerrar rango'));
+      await Swal.fire('No se pudo cerrar', mensajeError(err, 'Error al cerrar rango'), 'error');
     }
   };
 
@@ -332,17 +389,56 @@ export default function TabCorrelativos() {
                   <label className="mb-1 block text-xs font-bold text-slate-500">Correlativo Inicial</label>
                   <input
                     type="number"
-                    disabled={Boolean(rangoEditando && rangoEditando.nroActual != null && rangoEditando.nroInicio != null && rangoEditando.nroActual >= rangoEditando.nroInicio)}
+                    disabled={rangoUsado}
                     value={formRango.nroInicio}
-                    onChange={e => setFormRango({...formRango, nroInicio: parseInt(e.target.value) || 0})}
+                    onChange={e => {
+                      const nroInicio = parseInt(e.target.value) || 0;
+                      setFormRango({ ...formRango, nroInicio, nroMaximo: nroInicio + TAMANO_RANGO - 1 });
+                    }}
                     className="w-full rounded-lg border-2 border-slate-200 p-2 font-bold text-center text-lg text-[#052A79] focus:border-[#052A79] disabled:bg-slate-100 disabled:text-slate-500"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-bold text-slate-500">Correlativo Final (Máx)</label>
-                  <input type="number" value={formRango.nroMaximo} onChange={e => setFormRango({...formRango, nroMaximo: parseInt(e.target.value) || 0})} className="w-full rounded-lg border-2 border-slate-200 p-2 font-bold text-center text-lg text-[#052A79] focus:border-[#052A79]" />
+                  <input
+                    type="number"
+                    disabled={rangoUsado}
+                    value={formRango.nroMaximo}
+                    onChange={e => setFormRango({ ...formRango, nroMaximo: parseInt(e.target.value) || 0 })}
+                    className="w-full rounded-lg border-2 border-slate-200 p-2 font-bold text-center text-lg text-[#052A79] focus:border-[#052A79] disabled:bg-slate-100 disabled:text-slate-500"
+                  />
                 </div>
               </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500">N° Actual (solo lectura)</label>
+                    <p className="text-2xl font-black text-[#052A79]">
+                      {rangoEditando?.nroActual ?? formRango.nroInicio - 1}
+                    </p>
+                  </div>
+                  <div className="text-right text-xs text-slate-500">
+                    <p>Total: <b>{formRango.nroMaximo - formRango.nroInicio + 1}</b> números</p>
+                    <p className={formRango.nroMaximo - formRango.nroInicio + 1 === TAMANO_RANGO ? 'text-emerald-600' : 'font-bold text-red-600'}>
+                      {formRango.nroMaximo - formRango.nroInicio + 1 === TAMANO_RANGO ? 'Tamaño correcto' : `Debe ser ${TAMANO_RANGO}`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {!rangoUsado && (
+                <button
+                  type="button"
+                  disabled={sugerenciaCargando}
+                  onClick={usarSiguienteRangoDisponible}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#052A79] bg-white px-4 py-2 text-xs font-bold text-[#052A79] hover:bg-blue-50 disabled:opacity-50"
+                >
+                  <Sparkles size={14} />
+                  {sugerenciaCargando ? 'Buscando bloque libre...' : 'USAR SIGUIENTE RANGO DISPONIBLE'}
+                </button>
+              )}
+
               {rangoEditando && (
                 <p className="text-xs text-slate-500">
                   {rangoEditando.nroActual != null && rangoEditando.nroInicio != null && rangoEditando.nroActual >= rangoEditando.nroInicio

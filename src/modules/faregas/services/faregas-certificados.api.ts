@@ -35,6 +35,24 @@ export const faregasCertificadosApi = {
   cerrarRangoCorrelativo: (id: number) => fetchWithToken(`/certificados/correlativos/${id}/cerrar`, {
     method: 'PATCH'
   }),
+  sugerirSiguienteRangoCorrelativo: async (params: {
+    tipo: string;
+    plantaKey: string;
+    modalidad: string;
+    ignorarRangoId?: number | null;
+  }): Promise<{ nroInicio: number; nroMaximo: number; tamano: number }> => {
+    const query = new URLSearchParams({
+      tipo: params.tipo,
+      plantaKey: params.plantaKey,
+      modalidad: params.modalidad
+    });
+    if (params.ignorarRangoId) query.set('ignorarRangoId', String(params.ignorarRangoId));
+    const response = await fetchWithToken(`/certificados/correlativos-plan/siguiente?${query.toString()}`);
+    return response.data;
+  },
+  auditarCorrelativos: async () => fetchWithToken('/certificados/correlativos-plan/auditoria'),
+  obtenerPlanCorrelativos: async () => fetchWithToken('/certificados/correlativos-plan/plan'),
+  normalizarCorrelativos: async () => fetchWithToken('/certificados/correlativos-plan/aplicar', { method: 'POST' }),
   obtenerTipos: () => fetchWithToken('/certificados/tipos'),
   obtenerVehiculo: (placa: string, excludeCertificadoId?: number | null, tipoCertificado?: string) => {
     const params = new URLSearchParams();

@@ -242,6 +242,36 @@ export interface FiltrosListadoVentasChips {
   fechaHasta?: string;
 }
 
+export interface ImpactoTipoChip {
+  ambiente: 'DEMO' | 'PRODUCCION';
+  limpiezaHabilitada: boolean;
+  eliminable: boolean;
+  requiereConfirmacion: boolean;
+  bloqueos: Array<{ motivo: string; detalle: string }>;
+  tipo: { id: number; codigo: string; nombre: string; tipo: string; activo: boolean };
+  configuracionesSede: Array<{ id: number; planta_key: string; precio: number | null }>;
+  chips: Array<{ id: number; numero_chip: string; planta_actual_key: string; estado: string }>;
+  movimientos: Array<{ id: number; chip_id: number; tipo_movimiento: string }>;
+  asignacionesCertificado: Array<{ certificado_id: number; chip_id: number }>;
+  asignacionesOperacion: Array<{ operacion_detalle_id: number; chip_id: number }>;
+  ventas: Array<{ id: number }>;
+  productosFiscalesPreservados: Array<{ id: number; codigo_sku: string; descripcion: string }>;
+  certificadosPreservados: Array<{ id: number }>;
+}
+
+export interface EliminarTipoChipResultado {
+  tipoEliminado: number;
+  codigo: string;
+  nombre: string;
+  chipsEliminados: number;
+  movimientosEliminados: number;
+  asignacionesCertificadoEliminadas: number;
+  asignacionesOperacionEliminadas: number;
+  configuracionesSedeEliminadas: number;
+  certificadosDesvinculados: number;
+  productosFiscalesDesvinculados: number;
+}
+
 export const faregasChipsApi = {
   listarCatalogoChipsFiscales: async () => {
     const res = await faregasFetch('/chips/catalogo-fiscales') as { chips: { id: number; codigo: string; nombre: string; }[] };
@@ -283,5 +313,7 @@ export const faregasChipsApi = {
   listarProductosInventariables: async () => (await faregasFetch('/chips/productos')).productos as ProductoInventariable[],
   catalogosProductosInventariables: async () => (await faregasFetch('/chips/productos/catalogos')) as {sedes:Array<{key:string;nombre:string}>},
   crearProductoInventariable: async (payload:CrearProductoInventariablePayload) => faregasFetch('/chips/productos',{method:'POST',body:JSON.stringify(payload)}),
-  editarProductoInventariable: async (id:number, payload:CrearProductoInventariablePayload) => faregasFetch(`/chips/productos/${id}`,{method:'PUT',body:JSON.stringify(payload)})
+  editarProductoInventariable: async (id:number, payload:CrearProductoInventariablePayload) => faregasFetch(`/chips/productos/${id}`,{method:'PUT',body:JSON.stringify(payload)}),
+  obtenerImpactoTipoChip: async (id:number) => (await faregasFetch(`/chips/productos/${id}/impacto`)).impacto as ImpactoTipoChip,
+  eliminarTipoChip: async (id:number) => (await faregasFetch(`/chips/productos/${id}`,{method:'DELETE'})).resultado as EliminarTipoChipResultado
 };

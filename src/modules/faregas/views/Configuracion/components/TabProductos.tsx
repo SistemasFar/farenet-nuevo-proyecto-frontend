@@ -1,4 +1,5 @@
 import { faregasChipsApi } from '../../../services/faregas-chips.api';
+import Swal from 'sweetalert2';
 import { Edit, Link2, Power, PowerOff, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -9,6 +10,7 @@ import {
 } from '../../../services/faregas-config.api';
 import {
   faregasProductosApi,
+  type ImpactoProductoFiscal,
   type ProductoFacturacion
 } from '../../../services/faregas-productos.api';
 import { exportarExcel } from '../../../utils/exportar-excel';
@@ -25,6 +27,65 @@ const productoVacio = (): Partial<ProductoFacturacion> => ({
 });
 
 const nullableNumber = (value: string) => value === '' ? null : Number(value);
+const escaparHtml = (value: string) => value.replace(/[&<>'"]/g, (caracter) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  "'": '&#39;',
+  '"': '&quot;'
+}[caracter] || caracter));
+
+const listaImpacto = (items: string[], vacio: string) => items.length > 0
+  ? `<ul class="text-left text-xs leading-5">${items.map((item) => `<li>• ${escaparHtml(item)}</li>`).join('')}</ul>`
+  : `<p class="text-left text-xs text-slate-500">${escaparHtml(vacio)}</p>`;
+
+const renderImpactoEliminacion = (impacto: ImpactoProductoFiscal) => {
+  const esConjunto = impacto.requiereConfirmacionConjunto;
+  const operaciones = impacto.operaciones.map((operacion) => {
+    const productos = operacion.productos.map((producto) => `${producto.codigo_sku || 'SIN SKU'} — ${producto.descripcion || 'Sin descripción'}`);
+    const detalles = operacion.detalles.map((detalle) => `#${detalle.id} ${detalle.descripcion_snapshot || detalle.producto_descripcion || 'Detalle'}`).join(' · ');
+    return `#${operacion.id} [${operacion.mixta ? 'MIXTA' : operacion.estado || 'SIN ESTADO'}] · ${productos.join(' | ')} · detalles: ${detalles}`;
+  });
+  const otros = impacto.otrosProductos.map((producto) => `${producto.codigo_sku || 'SIN SKU'} — ${producto.descripcion || 'Sin descripción'}`);
+  const certificados = impacto.certificados.map((certificado) => `#${certificado.id} · ${certificado.numero_certificado || 'sin número'} · ${certificado.estado || 'sin estado'}`);
+  const certificadosAEliminar = impacto.certificadosMixtos
+    .filter((certificado) => impacto.certificadosAEliminar.includes(certificado.id))
+    .map((certificado) => `#${certificado.id} · ${certificado.numero_certificado || 'sin número'} · ${certificado.estado || 'sin estado'}`);
+  const certificadosPreservados = impacto.certificados
+    .filter((certificado) => !impacto.certificadosAEliminar.includes(certificado.id))
+    .map((certificado) => `#${certificado.id} · ${certificado.numero_certificado || 'sin número'} · ${certificado.estado || 'sin estado'}`);
+  const facturas = impacto.facturaciones.map((factura) => `#${factura.id} · ${factura.nro_comprobante || 'sin comprobante'} · ${factura.estado || 'sin estado'}`);
+  const ordenes = impacto.ordenesPago.map((orden) => `#${orden.id} · ${orden.estado || 'sin estado'} · S/ ${Number(orden.importe_total || 0).toFixed(2)}`);
+  const pagos = impacto.pagos.map((pago) => `#${pago.id} · S/ ${Number(pago.importe || 0).toFixed(2)}`);
+  const financieroRelacionado = impacto.financieroRelacionado;
+  const financierosPreservados = financieroRelacionado
+    ? financieroRelacionado.facturaciones.length + financieroRelacionado.ordenesPago.length + financieroRelacionado.pagos.length
+    : 0;
+  const tarifas = impacto.tarifas.map((tarifa) => `#${tarifa.id} · ${tarifa.tarifa_codigo || 'sin código'} · sede ${tarifa.planta_key || '-'}`);
+  const servicios = impacto.servicios.map((servicio) => `#${servicio.id} · ${servicio.nombre || servicio.codigo || 'sin nombre'}${servicio.tiene_otra_tarifa_activa ? ' (compartido)' : ' (exclusivo)'}`);
+  const mappings = [
+    ...impacto.mappings.producto_sede.map((row) => `fg_producto_sede #${(row as { id?: number }).id ?? '?'} · sede ${(row as { planta_key?: string }).planta_key ?? '-'}`),
+    ...impacto.mappings.producto_inventariable.map((row) => `fg_producto_inventariable #${(row as { id?: number }).id ?? '?'} · ${(row as { codigo?: string }).codigo ?? '-'}`),
+    ...impacto.mappings.producto_inventariable_sede.map((row) => `fg_producto_inventariable_sede #${(row as { id?: number }).id ?? '?'} · sede ${(row as { planta_key?: string }).planta_key ?? '-'}`)
+  ];
+
+  return `<div class="space-y-3 text-left">
+    ${esConjunto ? '<p class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">Este producto pertenece a operaciones de prueba que también contienen otros productos. Al continuar se eliminarán esas operaciones mixtas, sus detalles y sus registros financieros relacionados. Los demás productos del catálogo no se eliminarán.</p>' : '<p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Se eliminará el producto y su configuración operativa. Los históricos con snapshot se conservarán.</p>'}
+    <div><p class="mb-1 text-sm font-bold">Operaciones identificadas (${impacto.operaciones.length})</p>${listaImpacto(operaciones, 'Sin operaciones históricas.')}</div>
+    ${esConjunto ? `<div><p class="mb-1 text-sm font-bold">Otros productos que permanecen en catálogo</p>${listaImpacto(otros, 'No se identificaron otros productos.')}</div>` : ''}
+    <div><p class="mb-1 text-sm font-bold">Certificados (${certificados.length})</p>${listaImpacto(certificados, 'Sin certificados relacionados.')}</div>
+    ${esConjunto ? `<div><p class="mb-1 text-sm font-bold text-red-700">Certificados que se eliminarán (${certificadosAEliminar.length})</p>${listaImpacto(certificadosAEliminar, 'No se eliminarán certificados.')}</div>` : ''}
+    ${esConjunto ? `<div><p class="mb-1 text-sm font-bold">Certificados que se conservarán/desvincularán (${certificadosPreservados.length})</p>${listaImpacto(certificadosPreservados, 'No hay certificados a conservar.')}</div>` : ''}
+    <div><p class="mb-1 text-sm font-bold">Facturaciones (${facturas.length})</p>${listaImpacto(facturas, 'Sin facturaciones relacionadas.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Órdenes de pago (${ordenes.length})</p>${listaImpacto(ordenes, 'Sin órdenes de pago relacionadas.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Pagos (${pagos.length})</p>${listaImpacto(pagos, 'Sin pagos relacionados.')}</div>
+    ${financierosPreservados > 0 ? `<p class="text-xs text-slate-500">Registros financieros relacionados que permanecerán preservados: ${financierosPreservados}.</p>` : ''}
+    <div><p class="mb-1 text-sm font-bold">Tarifas (${tarifas.length})</p>${listaImpacto(tarifas, 'Sin tarifas relacionadas.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Mappings (${mappings.length})</p>${listaImpacto(mappings, 'Sin mappings relacionados.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Servicios (${servicios.length})</p>${listaImpacto(servicios, 'Sin servicios relacionados.')}</div>
+    <p class="text-xs text-slate-500">No se modificarán correlativos, series fiscales ni Nubefact.</p>
+  </div>`;
+};
 
 interface Props {
   canViewRelations?: boolean;
@@ -54,6 +115,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   const [mode, setMode] = useState<'CREATE' | 'EDIT'>('CREATE');
   const [actual, setActual] = useState<Partial<ProductoFacturacion>>(productoVacio());
   const [saving, setSaving] = useState(false);
+  const [eliminando, setEliminando] = useState<number | null>(null);
   const [productoGuardado, setProductoGuardado] = useState('');
 
   const cargar = async () => {
@@ -183,6 +245,52 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     }
   };
 
+  const eliminarProducto = async (producto: ProductoFacturacion) => {
+    setEliminando(producto.id);
+    try {
+      // La papelera primero solicita el impacto; esta consulta es read-only.
+      const impacto = await faregasProductosApi.obtenerImpacto(producto.id);
+      const esConjunto = impacto.requiereConfirmacionConjunto;
+      const confirmacion = await Swal.fire({
+        title: esConjunto ? 'ELIMINAR PRODUCTO Y CONJUNTO DE PRUEBA' : 'ELIMINAR PRODUCTO',
+        html: renderImpactoEliminacion(impacto),
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: esConjunto ? 'ELIMINAR TODO EL CONJUNTO DE PRUEBA' : 'ELIMINAR TODO',
+        cancelButtonText: 'CANCELAR',
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#64748b',
+        reverseButtons: true,
+        focusCancel: true,
+        width: '760px'
+      });
+      if (!confirmacion.isConfirmed) return;
+
+      const resultado = await faregasProductosApi.eliminar(producto.id, {
+        confirmarConjunto: esConjunto
+      });
+      await cargar();
+      const conjunto = resultado.conjuntoPrueba;
+      await Swal.fire({
+        title: 'Eliminación completada',
+        text: conjunto
+          ? `Eliminadas ${conjunto.operacionesEliminadas} operación(es) mixta(s), ${conjunto.detallesEliminados} detalle(s) y ${conjunto.certificadosEliminados} certificado(s) de prueba. ${producto.codigo_sku} y su configuración ya no están disponibles.`
+          : `El producto y su configuración asociada ya no están disponibles. Se limpiaron ${resultado.tarifasEliminadas + resultado.tarifasDesvinculadas} tarifa(s) y se desactivaron ${resultado.serviciosDesactivados} servicio(s).`,
+        icon: 'success',
+        confirmButtonText: 'OK'
+      });
+    } catch (err) {
+      await Swal.fire({
+        title: 'No se pudo eliminar',
+        text: err instanceof Error ? err.message : 'Ocurrió un error al eliminar el producto. No se eliminó nada.',
+        icon: 'error',
+        confirmButtonText: 'CERRAR'
+      });
+    } finally {
+      setEliminando(null);
+    }
+  };
+
   return (
     <div>
       <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
@@ -259,15 +367,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
                   <td className="px-3 py-3 text-center">{vinculacion ? <><div className="font-bold text-slate-800">{vinculacion.sedesActivas.length}</div><div className="max-w-40 truncate text-xs text-slate-500" title={vinculacion.sedesActivas.join(', ')}>{vinculacion.sedesActivas.join(', ') || 'Sin tarifa activa'}</div></> : '-'}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-right">{producto.precio_referencia == null ? '-' : `S/ ${producto.precio_referencia.toFixed(2)}`}</td>
                   <td className="px-3 py-3 text-center"><div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${producto.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{producto.activo ? 'ACTIVO' : 'INACTIVO'}</span></div><div className="mt-2 text-xs text-slate-500">{producto.es_para_venta ? 'Para venta' : 'No vendible'}</div></td>
-                  <td className="px-3 py-3 text-center"><div className="flex justify-center gap-2"><button onClick={() => { setMode('EDIT'); setActual(producto); setProductoGuardado(''); setModal(true); }} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-blue-100"><Edit size={18} /></button><button onClick={async () => {
-    if (!confirm(`¿Seguro que deseas eliminar permanentemente el SKU ${producto.codigo_sku}?`)) return;
-    try {
-      await faregasProductosApi.eliminar(producto.id);
-      await cargar();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al eliminar producto');
-    }
-  }} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-red-600 transition-colors hover:bg-red-100"><Trash2 size={18} /></button><button onClick={() => void cambiarEstado(producto)} title={producto.activo ? 'Desactivar' : 'Activar'} className={producto.activo ? 'rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-red-100' : 'rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-green-100'}>{producto.activo ? <PowerOff size={18} /> : <Power size={18} />}</button></div></td>
+                  <td className="px-3 py-3 text-center"><div className="flex justify-center gap-2"><button onClick={() => { setMode('EDIT'); setActual(producto); setProductoGuardado(''); setModal(true); }} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-blue-100"><Edit size={18} /></button><button onClick={() => void eliminarProducto(producto)} disabled={eliminando === producto.id} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-red-600 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"><Trash2 size={18} /></button><button onClick={() => void cambiarEstado(producto)} title={producto.activo ? 'Desactivar' : 'Activar'} className={producto.activo ? 'rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-red-100' : 'rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-green-100'}>{producto.activo ? <PowerOff size={18} /> : <Power size={18} />}</button></div></td>
                 </tr>;
               })}</tbody>
             </table>

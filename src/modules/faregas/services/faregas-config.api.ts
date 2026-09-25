@@ -37,6 +37,21 @@ const api = {
       throw new Error(errorData.message || 'Error PUT ' + path);
     }
     return res.json();
+  },
+  delete: async (path: string, body?: unknown) => {
+    const res = await fetch(`${BASE_URL}${path.replace('/api', '')}`, {
+      method: 'DELETE',
+      headers: {
+        ...getAuthHeaders(),
+        ...(body ? { 'Content-Type': 'application/json' } : {})
+      },
+      ...(body ? { body: JSON.stringify(body) } : {})
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Error DELETE ' + path);
+    }
+    return res.json();
   }
 };
 
@@ -70,6 +85,44 @@ export interface CategoriaServicio {
   descripcion?: string | null;
   activo: boolean;
   orden: number;
+  productos_vinculados?: number;
+  servicios_vinculados?: number;
+}
+
+export interface OperacionBloqueadaCategoria {
+  operacion_id: number;
+  motivo: 'SERVICIO_DE_OTRA_CATEGORIA' | 'PRODUCTO_FISCAL_COMPARTIDO';
+  referencias: number[];
+}
+
+export interface ImpactoCategoria {
+  categoria: { id: number; codigo: string; nombre: string };
+  requiereConfirmacion: boolean;
+  eliminable: boolean;
+  ambiente: 'DEMO' | 'PRODUCCION';
+  limpiezaHabilitada: boolean;
+  facturacionesProtegidas: Array<{ id: number; estado: string | null; nro_comprobante: string | null; serie: string | null; numero: number | null; entorno_facturador: string | null }>;
+  facturacionesBloqueantes: Array<{ id: number; estado: string | null; nro_comprobante: string | null }>;
+  servicios: Array<{ id: number; codigo: string; nombre: string; activo: boolean; formato_id: number | null }>;
+  tarifas: Array<{ id: number; servicio_id: number; planta_key: string; codigo: string; nombre: string; activo: boolean; producto_facturacion_id: number | null }>;
+  reglasConfiguracion: Array<{ id: number; servicio_id: number; planta_key: string; tipo_calculo: string; valor: number }>;
+  operaciones: Array<{ id: number; estado: string | null; total_detalles: number; detalles: Array<{ id: number; servicio_id: number | null; certificado_id: number | null }> }>;
+  operacionesBloqueadas: OperacionBloqueadaCategoria[];
+  detalleProductoSnapshot: number;
+  productosCompartidos: Array<{ id: number; codigo_sku: string; descripcion: string; motivo: string }>;
+  certificados: Array<{ id: number; estado: string | null; numero_certificado: string | null; origen: string; operaciones_externas: number }>;
+  certificadosAEliminar: number[];
+  certificadosPreservados: Array<{ id: number; estado: string | null; numero_certificado: string | null; motivo: string }>;
+  facturaciones: Array<{ id: number; estado: string | null; nro_comprobante: string | null; serie?: string | null; numero?: number | null; entorno_facturador?: string | null; aceptada_sunat?: boolean; intentos?: number }>;
+  intentosFacturacion: Array<{ id: number; facturacion_id: number; numero_intento: number; estado: string | null }>;
+  ordenesPago: Array<{ id: number; estado: string | null }>;
+  pagos: Array<{ id: number; importe: number }>;
+  formatos: Array<{ id: number; codigo: string; nombre: string; es_protegido: boolean; servicios_que_lo_usan: number; certificados: number }>;
+  formatosConservados: number;
+  mappingsPorSede: { tarifas: Array<{ id: number; planta_key: string; servicio_id: number }>; reglas: Array<{ id: number; planta_key: string; servicio_id: number }> };
+  productos: Array<{ id: number; codigo_sku: string; descripcion: string }>;
+  productosPreservados: number[];
+  chips: { reservas: unknown[]; movimientos: unknown[] };
 }
 
 export type TipoFlujoServicioFaregas = 'CERTIFICACION' | 'SERVICIO_COMPLEMENTARIO' | 'TALLER_INSPECCION';
@@ -153,6 +206,25 @@ export const faregasConfigApi = {
 
   editarCategoria: async (id: number, categoria: Partial<CategoriaServicio>): Promise<void> => {
     return api.put(`/api/faregas/config/categorias/${id}`, categoria);
+  },
+
+  obtenerImpactoCategoria: async (id: number): Promise<ImpactoCategoria> => {
+    const response = await api.get(`/api/faregas/config/categorias/${id}/impacto`);
+    return response.impacto;
+  },
+
+  eliminarCategoria: async (id: number, opciones: { confirmarTodo?: boolean } = {}): Promise<{
+    productosDesvinculados: number;
+    serviciosEliminados: number;
+    tarifasEliminadas: number;
+    reglasEliminadas: number;
+    operacionesEliminadas: number;
+    certificadosEliminados: number;
+    facturacionesEliminadas: number;
+    comprobantesLocalesEliminados: number;
+    ambiente: string;
+  }> => {
+    return api.delete(`/api/faregas/config/categorias/${id}`, { confirmarTodo: Boolean(opciones.confirmarTodo) });
   },
 
   cambiarEstadoCategoria: async (id: number, activo: boolean): Promise<void> => {

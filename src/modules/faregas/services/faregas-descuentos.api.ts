@@ -76,6 +76,31 @@ export const autoAplicarDescuentoPlaca = async (certificadoId: number): Promise<
   });
 };
 
+export interface ImpactoDescuento {
+  ambiente: 'DEMO' | 'PRODUCCION';
+  limpiezaHabilitada: boolean;
+  eliminable: boolean;
+  requiereConfirmacion: boolean;
+  bloqueos: Array<{ motivo: string; detalle: string }>;
+  descuento: { id: number; codigo: string; nombre: string; tipo: string; activo: boolean; planta_key: string | null; empresa_aliada_nombre: string | null };
+  codigos: Array<{ id: number; codigo: string; max_usos: number; usos_realizados: number; planta_key: string | null }>;
+  configuraciones: Array<{ id: number; servicio_id: number | null; planta_key: string | null; tipo_calculo: string | null; servicio_codigo?: string | null }>;
+  usos: Array<{ id: number; certificado_id: number | null; facturacion_id: number | null; orden_pago_id: number | null; estado: string | null }>;
+  serviciosPreservados: Array<{ id: number; codigo: string; nombre: string }>;
+  certificadosPreservados: number[];
+}
+
+export interface EliminarDescuentoResultado {
+  id: number;
+  codigo: string;
+  nombre: string;
+  descuentoEliminado: number;
+  codigosEliminados: number;
+  configuracionesEliminadas: number;
+  usosEliminados: number;
+  serviciosPreservados: number;
+}
+
 export const faregasDescuentosAdminApi = {
   listar: (buscar = '', estado = 'TODOS') => faregasFetch(`/descuentos?${new URLSearchParams({ buscar, estado })}`),
   maestros: () => faregasFetch('/descuentos/maestros'),
@@ -87,4 +112,6 @@ export const faregasDescuentosAdminApi = {
   crearCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/codigos`, { method: 'POST', body: JSON.stringify(data) }),
   actualizarCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/codigos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cambiarEstadoCodigo: (id: number, activo: boolean) => faregasFetch(`/descuentos/codigos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
+  obtenerImpacto: async (id: number) => (await faregasFetch(`/descuentos/${id}/impacto`)).impacto as ImpactoDescuento,
+  eliminar: async (id: number) => (await faregasFetch(`/descuentos/${id}`, { method: 'DELETE' })).resultado as EliminarDescuentoResultado,
 };

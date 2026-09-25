@@ -162,9 +162,10 @@ const estadoCertificadoVisible = (item: BorradorPanel) => {
 
 export function InicioView() {
   const navigate = useNavigate();
-  const { plantaKey: plantaSeleccionada, permisos, user } = useOutletContext<MainLayoutContext>();
-  const perfilId = String(user?.perfilId || (user as { perfil_id?: string } | null)?.perfil_id || '').toUpperCase();
-  const tienePermisoNotaCredito = perfilId === 'SISTEMAS' || permisos.includes('FAREGAS_NOTA_CREDITO');
+  const { plantaKey: plantaSeleccionada, permisos } = useOutletContext<MainLayoutContext>();
+  // La visibilidad depende del permiso asignado al perfil, nunca del nombre
+  // del perfil: así el acceso se puede restringir luego desde Configuración.
+  const tienePermisoNotaCredito = permisos.includes('FAREGAS_NOTA_CREDITO');
   const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
   const [ahoraMs, setAhoraMs] = useState(Date.now);
   const [loading, setLoading] = useState(false);

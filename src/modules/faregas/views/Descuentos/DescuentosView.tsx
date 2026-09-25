@@ -1,8 +1,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Edit, Settings, Power, PowerOff, Loader2, MapPin, X } from 'lucide-react';
+import { Edit, Settings, Power, PowerOff, Loader2, MapPin, Trash2, X } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { faregasDescuentosAdminApi, type DescuentoAdmin, type DescuentoFormData, type TipoCampana } from '../../services/faregas-descuentos.api';
+import { faregasDescuentosAdminApi, type DescuentoAdmin, type DescuentoFormData, type ImpactoDescuento, type TipoCampana } from '../../services/faregas-descuentos.api';
 
 type Maestro = { id?: number; key?: string; codigo?: string; nombre: string; categoria?: string };
 type Ejecutivo = { id: number; username?: string; nombre: string };
@@ -23,6 +23,26 @@ const tituloValor = (tipo: TipoCalculo) => tipo === 'FLAT'
     ? `Descuento (%)`
     : `Descuento (S/)`;
 
+const escaparHtml = (value: string) => value.replace(/[&<>'"]/g, (caracter) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+}[caracter] || caracter));
+
+const renderImpactoDescuento = (impacto: ImpactoDescuento) => {
+  const lista = (items: string[], vacio: string) => items.length > 0
+    ? `<ul class="text-left text-xs leading-5">${items.map((item) => `<li>• ${escaparHtml(item)}</li>`).join('')}</ul>`
+    : `<p class="text-left text-xs text-slate-500">${escaparHtml(vacio)}</p>`;
+  const bloqueos = impacto.bloqueos || [];
+  return `<div class="space-y-3 text-left">
+    ${bloqueos.length > 0
+      ? `<p class="rounded-lg border border-red-300 bg-red-100 p-3 text-xs font-bold text-red-900">No se puede eliminar: ${escaparHtml(bloqueos.map((b) => b.detalle).join(' '))}</p>`
+      : `<p class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">ELIMINAR CAMPAÑA / DESCUENTO &mdash; ${escaparHtml(impacto.descuento.nombre)}<br/>También se eliminarán (ambiente ${escaparHtml(impacto.ambiente)}): ${impacto.codigos.length} código(s), ${impacto.configuraciones.length} configuración(es) y ${impacto.usos.length} uso(s) de prueba.</p>`}
+    <div><p class="mb-1 text-sm font-bold">Códigos (${impacto.codigos.length})</p>${lista(impacto.codigos.map((c) => `#${c.id} · ${c.codigo} · ${c.usos_realizados}/${c.max_usos} uso(s)`), 'Sin códigos propios.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Configuraciones de servicios y alcances (${impacto.configuraciones.length})</p>${lista(impacto.configuraciones.map((r) => `#${r.id} · sede ${r.planta_key || 'todas'} · ${r.tipo_calculo || 'sin cálculo'}${r.servicio_codigo ? ` · servicio ${r.servicio_codigo}` : ''}`), 'Sin configuraciones.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Usos de prueba (${impacto.usos.length})</p>${lista(impacto.usos.map((u) => `#${u.id} · certificado ${u.certificado_id ?? '-'} · ${u.estado || 'sin estado'}`), 'Sin usos registrados.')}</div>
+    <p class="text-xs text-slate-500">Los servicios, empresas, certificados, comprobantes, órdenes de pago y operaciones se conservarán. Esta acción no se puede deshacer.</p>
+  </div>`;
+};
+
 export function DescuentosView() {
   const [lista, setLista] = useState<DescuentoAdmin[]>([]);
   const [plantas, setPlantas] = useState<Maestro[]>([]);
@@ -42,6 +62,44 @@ export function DescuentosView() {
   const [codigoTab, setCodigoTab] = useState<'CONFIGURAR' | 'LISTADO'>('CONFIGURAR');
   const [mostrarFormCodigo, setMostrarFormCodigo] = useState(false);
   const [buscarCodigo, setBuscarCodigo] = useState('');
+  const [eliminandoId, setEliminandoId] = useState<number | null>(null);
+
+  const eliminarDescuento = async (d: DescuentoAdmin) => {
+    setEliminandoId(d.id);
+    try {
+      const impacto = await faregasDescuentosAdminApi.obtenerImpacto(d.id);
+      const bloqueos = impacto.bloqueos || [];
+      const confirmacion = await Swal.fire({
+        title: bloqueos.length > 0 ? 'ELIMINACIÓN BLOQUEADA' : 'ELIMINAR CAMPAÑA / DESCUENTO',
+        html: renderImpactoDescuento(impacto),
+        icon: bloqueos.length > 0 ? 'error' : 'warning',
+        showCancelButton: bloqueos.length === 0,
+        showConfirmButton: true,
+        confirmButtonText: bloqueos.length > 0 ? 'ENTENDIDO' : 'ELIMINAR TODO',
+        cancelButtonText: 'CANCELAR',
+        confirmButtonColor: bloqueos.length > 0 ? '#64748b' : '#dc2626',
+        cancelButtonColor: '#64748b',
+        reverseButtons: true,
+        focusCancel: true,
+        width: '42rem'
+      });
+      if (bloqueos.length > 0) return;
+      if (!confirmacion.isConfirmed) return;
+
+      const resultado = await faregasDescuentosAdminApi.eliminar(d.id);
+      if (detalle?.descuento.id === d.id) setDetalle(null);
+      await cargar();
+      const partes = [`La campaña "${resultado.nombre}" fue eliminada.`];
+      if (resultado.codigosEliminados > 0) partes.push(`${resultado.codigosEliminados} código(s) y ${resultado.configuracionesEliminadas} configuración(es) se eliminaron.`);
+      if (resultado.usosEliminados > 0) partes.push(`${resultado.usosEliminados} uso(s) de prueba se eliminaron.`);
+      if (resultado.serviciosPreservados > 0) partes.push(`${resultado.serviciosPreservados} servicio(s) del catálogo se conservaron; sólo se quitó la relación con la campaña.`);
+      await Swal.fire({ title: 'Campaña eliminada', text: partes.join(' '), icon: 'success', confirmButtonText: 'OK' });
+    } catch (error) {
+      await Swal.fire({ title: 'No se pudo eliminar', text: error instanceof Error ? error.message : 'No se eliminó nada.', icon: 'error', confirmButtonText: 'CERRAR' });
+    } finally {
+      setEliminandoId(null);
+    }
+  };
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -240,7 +298,7 @@ export function DescuentosView() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs capitalize text-slate-500"><tr><th className="px-4 py-3">Nombre del descuento</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Empresa</th><th className="px-4 py-3">Vigencia</th><th className="px-4 py-3">Alcance y códigos</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Acciones</th></tr></thead>
-            <tbody className="divide-y divide-gray-100">{loading ? <tr><td colSpan={7} className="p-12 text-center"><Loader2 className="mx-auto animate-spin" /></td></tr> : lista.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-slate-400">No hay campañas o convenios registrados.</td></tr> : lista.map(d => <tr key={d.id} className="hover:bg-gray-50"><td className="px-4 py-3"><b className="text-[#052a79]">{d.nombre}</b></td><td className="px-4 py-3">{d.tipo}</td><td className="px-4 py-3">{d.empresa_aliada_nombre || '-'}</td><td className="px-4 py-3">{fecha(d.fecha_inicio)} – {fecha(d.fecha_fin)}</td><td className="px-4 py-3"><div className="flex flex-col items-start gap-1.5"><button onClick={() => abrirCodigos(d.id)} className={`rounded-md px-2 py-1 font-bold text-xs ${Number(d.total_codigos) > 0 ? 'bg-blue-50 text-[#052a79]' : 'bg-amber-100 text-amber-800'}`}>{Number(d.total_codigos) > 0 ? `${d.total_codigos} códigos` : 'Completar configuración'}</button>{d.nombres_codigos && <div className="flex flex-wrap gap-1 max-w-[150px]">{d.nombres_codigos.split(',').slice(0, 3).map(c => <span key={c} className="bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-600 rounded px-1.5 py-0.5 capitalize">{c}</span>)}{d.nombres_codigos.split(',').length > 3 && <span className="bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-600 rounded px-1.5 py-0.5 capitalize">+{d.nombres_codigos.split(',').length - 3}</span>}</div>}<div className="mt-0.5 text-slate-400 text-[11px] leading-tight">{d.total_servicios} servicios configurados<br/>{d.usos_realizados} usos realizados</div></div></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 font-bold text-xs ${d.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td className="px-4 py-3"><div className="flex items-center gap-2"><button onClick={() => abrirEditar(d.id)} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button><button onClick={() => abrirCodigos(d.id)} title="Configurar" className="rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-purple-100 transition-colors"><Settings size={18} /></button><button onClick={async () => { await faregasDescuentosAdminApi.cambiarEstado(d.id, !d.activo); await cargar(); }} title={d.activo ? 'Desactivar' : 'Activar'} className={d.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-green-100 transition-colors"}>{d.activo ? <PowerOff size={18} /> : <Power size={18} />}</button></div></td></tr>)}</tbody>
+            <tbody className="divide-y divide-gray-100">{loading ? <tr><td colSpan={7} className="p-12 text-center"><Loader2 className="mx-auto animate-spin" /></td></tr> : lista.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-slate-400">No hay campañas o convenios registrados.</td></tr> : lista.map(d => <tr key={d.id} className="hover:bg-gray-50"><td className="px-4 py-3"><b className="text-[#052a79]">{d.nombre}</b></td><td className="px-4 py-3">{d.tipo}</td><td className="px-4 py-3">{d.empresa_aliada_nombre || '-'}</td><td className="px-4 py-3">{fecha(d.fecha_inicio)} – {fecha(d.fecha_fin)}</td><td className="px-4 py-3"><div className="flex flex-col items-start gap-1.5"><button onClick={() => abrirCodigos(d.id)} className={`rounded-md px-2 py-1 font-bold text-xs ${Number(d.total_codigos) > 0 ? 'bg-blue-50 text-[#052a79]' : 'bg-amber-100 text-amber-800'}`}>{Number(d.total_codigos) > 0 ? `${d.total_codigos} códigos` : 'Completar configuración'}</button>{d.nombres_codigos && <div className="flex flex-wrap gap-1 max-w-[150px]">{d.nombres_codigos.split(',').slice(0, 3).map(c => <span key={c} className="bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-600 rounded px-1.5 py-0.5 capitalize">{c}</span>)}{d.nombres_codigos.split(',').length > 3 && <span className="bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-600 rounded px-1.5 py-0.5 capitalize">+{d.nombres_codigos.split(',').length - 3}</span>}</div>}<div className="mt-0.5 text-slate-400 text-[11px] leading-tight">{d.total_servicios} servicios configurados<br/>{d.usos_realizados} usos realizados</div></div></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 font-bold text-xs ${d.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td className="px-4 py-3"><div className="flex items-center gap-2"><button onClick={() => abrirEditar(d.id)} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button><button onClick={() => abrirCodigos(d.id)} title="Configurar" className="rounded-md border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-purple-100 transition-colors"><Settings size={18} /></button><button onClick={async () => { await faregasDescuentosAdminApi.cambiarEstado(d.id, !d.activo); await cargar(); }} title={d.activo ? 'Desactivar' : 'Activar'} className={d.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-green-100 transition-colors"}>{d.activo ? <PowerOff size={18} /> : <Power size={18} />}</button><button onClick={() => void eliminarDescuento(d)} disabled={eliminandoId === d.id} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-red-600 hover:bg-red-100 transition-colors disabled:cursor-wait disabled:opacity-50"><Trash2 size={18} /></button></div></td></tr>)}</tbody>
           </table>
         </div>
       </div>

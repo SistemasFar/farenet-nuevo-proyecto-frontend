@@ -306,10 +306,12 @@ export function Sidebar({
   
   // 🔐 ✨ AQUÍ SE LIBERA EL BLOQUEO ✨ 🔐
   let menuVisible = menuItems.filter((item) => {
-    // Si estamos en Faregas, validamos contra los permisos reales del perfil
+    // Si estamos en Faregas, la visibilidad depende EXCLUSIVAMENTE de los
+    // permisos asignados al perfil del usuario, nunca del nombre del perfil:
+    // cualquier restricción se corrige asignando o quitando el permiso.
     if (isFaregas) {
       if (item.key === 'descuentos') {
-        return permisos.includes('MENU_DESCUENTOS') || perfilId?.toLowerCase() === 'sistemas';
+        return permisos.includes('MENU_DESCUENTOS');
       }
       if (item.key === 'usuarios') {
         return permisos.includes('MENU_USUARIOS');
@@ -324,7 +326,7 @@ export function Sidebar({
         return permisos.includes('MENU_CONFIGURACION');
       }
       if (item.key === 'facturacion') {
-        return permisos.includes('MENU_FACTURACION') || perfilId?.toLowerCase() === 'sistemas';
+        return permisos.includes('MENU_FACTURACION');
       }
       if (item.key === 'chips') {
         return permisos.includes('MENU_CHIPS') || permisos.includes('CHIPS_VER');

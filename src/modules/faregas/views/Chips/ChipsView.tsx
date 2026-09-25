@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
-import { DownloadCloud, Info, Cpu, Boxes, FileText, Search } from 'lucide-react';
+import Swal from 'sweetalert2';
+import { DownloadCloud, Info, Cpu, Boxes, FileText, Search, Trash2 } from 'lucide-react';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { faregasChipsApi, type Chip, type ChipResumen, type FiltrosListadoVentasChips, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
+import { faregasChipsApi, type Chip, type ChipResumen, type FiltrosListadoVentasChips, type ImpactoTipoChip, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
 import { ChipScannerInput, parseChipScan } from './ChipScannerInput';
 import { ModalDetalleVentaChips } from './ModalDetalleVentaChips';
 import { ModalVentaChips } from './ModalVentaChips';
@@ -10,6 +11,28 @@ import { ModalVentaChips } from './ModalVentaChips';
 const empty: ChipResumen = { total: 0, disponibles: 0, reservados: 0, vendidos: 0, baja: 0, precio: 0, stockPermitido: false, ventaHabilitada: false, mappingFiscalCompleto: false };
 type EditableSede = { precio: number; stockPermitido: boolean; ventaHabilitada: boolean; productoFacturacionId?: number };
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
+
+const escaparHtml = (value: string) => value.replace(/[&<>'"]/g, (caracter) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+}[caracter] || caracter));
+
+const renderImpactoTipoChip = (impacto: ImpactoTipoChip) => {
+  const lista = (items: string[], vacio: string) => items.length > 0
+    ? `<ul class="text-left text-xs leading-5">${items.map((item) => `<li>• ${escaparHtml(item)}</li>`).join('')}</ul>`
+    : `<p class="text-left text-xs text-slate-500">${escaparHtml(vacio)}</p>`;
+  const bloqueos = impacto.bloqueos || [];
+  return `<div class="space-y-3 text-left">
+    ${bloqueos.length > 0
+      ? `<p class="rounded-lg border border-red-300 bg-red-100 p-3 text-xs font-bold text-red-900">No se puede eliminar: ${escaparHtml(bloqueos.map((b) => b.detalle).join(' '))}</p>`
+      : `<p class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">ELIMINAR TIPO DE CHIP &mdash; ${escaparHtml(impacto.tipo.nombre)}<br/>También se eliminarán sus datos de prueba relacionados (ambiente ${escaparHtml(impacto.ambiente)}).</p>`}
+    <div><p class="mb-1 text-sm font-bold">Configuraciones por sede (${impacto.configuracionesSede.length})</p>${lista(impacto.configuracionesSede.map((s) => `#${s.id} · sede ${s.planta_key}`), 'Sin configuraciones por sede.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Chips / seriales (${impacto.chips.length})</p>${lista(impacto.chips.map((c) => `#${c.id} · ${c.numero_chip} · ${c.estado}`), 'Sin seriales.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Movimientos (${impacto.movimientos.length})</p>${lista(impacto.movimientos.map((m) => `#${m.id} · chip ${m.chip_id} · ${m.tipo_movimiento}`), 'Sin movimientos.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Asignaciones a certificados (${impacto.asignacionesCertificado.length})</p>${lista(impacto.asignacionesCertificado.map((a) => `certificado ${a.certificado_id} · chip ${a.chip_id}`), 'Sin asignaciones.')}</div>
+    <div><p class="mb-1 text-sm font-bold">Asignaciones a operaciones (${impacto.asignacionesOperacion.length})</p>${lista(impacto.asignacionesOperacion.map((a) => `detalle ${a.operacion_detalle_id} · chip ${a.chip_id}`), 'Sin asignaciones.')}</div>
+    <p class="text-xs text-slate-500">El producto fiscal vinculado, si existe, se conservará. Esta acción no se puede deshacer.</p>
+  </div>`;
+};
 
 export function ChipsView() {
   const { plantaNombre, plantaKey } = useOutletContext<MainLayoutContext>();
@@ -28,7 +51,7 @@ export function ChipsView() {
   const [buscar, setBuscar] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
   const [mensaje, setMensaje] = useState('');
-  const [error, setError] = useState('');
+  const [eliminandoTipoId, setEliminandoTipoId] = useState<number | null>(null);  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showVentaModal, setShowVentaModal] = useState(false);
@@ -221,6 +244,43 @@ export function ChipsView() {
     }
   };
 
+  const handleEliminarTipoChip = async (prod: ProductoInventariable) => {
+    setEliminandoTipoId(prod.id);
+    try {
+      const impacto = await faregasChipsApi.obtenerImpactoTipoChip(prod.id);
+      const bloqueos = impacto.bloqueos || [];
+      const confirmacion = await Swal.fire({
+        title: bloqueos.length > 0 ? 'ELIMINACIÓN BLOQUEADA' : 'ELIMINAR TIPO DE CHIP',
+        html: renderImpactoTipoChip(impacto),
+        icon: bloqueos.length > 0 ? 'error' : 'warning',
+        showCancelButton: bloqueos.length === 0,
+        showConfirmButton: true,
+        confirmButtonText: bloqueos.length > 0 ? 'ENTENDIDO' : 'ELIMINAR TODO',
+        cancelButtonText: 'CANCELAR',
+        confirmButtonColor: bloqueos.length > 0 ? '#64748b' : '#dc2626',
+        cancelButtonColor: '#64748b',
+        reverseButtons: true,
+        focusCancel: true,
+        width: '42rem'
+      });
+      if (bloqueos.length > 0) return;
+      if (!confirmacion.isConfirmed) return;
+
+      const resultado = await faregasChipsApi.eliminarTipoChip(prod.id);
+      if (Number(selectedProductId) === prod.id) setSelectedProductId(null);
+      await cargar();
+      const partes = [`El tipo de chip "${resultado.nombre}" fue eliminado.`];
+      if (resultado.configuracionesSedeEliminadas > 0) partes.push(`${resultado.configuracionesSedeEliminadas} configuración(es) por sede.`);
+      if (resultado.chipsEliminados > 0) partes.push(`${resultado.chipsEliminados} serial(es), ${resultado.movimientosEliminados} movimiento(s) y ${resultado.asignacionesOperacionEliminadas} asignación(es) a operaciones.`);
+      if (resultado.productosFiscalesDesvinculados > 0) partes.push(`${resultado.productosFiscalesDesvinculados} producto(s) fiscal(es) se conservaron y sólo se desvincularon.`);
+      await Swal.fire({ title: 'Tipo de chip eliminado', text: partes.join(' '), icon: 'success', confirmButtonText: 'OK' });
+    } catch (error) {
+      await Swal.fire({ title: 'No se pudo eliminar', text: errorMessage(error), icon: 'error', confirmButtonText: 'CERRAR' });
+    } finally {
+      setEliminandoTipoId(null);
+    }
+  };
+
   const cards = [['Total', resumen.total], ['Disponibles', resumen.disponibles], ['Reservados', resumen.reservados], ['Vendidos', resumen.vendidos]];
   
   return <div className="space-y-5">
@@ -251,7 +311,19 @@ export function ChipsView() {
                 <h2 className="font-bold capitalize text-[#052A79]">{prod.nombre}</h2>
                 <p className="mt-1 font-mono text-xs text-slate-500">{prod.codigo}</p>
               </div>
-              <button className="text-xs font-bold text-blue-600 hover:underline" onClick={() => openEditModal(prod)}>Editar tipo</button>
+              <div className="flex shrink-0 items-center gap-3">
+                <button className="text-xs font-bold text-blue-600 hover:underline" onClick={() => openEditModal(prod)}>Editar tipo</button>
+                <button
+                  type="button"
+                  title="Eliminar"
+                  aria-label={`Eliminar tipo de chip ${prod.nombre}`}
+                  disabled={eliminandoTipoId === prod.id}
+                  onClick={() => void handleEliminarTipoChip(prod)}
+                  className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-red-600 transition hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
             <p className="mt-3 text-xs text-slate-500">Clasificación: <b>{prod.tipo}</b></p>
             {(() => {
@@ -447,6 +519,11 @@ export function ChipsView() {
 
 
 function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShowVentaModal: (v: boolean) => void; onSelectVenta: (operacionId: number) => void; refreshToken: number }) {
+  // El botón se refleja con el permiso real CHIPS_VENDER. Si luego se retira el
+  // permiso del perfil, el botón desaparece sin tocar código. El backend sigue
+  // siendo la autoridad: protege cada ruta con ese mismo permiso.
+  const { permisos } = useOutletContext<MainLayoutContext>();
+  const puedeVender = Array.isArray(permisos) && permisos.includes('CHIPS_VENDER');
   const [ventas, setVentas] = useState<VentaChipOperacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -499,9 +576,11 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
           <h2 className="text-lg font-bold text-slate-800">Operaciones recientes</h2>
           <p className="text-xs text-slate-500">Listado canónico de chips vendidos</p>
         </div>
-        <button onClick={() => setShowVentaModal(true)} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#041c53]">
-          + Vender Chips
-        </button>
+        {puedeVender && (
+          <button onClick={() => setShowVentaModal(true)} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#041c53]">
+            + Vender Chips
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
