@@ -3,6 +3,7 @@ import { CreditCard, PlusCircle, Trash2 } from 'lucide-react';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../../NuevoCertificadoView';
 import type { ResumenComercialFaregas } from '../../../../types/faregas-api';
+import { MensajeError, type ErroresCampo } from '../../faregas-wizard-errores';
 
 type TipoPago = PagoAgregado['tipo'];
 
@@ -22,6 +23,8 @@ interface PagoStepProps {
   condicionPago: 'CONTADO' | 'CREDITO';
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
   compact?: boolean;
+  erroresCampo?: ErroresCampo;
+  onCorregirCampo?: (campo: string) => void;
 }
 
 export function PagoStep({
@@ -41,6 +44,8 @@ export function PagoStep({
   condicionPago,
   onCondicionPagoChange,
   compact = false,
+  erroresCampo = {},
+  onCorregirCampo,
 }: PagoStepProps) {
 
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
@@ -179,7 +184,10 @@ export function PagoStep({
             </div>
           </div>
 
-          <div className={`rounded-2xl border-2 border-slate-200 bg-white ${compact ? 'p-4' : 'p-6'}`}>
+          <div
+            className={`rounded-2xl border-2 bg-white ${erroresCampo.pagos ? 'border-red-500' : 'border-slate-200'} ${compact ? 'p-4' : 'p-6'}`}
+            data-campo-error={erroresCampo.pagos ? true : undefined}
+          >
             <h4 className={`text-sm font-bold text-slate-700 capitalize ${compact ? 'mb-2' : 'mb-4'}`}>Pagos Registrados</h4>
             {pagosAgregados.length === 0 ? (
               <p className="text-slate-400 text-sm italic">No hay pagos registrados.</p>
@@ -193,7 +201,7 @@ export function PagoStep({
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="font-bold text-[#052a79] text-lg">S/ {parseFloat(p.importe).toFixed(2)}</span>
-                      <button onClick={() => eliminarPago(idx)} className="text-red-400 hover:text-red-600 transition">
+                      <button onClick={() => { onCorregirCampo?.('pagos'); eliminarPago(idx); }} className="text-red-400 hover:text-red-600 transition">
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
@@ -201,6 +209,7 @@ export function PagoStep({
                 ))}
               </div>
             )}
+            <MensajeError campo="pagos" errores={erroresCampo} />
           </div>
         </div>
 

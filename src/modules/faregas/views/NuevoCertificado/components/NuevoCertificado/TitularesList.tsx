@@ -3,6 +3,10 @@ import { Search, Plus, Trash2, ReceiptText } from 'lucide-react';
 import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
 import Swal from 'sweetalert2';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
+import { MensajeError, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
+
+/** Clase original de los campos de titular; el error sólo cambia el color. */
+const CLASE_CAMPO = 'w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
 
 export interface TitularState {
   _uuid: string; // for React keys
@@ -21,6 +25,8 @@ interface TitularesListProps {
   formFacturacion: FormFacturacionState;
   setFormFacturacion: React.Dispatch<React.SetStateAction<FormFacturacionState>>;
   onRemoveTitular?: (titular: TitularState) => Promise<void>;
+  erroresCampo?: ErroresCampo;
+  onCorregirCampo?: (campo: string) => void;
 }
 
 export function TitularesList({
@@ -29,7 +35,11 @@ export function TitularesList({
   formFacturacion,
   setFormFacturacion,
   onRemoveTitular,
+  erroresCampo = {},
+  onCorregirCampo,
 }: TitularesListProps) {
+  const errorTitular = (indice: number, campo: string) => erroresCampo[`titular.${indice}.${campo}`];
+  const limpiarTitular = (indice: number, campo: string) => onCorregirCampo?.(`titular.${indice}.${campo}`);
   
   const handleAdd = () => {
     const nextOrden = titulares.length > 0 ? Math.max(...titulares.map(t => t.orden)) + 1 : 1;
@@ -137,6 +147,8 @@ export function TitularesList({
   };
 
   const handleFacturacionChange = (field: keyof FormFacturacionState, value: string | boolean) => {
+    // Corregir un campo de facturación esconde únicamente su propio error.
+    onCorregirCampo?.(String(field));
     setFormFacturacion(prev => {
       if (typeof value === 'boolean') return { ...prev, [field]: value };
 
@@ -204,7 +216,8 @@ export function TitularesList({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DOC.</label>
-              <select value={t.tipoDocumento} onChange={(e) => handleChange(t._uuid, 'tipoDocumento', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors">
+              <select value={t.tipoDocumento} onChange={(e) => { limpiarTitular(index, 'tipoDocumento'); handleChange(t._uuid, 'tipoDocumento', e.target.value); }} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'tipoDocumento')))} data-campo-error={errorTitular(index, 'tipoDocumento') ? true : undefined}>
+              <MensajeError campo={`titular.${index}.$(.campo)`} errores={erroresCampo} />
                 <option value="DNI">DNI</option>
                 <option value="RUC">RUC</option>
                 <option value="CE">CE</option>
@@ -214,7 +227,9 @@ export function TitularesList({
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">NRO. DOCUMENTO</label>
               <div className="flex gap-2">
-                <input value={t.nroDocumento} onChange={(e) => handleChange(t._uuid, 'nroDocumento', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+                <input value={t.nroDocumento} onChange={(e) => { limpiarTitular(index, 'nroDocumento'); handleChange(t._uuid, 'nroDocumento', e.target.value); }} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'nroDocumento')))} data-campo-error={errorTitular(index, 'nroDocumento') ? true : undefined} />
+              <MensajeError campo={`titular.${index}.$(.campo)`} errores={erroresCampo} />
+              <MensajeError campo={`titular.${index}.$(.campo)`} errores={erroresCampo} />
                 <button type="button" onClick={() => handleSearch(t._uuid, t.tipoDocumento, t.nroDocumento)} className="bg-slate-200 hover:bg-slate-300 px-3 rounded-lg transition-colors flex items-center justify-center h-[42px]">
                   <Search className="w-5 h-5 text-slate-600" />
                 </button>
@@ -222,11 +237,15 @@ export function TitularesList({
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-bold text-slate-500 mb-1">NOMBRE / RAZÓN SOCIAL</label>
-              <input value={t.nombreRazonSocial} onChange={(e) => handleChange(t._uuid, 'nombreRazonSocial', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+              <input value={t.nombreRazonSocial} onChange={(e) => { limpiarTitular(index, 'nombreRazonSocial'); handleChange(t._uuid, 'nombreRazonSocial', e.target.value); }} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'nombreRazonSocial')))} data-campo-error={errorTitular(index, 'nombreRazonSocial') ? true : undefined} />
+              <MensajeError campo={`titular.${index}.$(.campo)`} errores={erroresCampo} />
+              <MensajeError campo={`titular.${index}.$(.campo)`} errores={erroresCampo} />
             </div>
             <div className="md:col-span-4">
               <label className="block text-xs font-bold text-slate-500 mb-1">DIRECCIÓN</label>
-              <input value={t.direccion} onChange={(e) => handleChange(t._uuid, 'direccion', e.target.value)} className="w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+              <input value={t.direccion} onChange={(e) => { limpiarTitular(index, 'direccion'); handleChange(t._uuid, 'direccion', e.target.value); }} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'direccion')))} data-campo-error={errorTitular(index, 'direccion') ? true : undefined} />
+              <MensajeError campo={`titular.${index}.$(.campo)`} errores={erroresCampo} />
+              <MensajeError campo={`titular.${index}.$(.campo)`} errores={erroresCampo} />
             </div>
           </div>
         </div>
@@ -273,7 +292,7 @@ export function TitularesList({
               value={formFacturacion.tipoDocFac}
               disabled={formFacturacion.usarTitularPrincipalFac}
               onChange={(event) => handleFacturacionChange('tipoDocFac', event.target.value)}
-              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] disabled:bg-slate-100 disabled:text-slate-500"
+              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] disabled:bg-slate-100 disabled:text-slate-500', Boolean(erroresCampo['tipoDocFac']))} data-campo-error={erroresCampo['tipoDocFac'] ? true : undefined} aria-invalid={erroresCampo['tipoDocFac'] ? true : undefined} aria-describedby={erroresCampo['tipoDocFac'] ? 'error-tipoDocFac' : undefined}
             >
               <option value="">-- SELECCIONAR --</option>
               <option value="BOLETA">BOLETA</option>
@@ -290,7 +309,7 @@ export function TitularesList({
                 onChange={(event) => handleFacturacionChange('nroDocFac', event.target.value)}
                 inputMode="numeric"
                 maxLength={11}
-                className="h-[42px] min-w-0 flex-1 rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
+                className={claseConError('h-[42px] min-w-0 flex-1 rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500', Boolean(erroresCampo['nroDocFac']))} data-campo-error={erroresCampo['nroDocFac'] ? true : undefined} aria-invalid={erroresCampo['nroDocFac'] ? true : undefined} aria-describedby={erroresCampo['nroDocFac'] ? 'error-nroDocFac' : undefined}
               />
               {!formFacturacion.usarTitularPrincipalFac && (
                 <button type="button" onClick={buscarClienteFacturacion} className="flex h-[42px] items-center justify-center rounded-lg bg-slate-200 px-3 transition-colors hover:bg-slate-300" title="Buscar cliente">
@@ -307,7 +326,7 @@ export function TitularesList({
               readOnly={formFacturacion.usarTitularPrincipalFac}
               onChange={(event) => handleFacturacionChange('razonSocialFac', event.target.value)}
               maxLength={100}
-              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold capitalize text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
+              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold capitalize text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500', Boolean(erroresCampo['razonSocialFac']))} data-campo-error={erroresCampo['razonSocialFac'] ? true : undefined} aria-invalid={erroresCampo['razonSocialFac'] ? true : undefined} aria-describedby={erroresCampo['razonSocialFac'] ? 'error-razonSocialFac' : undefined}
             />
           </div>
 
@@ -318,7 +337,7 @@ export function TitularesList({
               readOnly={formFacturacion.usarTitularPrincipalFac}
               onChange={(event) => handleFacturacionChange('direccionFac', event.target.value)}
               maxLength={100}
-              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold capitalize text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500"
+              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold capitalize text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500', Boolean(erroresCampo['direccionFac']))} data-campo-error={erroresCampo['direccionFac'] ? true : undefined} aria-invalid={erroresCampo['direccionFac'] ? true : undefined} aria-describedby={erroresCampo['direccionFac'] ? 'error-direccionFac' : undefined}
             />
           </div>
 
@@ -332,7 +351,7 @@ export function TitularesList({
               aria-required="true"
               value={formFacturacion.emailFac}
               onChange={(event) => handleFacturacionChange('emailFac', event.target.value)}
-              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]"
+              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]', Boolean(erroresCampo['emailFac']))} data-campo-error={erroresCampo['emailFac'] ? true : undefined} aria-invalid={erroresCampo['emailFac'] ? true : undefined} aria-describedby={erroresCampo['emailFac'] ? 'error-emailFac' : undefined}
             />
           </div>
 
@@ -347,7 +366,7 @@ export function TitularesList({
               value={formFacturacion.telefonoFac}
               onChange={(event) => handleFacturacionChange('telefonoFac', event.target.value)}
               maxLength={9}
-              className="h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]"
+              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]', Boolean(erroresCampo['telefonoFac']))} data-campo-error={erroresCampo['telefonoFac'] ? true : undefined} aria-invalid={erroresCampo['telefonoFac'] ? true : undefined} aria-describedby={erroresCampo['telefonoFac'] ? 'error-telefonoFac' : undefined}
             />
           </div>
 

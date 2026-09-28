@@ -307,6 +307,12 @@ interface FacturacionStepProps {
   /** Oculta el botón Nubefact cuando la pantalla se combina con Verificación. */
   mostrarBotonEmision?: boolean;
   mostrarEncabezado?: boolean;
+  /**
+   * En la variante compacta, el cliente ya se muestra en la cabecera resumen de
+   * la pantalla de emisión. Ocultarlo evita mostrarlo dos veces. El botón
+   * EDITAR EN TITULARES se traslada a la cabecera, así que no se pierde.
+   */
+  mostrarCliente?: boolean;
 }
 
 interface ResultadoPreflightFacturacion {
@@ -335,6 +341,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
   variante = 'estandar',
   mostrarBotonEmision = true,
   mostrarEncabezado = true,
+  mostrarCliente = true,
 }, ref) {
   const [isLoading, setIsLoading] = useState(Boolean(certificadoId));
   const [isSaving, setIsSaving] = useState(false);
@@ -532,12 +539,14 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
 
   if (variante === 'compacta') {
     return (
-      <div className="space-y-3 lg:col-span-1">
-        <ClienteComprobanteCompacto
-          formFacturacion={formFacturacion}
-          bloqueado={bloqueado}
-          onEditar={onEditarDatosCliente}
-        />
+      <div className="space-y-3">
+        {mostrarCliente && (
+          <ClienteComprobanteCompacto
+            formFacturacion={formFacturacion}
+            bloqueado={bloqueado}
+            onEditar={onEditarDatosCliente}
+          />
+        )}
         <ResumenTributarioCompacto resumen={resumenTributario} />
         {formFacturacion.condicionPagoFac === 'CREDITO' && (
           <DetalleCreditoCompacto

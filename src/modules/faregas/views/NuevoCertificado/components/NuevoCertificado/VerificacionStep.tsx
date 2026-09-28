@@ -33,6 +33,8 @@ interface VerificacionStepProps {
   variante?: 'estandar' | 'compacta';
   mostrarAcciones?: boolean;
   mostrarEncabezado?: boolean;
+  /** Altura del visor del documento. Sólo presentación. */
+  altoPreview?: string;
 }
 
 interface ValidacionEmisionResult {
@@ -54,6 +56,7 @@ function PreviewCertificadoCompacto({
   onPrint,
   mostrarImprimir,
   emitted,
+  altoPreview = 'h-[44vh] min-h-[320px]',
 }: {
   html: string | null;
   loading: boolean;
@@ -62,9 +65,13 @@ function PreviewCertificadoCompacto({
   onPrint: () => void;
   mostrarImprimir: boolean;
   emitted: boolean;
+  /** Altura del iframe. Sólo presentación: el contenido no cambia. */
+  altoPreview?: string;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
+    // El certificado es el único visor de esta pantalla (la boleta ya no se
+    // incrusta), así que ocupa todo el ancho disponible del contenedor.
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 bg-[#052a79] px-4 py-3 text-white">
         <div className="flex items-center gap-2">
           <Eye className="h-4 w-4 text-amber-300" />
@@ -84,7 +91,7 @@ function PreviewCertificadoCompacto({
       </div>
       {loading && <div className="flex min-h-[260px] items-center justify-center gap-2 bg-slate-100 text-xs font-semibold text-slate-600"><Loader2 className="h-5 w-5 animate-spin text-[#052a79]" /> Cargando documento...</div>}
       {!loading && error && <div className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">No se pudo cargar el documento: {error}</div>}
-      {!loading && html && <div className="bg-slate-100 p-3"><iframe ref={frameRef} srcDoc={html} title={emitted ? 'Certificado FAREGAS emitido' : 'Previsualización del certificado FAREGAS'} className="h-[44vh] min-h-[320px] w-full rounded-lg border border-slate-300 bg-white shadow-inner" /></div>}
+      {!loading && html && <div className="bg-slate-100 p-3"><iframe ref={frameRef} srcDoc={html} title={emitted ? 'Certificado FAREGAS emitido' : 'Previsualización del certificado FAREGAS'} className={`${altoPreview} w-full rounded-lg border border-slate-300 bg-white shadow-inner`} /></div>}
       {!loading && !html && !error && <div className="p-6 text-center text-xs font-semibold text-slate-600">No hay un documento disponible por ahora.</div>}
       {!emitted && !loading && html && <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-bold text-amber-800">PREVISUALIZACIÓN · PENDIENTE DE EMISIÓN</div>}
     </section>
@@ -110,6 +117,7 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
   variante = 'estandar',
   mostrarAcciones = true,
   mostrarEncabezado = true,
+  altoPreview,
 }, ref) {
 
   const totalPagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
@@ -320,14 +328,14 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
         : 'border-green-200 bg-green-50 text-green-800';
 
     return (
-      <div className="space-y-3 lg:col-span-1">
+      <div className="space-y-3">
         {(resultadoVisible || certificadoEstado === 'EMITIDO') && (
           <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-green-800">
             <div className="flex items-center gap-2 text-xs font-black"><CheckCircle2 className="h-4 w-4" /> CERTIFICADO EMITIDO</div>
+            {/* Comprobante y estado SUNAT ya están en la cabecera resumen: aquí
+                sólo lo propio del certificado. */}
             <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
               <div><div className="text-[9px] font-bold text-green-700">NÚMERO</div><div className="mt-0.5 font-black text-[#052a79]">{resultadoVisible?.numero_certificado || 'CERTIFICADO EMITIDO'}</div></div>
-              <div><div className="text-[9px] font-bold text-green-700">COMPROBANTE</div><div className="mt-0.5 truncate font-black text-slate-800">{facturacion?.nroComprobante || '-'}</div></div>
-              <div><div className="text-[9px] font-bold text-green-700">ESTADO SUNAT</div><div className="mt-0.5 font-black text-slate-800">{facturacion?.estado || '-'}</div></div>
               <div><div className="text-[9px] font-bold text-green-700">FECHA</div><div className="mt-0.5 font-semibold text-slate-700">{resultadoVisible?.fecha_emision ? new Date(resultadoVisible.fecha_emision).toLocaleDateString() : '—'}</div></div>
             </div>
           </div>
@@ -365,28 +373,10 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 border-b border-slate-100 pb-2"><h4 className="text-xs font-black text-slate-800">Facturación</h4></div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
-            <div><div className="text-[9px] font-bold text-slate-500">ESTADO SUNAT</div><div className="mt-0.5 font-black text-slate-800">{facturacionSimulada ? 'SIMULACIÓN' : facturacion?.estado || '-'}</div></div>
-            <div><div className="text-[9px] font-bold text-slate-500">COMPROBANTE</div><div className="mt-0.5 truncate font-black text-slate-800">{facturacion?.nroComprobante || formFacturacion.tipoDocFac || '-'}</div></div>
-            <div><div className="text-[9px] font-bold text-slate-500">DNI / RUC</div><div className="mt-0.5 font-semibold text-slate-700">{formFacturacion.nroDocFac || '-'}</div></div>
-            <div className="col-span-2"><div className="text-[9px] font-bold text-slate-500">CLIENTE</div><div className="mt-0.5 truncate font-semibold text-slate-700">{formFacturacion.razonSocialFac || '-'}</div></div>
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2">
-            <h4 className="text-xs font-black text-slate-800">Pago registrado</h4>
-            <span className="text-sm font-black text-[#052a79]">S/ {totalPagado.toFixed(2)}</span>
-          </div>
-          <div className="flex items-center justify-between gap-2 text-[11px]">
-            <span className="font-semibold text-slate-500">Condición</span>
-            <span className="font-black text-slate-800">{formFacturacion.condicionPagoFac === 'CREDITO' ? 'CRÉDITO' : 'CONTADO'}</span>
-          </div>
-          {pagosAgregados.length > 0 && <div className="mt-1 truncate text-[10px] font-semibold text-slate-500">{pagosAgregados.map(pago => `${pago.tipo} S/ ${parseFloat(pago.importe || '0').toFixed(2)}`).join(' · ')}</div>}
-          {pagosAgregados.length === 0 && <div className="mt-1 text-[10px] font-semibold text-amber-700">Sin pagos registrados.</div>}
-        </section>
+        {/* La sección "Facturación" y la de "Pago registrado" se retiraron de la
+            variante compacta: sus datos (comprobante, estado, cliente, total y
+            forma de pago) están ahora en la cabecera resumen de la pantalla,
+            y mostrarlos aquí era mostrarlo dos veces. */}
 
         <PreviewCertificadoCompacto
           html={certificadoHtml}
@@ -396,6 +386,7 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
           onPrint={imprimirCertificado}
           mostrarImprimir={Boolean(resultadoVisible || certificadoEstado === 'EMITIDO')}
           emitted={Boolean(resultadoVisible || certificadoEstado === 'EMITIDO')}
+          altoPreview={altoPreview}
         />
       </div>
     );

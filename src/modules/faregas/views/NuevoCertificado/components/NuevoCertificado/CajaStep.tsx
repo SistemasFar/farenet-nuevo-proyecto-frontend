@@ -10,6 +10,10 @@ import type {
 
 import type { ConsultaDescuentoResult } from '../../../../services/faregas-descuentos.api';
 import { ConsultaDescuento } from './ConsultaDescuento';
+import { MensajeError, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
+
+/** Clase original del campo de placa; el error sólo sustituye el color. */
+const CLASE_CAMPO = 'h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0';
 
 interface CajaStepProps {
   plantaSeleccionada: string;
@@ -22,6 +26,8 @@ interface CajaStepProps {
   onConsultar: () => Promise<void>;
   onInvalidarConsulta: () => void;
   onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
+  erroresCampo?: ErroresCampo;
+  onCorregirCampo?: (campo: string) => void;
 }
 
 const normalizarBusqueda = (valor: string) => valor
@@ -51,7 +57,10 @@ export function CajaStep({
   onConsultar,
   onInvalidarConsulta,
   onDescuentoChange,
+  erroresCampo = {},
+  onCorregirCampo,
 }: CajaStepProps) {
+  const esError = (campo: string) => Boolean(erroresCampo[campo]);
   const [catalogo, setCatalogo] = useState<CatalogoFaregas | null>(null);
   const [categoriaActiva, setCategoriaActiva] = useState('TODOS');
   const [busqueda, setBusqueda] = useState('');
@@ -190,8 +199,9 @@ export function CajaStep({
           <div className="flex flex-col sm:flex-row items-end justify-between gap-4">
             {seleccion.servicio.requiere_vehiculo ? (
               <div className="w-full sm:max-w-xs space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Placa de Rodaje</label>
-                <input type="text" className="h-[42px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-bold uppercase text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => { onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() })); }} maxLength={7} />
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Placa de Rodaje <span className="text-red-500">*</span></label>
+                <input type="text" className={claseConError(CLASE_CAMPO, esError('placa'))} data-campo-error={esError('placa') ? true : undefined} aria-invalid={esError('placa') ? true : undefined} aria-describedby={esError('placa') ? 'error-placa' : undefined} placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => { onCorregirCampo?.('placa'); onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() })); }} maxLength={7} />
+                <MensajeError campo="placa" errores={erroresCampo} />
               </div>
             ) : <div />}
 

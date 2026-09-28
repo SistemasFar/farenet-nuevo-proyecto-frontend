@@ -21,7 +21,8 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { validarDatosFacturacionBasica, validarDatosIniciales, validarExpedienteTecnico, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
+import { validarDatosInicialesCampos, validarPasoExpedienteTecnico, validarPasoPago, validarDatosFacturacionCampos, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
+import { useErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual as indicePaso } from './faregas-emision';
 
@@ -397,6 +398,34 @@ export function NuevoCertificadoView() {
     return true;
   };
 
+  /**
+   * Bloquea el avance de un paso marcando cada campo que falta. El resumen en
+   * Swal se conserva como ayuda, pero la información principal queda en el
+   * propio control: borde rojo y mensaje debajo, y el foco va al primer fallo.
+   */
+  const {
+    errores,
+    registrar: registrarErrores,
+    limpiarCampo: limpiarErrorCampo,
+    limpiarTodo: limpiarErroresPaso,
+    enfocarPrimerError,
+  } = useErroresPaso();
+
+  const bloquearPaso = (erroresCampo: Record<string, string>) => {
+    if (registrarErrores(erroresCampo)) {
+      enfocarPrimerError();
+      Swal.fire({
+        icon: 'warning',
+        title: 'Complete los campos obligatorios',
+        text: 'Los campos marcados en rojo deben corregirse para continuar.',
+        confirmButtonColor: '#052a79',
+      });
+      return true;
+    }
+    limpiarErroresPaso();
+    return false;
+  };
+
 
 
   useEffect(() => {
@@ -506,6 +535,10 @@ export function NuevoCertificadoView() {
                 fechaVigencia: textValue(gnv.vigencia_hasta).slice(0, 10),
                 modalidad: gnv.modalidad || '',
                 numeroChip: gnv.numero_chip || '',
+                observaciones: gnv.observaciones || '',
+                // Características después de la conversión (sólo INICIAL).
+                combustiblePosterior: gnv.combustible_posterior || '',
+                pesoNetoPosterior: gnv.peso_neto_posterior ?? '',
                 verificaciones: (detalle.data?.verificaciones || []).map(mapVerificacionBorrador),
               });
             }
@@ -723,6 +756,13 @@ export function NuevoCertificadoView() {
             ...prev,
             tallerAutorizadoId: gnv.taller_autorizado_id || prev.tallerAutorizadoId,
             fechaVigencia: textValue(gnv.vigencia_hasta).slice(0, 10) || prev.fechaVigencia,
+            // Si el backend devuelve NULL no se pisa lo que el operador ya
+            // escribió en pantalla; sólo se hidrata cuando hay valor guardado.
+            observaciones: gnv.observaciones || prev.observaciones || '',
+            // Igual que observaciones: un NULL del servidor no borra la
+            // pantalla. El peso es numérico en BD, de ahí el ?? ''.
+            combustiblePosterior: gnv.combustible_posterior || prev.combustiblePosterior || '',
+            pesoNetoPosterior: gnv.peso_neto_posterior ?? prev.pesoNetoPosterior ?? '',
             expedienteTecnico: gnv.expediente_tecnico || prev.expedienteTecnico,
             componentes: (gnv.componentes || []).map((componente: any) => ({
               orden: Number(componente.orden),
@@ -796,8 +836,7 @@ export function NuevoCertificadoView() {
   };
 
   const consultarDatosIniciales = async () => {
-    const errores = validarDatosIniciales(formCaja);
-    if (mostrarErroresPaso(errores)) return;
+    if (bloquearPaso(validarDatosInicialesCampos(formCaja))) return;
 
     setIsSavingStep(true);
     setSaveError('');
@@ -965,6 +1004,18 @@ export function NuevoCertificadoView() {
         vigenciaHasta: formGnv.fechaVigencia || formGnv.vigencia_hasta || null,
         modalidad: formCaja.modalidadCertificado || null,
         numeroChip: formGnv.numeroChip || formGnv.numero_chip || null,
+        // Campo opcional del inspector. Viaja al backend para que quede
+        // persistido; el backend es quien lo recorta y guarda como NULL si
+        // viene vacío. Antes no se enviaba y por eso se perdía.
+        observaciones: formGnv.observaciones || null,
+        // Características DESPUÉS de la conversión. Sólo existen y sólo se
+        // envían en modalidad INICIAL: es la única donde el formulario pinta la
+        // tabla "antes / después". En ANUAL no se envían, para no poner en NULL
+        // valores que el inspector ya haya escrito.
+        ...(formCaja.modalidadCertificado === 'INICIAL' ? {
+          combustiblePosterior: formGnv.combustiblePosterior || null,
+          pesoNetoPosterior: formGnv.pesoNetoPosterior || null,
+        } : {}),
       });
       if (formGnv.componentes?.length > 0) {
         await faregasCertificadosApi.guardarComponentesGnv(idBorrador, {
@@ -1090,6 +1141,30 @@ export function NuevoCertificadoView() {
     }
   };
 
+  /**
+   * Única puerta de salida del paso de Vehículo y Datos Técnicos.
+   *
+   * Todo lo que intente entrar a Previsualización pasa por aquí: el botón
+   * SIGUIENTE, la flecha del teclado y cualquier navegación futura. No se
+   * duplica la validación en otro sitio: si cambia la regla, cambia una vez.
+   *
+   * Devuelve true cuando el avance queda bloqueado.
+   */
+  const exigirVehiculoCompleto = (): boolean => {
+    const erroresCampo = validarFormularioVehiculoVisible({
+      tipoCertificado: formCaja.tipoCertificado as TipoCertificadoFaregas,
+      modalidad: formCaja.modalidadCertificado,
+      caja: formCaja,
+      vehiculo: formVehiculo,
+      titulares,
+      gnv: formGnv,
+      glp: formGlp,
+      conformidad: formConformidad,
+      facturacion: formFacturacion,
+    });
+    return bloquearPaso(erroresCampo);
+  };
+
   const irSiguientePaso = async () => {
     if (isSavingStep) return;
     if (currentStepIndex === 0) {
@@ -1097,7 +1172,7 @@ export function NuevoCertificadoView() {
         Swal.fire('Consulta requerida', 'Primero presione Consultar para validar los datos iniciales.', 'info');
         return;
       }
-      if (mostrarErroresPaso(validarDatosIniciales(formCaja))) return;
+      if (bloquearPaso(validarDatosInicialesCampos(formCaja))) return;
       setIsSavingStep(true);
       try {
         let idBorrador = certificadoId;
@@ -1136,7 +1211,14 @@ export function NuevoCertificadoView() {
         setIsSavingStep(false);
       }
     } else if (currentStepIndex < STEPS.length - 1) {
-      if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
+      if (STEPS[currentStepIndex].id === 'vehiculo') {
+        // Antes esta rama exigía `certificadoId` para entrar. Si el borrador no
+        // estaba disponible, la validación se saltaba entera y el paso avanzaba
+        // igual. Ahora la ausencia de borrador bloquea con un aviso claro.
+        if (!certificadoId) {
+          mostrarErroresPaso(['No se encontró el borrador del certificado. Recargue la pantalla para poder continuar.']);
+          return;
+        }
         try {
           const chipResponse = await faregasCertificadosApi.obtenerChipBorrador(certificadoId);
           if (chipResponse.data?.requiereChip && !chipResponse.data?.seleccionado) {
@@ -1147,31 +1229,19 @@ export function NuevoCertificadoView() {
           mostrarErroresPaso([e.message || 'No se pudo validar el chip seleccionado.']);
           return;
         }
-        const erroresExpediente = formCaja.tipo_flujo === 'TALLER_INSPECCION'
-          ? (formatoFormulario
-              ? validarFormularioFormatoDinamico(formatoFormulario.campos, formatoValores)
-              : [formatoFormularioError || 'No se pudo cargar el formulario dinámico del formato.'])
-          : validarExpedienteTecnico({
-              tipoCertificado: formCaja.tipoCertificado as TipoCertificadoFaregas,
-              modalidad: formCaja.modalidadCertificado,
-              caja: formCaja,
-              vehiculo: formVehiculo,
-              titulares,
-              gnv: formGnv,
-              glp: formGlp,
-              conformidad: formConformidad,
-            });
-        const errores = [
-          ...erroresExpediente,
-          ...(formCaja.tipo_flujo !== 'TALLER_INSPECCION'
-            && formVehiculo.anioModelo
-            && formVehiculo.anioFabricacion
-            && Number(formVehiculo.anioModelo) > Number(formVehiculo.anioFabricacion)
-            ? ['El Año Modelo no puede ser mayor que el Año de Fabricación.']
-            : []),
-          ...validarDatosFacturacionBasica(formFacturacion),
-        ];
-        if (mostrarErroresPaso(errores)) return;
+        const esDinamico = formCaja.tipo_flujo === 'TALLER_INSPECCION';
+        if (esDinamico) {
+          // El formulario dinámico define sus propias variables: se conserva el
+          // resumen en Swal porque cada campo se pinta desde el motor de
+          // formatos y no desde un control con nombre fijo.
+          const erroresDinamico = formatoFormulario
+            ? validarFormularioFormatoDinamico(formatoFormulario.campos, formatoValores)
+            : [formatoFormularioError || 'No se pudo cargar el formulario dinámico del formato.'];
+          if (mostrarErroresPaso(erroresDinamico)) return;
+        } else {
+          // Regla única: todo control visible y editable debe estar completo.
+          if (exigirVehiculoCompleto()) return;
+        }
         setIsSavingStep(true);
         try {
           if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
@@ -1191,16 +1261,11 @@ export function NuevoCertificadoView() {
           setIsSavingStep(false);
         }
       } else if (STEPS[currentStepIndex].id === 'pago' && certificadoId) {
-        const totalPagado = pagosAgregados.reduce((total, pago) => total + Number(pago.importe || 0), 0);
-        const esCredito = formFacturacion.condicionPagoFac === 'CREDITO';
-        if (!esCredito && Math.abs(totalPagado - precioTotal) > 0.009) {
-          mostrarErroresPaso([`El pago debe completar S/ ${precioTotal.toFixed(2)}. Saldo pendiente: S/ ${Math.max(0, precioTotal - totalPagado).toFixed(2)}.`]);
-          return;
-        }
-        if (esCredito && totalPagado >= precioTotal - 0.009) {
-          mostrarErroresPaso(['Una venta al crédito debe conservar un saldo pendiente para distribuirlo en cuotas.']);
-          return;
-        }
+        if (bloquearPaso(validarPasoPago({
+          condicionPago: formFacturacion.condicionPagoFac,
+          pagos: pagosAgregados,
+          precioTotal,
+        }))) return;
         setIsSavingStep(true);
         try {
           await guardarPasoPagos(certificadoId);
@@ -1615,6 +1680,8 @@ export function NuevoCertificadoView() {
             certificadoId={certificadoId}
             consultaRealizada={isConsultado}
             consultando={isSavingStep}
+            erroresCampo={errores}
+            onCorregirCampo={limpiarErrorCampo}
             onConsultar={consultarDatosIniciales}
             onInvalidarConsulta={() => {
               setIsConsultado(false);
@@ -1682,7 +1749,12 @@ export function NuevoCertificadoView() {
               maestrosVehiculo={maestrosVehiculo}
               categoriaVehicular={formCaja.categoria}
               categoriasVehiculares={maestros?.categorias || []}
-              onCategoriaVehicularChange={(categoria) => setFormCaja((prev) => ({ ...prev, categoria }))}
+              erroresCampo={errores}
+              onCorregirCampo={limpiarErrorCampo}
+              onCategoriaVehicularChange={(categoria) => {
+                limpiarErrorCampo('categoria');
+                setFormCaja((prev) => ({ ...prev, categoria }));
+              }}
             />
           </>
         )}
@@ -1716,12 +1788,17 @@ export function NuevoCertificadoView() {
             resumenComercial={resumenComercial}
             maestrosPago={maestrosPago}
             condicionPago={formFacturacion.condicionPagoFac}
-            onCondicionPagoChange={(condicionPago) => setFormFacturacion((prev) => ({
-              ...prev,
-              condicionPagoFac: condicionPago,
-              fechaVencimientoFac: condicionPago === 'CONTADO' ? '' : prev.fechaVencimientoFac,
-              cuotasFac: condicionPago === 'CONTADO' ? [] : prev.cuotasFac,
-            }))}
+            erroresCampo={errores}
+            onCorregirCampo={limpiarErrorCampo}
+            onCondicionPagoChange={(condicionPago) => {
+              limpiarErrorCampo('pagos');
+              setFormFacturacion((prev) => ({
+                ...prev,
+                condicionPagoFac: condicionPago,
+                fechaVencimientoFac: condicionPago === 'CONTADO' ? '' : prev.fechaVencimientoFac,
+                cuotasFac: condicionPago === 'CONTADO' ? [] : prev.cuotasFac,
+              }));
+            }}
           />
         )}
         {STEPS[currentStepIndex].id === 'previsualizacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
@@ -1820,9 +1897,12 @@ export function NuevoCertificadoView() {
             <button
               type="button"
               onClick={irSiguientePaso}
-              disabled={isSavingStep || (currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || (formCaja.tipoCertificado !== 'CONFORMIDAD' && !formCaja.modalidadCertificado)))}
+              // El botón no se bloquea por falta de datos: sigue siendo
+              // pulsable para que la validación pueda señalar el campo exacto.
+              // Sólo se deshabilita mientras se guarda.
+              disabled={isSavingStep}
               className={`rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm
-                ${(isSavingStep || (currentStepIndex === 0 && (!formCaja.tipoCertificado || !formCaja.placa || (formCaja.tipoCertificado !== 'CONFORMIDAD' && !formCaja.modalidadCertificado))))
+                ${isSavingStep
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-gold-3d hover:-translate-y-0.5'
                 }`}

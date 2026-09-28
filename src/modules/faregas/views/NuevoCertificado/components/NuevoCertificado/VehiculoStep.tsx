@@ -15,6 +15,14 @@ import {
   formatMes,
   formatAnio
 } from '../../../../utils/vehiculo-formatters';
+import { MensajeError, propsCampo, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
+import { camposObligatoriosVisibles } from '../../faregas-wizard.validation';
+
+/** Clase original de los campos del paso; el error sólo sustituye el color. */
+const CLASE_CAMPO = 'w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
+
+/** Clase original de los campos dentro de la tabla de conversión antes/después. */
+const CLASE_TABLA = 'w-full p-1.5 border-2 border-amber-300 rounded text-slate-800 font-bold focus:border-amber-500 focus:ring-0 text-xs';
 
 interface VehiculoStepProps {
   tipoCertificado: TipoCertificadoFaregas;
@@ -41,6 +49,10 @@ interface VehiculoStepProps {
   categoriaVehicular: string;
   categoriasVehiculares: MaestroOption[];
   onCategoriaVehicularChange: (categoria: string) => void;
+  /** Errores del paso, indexados por el nombre del campo. */
+  erroresCampo?: ErroresCampo;
+  /** Limpia el error de un único campo cuando el usuario lo corrige. */
+  onCorregirCampo?: (campo: string) => void;
 }
 
 export function VehiculoStep({
@@ -67,8 +79,21 @@ export function VehiculoStep({
   maestrosVehiculo,
   categoriaVehicular,
   categoriasVehiculares,
-  onCategoriaVehicularChange
+  onCategoriaVehicularChange,
+  erroresCampo = {},
+  onCorregirCampo
 }: VehiculoStepProps) {
+
+  // El asterisco de cada etiqueta sale del mismo conjunto que usa la
+  // validación, así que lo marcado como obligatorio y lo que se bloquea
+  // nunca se contradicen.
+  const obligatorio = React.useMemo(
+    () => new Set(camposObligatoriosVisibles(tipoCertificado, modalidadCertificado)),
+    [tipoCertificado, modalidadCertificado]
+  );
+  const required = (campo: string) => (obligatorio.has(campo) ? ' *' : '');
+  const esError = (campo: string) => Boolean(erroresCampo[campo]);
+  const limpiar = (campo: string) => onCorregirCampo?.(campo);
   
   // Initialize verificaciones based on catalog
   useEffect(() => {
@@ -118,6 +143,7 @@ export function VehiculoStep({
   const handleVehiculo = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     let finalValue = value.toUpperCase();
+    limpiar(name);
     
     switch (name) {
       case 'vin': finalValue = formatVIN(finalValue); break;
@@ -152,6 +178,7 @@ export function VehiculoStep({
   const handleGlp = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     let finalValue = value.toUpperCase();
+    limpiar(name);
     if (['pesoNetoPosterior', 'cargaUtilPosterior'].includes(name)) {
       finalValue = formatDecimal(finalValue, 6, 2);
     }
@@ -161,6 +188,7 @@ export function VehiculoStep({
   const handleGnv = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     let finalValue = value.toUpperCase();
+    limpiar(name);
     if (name === 'numeroChip') {
       finalValue = formatAlfanumerico(finalValue, 15);
     } else if (name === 'pesoNetoPosterior') {
@@ -172,6 +200,7 @@ export function VehiculoStep({
   const handleConformidad = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     let finalValue = value.toUpperCase();
+    limpiar(`conformidad.${name}`);
     if (name === 'caracteristicaRegistrable') {
        finalValue = formatAlfanumericoConEspacios(finalValue, 300);
     } else if (['motivo', 'usoOriginalVehiculo'].includes(name)) {
@@ -245,90 +274,108 @@ export function VehiculoStep({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">MARCA</label>
-            <input name="marca" value={formVehiculo.marca || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">MARCA{required('marca') && <span className="text-red-500">*</span>}</label>
+            <input name="marca" value={formVehiculo.marca || ''} onChange={handleVehiculo} {...propsCampo('marca', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="marca" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">MODELO</label>
-            <input name="modelo" value={formVehiculo.modelo || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">MODELO{required('modelo') && <span className="text-red-500">*</span>}</label>
+            <input name="modelo" value={formVehiculo.modelo || ''} onChange={handleVehiculo} {...propsCampo('modelo', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="modelo" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">VERSIÓN</label>
-            <input name="version" value={formVehiculo.version || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">VERSIÓN{required('version') && <span className="text-red-500">*</span>}</label>
+            <input name="version" value={formVehiculo.version || ''} onChange={handleVehiculo} {...propsCampo('version', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="version" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">AÑO FABRICACIÓN</label>
-            <input name="anioFabricacion" value={formVehiculo.anioFabricacion || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">AÑO FABRICACIÓN{required('anioFabricacion') && <span className="text-red-500">*</span>}</label>
+            <input name="anioFabricacion" value={formVehiculo.anioFabricacion || ''} onChange={handleVehiculo} {...propsCampo('anioFabricacion', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="anioFabricacion" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">AÑO MODELO</label>
-            <input name="anioModelo" value={formVehiculo.anioModelo || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">AÑO MODELO{required('anioModelo') && <span className="text-red-500">*</span>}</label>
+            <input name="anioModelo" value={formVehiculo.anioModelo || ''} onChange={handleVehiculo} {...propsCampo('anioModelo', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="anioModelo" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">VIN</label>
-            <input name="vin" value={formVehiculo.vin || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">VIN{required('vin') && <span className="text-red-500">*</span>}</label>
+            <input name="vin" value={formVehiculo.vin || ''} onChange={handleVehiculo} {...propsCampo('vin', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="vin" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">SERIE CHASIS</label>
-            <input name="serieChasis" value={formVehiculo.serieChasis || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">SERIE CHASIS{required('serieChasis') && <span className="text-red-500">*</span>}</label>
+            <input name="serieChasis" value={formVehiculo.serieChasis || ''} onChange={handleVehiculo} {...propsCampo('serieChasis', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="serieChasis" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">N° MOTOR</label>
-            <input name="numeroMotor" value={formVehiculo.numeroMotor || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">N° MOTOR{required('numeroMotor') && <span className="text-red-500">*</span>}</label>
+            <input name="numeroMotor" value={formVehiculo.numeroMotor || ''} onChange={handleVehiculo} {...propsCampo('numeroMotor', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="numeroMotor" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">COMBUSTIBLE</label>
-            <input name="combustible" value={formVehiculo.combustible || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">COMBUSTIBLE{required('combustible') && <span className="text-red-500">*</span>}</label>
+            <input name="combustible" value={formVehiculo.combustible || ''} onChange={handleVehiculo} {...propsCampo('combustible', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="combustible" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">COLOR</label>
-            <input name="color" value={formVehiculo.color || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">COLOR{required('color') && <span className="text-red-500">*</span>}</label>
+            <input name="color" value={formVehiculo.color || ''} onChange={handleVehiculo} {...propsCampo('color', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="color" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">CLASE VEHICULAR</label>
-            <input name="clase" value={formVehiculo.clase || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">CLASE VEHICULAR{required('clase') && <span className="text-red-500">*</span>}</label>
+            <input name="clase" value={formVehiculo.clase || ''} onChange={handleVehiculo} {...propsCampo('clase', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="clase" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">CATEGORÍA</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">CATEGORÍA{required('categoria') && <span className="text-red-500">*</span>}</label>
             <select
               value={categoriaVehicular || ''}
               onChange={(event) => onCategoriaVehicularChange(event.target.value)}
-              className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 transition-colors"
+              className={claseConError(CLASE_CAMPO, esError('categoria'))}
+              data-campo-error={esError('categoria') ? true : undefined}
+              aria-invalid={esError('categoria') ? true : undefined}
+              aria-describedby={esError('categoria') ? 'error-categoria' : undefined}
             >
               <option value="">-- SELECCIONAR --</option>
               {categoriasVehiculares.map((categoria) => (
                 <option key={categoria.key} value={categoria.key}>{categoria.nombre}</option>
               ))}
             </select>
+            <MensajeError campo="categoria" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">CARROCERÍA</label>
-            <input name="carroceria" value={formVehiculo.carroceria || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">CARROCERÍA{required('carroceria') && <span className="text-red-500">*</span>}</label>
+            <input name="carroceria" value={formVehiculo.carroceria || ''} onChange={handleVehiculo} {...propsCampo('carroceria', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="carroceria" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">NÚMERO CILINDROS</label>
-            <input name="numeroCilindros" value={formVehiculo.numeroCilindros || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">NÚMERO CILINDROS{required('numeroCilindros') && <span className="text-red-500">*</span>}</label>
+            <input name="numeroCilindros" value={formVehiculo.numeroCilindros || ''} onChange={handleVehiculo} {...propsCampo('numeroCilindros', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="numeroCilindros" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">CILINDRADA</label>
-            <input name="cilindrada" value={formVehiculo.cilindrada || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">CILINDRADA{required('cilindrada') && <span className="text-red-500">*</span>}</label>
+            <input name="cilindrada" value={formVehiculo.cilindrada || ''} onChange={handleVehiculo} {...propsCampo('cilindrada', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="cilindrada" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">EJES / RUEDAS</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">EJES / RUEDAS *</label>
             <div className="flex gap-2">
                 <input name="numeroEjes" value={formVehiculo.numeroEjes || ''} onChange={handleVehiculo} className="w-1/2 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Ejes" />
                 <input name="numeroRuedas" value={formVehiculo.numeroRuedas || ''} onChange={handleVehiculo} className="w-1/2 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Ruedas" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">ASIENTOS / PASAJEROS</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">ASIENTOS / PASAJEROS *</label>
             <div className="flex gap-2">
                 <input name="numeroAsientos" value={formVehiculo.numeroAsientos || ''} onChange={handleVehiculo} className="w-1/2 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Asientos" />
                 <input name="numeroPasajeros" value={formVehiculo.numeroPasajeros || ''} onChange={handleVehiculo} className="w-1/2 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Pasajeros" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">PESO NETO / BRUTO / UTIL</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">PESO NETO / BRUTO / UTIL *</label>
             <div className="flex gap-2">
               <input name="pesoNeto" value={formVehiculo.pesoNeto || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Neto" />
               <input name="pesoBruto" value={formVehiculo.pesoBruto || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Bruto" />
@@ -336,11 +383,12 @@ export function VehiculoStep({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">POTENCIA</label>
-            <input name="potencia" value={formVehiculo.potencia || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">POTENCIA{required('potencia') && <span className="text-red-500">*</span>}</label>
+            <input name="potencia" value={formVehiculo.potencia || ''} onChange={handleVehiculo} {...propsCampo('potencia', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="potencia" errores={erroresCampo} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">LARGO / ANCHO / ALTO (M)</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">LARGO / ANCHO / ALTO (M) *</label>
             <div className="flex gap-2">
               <input name="longitud" value={formVehiculo.longitud || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Largo" />
               <input name="ancho" value={formVehiculo.ancho || ''} onChange={handleVehiculo} className="w-1/3 p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Ancho" />
@@ -348,8 +396,9 @@ export function VehiculoStep({
             </div>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">FÓRMULA RODANTE</label>
-            <input name="formulaRodante" value={formVehiculo.formulaRodante || ''} onChange={handleVehiculo} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+            <label className="block text-xs font-bold text-slate-500 mb-1">FÓRMULA RODANTE{required('formulaRodante') && <span className="text-red-500">*</span>}</label>
+            <input name="formulaRodante" value={formVehiculo.formulaRodante || ''} onChange={handleVehiculo} {...propsCampo('formulaRodante', erroresCampo, CLASE_CAMPO)} />
+            <MensajeError campo="formulaRodante" errores={erroresCampo} />
           </div>
         </div>
         {vehiculoOrigen === 'FARENET' && (
@@ -366,6 +415,8 @@ export function VehiculoStep({
           formFacturacion={formFacturacion}
           setFormFacturacion={setFormFacturacion}
           onRemoveTitular={onRemoveTitular}
+          erroresCampo={erroresCampo}
+          onCorregirCampo={onCorregirCampo}
         />
       </div>
 
@@ -393,7 +444,8 @@ export function VehiculoStep({
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO <span className="text-red-500">*</span></label>
-                <select name="tallerAutorizadoId" value={formGlp.tallerAutorizadoId || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors">
+                <select name="tallerAutorizadoId" value={formGlp.tallerAutorizadoId || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.tallerAutorizadoId'))} data-campo-error={esError('glp.tallerAutorizadoId') ? true : undefined}>
+            <MensajeError campo="glp.tallerAutorizadoId" errores={erroresCampo} />
                   <option value="">-- SELECCIONAR --</option>
                   {talleres?.map(t => (
                     <option key={t.id} value={t.id}>{t.nombre}</option>
@@ -402,13 +454,15 @@ export function VehiculoStep({
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA <span className="text-red-500">*</span></label>
-                <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+                <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.fechaVigencia'))} data-campo-error={esError('glp.fechaVigencia') ? true : undefined} />
+            <MensajeError campo="glp.fechaVigencia" errores={erroresCampo} />
               </div>
             </div>
 
             <div>
                <label className="block text-xs font-bold text-slate-500 mb-1">EXPEDIENTE TÉCNICO <span className="text-red-500">*</span></label>
-               <input name="expedienteTecnico" value={formGlp.expedienteTecnico || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+               <input name="expedienteTecnico" value={formGlp.expedienteTecnico || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.expedienteTecnico'))} data-campo-error={esError('glp.expedienteTecnico') ? true : undefined} />
+            <MensajeError campo="glp.expedienteTecnico" errores={erroresCampo} />
             </div>
 
             {modalidadCertificado === 'INICIAL' && (
@@ -436,14 +490,16 @@ export function VehiculoStep({
                     <div className="text-xs font-bold text-slate-600">Peso neto (Kg.)</div>
                     <div className="text-sm font-semibold text-slate-500">{formVehiculo.pesoNeto || '-'}</div>
                     <div>
-                      <input type="number" step="0.01" name="pesoNetoPosterior" value={formGlp.pesoNetoPosterior || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Nuevo peso neto" />
+                      <input type="number" step="0.01" name="pesoNetoPosterior" value={formGlp.pesoNetoPosterior || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.pesoNetoPosterior'))} data-campo-error={esError('glp.pesoNetoPosterior') ? true : undefined} placeholder="Nuevo peso neto" />
+            <MensajeError campo="glp.pesoNetoPosterior" errores={erroresCampo} />
                     </div>
                   </div>
                   <div className="grid grid-cols-3 p-3 items-center">
                     <div className="text-xs font-bold text-slate-600">Carga útil (Kg.)</div>
                     <div className="text-sm font-semibold text-slate-500">{formVehiculo.cargaUtil || '-'}</div>
                     <div>
-                      <input type="number" step="0.01" name="cargaUtilPosterior" value={formGlp.cargaUtilPosterior || ''} onChange={handleGlp} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="Nueva carga útil" />
+                      <input type="number" step="0.01" name="cargaUtilPosterior" value={formGlp.cargaUtilPosterior || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.cargaUtilPosterior'))} data-campo-error={esError('glp.cargaUtilPosterior') ? true : undefined} placeholder="Nueva carga útil" />
+            <MensajeError campo="glp.cargaUtilPosterior" errores={erroresCampo} />
                     </div>
                   </div>
                 </div>
@@ -523,7 +579,8 @@ export function VehiculoStep({
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO <span className="text-red-500">*</span></label>
-                <select name="tallerAutorizadoId" value={formGnv.tallerAutorizadoId || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors">
+                <select name="tallerAutorizadoId" value={formGnv.tallerAutorizadoId || ''} onChange={handleGnv} className={claseConError(CLASE_CAMPO, esError('gnv.tallerAutorizadoId'))} data-campo-error={esError('gnv.tallerAutorizadoId') ? true : undefined}>
+            <MensajeError campo="gnv.tallerAutorizadoId" errores={erroresCampo} />
                   <option value="">-- SELECCIONAR --</option>
                   {talleres?.map(t => (
                     <option key={t.id} value={t.id}>{t.nombre}</option>
@@ -532,7 +589,8 @@ export function VehiculoStep({
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA <span className="text-red-500">*</span></label>
-                <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+                <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} className={claseConError(CLASE_CAMPO, esError('gnv.fechaVigencia'))} data-campo-error={esError('gnv.fechaVigencia') ? true : undefined} />
+            <MensajeError campo="gnv.fechaVigencia" errores={erroresCampo} />
               </div>
             </div>
 
@@ -543,7 +601,7 @@ export function VehiculoStep({
                 value={formGnv.observaciones || ''}
                 onChange={handleGnv}
                 maxLength={250}
-                className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors"
+                className={claseConError(CLASE_CAMPO, esError('gnv.observaciones'))} data-campo-error={esError('gnv.observaciones') ? true : undefined}
                 placeholder="EJ: NINGUNA"
               />
             </div>
@@ -590,12 +648,14 @@ export function VehiculoStep({
                               name="combustiblePosterior"
                               value={formGnv.combustiblePosterior || ''}
                               onChange={handleGnv}
-                              className="w-full p-1.5 border-2 border-amber-300 rounded text-slate-800 font-bold focus:border-amber-500 focus:ring-0 text-xs"
+                              className={claseConError(CLASE_TABLA, esError('gnv.combustiblePosterior'))}
+                              data-campo-error={esError('gnv.combustiblePosterior') ? true : undefined}
                             >
                               <option value="">-- SELECCIONAR --</option>
                               <option value="BI - COMBUSTIBLE GNV">BI - COMBUSTIBLE GNV</option>
                               <option value="DUAL GNV">DUAL GNV</option>
                             </select>
+                            <MensajeError campo="gnv.combustiblePosterior" errores={erroresCampo} />
                           </td>
                         </tr>
                         <tr className="border-t border-slate-200">
@@ -608,9 +668,11 @@ export function VehiculoStep({
                               name="pesoNetoPosterior"
                               value={formGnv.pesoNetoPosterior || ''}
                               onChange={handleGnv}
-                              className="w-32 p-1.5 border-2 border-amber-300 rounded text-slate-800 font-bold focus:border-amber-500 focus:ring-0 text-xs"
+                              className={claseConError(CLASE_TABLA, esError('gnv.pesoNetoPosterior'))}
+                              data-campo-error={esError('gnv.pesoNetoPosterior') ? true : undefined}
                               placeholder="Ej. 1453"
                             />
+                            <MensajeError campo="gnv.pesoNetoPosterior" errores={erroresCampo} />
                           </td>
                         </tr>
                       </tbody>
@@ -731,8 +793,9 @@ export function VehiculoStep({
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE CONFORMIDAD</label>
-                <select name="tipoConformidad" value={formConformidad.tipoConformidad || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors">
+                <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE CONFORMIDAD *</label>
+                <select name="tipoConformidad" value={formConformidad.tipoConformidad || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoConformidad'))} data-campo-error={esError('conformidad.tipoConformidad') ? true : undefined}>
+            <MensajeError campo="conformidad.tipoConformidad" errores={erroresCampo} />
                   <option value="">-- SELECCIONAR --</option>
                   <option value="MODIFICACION">MODIFICACIÓN</option>
                   <option value="MONTAJE">MONTAJE</option>
@@ -740,8 +803,9 @@ export function VehiculoStep({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TRÁMITE</label>
-                <input name="tipoTramite" value={formConformidad.tipoTramite || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+                <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TRÁMITE *</label>
+                <input name="tipoTramite" value={formConformidad.tipoTramite || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoTramite'))} data-campo-error={esError('conformidad.tipoTramite') ? true : undefined} />
+            <MensajeError campo="conformidad.tipoTramite" errores={erroresCampo} />
               </div>
             </div>
 
@@ -749,20 +813,24 @@ export function VehiculoStep({
               <h5 className="font-bold text-slate-700 mb-3">CARACTERÍSTICAS REGISTRABLES Y MOTIVO</h5>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">CARACTERÍSTICA A CERTIFICAR</label>
-                  <input name="caracteristicaRegistrable" value={formConformidad.caracteristicaRegistrable || ''} onChange={handleConformidad} maxLength={300} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="EJ: NÚMERO DE EJES" />
+                  <label className="block text-xs font-bold text-slate-500 mb-1">CARACTERÍSTICA A CERTIFICAR *</label>
+                  <input name="caracteristicaRegistrable" value={formConformidad.caracteristicaRegistrable || ''} onChange={handleConformidad} maxLength={300} className={claseConError(CLASE_CAMPO, esError('conformidad.caracteristicaRegistrable'))} data-campo-error={esError('conformidad.caracteristicaRegistrable') ? true : undefined} placeholder="EJ: NÚMERO DE EJES" />
+            <MensajeError campo="conformidad.caracteristicaRegistrable" errores={erroresCampo} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">MOTIVO</label>
-                  <input name="motivo" value={formConformidad.motivo || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" placeholder="EJ: RECTIFICACIÓN" />
+                  <label className="block text-xs font-bold text-slate-500 mb-1">MOTIVO *</label>
+                  <input name="motivo" value={formConformidad.motivo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.motivo'))} data-campo-error={esError('conformidad.motivo') ? true : undefined} placeholder="EJ: RECTIFICACIÓN" />
+            <MensajeError campo="conformidad.motivo" errores={erroresCampo} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">USO ORIGINAL DEL VEHÍCULO</label>
-                  <input name="usoOriginalVehiculo" value={formConformidad.usoOriginalVehiculo || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+                  <label className="block text-xs font-bold text-slate-500 mb-1">USO ORIGINAL DEL VEHÍCULO *</label>
+                  <input name="usoOriginalVehiculo" value={formConformidad.usoOriginalVehiculo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.usoOriginalVehiculo'))} data-campo-error={esError('conformidad.usoOriginalVehiculo') ? true : undefined} />
+            <MensajeError campo="conformidad.usoOriginalVehiculo" errores={erroresCampo} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">DESCRIPCIÓN / OBSERVACIONES COMPLEMENTARIAS</label>
-                  <input name="descripcion" value={formConformidad.descripcion || ''} onChange={handleConformidad} className="w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors" />
+                  <label className="block text-xs font-bold text-slate-500 mb-1">DESCRIPCIÓN / OBSERVACIONES COMPLEMENTARIAS *</label>
+                  <input name="descripcion" value={formConformidad.descripcion || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.descripcion'))} data-campo-error={esError('conformidad.descripcion') ? true : undefined} />
+            <MensajeError campo="conformidad.descripcion" errores={erroresCampo} />
                 </div>
               </div>
             </div>

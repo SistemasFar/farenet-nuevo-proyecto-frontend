@@ -54,35 +54,6 @@ export const validarDatosIniciales = (caja: Record<string, any>) => {
   return errores;
 };
 
-export const validarDatosFacturacionBasica = (facturacion: Record<string, any>) => {
-  const errores: string[] = [];
-  const tipoComprobante = String(facturacion.tipoDocFac || '').trim().toUpperCase();
-  const documento = String(facturacion.nroDocFac || '').replace(/\D/g, '');
-  const email = String(facturacion.emailFac || '').trim();
-
-  if (!['BOLETA', 'FACTURA'].includes(tipoComprobante)) {
-    errores.push('Seleccione el tipo de comprobante en Titulares y Datos de Facturación.');
-  }
-  if (![8, 11].includes(documento.length)) {
-    errores.push('Complete un DNI de 8 dígitos o un RUC de 11 dígitos para facturación.');
-  }
-  if (tipoComprobante === 'FACTURA' && documento.length !== 11) {
-    errores.push('La factura requiere un RUC de 11 dígitos.');
-  }
-  if (tipoComprobante === 'FACTURA' && documento.length === 11 && !esRucValido(documento)) {
-    errores.push('El RUC ingresado no tiene un dígito verificador válido. Revise el número antes de facturar.');
-  }
-  if (vacio(facturacion.razonSocialFac)) errores.push('Complete el nombre o razón social de facturación.');
-  if (vacio(facturacion.direccionFac)) errores.push('Complete la dirección fiscal.');
-  if (vacio(facturacion.telefonoFac)) errores.push('Complete el teléfono de facturación.');
-  if (!email) {
-    errores.push('Complete el correo electrónico de facturación.');
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errores.push('El correo de facturación no tiene un formato válido.');
-  }
-  return errores;
-};
-
 export const validarExpedienteTecnico = ({
   tipoCertificado,
   caja,
@@ -179,4 +150,567 @@ export const validarExpedienteTecnico = ({
   return [...new Set(errores)];
 };
 
+// ===========================================================================
+// Validación por campo
+//
+// Las funciones anteriores devuelven una lista de textos y ya se usan en el
+// guardado y en la emisión. Estas funciones son el mismo criterio expressed
+// como "campo -> mensaje", que es lo que necesita la vista para marcar el
+// control concreto, mostrar su mensaje ylimpiar su error al corregirlo.
+//
+// La fuente de verdad de qué es obligatorio es el backend: la lista de campos
+// de `validarEmision` para cada tipo. Aquí se replica esa lista y se añaden
+// reglas de formato (números y años) que el backend no comprueba porque confía
+// en que el dato guardado ya es válido.
+// ===========================================================================
 
+export type ErroresCampo = Record<string, string>;
+
+type FormatoNumerico = 'entero' | 'decimal';
+
+/** Devuelve el número, o null si está vacío, o NaN si no es numérico. */
+const leerNumero = (valor: unknown): number | null => {
+  const texto = String(valor ?? '').trim().replace(',', '.');
+  if (texto === '') return null;
+  const numero = Number(texto);
+  return Number.isFinite(numero) ? numero : NaN;
+};
+
+const esEnteroPositivo = (valor: unknown): boolean => {
+  const numero = leerNumero(valor);
+  return numero !== null && !Number.isNaN(numero) && Number.isInteger(numero) && numero > 0;
+};
+
+const esDecimalPositivo = (valor: unknown): boolean => {
+  const numero = leerNumero(valor);
+  return numero !== null && !Number.isNaN(numero) && numero > 0;
+};
+
+const mensajeFormato = (etiqueta: string, formato: FormatoNumerico) =>
+  `${etiqueta.charAt(0).toUpperCase()}${etiqueta.slice(1)} debe ser un número ${formato === 'entero' ? 'entero' : 'decimale'} mayor que cero.`;
+
+type ReglaCampo = {
+  campo: string;
+  etiqueta: string;
+  formato?: FormatoNumerico;
+  /** Si se indica, el campo sólo es obligatorio para esos tipos. */
+  tipos?: TipoCertificadoFaregas[];
+};
+
+/** Comunes a todo certificado técnico + las específicas de cada tipo. */
+export const REGLAS_CAMPOS_TECNICOS: ReglaCampo[] = [
+  { campo: 'marca', etiqueta: 'la marca' },
+  { campo: 'modelo', etiqueta: 'el modelo' },
+  { campo: 'anioFabricacion', etiqueta: 'el año de fabricación' },
+  { campo: 'numeroMotor', etiqueta: 'el número de motor' },
+  { campo: 'combustible', etiqueta: 'el combustible' },
+  { campo: 'numeroCilindros', etiqueta: 'el número de cilindros', formato: 'entero' },
+  { campo: 'numeroEjes', etiqueta: 'el número de ejes', formato: 'entero' },
+  { campo: 'numeroRuedas', etiqueta: 'el número de ruedas', formato: 'entero' },
+  { campo: 'numeroAsientos', etiqueta: 'el número de asientos', formato: 'entero' },
+  { campo: 'numeroPasajeros', etiqueta: 'el número de pasajeros', formato: 'entero' },
+  { campo: 'longitud', etiqueta: 'el largo', formato: 'decimal' },
+  { campo: 'ancho', etiqueta: 'el ancho', formato: 'decimal' },
+  { campo: 'alto', etiqueta: 'el alto', formato: 'decimal' },
+  { campo: 'pesoNeto', etiqueta: 'el peso neto', formato: 'decimal' },
+  { campo: 'pesoBruto', etiqueta: 'el peso bruto', formato: 'decimal' },
+  { campo: 'categoria', etiqueta: 'la categoría vehicular', tipos: ['GNV_ANUAL', 'GLP_ANUAL', 'CONFORMIDAD'] },
+  { campo: 'version', etiqueta: 'la versión', tipos: ['GNV_ANUAL', 'GLP_ANUAL', 'CONFORMIDAD'] },
+  { campo: 'cilindrada', etiqueta: 'la cilindrada', tipos: ['GNV_ANUAL', 'GLP_ANUAL', 'CONFORMIDAD'] },
+  { campo: 'color', etiqueta: 'el color', tipos: ['GNV_ANUAL', 'GLP_ANUAL', 'CONFORMIDAD'] },
+  { campo: 'cargaUtil', etiqueta: 'la carga útil', tipos: ['GLP_ANUAL', 'CONFORMIDAD'] },
+  { campo: 'clase', etiqueta: 'la clase vehicular', tipos: ['CONFORMIDAD'] },
+  { campo: 'carroceria', etiqueta: 'la carrocería', tipos: ['CONFORMIDAD'] },
+  { campo: 'anioModelo', etiqueta: 'el año modelo', tipos: ['CONFORMIDAD'] },
+  { campo: 'formulaRodante', etiqueta: 'la fórmula rodante', tipos: ['CONFORMIDAD'] },
+  { campo: 'potencia', etiqueta: 'la potencia', tipos: ['CONFORMIDAD'] },
+];
+
+const aplicaAlTipo = (regla: ReglaCampo, tipo: TipoCertificadoFaregas) =>
+  !regla.tipos || regla.tipos.includes(tipo);
+
+const marcar = (errores: ErroresCampo, campo: string, mensaje: string) => {
+  if (!errores[campo]) errores[campo] = mensaje;
+};
+
+/**
+ * Valida un campo con la regla dada: vacío o mal formado. Devuelve el mensaje
+ * cuando corresponde, o undefined cuando el valor es válido.
+ */
+const errorDeCampo = (
+  valor: unknown,
+  regla: ReglaCampo
+): string | undefined => {
+  if (vacio(valor)) return `Complete ${regla.etiqueta}.`;
+  if (regla.formato === 'entero' && !esEnteroPositivo(valor)) {
+    return mensajeFormato(regla.etiqueta, 'entero');
+  }
+  if (regla.formato === 'decimal' && !esDecimalPositivo(valor)) {
+    return mensajeFormato(regla.etiqueta, 'decimal');
+  }
+  return undefined;
+};
+
+export const validarCamposTecnicos = (
+  tipo: TipoCertificadoFaregas,
+  vehiculo: Record<string, any>
+): ErroresCampo => {
+  const errores: ErroresCampo = {};
+  for (const regla of REGLAS_CAMPOS_TECNICOS) {
+    if (!aplicaAlTipo(regla, tipo)) continue;
+    const mensaje = errorDeCampo(vehiculo[regla.campo], regla);
+    if (mensaje) marcar(errores, regla.campo, mensaje);
+  }
+  return errores;
+};
+
+/**
+ * VIN y serie de chasis son alternatives: basta con uno de los dos, igual que
+ * en el backend. Si faltan ambos se marca el VIN, que es el primero visible.
+ */
+export const validarIdentificacionVehiculo = (vehiculo: Record<string, any>): ErroresCampo => {
+  // Basta con uno de los dos, igual que en el backend. Sólo es error cuando
+  // faltan ambos; se marca el VIN porque es el primero visible del formulario.
+  if (!vacio(vehiculo.vin) || !vacio(vehiculo.serieChasis)) return {};
+  return { vin: 'Complete el VIN o la serie de chasis.' };
+};
+
+/**
+ * Regla de años ya existente: el año modelo no puede ser posterior al de
+ * fabricación. Se marca el año modelo, que es el dato que se corregiría.
+ */
+export const validarAniosVehiculo = (vehiculo: Record<string, any>): ErroresCampo => {
+  const modelo = leerNumero(vehiculo.anioModelo);
+  const fabricacion = leerNumero(vehiculo.anioFabricacion);
+  if (modelo === null || fabricacion === null) return {};
+  if (Number.isNaN(modelo) || Number.isNaN(fabricacion)) return {};
+  if (modelo > fabricacion) {
+    return { anioModelo: 'El Año Modelo no puede ser mayor que el Año de Fabricación.' };
+  }
+  return {};
+};
+
+const CAMPOS_DATOS_INICIALES: ReglaCampo[] = [
+  { campo: 'tarifaCodigo', etiqueta: 'el servicio' },
+  { campo: 'placa', etiqueta: 'la placa' },
+];
+
+export const validarDatosInicialesCampos = (caja: Record<string, any>): ErroresCampo => {
+  const errores: ErroresCampo = {};
+  for (const regla of CAMPOS_DATOS_INICIALES) {
+    const mensaje = errorDeCampo(caja[regla.campo], regla);
+    if (mensaje) marcar(errores, regla.campo, mensaje);
+  }
+  if (caja.tipoCertificado !== 'CONFORMIDAD' && vacio(caja.modalidadCertificado)) {
+    marcar(errores, 'modalidadCertificado', 'Seleccione si el certificado es inicial o anual.');
+  }
+  return errores;
+};
+
+/** Titulares: al menos uno, y cada uno con documento y nombre. */
+export const validarTitulares = (
+  titulares: Array<Record<string, any>>,
+  tipo: TipoCertificadoFaregas
+): ErroresCampo => {
+  const errores: ErroresCampo = {};
+  if (tipo !== 'GLP_ANUAL' && tipo !== 'CONFORMIDAD') return errores;
+  if (titulares.length === 0) {
+    return { titulares: 'Registre al menos un titular del certificado.' };
+  }
+  titulares.forEach((titular, indice) => {
+    const numero = indice + 1;
+    const reglas: ReglaCampo[] = [
+      { campo: 'tipoDocumento', etiqueta: `el tipo de documento del titular ${numero}` },
+      { campo: 'nroDocumento', etiqueta: `el documento del titular ${numero}` },
+      { campo: 'nombreRazonSocial', etiqueta: `el nombre del titular ${numero}` },
+    ];
+    if (tipo === 'CONFORMIDAD') {
+      reglas.push({ campo: 'direccion', etiqueta: `la dirección del titular ${numero}` });
+    }
+    for (const regla of reglas) {
+      if (vacio(titular[regla.campo])) {
+        marcar(errores, `titular.${indice}.${regla.campo}`, `Complete ${regla.etiqueta}.`);
+      }
+    }
+  });
+  return errores;
+};
+
+/** Reglas de taller, vigencia y expediente, por familia de certificado. */
+export const validarDatosEspecificos = ({
+  tipo,
+  gnv,
+  glp,
+  conformidad,
+}: {
+  tipo: TipoCertificadoFaregas;
+  gnv: Record<string, any>;
+  glp: Record<string, any>;
+  conformidad: Record<string, any>;
+}): ErroresCampo => {
+  const errores: ErroresCampo = {};
+
+  if (tipo === 'GNV_ANUAL') {
+    if (vacio(gnv.tallerAutorizadoId)) marcar(errores, 'gnv.tallerAutorizadoId', 'Seleccione el taller autorizado.');
+    if (vacio(gnv.fechaVigencia)) marcar(errores, 'gnv.fechaVigencia', 'Complete la vigencia del certificado GNV.');
+    const verificaciones = gnv.verificaciones || [];
+    if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
+      marcar(errores, 'gnv.verificaciones', 'Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
+    }
+  }
+
+  if (tipo === 'GLP_ANUAL') {
+    if (vacio(glp.tallerAutorizadoId)) marcar(errores, 'glp.tallerAutorizadoId', 'Seleccione el taller autorizado.');
+    if (vacio(glp.fechaVigencia)) marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
+    if (vacio(glp.expedienteTecnico)) marcar(errores, 'glp.expedienteTecnico', 'Complete el número de expediente técnico.');
+
+    const componentes = glp.componentes || [];
+    for (const nombre of ['CILINDRO', 'REGULADOR']) {
+      const componente = componentes.find((item: any) => item.componente === nombre);
+      if (!componente) {
+        marcar(errores, 'glp.componentes', `Registre el componente ${nombre}.`);
+        continue;
+      }
+      const reglas: ReglaCampo[] = [
+        { campo: 'marca', etiqueta: `la marca del ${nombre}` },
+        { campo: 'modelo', etiqueta: `el modelo del ${nombre}` },
+      ];
+      if (nombre === 'CILINDRO') {
+        reglas.push(
+          { campo: 'capacidadLitros', etiqueta: 'la capacidad del cilindro', formato: 'decimal' },
+          { campo: 'mesFabricacion', etiqueta: 'el mes de fabricación del cilindro' },
+          { campo: 'anioFabricacion', etiqueta: 'el año de fabricación del cilindro' },
+          { campo: 'numeroSerie', etiqueta: 'la serie del cilindro' }
+        );
+      }
+      // Las claves de la regla coinciden con las del componente, así que se
+      // lee el mismo nombre en ambos lados.
+      for (const regla of reglas) {
+        const mensaje = errorDeCampo(componente[regla.campo], regla);
+        if (mensaje) {
+          marcar(errores, `glp.componentes.${nombre}.${regla.campo}`, mensaje);
+        }
+      }
+    }
+
+    const verificaciones = glp.verificaciones || [];
+    if (verificaciones.length !== 7 || verificaciones.some((item: any) => item.cumple !== true)) {
+      marcar(errores, 'glp.verificaciones', 'Las 7 verificaciones GLP deben estar evaluadas como CUMPLE.');
+    }
+  }
+
+  if (tipo === 'CONFORMIDAD') {
+    if (vacio(conformidad.tipoConformidad)) {
+      marcar(errores, 'conformidad.tipoConformidad', 'Seleccione el tipo de conformidad.');
+    }
+    const reglas: ReglaCampo[] = [
+      { campo: 'tipoTramite', etiqueta: 'el tipo de trámite' },
+      { campo: 'caracteristicaRegistrable', etiqueta: 'la característica registrable' },
+      { campo: 'motivo', etiqueta: 'el motivo' },
+      { campo: 'descripcion', etiqueta: 'la descripción' },
+      { campo: 'usoOriginalVehiculo', etiqueta: 'el uso original del vehículo' },
+    ];
+    for (const regla of reglas) {
+      const mensaje = errorDeCampo(conformidad[regla.campo], regla);
+      if (mensaje) marcar(errores, `conformidad.${regla.campo}`, mensaje);
+    }
+  }
+
+  return errores;
+};
+
+/**
+ * Valida el paso completo de expediente técnico y devuelve los errores por
+ * campo, listos para marcar cada control.
+ */
+export const validarPasoExpedienteTecnico = ({
+  tipoCertificado,
+  caja,
+  vehiculo,
+  titulares,
+  gnv,
+  glp,
+  conformidad,
+}: DatosAsistente): ErroresCampo => {
+  const tipo = tipoCertificado;
+
+  // La categoría vehicular es la excepción: se elige en el paso de datos
+  // iniciales y se guarda en `caja`, no en `vehiculo`. Se combina aquí para
+  // que la regla lea el mismo valor que el select. Sin esto, la categoría
+  // aparecía siempre vacía y el error se trasladaba a otro campo.
+  const vehiculoConCategoria = { ...vehiculo, categoria: caja.categoria };
+
+  // La placa NO se comprueba aquí: se edita y se valida en el paso de datos
+  // iniciales, y marcarla en este paso dejaría un error sin campo en pantalla.
+  return {
+    ...validarCamposTecnicos(tipo, vehiculoConCategoria),
+    ...validarIdentificacionVehiculo(vehiculo),
+    ...validarAniosVehiculo(vehiculo),
+    ...validarTitulares(titulares, tipo),
+    ...validarDatosEspecificos({ tipo, gnv, glp, conformidad }),
+  };
+};
+
+type DatosPago = {
+  condicionPago: string;
+  pagos: Array<Record<string, any>>;
+  precioTotal: number;
+};
+
+/**
+ * Reglas de pago ya existentes en el asistente, expresadas por campo.
+ * CONTADO exige el total completo; CRÉDITO debe conservar saldo para
+ * distribuirlo en cuotas.
+ */
+export const validarPasoPago = ({ condicionPago, pagos, precioTotal }: DatosPago): ErroresCampo => {
+  const totalPagado = pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0);
+  const esCredito = condicionPago === 'CREDITO';
+  const saldo = Math.max(0, precioTotal - totalPagado);
+
+  if (!esCredito && Math.abs(totalPagado - precioTotal) > 0.009) {
+    return {
+      pagos: `El pago debe completar S/ ${precioTotal.toFixed(2)}. Saldo pendiente: S/ ${saldo.toFixed(2)}.`,
+    };
+  }
+  if (esCredito && totalPagado >= precioTotal - 0.009) {
+    return { pagos: 'Una venta al crédito debe conservar un saldo pendiente para distribuirlo en cuotas.' };
+  }
+  return {};
+};
+
+/**
+ * Campos que deben llevar asterisco para un tipo de certificado. Se deriva de
+ * las mismas reglas que validan, para que la etiqueta y el error nunca
+ * discrepen: lo que no es obligatorio para ese tipo no se marca con asterisco.
+ */
+export const camposObligatorios = (tipo: TipoCertificadoFaregas): string[] =>
+  REGLAS_CAMPOS_TECNICOS
+    .filter((regla) => aplicaAlTipo(regla, tipo))
+    .map((regla) => regla.campo);
+
+/**
+ * Mismo criterio de los datos de facturación, pero por campo, para poder marcar
+ * el control concreto. Es la función primitiva: la de textos se deriva de ésta,
+ * de modo que ambas no pueden discrepar entre sí.
+ */
+export const validarDatosFacturacionCampos = (
+  facturacion: Record<string, any>
+): ErroresCampo => {
+  const errores: ErroresCampo = {};
+  const tipoComprobante = String(facturacion.tipoDocFac || '').trim().toUpperCase();
+  const documento = String(facturacion.nroDocFac || '').replace(/\D/g, '');
+  const email = String(facturacion.emailFac || '').trim();
+
+  if (!['BOLETA', 'FACTURA'].includes(tipoComprobante)) {
+    errores.tipoDocFac = 'Seleccione el tipo de comprobante en Titulares y Datos de Facturación.';
+  }
+  if (![8, 11].includes(documento.length)) {
+    errores.nroDocFac = 'Complete un DNI de 8 dígitos o un RUC de 11 dígitos para facturación.';
+  } else if (tipoComprobante === 'FACTURA' && documento.length !== 11) {
+    errores.nroDocFac = 'La factura requiere un RUC de 11 dígitos.';
+  } else if (tipoComprobante === 'FACTURA' && documento.length === 11 && !esRucValido(documento)) {
+    errores.nroDocFac = 'El RUC ingresado no tiene un dígito verificador válido. Revise el número antes de facturar.';
+  }
+  if (vacio(facturacion.razonSocialFac)) {
+    errores.razonSocialFac = 'Complete el nombre o razón social de facturación.';
+  }
+  if (vacio(facturacion.direccionFac)) {
+    errores.direccionFac = 'Complete la dirección fiscal.';
+  }
+  if (vacio(facturacion.telefonoFac)) {
+    errores.telefonoFac = 'Complete el teléfono de facturación.';
+  }
+  if (!email) {
+    errores.emailFac = 'Complete el correo electrónico de facturación.';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errores.emailFac = 'El correo de facturación no tiene un formato válido.';
+  }
+
+  return errores;
+};
+
+export const validarDatosFacturacionBasica = (facturacion: Record<string, any>) =>
+  Object.values(validarDatosFacturacionCampos(facturacion));
+
+// ===========================================================================
+// Regla única del formulario de Vehículo y Datos Técnicos
+//
+// Todo control VISIBLE y EDITABLE del formulario debe estar completo para
+// poder avanzar a Previsualización. No hay excepciones por tipo: si el campo
+// está en pantalla, el operador tiene que llenarlo.
+//
+// Esto sustituye, para el bloqueo de avance, a REGLAS_CAMPOS_TECNICOS. Esa
+// tabla sigue existiendo para las validaciones específicas de cada familia
+// (taller, verificaciones, componentes), pero ya no decide qué campo visible
+// puede quedar vacío.
+//
+// La clave de cada error es la MISMA que consume el control marcado en rojo,
+// de modo que el error siempre cae en su campo.
+// ===========================================================================
+
+export const MENSAJE_CAMPO_OBLIGATORIO = 'Este campo es obligatorio.';
+
+/** Bloque A. Se renderiza siempre, para cualquier tipo de certificado. */
+export const CAMPOS_VISIBLES_COMUNES = [
+  'marca', 'modelo', 'version', 'anioFabricacion', 'anioModelo', 'vin', 'serieChasis',
+  'numeroMotor', 'combustible', 'color', 'clase', 'categoria', 'carroceria',
+  'numeroCilindros', 'cilindrada', 'numeroEjes', 'numeroRuedas', 'numeroAsientos',
+  'numeroPasajeros', 'pesoNeto', 'pesoBruto', 'cargaUtil', 'potencia',
+  'longitud', 'ancho', 'alto', 'formulaRodante',
+] as const;
+
+/**
+ * Bloque B, sección GNV (más los campos "después" cuando la modalidad es INICIAL).
+ *
+ * `gnv.observaciones` queda fuera a propósito: su etiqueta en pantalla dice
+ * "(Opcional)" y el backend tampoco lo exige. Marcarlo en rojo contradiría lo
+ * que el propio formulario afirma al operador.
+ */
+export const CAMPOS_VISIBLES_GNV = ['gnv.tallerAutorizadoId', 'gnv.fechaVigencia'] as const;
+export const CAMPOS_VISIBLES_GNV_INICIAL = [
+  'gnv.combustiblePosterior', 'gnv.pesoNetoPosterior',
+] as const;
+
+/** Bloque B, sección GLP (idem para INICIAL). */
+export const CAMPOS_VISIBLES_GLP = [
+  'glp.tallerAutorizadoId', 'glp.fechaVigencia', 'glp.expedienteTecnico',
+] as const;
+export const CAMPOS_VISIBLES_GLP_INICIAL = [
+  'glp.pesoNetoPosterior', 'glp.cargaUtilPosterior',
+] as const;
+
+/** Bloque B, sección CONFORMIDAD. */
+export const CAMPOS_VISIBLES_CONFORMIDAD = [
+  'conformidad.tipoConformidad', 'conformidad.tipoTramite', 'conformidad.caracteristicaRegistrable',
+  'conformidad.motivo', 'conformidad.usoOriginalVehiculo', 'conformidad.descripcion',
+] as const;
+
+/** Campos de cada fila de titular. */
+export const CAMPOS_VISIBLES_TITULAR = [
+  'tipoDocumento', 'nroDocumento', 'nombreRazonSocial', 'direccion',
+] as const;
+
+/** Datos de facturación, que se capturan en el mismo paso. */
+export const CAMPOS_VISIBLES_FACTURACION = [
+  'tipoDocFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac', 'emailFac',
+] as const;
+
+/**
+ * Vacío para efectos de avance.
+ * `''`, espacios, null, undefined y NaN invalidan. El 0 NO es vacío: si un
+ * campo admite cero, cero es un valor escrito y debe dejar pasar el avance.
+ */
+export const esValorVacioParaAvance = (valor: unknown): boolean => {
+  if (valor === null || valor === undefined) return true;
+  if (typeof valor === 'number') return Number.isNaN(valor);
+  if (typeof valor === 'boolean') return valor === false;
+  return String(valor).trim() === '';
+};
+
+const leerPorRuta = (raiz: Record<string, any>, ruta: string): unknown => {
+  if (!raiz) return undefined;
+  if (!ruta.includes('.')) return raiz[ruta];
+  return ruta.split('.').reduce<any>((actual, parte) => (actual == null ? undefined : actual[parte]), raiz);
+};
+
+const marcarVacias = (errores: ErroresCampo, raiz: Record<string, any>, campos: readonly string[]) => {
+  for (const campo of campos) {
+    if (esValorVacioParaAvance(leerPorRuta(raiz, campo))) {
+      marcar(errores, campo, MENSAJE_CAMPO_OBLIGATORIO);
+    }
+  }
+};
+
+type ContextoFormularioVehiculo = {
+  tipoCertificado: TipoCertificadoFaregas;
+  modalidad?: string;
+  caja: Record<string, any>;
+  vehiculo: Record<string, any>;
+  titulares: Array<Record<string, any>>;
+  gnv: Record<string, any>;
+  glp: Record<string, any>;
+  conformidad: Record<string, any>;
+  facturacion: Record<string, any>;
+};
+
+/**
+ * Conjunto de claves que el formulario visible exige para un tipo y modalidad.
+ * Lo usan tanto la validación como el asterisco de las etiquetas, de modo que
+ * lo marcado con * y lo bloqueado nunca pueden divergir.
+ */
+export const camposObligatoriosVisibles = (
+  tipoCertificado: TipoCertificadoFaregas,
+  modalidad?: string
+): string[] => {
+  const campos: string[] = [...CAMPOS_VISIBLES_COMUNES];
+  const esInicial = String(modalidad || '').toUpperCase() === 'INICIAL';
+
+  if (tipoCertificado === 'GNV_ANUAL') {
+    campos.push(...CAMPOS_VISIBLES_GNV);
+    if (esInicial) campos.push(...CAMPOS_VISIBLES_GNV_INICIAL);
+  }
+  if (tipoCertificado === 'GLP_ANUAL') {
+    campos.push(...CAMPOS_VISIBLES_GLP);
+    if (esInicial) campos.push(...CAMPOS_VISIBLES_GLP_INICIAL);
+  }
+  if (tipoCertificado === 'CONFORMIDAD') {
+    campos.push(...CAMPOS_VISIBLES_CONFORMIDAD);
+  }
+  return campos;
+};
+
+/**
+ * Valida el formulario de Vehículo y Datos Técnicos completo: todo control
+ * visible y editable debe tener valor. Sólo se examinan los bloques que
+ * están renderizados para el tipo y la modalidad actuales, de modo que nunca
+ * se exige un campo de otra sección que no aparece en pantalla.
+ */
+export const validarFormularioVehiculoVisible = ({
+  tipoCertificado,
+  modalidad,
+  caja,
+  vehiculo,
+  titulares,
+  gnv,
+  glp,
+  conformidad,
+  facturacion,
+}: ContextoFormularioVehiculo): ErroresCampo => {
+  const errores: ErroresCampo = {};
+
+  // La categoría se edita en el paso 1 y vive en `caja`.
+  const vehiculoConCategoria = { ...vehiculo, categoria: caja.categoria };
+  marcarVacias(errores, vehiculoConCategoria, CAMPOS_VISIBLES_COMUNES);
+
+  const esInicial = String(modalidad || '').toUpperCase() === 'INICIAL';
+
+  // Las claves de las secciones ya vienen cualificadas (glp.tallerAutorizadoId),
+  // así que la raíz debe exponerlas en su primer segmento. Sin esto se buscaría
+  // gnv.gnv.tallerAutorizadoId y el campo se marcaría siempre como vacío.
+  if (tipoCertificado === 'GNV_ANUAL') {
+    marcarVacias(errores, { gnv }, CAMPOS_VISIBLES_GNV);
+    if (esInicial) marcarVacias(errores, { gnv }, CAMPOS_VISIBLES_GNV_INICIAL);
+  }
+  if (tipoCertificado === 'GLP_ANUAL') {
+    marcarVacias(errores, { glp }, CAMPOS_VISIBLES_GLP);
+    if (esInicial) marcarVacias(errores, { glp }, CAMPOS_VISIBLES_GLP_INICIAL);
+  }
+  if (tipoCertificado === 'CONFORMIDAD') {
+    marcarVacias(errores, { conformidad }, CAMPOS_VISIBLES_CONFORMIDAD);
+  }
+
+  // Cada fila de titular debe estar completa; una fila a medias no pasa.
+  // La clave es titular.<indice>.<campo>, así que la raíz se anida en dos
+  // niveles para que la ruta se pueda recorrer segmento a segmento.
+  titulares.forEach((titular, indice) => {
+    marcarVacias(
+      errores,
+      { titular: { [indice]: titular } },
+      CAMPOS_VISIBLES_TITULAR.map((campo) => `titular.${indice}.${campo}`)
+    );
+  });
+
+  marcarVacias(errores, facturacion, CAMPOS_VISIBLES_FACTURACION);
+
+  return errores;
+};
