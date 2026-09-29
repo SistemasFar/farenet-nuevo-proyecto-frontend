@@ -100,7 +100,7 @@ export function ServicioModal({
   const [generaCertificado, setGeneraCertificado] = useState(Boolean(initialData.requiere_certificado));
   const [variante, setVariante] = useState<VarianteCertificado | ''>(varianteDesdeServicio(initialData));
   const [requiereVehiculo, setRequiereVehiculo] = useState(initialData.requiere_vehiculo ?? Boolean(initialData.requiere_certificado));
-  const [orden, setOrden] = useState(initialData.orden ?? 10);
+  const orden = initialData.orden ?? 10;
   const productosSeleccionables = useMemo(() => productos.filter((producto) =>
     Number(producto.categoria_id) === Number(categoria.id)
     || tarifasAsignadas.some((tarifa) => Number(tarifa.producto_facturacion_id) === Number(producto.id))
@@ -118,7 +118,7 @@ export function ServicioModal({
       const productoSede = productoTarifa || productoPredeterminado;
       inicial[sede.key] = {
         seleccionada: Boolean(tarifa?.activo),
-        precio: tarifa ? String(tarifa.precio) : String(productoInicial?.precio_referencia || ''),
+        precio: tarifa ? String(tarifa.precio) : String(productoSede?.precio_unitario ?? ''),
         productoId: productoSede ? String(productoSede.id) : '',
         productoBusqueda: productoSede?.codigo_sku || '',
         tarifaId: tarifa?.tarifa_id,
@@ -138,13 +138,12 @@ export function ServicioModal({
     if (productoFijo) return;
     const sku = value.trim().toUpperCase();
     const producto = productos.find((item) => String(item.codigo_sku).trim().toUpperCase() === sku);
-    const estado = sedes[key];
     actualizarSede(key, {
       productoBusqueda: value.toUpperCase(),
       productoId: producto ? String(producto.id) : '',
-      precio: !estado?.precio && producto?.precio_referencia != null
-        ? String(producto.precio_referencia)
-        : estado?.precio || ''
+      precio: producto?.precio_unitario != null
+        ? String(producto.precio_unitario)
+        : ''
     });
   };
 
@@ -180,10 +179,13 @@ export function ServicioModal({
     for (const [sedeKey, sede] of Object.entries(sedes).filter(([, item]) => item.seleccionada)) {
       const sedeConfigurada = sedesDisponibles.find((item) => item.key === sedeKey);
       const nombreSede = sedeConfigurada?.nombre || sedeKey;
-      const precio = Number(sede.precio);
-      if (!Number.isFinite(precio) || precio <= 0) throw new Error(`La sede ${nombreSede} debe tener un precio mayor que cero.`);
       const problemaProducto = problemaProductoFiscal(sede.productoId, sede.productoBusqueda);
       if (problemaProducto) throw new Error(`La sede ${nombreSede}: ${problemaProducto}`);
+      const producto = productos.find((item) => String(item.id) === String(sede.productoId));
+      const precio = Number(producto?.precio_unitario);
+      if (!Number.isFinite(precio) || precio <= 0) {
+        throw new Error(`El producto fiscal de la sede ${nombreSede} debe tener un precio unitario mayor que cero.`);
+      }
     }
   };
 
@@ -216,7 +218,8 @@ export function ServicioModal({
         const estado = sedes[sede.key];
         if (!estado) continue;
         if (estado.seleccionada) {
-          const datos = { precio: Number(estado.precio), producto_facturacion_id: Number(estado.productoId), activo: true };
+          const producto = productos.find((item) => String(item.id) === String(estado.productoId));
+          const datos = { precio: Number(producto?.precio_unitario), producto_facturacion_id: Number(estado.productoId), activo: true };
           if (estado.tarifaId) await faregasTarifasAdminApi.editar(estado.tarifaId, datos);
           else await faregasTarifasAdminApi.crear({ planta_key: sede.key, servicio_id: servicioId, ...datos });
         } else if (estado.tarifaId && estado.activaOriginalmente) {
@@ -259,7 +262,6 @@ export function ServicioModal({
                       <option value="TALLER_GLP_INICIAL">Taller GLP Inicial</option>
                       <option value="TALLER_GLP_ANUAL">Taller GLP Anual</option></select></label>}
               <label className="flex items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={requiereVehiculo} onChange={(event) => setRequiereVehiculo(event.target.checked)} className="h-4 w-4" />Requiere vehículo en planta</label>
-              <label className="text-sm font-semibold text-slate-700">Orden en Nuevo Certificado<input type="number" value={orden} onChange={(event) => setOrden(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border p-2" /></label>
             </div>
             {generaCertificado && (
               <p className="mt-3 text-xs text-slate-500">
@@ -269,8 +271,8 @@ export function ServicioModal({
           </section>
           <section className="rounded-xl border border-slate-200 p-4">
             <div className="mb-3">
-              <h4 className="font-bold text-slate-800">3. Sedes, precio y producto fiscal</h4>
-              <p className="mt-1 text-xs text-slate-500">Estas selecciones son las tarifas reales de la operación; no se guardan en una tabla duplicada.</p>
+              <h4 className="font-bold text-slate-800">3. Sedes y producto fiscal</h4>
+              <p className="mt-1 text-xs text-slate-500">Cada sede usa automáticamente el precio unitario del producto fiscal seleccionado.</p>
             </div>
 
             {!hayProductosFiscalesValidos && (
@@ -316,7 +318,7 @@ export function ServicioModal({
                             ...(event.target.checked && productoFijo ? {
                               productoId: String(productoFijo.id),
                               productoBusqueda: productoFijo.codigo_sku,
-                              precio: estado.precio || String(productoFijo.precio_referencia || '')
+                              precio: String(productoFijo.precio_unitario ?? '')
                             } : {})
                           })}
                           className="h-4 w-4"
@@ -326,7 +328,7 @@ export function ServicioModal({
 
                       {estado.seleccionada && (
                         <div className="mt-3 space-y-2">
-                          <div className="grid gap-2 sm:grid-cols-[1fr_7rem]">
+                          <div>
                             <input
                               required
                               type="text"
@@ -339,20 +341,10 @@ export function ServicioModal({
                               title={productoFijo ? 'Esta operación pertenece únicamente a este producto fiscal.' : undefined}
                               className={`min-w-0 rounded-lg border bg-white p-2 text-xs ${problemaProducto ? 'border-amber-400' : ''}`}
                             />
-                            <input
-                              required
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={estado.precio}
-                              onChange={(event) => actualizarSede(sede.key, { precio: event.target.value })}
-                              placeholder="Precio"
-                              className="rounded-lg border p-2 text-xs"
-                            />
                           </div>
                           {productoSeleccionado && (
                             <p className="text-xs text-slate-600">
-                              <b>{productoSeleccionado.descripcion}</b> · {productoSeleccionado.categoria_nombre || 'Sin categoría'}
+                              <b>{productoSeleccionado.descripcion}</b> · {productoSeleccionado.categoria_nombre || 'Sin categoría'} · Precio unitario: <b>S/ {Number(productoSeleccionado.precio_unitario || 0).toFixed(2)}</b>
                             </p>
                           )}
                           {problemaProducto && (

@@ -77,16 +77,18 @@ describe('las secciones del modal son las pedidas', () => {
     expect(MODAL).toMatch(/>Nombre<input required/);
   });
 
-  it('2. Certificado: genera certificado, tipo, vehículo y orden', () => {
+  it('2. Certificado: genera certificado, tipo y vehículo, sin orden visible', () => {
     expect(MODAL).toMatch(/2\. Certificado/);
     expect(MODAL).toMatch(/Genera certificado/);
     expect(MODAL).toMatch(/Tipo de certificado/);
     expect(MODAL).toMatch(/Requiere veh\u00EDculo en planta/);
-    expect(MODAL).toMatch(/Orden en Nuevo Certificado/);
+    expect(MODAL).not.toMatch(/Orden en Nuevo Certificado/);
   });
 
-  it('3. Sedes, precio y producto fiscal', () => {
-    expect(MODAL).toMatch(/3\. Sedes, precio y producto fiscal/);
+  it('3. Sedes usa el precio unitario del producto sin pedir otro precio', () => {
+    expect(MODAL).toMatch(/3\. Sedes y producto fiscal/);
+    expect(MODAL).toMatch(/producto\?\.precio_unitario/);
+    expect(MODAL).not.toMatch(/placeholder="Precio"/);
   });
 });
 

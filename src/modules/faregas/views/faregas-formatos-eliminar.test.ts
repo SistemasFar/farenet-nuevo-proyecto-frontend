@@ -100,14 +100,17 @@ describe('después de eliminar se refresca el listado', () => {
   });
 });
 
-describe('el botón Asignar y el resto del flujo no cambian', () => {
-  it('sigue habiendo Asignar / Crear variante', () => {
-    expect(MODAL).toMatch(/modo === 'EXISTENTE' \? 'Asignar' : 'Crear variante'/);
+describe('el modal sólo permite usar un formato existente', () => {
+  it('mantiene Asignar y oculta creación y variantes', () => {
+    expect(MODAL).toMatch(/>\s*Asignar\s*</);
+    expect(MODAL).not.toMatch(/Crear formato dinámico/);
+    expect(MODAL).not.toMatch(/Variante de protegido/);
+    expect(MODAL).not.toMatch(/Crear variante/);
   });
 
-  it('sigue creando formato y variante', () => {
-    expect(codigo(MODAL)).toMatch(/crearFormato\(/);
-    expect(codigo(MODAL)).toMatch(/crearVarianteFormato\(/);
+  it('sólo asigna el formato seleccionado', () => {
+    expect(codigo(MODAL)).not.toMatch(/crearFormato\(/);
+    expect(codigo(MODAL)).not.toMatch(/crearVarianteFormato\(/);
     expect(codigo(MODAL)).toMatch(/asignarFormato\(servicio\.id, formato\.id\)/);
   });
 
