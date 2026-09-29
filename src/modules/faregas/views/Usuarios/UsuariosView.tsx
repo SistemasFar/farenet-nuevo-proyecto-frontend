@@ -245,8 +245,36 @@ export function UsuariosView() {
     }
   };
 
+  // Submódulos del módulo Chips. Se muestran indentados bajo "Chips" y
+  // comparten su ciclo de vida: sin el permiso padre no tienen sentido, así que
+  // desmarcar Chips los desmarca a todos y dejarlos deshabilitados.
+  const SUBMODULOS_CHIPS = [
+    'MENU_CHIPS_INVENTARIO',
+    'MENU_CHIPS_TIPOS',
+    'MENU_CHIPS_VENTAS'
+  ] as const;
+  const PERMISO_CHIPS = 'MENU_CHIPS';
+
   const togglePermiso = (clave: string) => {
     const current = formData.permisos || [];
+
+    // Desmarcar Chips se lleva por delante sus submódulos.
+    if (clave === PERMISO_CHIPS && current.includes(PERMISO_CHIPS)) {
+      setFormData({
+        ...formData,
+        permisos: current.filter((p: string) => p !== PERMISO_CHIPS && !SUBMODULOS_CHIPS.includes(p as any))
+      });
+      return;
+    }
+
+    // Marcar Chips habilita sus tres submódulos sin marcar ninguno: se deja que
+    // el administrador elija cuáles, y editar el perfil sin tocar nada más no
+    // le quita acceso a lo que ya tenía.
+    if (clave === PERMISO_CHIPS) {
+      setFormData({ ...formData, permisos: [...current, clave] });
+      return;
+    }
+
     if (current.includes(clave)) {
       setFormData({ ...formData, permisos: current.filter((p: string) => p !== clave) });
     } else {
@@ -788,24 +816,58 @@ export function UsuariosView() {
 
                         <div className="border-t pt-4 mt-4">
                             <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Módulos / Menú</label>
-                            <div className="grid grid-cols-2 gap-2">
-                            {permisos.map(p => {
+                            {(() => {
                                 const isSistemas = formData.clave === 'SISTEMAS';
-                                const isChecked = isSistemas || (formData.permisos || []).includes(p.clave);
-                                
+                                const marcados = formData.permisos || [];
+                                const esSubmodulo = (clave: string) => (SUBMODULOS_CHIPS as readonly string[]).includes(clave);
+                                // Los submódulos no se listan sueltos: se anidan bajo Chips.
+                                const lista = permisos.filter((p: any) => !esSubmodulo(p.clave));
+                                const hijos = permisos.filter((p: any) => esSubmodulo(p.clave));
+                                const padreActivo = isSistemas || marcados.includes(PERMISO_CHIPS);
+                                // Chips sale de la grilla: ocupa su propio bloque de
+                                // ancho completo para que sus hijos queden debajo y no
+                                // se mezclen con Configuración, Facturación, etc.
+                                const padre = lista.find((p: any) => p.clave === PERMISO_CHIPS);
+                                const otros = lista.filter((p: any) => p.clave !== PERMISO_CHIPS);
+
+                                const casilla = (p: any, hijo: boolean) => {
+                                    const activo = isSistemas || marcados.includes(p.clave);
+                                    const bloqueado = isSistemas || (hijo && !padreActivo);
+                                    return (
+                                        <label key={p.clave}
+                                            className={`flex items-center gap-2 text-sm p-2 rounded border ${hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
+                                            title={hijo && !padreActivo && !isSistemas ? 'Active primero Chips' : undefined}>
+                                            <input type="checkbox"
+                                                className="h-4 w-4 text-[#052a79]"
+                                                checked={activo}
+                                                onChange={() => !bloqueado && togglePermiso(p.clave)}
+                                                disabled={bloqueado}
+                                            />
+                                            <span className={`font-medium ${hijo ? 'text-slate-600 text-xs' : 'text-slate-700'}`}>{p.nombre}</span>
+                                        </label>
+                                    );
+                                };
+
                                 return (
-                                <label key={p.clave} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${isSistemas ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
-                                    <input type="checkbox"
-                                    className="h-4 w-4 text-[#052a79]"
-                                    checked={isChecked}
-                                    onChange={() => !isSistemas && togglePermiso(p.clave)}
-                                    disabled={isSistemas}
-                                    />
-                                    <span className="font-medium text-slate-700">{p.nombre}</span>
-                                </label>
+                                    <div className="space-y-3">
+                                        {padre && (
+                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {casilla(padre, false)}
+                                                </div>
+                                                {/* La línea vertical es la guía visual de la
+                                                    jerarquía: los hijos cuelgan de Chips. */}
+                                                <div className="mt-2 ml-3 space-y-1.5 border-l-2 border-slate-300 pl-3">
+                                                    {hijos.map((h: any) => casilla(h, true))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            {otros.map((p: any) => casilla(p, false))}
+                                        </div>
+                                    </div>
                                 );
-                            })}
-                            </div>
+                            })()}
                         </div>
                     </>
                 )}

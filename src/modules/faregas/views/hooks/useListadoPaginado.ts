@@ -5,9 +5,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *
  * Centraliza las reglas que el resto de la aplicación cumple a mano:
  *  - `page` arranca en 1 y `pageSize` en 10.
- *  - Cualquier cambio de filtro vuelve a la página 1.
  *  - Un listado marcado como `transaccional` abre en HOY -> HOY, y "limpiar"
  *    restaura HOY -> HOY (nunca "todo el histórico").
+ *  - El backend es quien filtra: no hay filtrado en memoria sobre la página.
+ *
+ * DISTINCIÓN IMPORTANTE entre los dos estados de filtro:
+ *
+ *  - `filtros` es lo que el usuario VE en los campos. `setFiltro` sólo edita
+ *    ese borrador; no dispara ninguna consulta.
+ *  - `aplicados` es lo que se pidió al backend. Sólo cambia al pulsar "Buscar"
+ *    (`aplicarFiltros`) o "Limpiar" (`limpiarFiltros`).
+ *
+ * Antes esta distinción no existía: el efecto que recarga dependía de
+ * `[page, pageSize]` y `aplicarFiltros`/`limpiarFiltros` sólo hacían
+ * `setPage(1)`. Como `setPage(1)` sobre la página 1 es un no-op de React, los
+ * botones BUSCAR y LIMPIAR no recargaban nada: la tabla seguía mostrando los
+ * datos del rango anterior.
  *
  * `cargar` recibe los parámetros ya resueltos y debe devolver el sobre del
  * backend ({ items, total, page, limit, totalPages }).
@@ -63,19 +76,26 @@ export function useListadoPaginado<T>({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [rangoError, setRangoError] = useState('');
-  const [filtros, setFiltros] = useState<Record<string, string>>(() => ({
+
+  const iniciales = {
     ...filtrosIniciales,
     ...(transaccional ? { fechaDesde: hoy, fechaHasta: hoy } : {})
-  }));
+  };
+  // Lo que el usuario ve en los campos (borrador).
+  const [filtros, setFiltros] = useState<Record<string, string>>(() => ({ ...iniciales }));
+  // Lo que realmente se consulta al backend.
+  const [aplicados, setAplicados] = useState<Record<string, string>>(() => ({ ...iniciales }));
 
   // Ref para que cambiar de callback no dispare bucles de request.
   const cargarRef = useRef(cargar);
   cargarRef.current = cargar;
+  const aplicadosRef = useRef(aplicados);
+  aplicadosRef.current = aplicados;
   const filtrosRef = useRef(filtros);
   filtrosRef.current = filtros;
 
   const refrescar = useCallback(async (pagina: number, tamanho: number) => {
-    const actuales = filtrosRef.current;
+    const actuales = aplicadosRef.current;
     // Validación de rango: no se consulta y no se intercambian fechas.
     const desde = String(actuales.fechaDesde || '');
     const hasta = String(actuales.fechaHasta || '');
@@ -112,28 +132,35 @@ export function useListadoPaginado<T>({
     }
   }, []);
 
+  // Depende de `aplicados`: por eso BUSCAR y LIMPIAR sí consultan aunque ya
+  // estemos en la página 1 (donde `setPage(1)` no produce ningún cambio).
   useEffect(() => {
     void refrescar(page, pageSize);
-  }, [page, pageSize, refrescar]);
+  }, [page, pageSize, aplicados, refrescar]);
 
-  /** Cambiar un filtro SIEMPRE vuelve a la página 1. */
+  /** Edita un campo del formulario. NO consulta: eso es "Buscar". */
   const setFiltro = useCallback((campo: string, valor: string) => {
     setFiltros((prev) => ({ ...prev, [campo]: valor }));
-    setPage(1);
   }, []);
 
+  /** "Buscar": manda los filtros al backend y vuelve a la página 1. */
   const aplicarFiltros = useCallback((nuevos?: Record<string, string>) => {
-    if (nuevos) setFiltros((prev) => ({ ...prev, ...nuevos }));
+    const base = nuevos
+      ? { ...filtrosRef.current, ...nuevos }
+      : { ...filtrosRef.current };
+    setFiltros(base);
+    setAplicados(base);
     setPage(1);
   }, []);
 
   /** "Limpiar" restaura los filtros propios y, si es transaccional, HOY -> HOY. */
   const limpiarFiltros = useCallback(() => {
-    setFiltros({
-      ...filtrosIniciales,
-      ...(transaccional ? { fechaDesde: hoy, fechaHasta: hoy } : {})
-    });
+    const base = { ...iniciales };
+    setFiltros(base);
+    setAplicados(base);
     setPage(1);
+    // `iniciales` cambia de identidad en cada render; se compara por valor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtrosIniciales, transaccional, hoy]);
 
   const cambiarPageSize = useCallback((nuevo: number) => {

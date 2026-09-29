@@ -72,6 +72,14 @@ describe('componente de paginación', () => {
 // ===========================================================================
 
 describe('hook de listado paginado', () => {
+  /** Recorta un solo callback del hook: desde `marca` hasta la siguiente declaración. */
+  const bloque = (marca: string) => {
+    const ini = HOOK.indexOf(marca);
+    expect(ini).toBeGreaterThan(-1);
+    const fin = HOOK.indexOf('\n\n', ini);
+    return HOOK.slice(ini, fin === -1 ? undefined : fin);
+  };
+
   it('arranca en la página 1 con 10 por página', () => {
     expect(HOOK).toMatch(/const \[page, setPage\] = useState\(1\);/);
     expect(HOOK).toMatch(/pageSizePorDefecto = 10/);
@@ -83,12 +91,30 @@ describe('hook de listado paginado', () => {
 
   it('"limpiar" restaura HOY -> HOY, nunca vacío', () => {
     expect(HOOK).toMatch(/const limpiarFiltros = useCallback\(\(\) => \{/);
-    expect(HOOK).toMatch(/setFiltros\(\{\s*\.\.\.filtrosIniciales,\s*\.\.\.\(transaccional \? \{ fechaDesde: hoy, fechaHasta: hoy \} : \{\}\)/);
+    // Los valores por defecto viven en `iniciales`, que es la única fuente.
+    expect(HOOK).toMatch(/const iniciales = \{\s*\.\.\.filtrosIniciales,\s*\.\.\.\(transaccional \? \{ fechaDesde: hoy, fechaHasta: hoy \} : \{\}\)\s*\};/);
+    // "Limpiar" devuelve el formulario y lo aplicado a ese mismo valor por
+    // defecto, de modo que el backend vuelve a traer HOY -> HOY.
+    const b = bloque('const limpiarFiltros = useCallback');
+    expect(b).toMatch(/const base = \{ \.\.\.iniciales \};/);
+    expect(b).toMatch(/setFiltros\(base\);/);
+    expect(b).toMatch(/setAplicados\(base\);/);
+    expect(b).toMatch(/setPage\(1\);/);
   });
 
-  it('cambiar un filtro vuelve a la página 1', () => {
-    const bloque = HOOK.slice(HOOK.indexOf('const setFiltro = useCallback'));
-    expect(bloque).toMatch(/setPage\(1\);/);
+  it('editar un campo NO dispara la consulta: eso es "Buscar"', () => {
+    const b = bloque('const setFiltro = useCallback');
+    expect(b).toMatch(/setFiltros\(\(prev\) => \(\{ \.\.\.prev, \[campo\]: valor \}\)\);/);
+    // Ni setPage(1) ni consulta: escribir una fecha no recarga la tabla.
+    expect(b).not.toMatch(/setPage\(1\)/);
+    expect(b).not.toMatch(/setAplicados/);
+  });
+
+  it('"Buscar" manda los filtros al backend y vuelve a la página 1', () => {
+    const b = bloque('const aplicarFiltros = useCallback');
+    expect(b).toMatch(/setFiltros\(base\);/);
+    expect(b).toMatch(/setAplicados\(base\);/);
+    expect(b).toMatch(/setPage\(1\);/);
   });
 
   it('cambiar el tamaño de página también vuelve a la 1', () => {
@@ -113,9 +139,18 @@ describe('hook de listado paginado', () => {
     // dispara peticiones nuevas.
     expect(HOOK).toMatch(/cargarRef = useRef\(cargar\);/);
     expect(HOOK).toMatch(/cargarRef\.current = cargar;/);
-    // Y el efecto sólo depende de page / pageSize / refrescar estable.
-    expect(HOOK).toMatch(/\}, \[page, pageSize, refrescar\]\);/);
+    // Y `refrescar` sigue siendo estable (dependencias vacías).
     expect(HOOK).toMatch(/const refrescar = useCallback\(async \(pagina: number, tamanho: number\) => \{[\s\S]*?\}, \[\]\);/);
+  });
+
+  it('el efecto recarga al cambiar los filtros APLICADOS, no al escribirlos', () => {
+    // Éste era el bug de BUSCAR/LIMPIAR: el efecto sólo miraba page/pageSize,
+    // así que sobre la página 1 (donde setPage(1) no produce cambio) los botones
+    // no llegaban a consultar nada.
+    expect(HOOK).toMatch(/\}, \[page, pageSize, aplicados, refrescar\]\);/);
+    // Y la consulta lee los aplicados, no el borrador del formulario.
+    expect(HOOK).toMatch(/const actuales = aplicadosRef\.current;/);
+    expect(HOOK).toMatch(/aplicadosRef = useRef\(aplicados\);/);
   });
 
   it('acepta un backend que todavía devuelve un arreglo plano', () => {
@@ -223,7 +258,11 @@ describe('los catálogos maestros no se filtran por fecha', () => {
   it('el hook sólo aplica fechas a los listados marcados transaccional', () => {
     // La fecha se inyecta únicamente si `transaccional` es true.
     expect(HOOK).toMatch(/transaccional \? \{ fechaDesde: hoy, fechaHasta: hoy \} : \{\}/);
-    expect(HOOK.match(/transaccional \? \{ fechaDesde/g)).toHaveLength(2);
+    // Aparece UNA sola vez: en `iniciales`. Antes estaba duplicado (en el
+    // useState y en limpiarFiltros), y esa duplicación era justamente la que
+    // hacía que el botón LIMPIAR dependiera de un setPage(1) inoperante.
+    expect(HOOK.match(/transaccional \? \{ fechaDesde/g)).toHaveLength(1);
+    expect(HOOK).toMatch(/const iniciales = \{/);
   });
 
   it('el componente de paginación no manda fechas al backend', () => {

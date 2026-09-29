@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasChipsApi } from '../../services/faregas-chips.api';
@@ -91,6 +91,15 @@ export function ModalVentaChips({
   const [errorValidacion, setErrorValidacion] = useState('');
   const [errorPago, setErrorPago] = useState('');
   const [mensaje, setMensaje] = useState('');
+  // El bloque de resultado está al final del modal. Cuando aparece, se acerca
+  // con `block: 'nearest'`, que desplaza lo mínimo indispensable: nunca sube
+  // al principio de la página ni usa window.scrollTo(0, 0).
+  const resultadoRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!resultadoVenta) return;
+    resultadoRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [resultadoVenta]);
 
   const parsed = parseChipScan(scan);
   const chipsValidados = resultadoValidacion?.items.filter((item) => item.validoParaVenta) ?? [];
@@ -540,29 +549,6 @@ export function ModalVentaChips({
             {errorValidacion && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-600">{errorValidacion}</p>}
             {error && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-600">{error}</p>}
             {mensaje && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-700">{mensaje}</p>}
-            {resultadoVenta && (
-              <div className={`rounded-xl border p-4 ${resultadoVenta.facturacionEstado === 'ACEPTADO' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
-                <p className="font-bold text-slate-900">{resultadoVenta.facturacionEstado === 'ACEPTADO' ? 'COMPROBANTE EMITIDO CORRECTAMENTE' : 'RESULTADO DE LA EMISIÓN'}</p>
-                {resultadoVenta.facturacion?.nroComprobante && <p className="mt-1 font-mono text-lg font-bold text-[#052A79]">{resultadoVenta.facturacion.nroComprobante}</p>}
-                <p className="mt-1 text-sm text-slate-600">Operación #{resultadoVenta.operacionId} · Estado: {resultadoVenta.facturacionEstado}</p>
-                {resultadoVenta.facturacion?.enlacePdf && (
-                  <a href={resultadoVenta.facturacion.enlacePdf} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white">VER COMPROBANTE</a>
-                )}
-                {esComprobanteReintentable(resultadoVenta?.facturacion) && (
-                  <button
-                    type="button"
-                    onClick={() => void handleReintentarFacturacion()}
-                    disabled={reintentandoFacturacion}
-                    aria-busy={reintentandoFacturacion}
-                    title="Reintentar la emision de este comprobante sin generar otro numero"
-                    className="ml-2 mt-3 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {reintentandoFacturacion ? 'REINTENTANDO...' : 'REINTENTAR COMPROBANTE'}
-                  </button>
-                )}
-                <button type="button" onClick={onClose} className="ml-2 mt-3 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700">CERRAR</button>
-              </div>
-            )}
           </div>
         </div>
 
@@ -587,7 +573,10 @@ export function ModalVentaChips({
           </fieldset>
         </div>
 
-        <div className="flex flex-col-reverse justify-end gap-3 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-4 sm:flex-row">
+        {/* Mientras no haya resultado, la barra de acción sigue cerrando el
+            modal. Cuando el resultado aparece debajo, las esquinas pasan al
+            bloque de resultado para que no quede un corte en medio. */}
+        <div className={`flex flex-col-reverse justify-end gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:flex-row ${resultadoVenta ? '' : 'rounded-b-2xl'}`}>
           <button onClick={onClose} disabled={loadingVenta || validandoChips} className="w-full rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Cancelar</button>
           <button
             onClick={() => void handleSubmit()}
@@ -597,6 +586,42 @@ export function ModalVentaChips({
             {loadingVenta ? 'Procesando...' : 'Confirmar Venta y Emitir'}
           </button>
         </div>
+
+        {/* El resultado de la emisión vive AQUÍ, al final del flujo y debajo del
+            botón que lo produce. Antes se renderizaba dentro de la columna
+            "2. Chips a vender", muy por encima del botón, así que tras emitir
+            el usuario no veía nada cambiar: el resultado quedaba fuera de
+            pantalla. Sólo se mueve en el DOM; la lógica de emisión y los
+            reintentos son los mismos. */}
+        {resultadoVenta && (
+          <div
+            ref={resultadoRef}
+            aria-live="polite"
+            className={`mx-4 mb-4 rounded-b-2xl border p-4 sm:mx-5 sm:mb-5 ${resultadoVenta.facturacionEstado === 'ACEPTADO' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
+          >
+            <p className="font-bold text-slate-900">{resultadoVenta.facturacionEstado === 'ACEPTADO' ? 'COMPROBANTE EMITIDO CORRECTAMENTE' : 'RESULTADO DE LA EMISIÓN'}</p>
+            {resultadoVenta.facturacion?.nroComprobante && <p className="mt-1 font-mono text-lg font-bold text-[#052A79]">{resultadoVenta.facturacion.nroComprobante}</p>}
+            <p className="mt-1 text-sm text-slate-600">Operación #{resultadoVenta.operacionId} · Estado: {resultadoVenta.facturacionEstado}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {resultadoVenta.facturacion?.enlacePdf && (
+                <a href={resultadoVenta.facturacion.enlacePdf} target="_blank" rel="noreferrer" className="inline-flex rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white">VER COMPROBANTE</a>
+              )}
+              {esComprobanteReintentable(resultadoVenta?.facturacion) && (
+                <button
+                  type="button"
+                  onClick={() => void handleReintentarFacturacion()}
+                  disabled={reintentandoFacturacion}
+                  aria-busy={reintentandoFacturacion}
+                  title="Reintentar la emision de este comprobante sin generar otro numero"
+                  className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {reintentandoFacturacion ? 'REINTENTANDO...' : 'REINTENTAR COMPROBANTE'}
+                </button>
+              )}
+              <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">CERRAR</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

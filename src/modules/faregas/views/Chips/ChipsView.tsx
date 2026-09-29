@@ -37,10 +37,32 @@ const renderImpactoTipoChip = (impacto: ImpactoTipoChip) => {
 };
 
 export function ChipsView() {
-  const { plantaNombre, plantaKey } = useOutletContext<MainLayoutContext>();
+  const { plantaNombre, plantaKey, permisos } = useOutletContext<MainLayoutContext>();
   const [searchParams] = useSearchParams();
   const productoSolicitadoId = Number(searchParams.get('producto') || 0);
-  const [activeTab, setActiveTab] = useState<'INVENTARIO' | 'PRODUCTOS'>(searchParams.get('tab') === 'productos' ? 'PRODUCTOS' : 'INVENTARIO');
+
+  // Submódulos de Chips. MENU_CHIPS da el módulo; los MENU_CHIPS_* dan cada
+  // pestaña. El botón de venta sigue dependiendo de CHIPS_VENDER (capacidad
+  // operativa), no de la navegación.
+  const lista = Array.isArray(permisos) ? permisos : [];
+  const puedeInventario = lista.includes('MENU_CHIPS_INVENTARIO');
+  const puedeTipos = lista.includes('MENU_CHIPS_TIPOS');
+  const puedeVentas = lista.includes('MENU_CHIPS_VENTAS');
+
+  const PESTANAS = useMemo(() => ([
+    { id: 'INVENTARIO', permiso: puedeInventario, etiqueta: 'INVENTARIO DE CHIPS', Icono: Cpu },
+    { id: 'PRODUCTOS', permiso: puedeTipos, etiqueta: 'TIPOS DE CHIP', Icono: Boxes },
+    { id: 'VENTAS', permiso: puedeVentas, etiqueta: 'VENTAS DE CHIPS', Icono: FileText }
+  ] as const).filter((p) => p.permiso), [puedeInventario, puedeTipos, puedeVentas]);
+
+  // Si la URL pide una pestaña que el perfil no tiene, se cae a la primera
+  // permitida en lugar de dejar la pantalla vacía.
+  const [activeTab, setActiveTab] = useState<'INVENTARIO' | 'PRODUCTOS' | 'VENTAS'>(() => {
+    const pedida = searchParams.get('tab') === 'productos' ? 'PRODUCTOS' : 'INVENTARIO';
+    if (pedida === 'PRODUCTOS' && !puedeTipos) return puedeVentas ? 'VENTAS' : 'INVENTARIO';
+    if (pedida === 'INVENTARIO' && !puedeInventario) return puedeVentas ? 'VENTAS' : 'INVENTARIO';
+    return pedida;
+  });
   const [productoSolicitadoAtendido, setProductoSolicitadoAtendido] = useState(false);
   const [resumen, setResumen] = useState<ChipResumen>(empty);
   const [chips, setChips] = useState<Chip[]>([]);
@@ -85,17 +107,29 @@ export function ChipsView() {
 
   const cargar = useCallback(async () => {
     try {
-      const [r, l, prods, cat] = await Promise.all([
-        faregasChipsApi.resumen(selectedProductId === '' ? undefined : Number(selectedProductId)),
-        faregasChipsApi.listar({
-          buscar,
-          estado: filtroEstado === 'TODOS' ? undefined : filtroEstado,
-          page: chipsPagina,
-          pageSize: chipsPageSize
-        }),
-        faregasChipsApi.listarProductosInventariables(),
-        faregasChipsApi.catalogosProductosInventariables()
-      ]);
+      // Cada pestaña pide sólo lo suyo. Antes se pedían las cuatro cosas
+      // siempre, así que un perfil sin uno de los submódulos acumulaba 403 en
+      // pantalla aunque nunca abriera esa pestaña.
+      const resumenP = puedeInventario
+        ? faregasChipsApi.resumen(selectedProductId === '' ? undefined : Number(selectedProductId))
+        : Promise.resolve(empty);
+      const chipsP = puedeInventario
+        ? faregasChipsApi.listar({
+            buscar,
+            estado: filtroEstado === 'TODOS' ? undefined : filtroEstado,
+            page: chipsPagina,
+            pageSize: chipsPageSize
+          })
+        : Promise.resolve({ items: [] as Chip[], total: 0, page: 1, limit: 10, totalPages: 0 });
+      // El catálogo de tipos lo usan las dos primeras pestañas.
+      const prodsP = (puedeInventario || puedeTipos)
+        ? faregasChipsApi.listarProductosInventariables()
+        : Promise.resolve([] as ProductoInventariable[]);
+      const catP = puedeInventario
+        ? faregasChipsApi.catalogosProductosInventariables()
+        : Promise.resolve({ sedes: [] as { key: string; nombre: string }[] });
+
+      const [r, l, prods, cat] = await Promise.all([resumenP, chipsP, prodsP, catP]);
       setResumen(r);
       setChips(l.items);
       setChipsResumen({
@@ -114,7 +148,7 @@ export function ChipsView() {
     } catch (error: unknown) {
       setError(errorMessage(error));
     }
-  }, [buscar, filtroEstado, selectedProductId, chipsPagina, chipsPageSize]);
+  }, [buscar, filtroEstado, selectedProductId, chipsPagina, chipsPageSize, puedeInventario, puedeTipos]);
 
   // Cualquier cambio de filtro del inventario vuelve a la pagina 1.
   const aplicarFiltroInventario = (campo: 'buscar' | 'estado', valor: string) => {
@@ -320,9 +354,12 @@ export function ChipsView() {
     </div>
 
     <div className="grid grid-cols-1 gap-2 rounded-xl bg-slate-200 p-1 sm:grid-cols-3">
-      <button type="button" onClick={() => setActiveTab('INVENTARIO')} className={`flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-xs font-bold transition ${activeTab === 'INVENTARIO' ? 'bg-[#052A79] text-white shadow' : 'text-slate-600 hover:bg-white'}`}><Cpu size={17} /> INVENTARIO DE CHIPS</button>
-      <button type="button" onClick={() => setActiveTab('PRODUCTOS')} className={`flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-xs font-bold transition ${activeTab === 'PRODUCTOS' ? 'bg-[#052A79] text-white shadow' : 'text-slate-600 hover:bg-white'}`}><Boxes size={17} /> TIPOS DE CHIP</button>
-      <button type="button" onClick={() => setActiveTab('VENTAS')} className={`flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-xs font-bold transition ${activeTab === 'VENTAS' ? 'bg-[#052A79] text-white shadow' : 'text-slate-600 hover:bg-white'}`}><FileText size={17} /> VENTAS DE CHIPS</button>
+      {PESTANAS.map(({ id, etiqueta, Icono }) => (
+        <button key={id} type="button" onClick={() => setActiveTab(id)}
+          className={`flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-xs font-bold transition ${activeTab === id ? 'bg-[#052A79] text-white shadow' : 'text-slate-600 hover:bg-white'}`}>
+          <Icono size={17} /> {etiqueta}
+        </button>
+      ))}
     </div>
 
     {activeTab === 'PRODUCTOS' && <div className="space-y-4">

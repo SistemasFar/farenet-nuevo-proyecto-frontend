@@ -50,6 +50,15 @@ export const faregasFormatosApi = {
     }) as Promise<Formato>;
   },
 
+  /**
+   * Elimina un formato. Sólo funciona si no está protegido y no está en uso: la
+   * validación real está en el backend, que devuelve un mensaje claro en lugar
+   * de un error de clave foránea.
+   */
+  eliminarFormato: async (id: number): Promise<{ mensaje: string }> => {
+    return faregasFetch(`/formatos/${id}`, { method: 'DELETE' }) as Promise<{ mensaje: string }>;
+  },
+
   listarVersiones: async (formatoId: number): Promise<FormatoVersion[]> => {
     return faregasFetch(`/formatos/${formatoId}/versiones`) as Promise<FormatoVersion[]>;
   },

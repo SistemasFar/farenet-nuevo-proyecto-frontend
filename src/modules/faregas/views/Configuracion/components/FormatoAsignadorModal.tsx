@@ -18,6 +18,7 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [aviso, setAviso] = useState('');
   const [modo, setModo] = useState<ModoAsignacion>('EXISTENTE');
   const [filtro, setFiltro] = useState('');
   const [nuevoNombre, setNuevoNombre] = useState('');
@@ -55,6 +56,34 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
     try {
       onAsignado(await accion());
     } catch (cause) {
+      setError(mensajeError(cause));
+      setSaving(false);
+    }
+  };
+
+  const cargarFormatos = async () => {
+    const resultado = await faregasFormatosApi.listarFormatos();
+    setFormatos(resultado.filter((formato) => formato.activo));
+  };
+
+  const eliminarFormato = async (formato: Formato) => {
+    const confirmado = window.confirm(
+      `¿Eliminar el formato "${formato.nombre}"?\n\n`
+      + `Código: ${formato.codigo}\n\n`
+      + 'Esta acción eliminará el formato si no está siendo utilizado.'
+    );
+    if (!confirmado) return;
+    setSaving(true);
+    setError('');
+    try {
+      await faregasFormatosApi.eliminarFormato(formato.id);
+      // Se recarga sólo la lista de formatos: la pantalla no se vuelve a pintar
+      // entera y el formato desaparece de inmediato.
+      await cargarFormatos();
+      setAviso('Formato eliminado correctamente.');
+    } catch (cause) {
+      // El backend explica por qué no se puede eliminar (protegido, en uso o
+      // con variantes), en vez de un error genérico de base de datos.
       setError(mensajeError(cause));
       setSaving(false);
     }
@@ -103,7 +132,7 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
             ['NUEVO', 'Crear formato dinámico'],
             ['VARIANTE_PROTEGIDO', 'Variante de protegido']
           ] as const).map(([id, label]) => (
-            <button key={id} type="button" onClick={() => { setModo(id); setError(''); }}
+            <button key={id} type="button" onClick={() => { setModo(id); setError(''); setAviso(''); }}
               className={`px-3 py-3 text-sm font-bold ${modo === id ? 'bg-blue-50 text-blue-800' : 'text-slate-500 hover:bg-slate-50'}`}>
               {label}
             </button>
@@ -111,7 +140,8 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
+          {error && <div className="mb-4 whitespace-pre-line rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
+          {aviso && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{aviso}</div>}
 
           {modo === 'NUEVO' ? (
             <form onSubmit={crearNuevo} className="mx-auto max-w-md space-y-4">
@@ -148,11 +178,21 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
                       <p className="mt-1 font-mono text-xs text-slate-500">{formato.codigo}</p>
                       <p className="mt-1 text-xs text-slate-500">{formato.motor}</p>
                     </div>
-                    <button type="button" disabled={saving}
-                      onClick={() => void (modo === 'EXISTENTE' ? asignarExistente(formato) : crearVariante(formato))}
-                      className="mt-4 rounded-lg border border-blue-200 p-2 font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50">
-                      {modo === 'EXISTENTE' ? 'Asignar' : 'Crear variante'}
-                    </button>
+                    <div className="mt-4 flex gap-2">
+                      <button type="button" disabled={saving}
+                        onClick={() => void (modo === 'EXISTENTE' ? asignarExistente(formato) : crearVariante(formato))}
+                        className="flex-1 rounded-lg border border-blue-200 p-2 font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50">
+                        {modo === 'EXISTENTE' ? 'Asignar' : 'Crear variante'}
+                      </button>
+                      {/* Un formato protegido nunca se elimina, ni se ofrece la
+                          opción: el backend también lo rechaza. */}
+                      {!formato.es_protegido && (
+                        <button type="button" disabled={saving} onClick={() => void eliminarFormato(formato)}
+                          className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50">
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>
