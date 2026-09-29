@@ -84,7 +84,6 @@ export interface CategoriaServicio {
   nombre: string;
   descripcion?: string | null;
   activo: boolean;
-  orden: number;
   productos_vinculados?: number;
   servicios_vinculados?: number;
 }
@@ -175,9 +174,34 @@ export const faregasConfigApi = {
     await api.put(`/api/faregas/config/sedes/${encodeURIComponent(sedeKey)}/empresa`, { empresa_key: empresaKey });
   },
 
-  obtenerSedes: async (): Promise<Sede[]> => {
-    const response = await api.get('/api/faregas/config/sedes');
-    return response.sedes;
+  /**
+   * Listado paginado de sedes. La búsqueda es por nombre de sede (obligatoria) y
+   * también acepta código y empresa.
+   *
+   * La paginación es REAL en el backend: LIMIT/OFFSET + COUNT con los mismos
+   * filtros, así que `total` es el del resultado filtrado y no el de la página.
+   * El endpoint sigue devolviendo además el arreglo `sedes` en la raíz, para no
+   * romper a cualquier consumidor que aún lo espere.
+   */
+  obtenerSedes: async (
+    filtros: { buscar?: string; page?: number; pageSize?: number } = {}
+  ): Promise<{ items: Sede[]; total: number; page: number; limit: number; totalPages: number }> => {
+    const params = new URLSearchParams();
+    if (filtros.buscar?.trim()) params.set('buscar', filtros.buscar.trim());
+    if (filtros.page) params.set('page', String(filtros.page));
+    if (filtros.pageSize) params.set('pageSize', String(filtros.pageSize));
+    const query = params.toString();
+    const response = await api.get(`/api/faregas/config/sedes${query ? `?${query}` : ''}`);
+    const items: Sede[] = response.items || response.sedes || [];
+    const limit = Number(response.limit || filtros.pageSize || 10);
+    const total = Number(response.total ?? items.length);
+    return {
+      items,
+      total,
+      page: Number(response.page || filtros.page || 1),
+      limit,
+      totalPages: Number(response.totalPages ?? (total > 0 ? Math.ceil(total / limit) : 0))
+    };
   },
 
   crearSede: async (sede: Partial<Sede>): Promise<void> => {

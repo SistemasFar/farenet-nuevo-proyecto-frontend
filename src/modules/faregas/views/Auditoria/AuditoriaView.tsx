@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Eye } from 'lucide-react';
+import { Paginacion } from '../components/Paginacion';
 import { faregasAuditoriaApi, type AuditoriaAccesoFaregas } from '../../services/faregas-auditoria.api';
 
 const MODULOS = [
@@ -79,6 +80,19 @@ const referencia = (item: AuditoriaAccesoFaregas) => {
     return '-';
 };
 
+/**
+ * Fecha local en formato YYYY-MM-DD, que es lo que espera `input type="date"`.
+ * Se arma con los getters locales a propósito: pasar la fecha por `toISOString()`
+ * la convertiría a UTC y, en la franja de la tarde, saltaría al día siguiente.
+ */
+const hoyLocal = () => {
+  const ahora = new Date();
+  const y = ahora.getFullYear();
+  const m = String(ahora.getMonth() + 1).padStart(2, '0');
+  const d = String(ahora.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 export function AuditoriaView() {
     const [registros, setRegistros] = useState<AuditoriaAccesoFaregas[]>([]);
     const [seleccionado, setSeleccionado] = useState<AuditoriaAccesoFaregas | null>(null);
@@ -88,21 +102,48 @@ export function AuditoriaView() {
     const [buscar, setBuscar] = useState('');
     const [username, setUsername] = useState('');
     const [exitoso, setExitoso] = useState('');
-    const [fechaInicio, setFechaInicio] = useState('');
-    const [fechaFin, setFechaFin] = useState('');
+    // Listado transaccional: abre en HOY -> HOY, nunca en todo el historico.
+    const [fechaInicio, setFechaInicio] = useState(hoyLocal());
+    const [fechaFin, setFechaFin] = useState(hoyLocal());
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [resumen, setResumen] = useState({ items: 0, total: 0, page: 1, limit: 10, totalPages: 0 });
+    const [rangoError, setRangoError] = useState('');
 
-    const cargarAuditoria = async (moduloSeleccionado = modulo, filtrosLimpios = false) => {
+    const cargarAuditoria = async (moduloSeleccionado = modulo, filtrosLimpios = false, paginaActual = page) => {
         try {
             setLoading(true);
             setError('');
-            setRegistros(await faregasAuditoriaApi.listarAccesos({
+            const desde = filtrosLimpios ? hoyLocal() : fechaInicio;
+            const hasta = filtrosLimpios ? hoyLocal() : fechaFin;
+            // Rango invertido: no se consulta y no se intercambian las fechas.
+            if (desde && hasta && desde > hasta) {
+                setRangoError('La fecha Desde no puede ser posterior a la fecha Hasta.');
+                setLoading(false);
+                return;
+            }
+            setRangoError('');
+            const respuesta = await faregasAuditoriaApi.listarAccesos({
                 modulo: moduloSeleccionado,
                 buscar: filtrosLimpios ? '' : buscar,
                 username: filtrosLimpios ? '' : username,
-                exitoso: filtrosLimpios ? '' : exitoso,
-                fechaInicio: filtrosLimpios ? '' : fechaInicio,
-                fechaFin: filtrosLimpios ? '' : fechaFin
-            }));
+                exitoso: filtrosLimpios ? '' : filtrosLimpios ? '' : exitoso,
+                fechaInicio: desde,
+                // El endpoint toma `fechaFin`, NO `fechaHasta`: mandar `fechaHasta`
+                // descartaba la fecha maxima en silencio y el rango se burlaba
+                // mostrando todo lo posterior al `desde`.
+                fechaFin: hasta,
+                page: paginaActual,
+                pageSize
+            });
+            setRegistros(respuesta.items);
+            setResumen({
+                items: respuesta.items.length,
+                total: respuesta.total,
+                page: respuesta.page,
+                limit: respuesta.limit,
+                totalPages: respuesta.totalPages
+            });
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al cargar auditoría.');
         } finally {
@@ -112,22 +153,51 @@ export function AuditoriaView() {
 
     const seleccionarModulo = (nuevoModulo: string) => {
         setModulo(nuevoModulo);
-        void cargarAuditoria(nuevoModulo);
+        setPage(1);
+        void cargarAuditoria(nuevoModulo, false, 1);
+    };
+
+    // Cualquier cambio de filtro vuelve a la pagina 1.
+    const aplicarFiltros = () => {
+        setPage(1);
+        void cargarAuditoria(modulo, false, 1);
+    };
+
+    const cambiarPageSize = (nuevo: number) => {
+        setPageSize(nuevo);
+        setPage(1);
+        void cargarAuditoria(modulo, false, 1);
+    };
+
+    const irAPagina = (nueva: number) => {
+        setPage(nueva);
+        void cargarAuditoria(modulo, false, nueva);
     };
 
     const limpiar = () => {
         setBuscar('');
         setUsername('');
         setExitoso('');
-        setFechaInicio('');
-        setFechaFin('');
-        void cargarAuditoria(modulo, true);
+        setFechaInicio(hoyLocal());
+        setFechaFin(hoyLocal());
+        setPage(1);
+        void cargarAuditoria(modulo, true, 1);
     };
 
     useEffect(() => {
         let activo = true;
-        faregasAuditoriaApi.listarAccesos({ modulo: 'INICIO' })
-            .then((data) => { if (activo) setRegistros(data); })
+        faregasAuditoriaApi.listarAccesos({ modulo: 'INICIO', fechaInicio: hoyLocal(), fechaFin: hoyLocal(), page: 1, pageSize: 10 })
+            .then((respuesta) => {
+                if (!activo) return;
+                setRegistros(respuesta.items);
+                setResumen({
+                    items: respuesta.items.length,
+                    total: respuesta.total,
+                    page: respuesta.page,
+                    limit: respuesta.limit,
+                    totalPages: respuesta.totalPages
+                });
+            })
             .catch((err: unknown) => { if (activo) setError(err instanceof Error ? err.message : 'Error al cargar auditoría.'); })
             .finally(() => { if (activo) setLoading(false); });
         return () => { activo = false; };
@@ -189,17 +259,18 @@ export function AuditoriaView() {
                         <input aria-label="Fecha hasta" type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79]" />
                     </div>
                     <div className="mt-3 flex gap-2">
-                        <button type="button" onClick={() => void cargarAuditoria()} disabled={loading} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{loading ? 'Buscando...' : 'Buscar'}</button>
+                        <button type="button" onClick={aplicarFiltros} disabled={loading} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{loading ? 'Buscando...' : 'Buscar'}</button>
                         <button type="button" onClick={limpiar} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">Limpiar</button>
                     </div>
                 </div>
             </div>
 
             {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+            {rangoError && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{rangoError}</div>}
 
             <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-                    <div><div className="font-semibold text-gray-700">Actividad registrada</div><div className="text-xs text-gray-500">{registros.length} registros encontrados</div></div>
+                    <div><div className="font-semibold text-gray-700">Actividad registrada</div><div className="text-xs text-gray-500">{resumen.total} registros encontrados</div></div>
                     <div className="flex gap-2">
                         <button type="button" onClick={exportarExcel} disabled={loading || registros.length === 0} className="flex items-center gap-1 rounded-lg bg-[#0F7B3E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b5f30] shadow-sm disabled:opacity-50">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -227,10 +298,17 @@ export function AuditoriaView() {
                                 <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.exitoso ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.exitoso ? 'Completado' : 'No completado'}</span></td>
                                 <td className="px-4 py-3"><button type="button" onClick={() => setSeleccionado(item)} title="Ver detalle" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors"><Eye size={18} /></button></td>
                             </tr>)}
-                            {!loading && registros.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500">No hay actividad registrada en este módulo.</td></tr>}
+                            {!loading && registros.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500">No se encontraron registros para el rango seleccionado.</td></tr>}
                         </tbody>
                     </table>
                 </div>
+                <Paginacion
+                    resumen={resumen}
+                    onCambioPagina={irAPagina}
+                    onCambioPageSize={cambiarPageSize}
+                    etiqueta="eventos"
+                    deshabilitado={loading}
+                />
             </div>
 
             {seleccionado && <DetalleEvento item={seleccionado} cerrar={() => setSeleccionado(null)} />}

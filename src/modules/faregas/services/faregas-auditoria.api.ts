@@ -12,6 +12,8 @@ export interface AuditoriaAccesoFiltro {
   plantaKey?: string;
   buscar?: string;
   modulo?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface AuditoriaAccesoFaregas {
@@ -36,8 +38,16 @@ export interface AuditoriaAccesoFaregas {
   datos: Record<string, unknown> | null;
 }
 
+export interface AuditoriaAccesoPaginado {
+  items: AuditoriaAccesoFaregas[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export const faregasAuditoriaApi = {
-  listarAccesos: async (filtros: AuditoriaAccesoFiltro = {}): Promise<AuditoriaAccesoFaregas[]> => {
+  listarAccesos: async (filtros: AuditoriaAccesoFiltro = {}): Promise<AuditoriaAccesoPaginado> => {
     const params = new URLSearchParams();
     if (filtros.username?.trim()) params.append('username', filtros.username.trim());
     if (filtros.evento?.trim()) params.append('evento', filtros.evento.trim());
@@ -50,11 +60,20 @@ export const faregasAuditoriaApi = {
     if (filtros.plantaKey?.trim()) params.append('plantaKey', filtros.plantaKey.trim());
     if (filtros.buscar?.trim()) params.append('buscar', filtros.buscar.trim());
     if (filtros.modulo?.trim()) params.append('modulo', filtros.modulo.trim());
+    if (filtros.page) params.append('page', String(filtros.page));
+    if (filtros.pageSize) params.append('pageSize', String(filtros.pageSize));
 
     const queryString = params.toString();
     const endpoint = queryString ? `/auditoria/accesos?${queryString}` : '/auditoria/accesos';
-    
+
     const response = await fetchWithToken(endpoint, { method: 'GET' });
-    return response.data || [];
+    const items = response.items || response.data || [];
+    return {
+      items,
+      total: Number(response.total ?? items.length),
+      page: Number(response.page || 1),
+      limit: Number(response.limit || 10),
+      totalPages: Number(response.totalPages || 0)
+    };
   }
 };

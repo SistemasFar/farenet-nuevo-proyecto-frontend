@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, FileText, Loader2, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, FileText, Loader2, RefreshCw, X } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { faregasChipsApi, type DetalleVentaChip } from '../../services/faregas-chips.api';
+import { esComprobanteReintentable } from './facturacionReintento';
 
 const money = (value: number | null | undefined) => `S/ ${Number(value || 0).toFixed(2)}`;
 const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString('es-PE') : '—';
@@ -22,24 +24,60 @@ export function ModalDetalleVentaChips({
   const [detalle, setDetalle] = useState<DetalleVentaChip | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reintentandoFacturacion, setReintentandoFacturacion] = useState(false);
+  const [errorReintento, setErrorReintento] = useState('');
 
-  useEffect(() => {
-    let activo = true;
-    const cargar = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const response = await faregasChipsApi.obtenerDetalleVenta(operacionId);
-        if (activo) setDetalle(response.venta);
-      } catch (e: unknown) {
-        if (activo) setError(e instanceof Error ? e.message : 'No se pudo consultar la venta.');
-      } finally {
-        if (activo) setLoading(false);
-      }
-    };
-    void cargar();
-    return () => { activo = false; };
+  const cargar = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await faregasChipsApi.obtenerDetalleVenta(operacionId);
+      setDetalle(response.venta);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo consultar la venta.');
+    } finally {
+      setLoading(false);
+    }
   }, [operacionId]);
+
+  useEffect(() => { void cargar(); }, [cargar]);
+
+  /**
+   * Reintenta la emisión del comprobante ya reservado de esta venta.
+   *
+   * No vuelve a vender: no manda el formulario de venta, no revalida el chip,
+   * no crea operación ni pago y no altera el estado VENDIDO. El backend
+   * reutiliza la serie y el número que ya están guardados, así que el
+   * comprobante sigue siendo el mismo aunque el reintento vuelva a fallar.
+   */
+  const handleReintentarFacturacion = async () => {
+    const comprobante = detalle?.facturacion;
+    if (!esComprobanteReintentable(comprobante)) return;
+
+    const confirmacion = await Swal.fire({
+      icon: 'question',
+      title: 'Reintentar comprobante',
+      html: `Se volverá a intentar emitir <b>${comprobante?.nroComprobante}</b>.<br>No se generará una nueva venta ni un nuevo número.`,
+      showCancelButton: true,
+      confirmButtonText: 'Reintentar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#052A79'
+    });
+    if (!confirmacion.isConfirmed) return;
+
+    setReintentandoFacturacion(true);
+    setErrorReintento('');
+    try {
+      await faregasChipsApi.reintentarFacturacionOperacion(operacionId);
+      // Se recarga el detalle para mostrar el estado real devuelto por el
+      // proveedor, sin cerrar el modal ni volver a listar las ventas.
+      await cargar();
+    } catch (e: unknown) {
+      setErrorReintento(e instanceof Error ? e.message : 'No se pudo reintentar la emisión del comprobante.');
+    } finally {
+      setReintentandoFacturacion(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
@@ -140,6 +178,23 @@ export function ModalDetalleVentaChips({
                     {detalle.facturacion.mensajeRechazo && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><b>Motivo:</b> {detalle.facturacion.mensajeRechazo}{detalle.facturacion.sunatResponseCode ? ` (código ${detalle.facturacion.sunatResponseCode})` : ''}</p>}
                     {detalle.facturacion.ultimoIntento && <p className="text-xs text-slate-500">Último intento: #{detalle.facturacion.ultimoIntento.numero} · {detalle.facturacion.ultimoIntento.estado} · HTTP {detalle.facturacion.ultimoIntento.httpStatus || '—'}</p>}
                     {detalle.facturacion.enlacePdf && <a href={detalle.facturacion.enlacePdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"><FileText className="h-4 w-4" /> VER COMPROBANTE</a>}
+                    {errorReintento && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{errorReintento}</p>}
+                    {esComprobanteReintentable(detalle.facturacion) && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => void handleReintentarFacturacion()}
+                          disabled={reintentandoFacturacion}
+                          aria-busy={reintentandoFacturacion}
+                          title="Reintentar la emision de este comprobante sin generar otro numero"
+                          className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${reintentandoFacturacion ? 'animate-spin' : ''}`} />
+                          {reintentandoFacturacion ? 'REINTENTANDO...' : 'REINTENTAR COMPROBANTE'}
+                        </button>
+                        <p className="mt-1 text-xs text-slate-500">Reintenta el mismo comprobante reservado. No genera otra venta ni otro numero.</p>
+                      </div>
+                    )}
                   </div>
                 ) : <p className="mt-3 text-sm font-bold text-slate-500">SIN FACTURACIÓN</p>}
               </section>

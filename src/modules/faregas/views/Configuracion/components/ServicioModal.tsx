@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   faregasConfigApi,
   type CategoriaServicio,
@@ -11,7 +11,6 @@ import {
   faregasTarifasAdminApi,
   type TarifaSede
 } from '../../../services/faregas-tarifas-admin.api';
-import { faregasFormatosApi, type Formato } from '../../../services/faregas-formatos.api';
 
 type VarianteCertificado = 'GNV_INICIAL' | 'GNV_ANUAL' | 'GLP_INICIAL' | 'GLP_ANUAL' | 'CONFORMIDAD' | 'TALLER_GNV_INICIAL' | 'TALLER_GNV_ANUAL' | 'TALLER_GLP_INICIAL' | 'TALLER_GLP_ANUAL';
 
@@ -100,8 +99,6 @@ export function ServicioModal({
   const [nombre, setNombre] = useState(initialData.nombre || productoInicial?.descripcion || categoria.nombre);
   const [generaCertificado, setGeneraCertificado] = useState(Boolean(initialData.requiere_certificado));
   const [variante, setVariante] = useState<VarianteCertificado | ''>(varianteDesdeServicio(initialData));
-  const [formatoId, setFormatoId] = useState(initialData.formato_id ? String(initialData.formato_id) : '');
-  const [formatos, setFormatos] = useState<Formato[]>([]);
   const [requiereVehiculo, setRequiereVehiculo] = useState(initialData.requiere_vehiculo ?? Boolean(initialData.requiere_certificado));
   const [orden, setOrden] = useState(initialData.orden ?? 10);
   const productosSeleccionables = useMemo(() => productos.filter((producto) =>
@@ -133,14 +130,6 @@ export function ServicioModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    let cancelado = false;
-    faregasFormatosApi.listarFormatos()
-      .then((data) => { if (!cancelado) setFormatos(data); })
-      .catch((err) => { if (!cancelado) setError(err instanceof Error ? err.message : 'No se pudieron cargar los formatos.'); });
-    return () => { cancelado = true; };
-  }, []);
-
   const actualizarSede = (key: string, cambios: Partial<EstadoSede>) => {
     setSedes((actual) => ({ ...actual, [key]: { ...actual[key], ...cambios } }));
   };
@@ -169,8 +158,8 @@ export function ServicioModal({
     }
     if (Number(producto.categoria_id) !== Number(categoria.id)) return `El SKU ${producto.codigo_sku} no pertenece a esta categoría.`;
     if (!producto.activo || !producto.es_para_venta) return `El SKU ${producto.codigo_sku} debe estar activo y habilitado para venta.`;
-    if (!['NIU', 'ZZ'].includes(String(producto.unidad || '').toUpperCase())) return `El SKU ${producto.codigo_sku} debe utilizaráá�� unidad NIU o ZZ.`;
-    if (generaCertificado && String(producto.tipo_afectacion_igv || '') !== '10') return `El SKU ${producto.codigo_sku} debe tener afectaci�n IGV 10 para una certificaci�n.`;
+    if (!['NIU', 'ZZ'].includes(String(producto.unidad || '').toUpperCase())) return `El SKU ${producto.codigo_sku} debe usar la unidad NIU o ZZ.`;
+    if (generaCertificado && String(producto.tipo_afectacion_igv || '') !== '10') return `El SKU ${producto.codigo_sku} debe tener afectación IGV 10 para una certificación.`;
     return null;
   };
 
@@ -182,8 +171,9 @@ export function ServicioModal({
   );
 
   const validar = () => {
-    if (!codigoTecnico(codigo) || !nombre.trim()) throw new Error('El c�digo y el nombre de la operaci�n son obligatorios.');
-    if (generaCertificado && !formatoId) throw new Error('Selecciona el formato real que utilizaráá��á esta operaci�n.');
+    if (!codigoTecnico(codigo) || !nombre.trim()) throw new Error('El código y el nombre de la operación son obligatorios.');
+    // La plantilla del certificado NO se elige aquí: se configura después, en el
+    // flujo de formatos. Por eso no es un campo obligatorio de este formulario.
     if (productoFijo && !Object.values(sedes).some((sede) => sede.seleccionada)) {
       throw new Error(`Selecciona al menos una sede para el producto ${productoFijo.codigo_sku}.`);
     }
@@ -204,21 +194,23 @@ export function ServicioModal({
       validar();
       setSaving(true);
       const certificado = generaCertificado && variante ? configuracionVariante(variante) : null;
-        if (generaCertificado && !variante) throw new Error('Debe seleccionar una variante v�lida');
+        if (generaCertificado && !variante) throw new Error('Debe seleccionar una variante válida');
       const payload: Partial<ServicioConfiguracionFaregas> = {
         codigo: codigoTecnico(codigo), nombre: nombre.trim(), categoria_id: categoria.id,
         tipo_flujo: (certificado ? certificado.tipo_flujo : 'SERVICIO_COMPLEMENTARIO') as TipoFlujoServicioFaregas,
         requiere_certificado: generaCertificado,
         tipo_certificado_clave: certificado?.tipo_certificado_clave || null,
         modalidad: certificado?.modalidad || null,
-        formato_id: generaCertificado ? Number(formatoId) : null,
+        // `formato_id` no se envía: la plantilla se asigna después, desde el
+        // flujo de formatos. Omitirlo (en vez de mandarlo en null) es lo que
+        // permite que el backend conserve el formato ya configurado.
         requiere_vehiculo: requiereVehiculo, orden
       };
 
       let servicioId = initialData.id;
       if (mode === 'CREATE') servicioId = await faregasConfigApi.crearServicio(payload);
       else if (servicioId) await faregasConfigApi.editarServicio(servicioId, payload);
-      else throw new Error('No se pudo identificar la operaci�n.');
+      else throw new Error('No se pudo identificar la operación.');
 
       for (const sede of sedesDisponibles) {
         const estado = sedes[sede.key];
@@ -235,7 +227,7 @@ export function ServicioModal({
       onSaved();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar la configuraci�n.');
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la configuración.');
     } finally {
       setSaving(false);
     }
@@ -245,15 +237,15 @@ export function ServicioModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-5 flex items-start justify-between gap-4">
-          <div><p className="text-xs font-bold capitalize tracking-wide text-blue-600">{categoria.codigo} · {categoria.nombre}</p><h3 className="mt-1 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Configurar nueva operaci�n' : 'Configurar operaci�n'}</h3><p className="mt-1 text-sm text-slate-500">Define el comportamiento, el formato y las sedes usando la misma configuraci�n oficial de Tarifas por sede.</p></div>
+          <div><p className="text-xs font-bold capitalize tracking-wide text-blue-600">{categoria.codigo} · {categoria.nombre}</p><h3 className="mt-1 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Configurar nueva operación' : 'Configurar operación'}</h3><p className="mt-1 text-sm text-slate-500">Define el comportamiento y las sedes usando la misma configuración oficial de Tarifas por sede.</p></div>
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 font-bold text-slate-500 hover:bg-slate-100">✕</button>
         </div>
         {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
         <form onSubmit={guardar} className="space-y-5">
           <section className="rounded-xl border border-slate-200 p-4">
-            <h4 className="mb-3 font-bold text-slate-800">1. Identidad de la operaci�n</h4>
+            <h4 className="mb-3 font-bold text-slate-800">1. Identidad de la operación</h4>
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="text-sm font-semibold text-slate-700">C�digo t�cnico<input required disabled={mode === 'EDIT'} value={codigo} onChange={(event) => setCodigo(event.target.value)} className="mt-1 w-full rounded-lg border p-2 capitalize disabled:bg-slate-100" /></label>
+              <label className="text-sm font-semibold text-slate-700">Código técnico<input required disabled={mode === 'EDIT'} value={codigo} onChange={(event) => setCodigo(event.target.value)} className="mt-1 w-full rounded-lg border p-2 capitalize disabled:bg-slate-100" /></label>
               <label className="text-sm font-semibold text-slate-700">Nombre<input required value={nombre} onChange={(event) => setNombre(event.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
             </div>
           </section>
@@ -266,15 +258,19 @@ export function ServicioModal({
                       <option value="TALLER_GNV_ANUAL">Taller GNV Anual</option>
                       <option value="TALLER_GLP_INICIAL">Taller GLP Inicial</option>
                       <option value="TALLER_GLP_ANUAL">Taller GLP Anual</option></select></label>}
-              {generaCertificado && <label className="text-sm font-semibold text-slate-700">Formato de impresi�n<select required value={formatoId} onChange={(event) => setFormatoId(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2"><option value="">Seleccionar formato...</option>{formatos.filter((formato) => formato.activo || String(formato.id) === formatoId).map((formato) => <option key={formato.id} value={formato.id}>{formato.nombre} · {formato.codigo} · {formato.motor}</option>)}</select></label>}
               <label className="flex items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={requiereVehiculo} onChange={(event) => setRequiereVehiculo(event.target.checked)} className="h-4 w-4" />Requiere vehículo en planta</label>
               <label className="text-sm font-semibold text-slate-700">Orden en Nuevo Certificado<input type="number" value={orden} onChange={(event) => setOrden(Number(event.target.value) || 0)} className="mt-1 w-full rounded-lg border p-2" /></label>
             </div>
+            {generaCertificado && (
+              <p className="mt-3 text-xs text-slate-500">
+                La plantilla del certificado se asigna después, en el flujo de formatos. Esta operación puede guardarse sin ella.
+              </p>
+            )}
           </section>
           <section className="rounded-xl border border-slate-200 p-4">
             <div className="mb-3">
               <h4 className="font-bold text-slate-800">3. Sedes, precio y producto fiscal</h4>
-              <p className="mt-1 text-xs text-slate-500">Estas selecciones son las tarifas reales de la operaci�n; no se guardan en una tabla duplicada.</p>
+              <p className="mt-1 text-xs text-slate-500">Estas selecciones son las tarifas reales de la operación; no se guardan en una tabla duplicada.</p>
             </div>
 
             {!hayProductosFiscalesValidos && (
@@ -378,7 +374,7 @@ export function ServicioModal({
               title={haySedesSeleccionadasIncompletas ? 'Completa el producto fiscal de todas las sedes seleccionadas.' : undefined}
               className="rounded-lg bg-[#052A79] px-5 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {saving ? 'Guardando...' : 'Guardar configuraci�n'}
+              {saving ? 'Guardando...' : 'Guardar configuración'}
             </button>
           </div>
         </form>

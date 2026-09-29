@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Search } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { faregasChipsApi } from '../../services/faregas-chips.api';
 import type { ValidacionVentaDirectaResponse, VentaDirectaFacturacion, VentaDirectaResponse } from '../../services/faregas-chips.api';
+import { faregasClientesApi } from '../../services/faregas-clientes.api';
 import { ChipScannerInput, parseChipScan } from './ChipScannerInput';
+import { esComprobanteReintentable } from './facturacionReintento';
 import { PagoStep } from '../NuevoCertificado/components/NuevoCertificado/PagoStep';
 import { maestrosApi } from '@/services/api';
 import type { MaestrosPagoResponse } from '@/types/maestros';
@@ -35,6 +39,25 @@ const errorDocumentoFiscal = (
   return '';
 };
 
+/**
+ * Mismas reglas que aplica el backend en `faregas-facturacion.rules.js`
+ * (normalizarFacturacion / validarFacturacion). No se inventan reglas nuevas:
+ * el correo se normaliza en minúsculas y se valida su formato; el teléfono se
+ * limita a 30 caracteres. Ambos siguen siendo opcionales, igual que en
+ * FAREGAS, de modo que agregar el campo no bloquea ventas que antes pasaban.
+ */
+const normalizarEmail = (valor: string) => valor.trim().toLowerCase();
+const LIMITE_TELEFONO = 30;
+const REGLA_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const errorContacto = (email: string, telefono: string) => {
+  if (email && !REGLA_EMAIL.test(email)) return 'El correo no tiene un formato válido.';
+  if (telefono && telefono.length > LIMITE_TELEFONO) {
+    return `El teléfono admite hasta ${LIMITE_TELEFONO} caracteres.`;
+  }
+  return '';
+};
+
 export function ModalVentaChips({
   onClose,
   onVentaExitosa
@@ -48,6 +71,9 @@ export function ModalVentaChips({
   const [nroDocumento, setNroDocumento] = useState('');
   const [nombreRazonSocial, setNombreRazonSocial] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [email, setEmail] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [buscandoCliente, setBuscandoCliente] = useState(false);
 
   const [condicionPago, setCondicionPago] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
   const [pagoTab, setPagoTab] = useState<PagoAgregado['tipo']>('EFECTIVO');
@@ -56,6 +82,7 @@ export function ModalVentaChips({
   const [maestrosPago, setMaestrosPago] = useState<MaestrosPagoResponse['data'] | null>(null);
 
   const [loadingVenta, setLoadingVenta] = useState(false);
+  const [reintentandoFacturacion, setReintentandoFacturacion] = useState(false);
   const [validandoChips, setValidandoChips] = useState(false);
   const [ventaRegistrada, setVentaRegistrada] = useState(false);
   const [resultadoVenta, setResultadoVenta] = useState<VentaDirectaResponse | null>(null);
@@ -88,8 +115,10 @@ export function ModalVentaChips({
     tipoDocumentoCliente,
     nroDocumento
   );
+  const errorContactoActual = errorContacto(email, telefono);
   const datosFiscalesValidos = Boolean(
     !errorFiscalDocumento
+    && !errorContactoActual
     && nombreRazonSocial.trim()
     && nombreRazonSocial.trim().length <= 100
     && direccion.trim()
@@ -110,6 +139,54 @@ export function ModalVentaChips({
     setPagosAgregados([]);
     setFormPago(crearFormPagoVacio());
     setErrorPago('');
+  };
+
+  /**
+   * Reutiliza el endpoint genérico de maestro de clientes que ya usa Nuevo
+   * Certificado (GET /clientes/autocompletar/:tipoDocumento/:nroDocumento).
+   * No hay endpoint propio de chips: ese endpoint ya resuelve en orden
+   * fg_cliente -> histórico de fg_facturacion -> persona de FARENET.
+   */
+  const buscarCliente = async () => {
+    const documento = nroDocumento.replace(/\D/g, '');
+    if (errorDocumentoFiscal(tipoComprobante, tipoDocumentoCliente, documento)) {
+      setError('Corrija el número de documento antes de buscar el cliente.');
+      return;
+    }
+
+    setBuscandoCliente(true);
+    try {
+      const response = await faregasClientesApi.autocompletarPersona(tipoDocumentoCliente, documento);
+      const persona = response?.data;
+      if (!persona) throw new Error('SIN_COINCIDENCIAS');
+
+      // Un dato vacío que viene del maestro no borra lo que el operador ya
+      // escribió: sólo se rellena lo que falta.
+      setNombreRazonSocial(prev => persona.nombreRazonSocial || persona.nombrerazonsocial || prev);
+      setDireccion(prev => persona.direccion || prev);
+      setEmail(prev => normalizarEmail(persona.correo || persona.email || '') || prev);
+      setTelefono(prev => (persona.telefono || '').trim() || prev);
+      setError('');
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Cliente encontrado',
+        text: persona.origen === 'FAREGAS'
+          ? 'Datos recuperados de Faregas.'
+          : 'Datos recuperados de Farenet.',
+        timer: 1800,
+        showConfirmButton: false
+      });
+    } catch {
+      // No se bloquea el formulario: el cliente se puede escribir a mano.
+      await Swal.fire(
+        'No se encontró un cliente registrado',
+        'Puede completar los datos manualmente.',
+        'info'
+      );
+    } finally {
+      setBuscandoCliente(false);
+    }
   };
 
   const handleScanChange = (valor: string) => {
@@ -205,6 +282,8 @@ export function ModalVentaChips({
         nroDocumento: nroDocumento.trim(),
         nombreRazonSocial: nombreRazonSocial.trim(),
         direccion: direccion.trim(),
+        email: normalizarEmail(email) || null,
+        telefono: telefono.trim() || null,
         condicionPago,
         medioPago: pagosAgregados[0]?.tipo || 'EFECTIVO',
         pagosAgregados,
@@ -257,6 +336,62 @@ export function ModalVentaChips({
     }
   };
 
+  /**
+   * Reintenta la emisión del MISMO comprobante ya reservado.
+   *
+   * No vuelve a enviar el formulario de venta: no revalida el chip, no crea
+   * operación, ni pago, ni toca el inventario. El backend reutiliza la serie y
+   * el número que ya están en fg_facturacion, así que BBB1-00000089 sigue
+   * siendo BBB1-00000089 aunque vuelva a fallar.
+   */
+  const handleReintentarFacturacion = async () => {
+    const operacionId = resultadoVenta?.operacionId;
+    if (!operacionId || !esComprobanteReintentable(resultadoVenta?.facturacion)) return;
+
+    const numero = resultadoVenta?.facturacion?.nroComprobante;
+    const confirmacion = await Swal.fire({
+      icon: 'question',
+      title: 'Reintentar comprobante',
+      html: `Se volverá a intentar emitir <b>${numero}</b>.<br>No se generará una nueva venta ni un nuevo número.`,
+      showCancelButton: true,
+      confirmButtonText: 'Reintentar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#052A79'
+    });
+    if (!confirmacion.isConfirmed) return;
+
+    setReintentandoFacturacion(true);
+    setError('');
+    setMensaje('');
+    try {
+      const response = await faregasChipsApi.reintentarFacturacionOperacion(operacionId);
+      const facturacion = response?.facturacion;
+      if (!facturacion) throw new Error('La respuesta no incluyó el comprobante.');
+
+      // Se reemplaza sólo el estado de la emisión; la venta y el pago no se
+      // tocan porque no se vuelven a enviar.
+      setResultadoVenta(prev => (prev ? { ...prev, facturacion, facturacionEstado: facturacion.estado } : prev));
+      onVentaExitosa({ success: true, operacionId, operacionEstado: prevOperacionEstado(), facturacion, facturacionEstado: facturacion.estado });
+
+      if (facturacion.estado === 'ACEPTADO') {
+        setMensaje('COMPROBANTE EMITIDO CORRECTAMENTE');
+      } else if (['PENDIENTE', 'PENDIENTE_SUNAT'].includes(facturacion.estado)) {
+        setMensaje(`Comprobante ${facturacion.nroComprobante || numero} registrado y pendiente de SUNAT.`);
+      } else {
+        setError(
+          facturacion.sunatDescription
+            || `El comprobante ${facturacion.nroComprobante || numero} sigue en estado ${facturacion.estado}.`
+        );
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo reintentar la emisión del comprobante.');
+    } finally {
+      setReintentandoFacturacion(false);
+    }
+  };
+
+  const prevOperacionEstado = () => resultadoVenta?.operacionEstado || 'PAGADO';
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-2 backdrop-blur-sm sm:p-4 lg:p-6">
       <div className="my-2 w-full max-w-[1400px] rounded-2xl bg-white shadow-xl sm:my-4">
@@ -288,7 +423,26 @@ export function ModalVentaChips({
             </div>
 
             <label className="block text-sm font-bold text-slate-700">Nro Documento
-              <input value={nroDocumento} onChange={e => setNroDocumento(e.target.value)} inputMode="numeric" maxLength={tipoDocumentoCliente === 'RUC' ? 11 : 8} disabled={ventaRegistrada} className="mt-1 w-full rounded-lg border border-slate-300 p-2 focus:border-blue-500 focus:outline-none disabled:bg-slate-100" />
+              <div className="mt-1 flex gap-2">
+                <input
+                  value={nroDocumento}
+                  onChange={e => setNroDocumento(e.target.value)}
+                  inputMode="numeric"
+                  maxLength={tipoDocumentoCliente === 'RUC' ? 11 : 8}
+                  disabled={ventaRegistrada}
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
+                />
+                <button
+                  type="button"
+                  onClick={() => void buscarCliente()}
+                  disabled={buscandoCliente || ventaRegistrada}
+                  aria-busy={buscandoCliente}
+                  title="Buscar cliente en el maestro"
+                  className="flex shrink-0 items-center justify-center rounded-lg bg-slate-200 px-3 transition-colors hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Search className={`h-5 w-5 text-slate-600 ${buscandoCliente ? 'animate-pulse' : ''}`} />
+                </button>
+              </div>
             </label>
             {errorFiscalDocumento && <p className="text-sm font-bold text-red-600">{errorFiscalDocumento}</p>}
 
@@ -299,6 +453,30 @@ export function ModalVentaChips({
             <label className="block text-sm font-bold text-slate-700">Dirección fiscal
               <input value={direccion} maxLength={100} disabled={ventaRegistrada} onChange={e => setDireccion(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2 focus:border-blue-500 focus:outline-none disabled:bg-slate-100" />
             </label>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block text-sm font-bold text-slate-700">Correo
+                <input
+                  type="email"
+                  value={email}
+                  disabled={ventaRegistrada}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="cliente@correo.com"
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2 focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
+                />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">Teléfono
+                <input
+                  type="tel"
+                  value={telefono}
+                  maxLength={LIMITE_TELEFONO}
+                  disabled={ventaRegistrada}
+                  onChange={e => setTelefono(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 p-2 focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
+                />
+              </label>
+            </div>
+            {errorContactoActual && <p className="text-sm font-bold text-red-600">{errorContactoActual}</p>}
           </div>
 
           <div className="space-y-3">
@@ -369,6 +547,18 @@ export function ModalVentaChips({
                 <p className="mt-1 text-sm text-slate-600">Operación #{resultadoVenta.operacionId} · Estado: {resultadoVenta.facturacionEstado}</p>
                 {resultadoVenta.facturacion?.enlacePdf && (
                   <a href={resultadoVenta.facturacion.enlacePdf} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white">VER COMPROBANTE</a>
+                )}
+                {esComprobanteReintentable(resultadoVenta?.facturacion) && (
+                  <button
+                    type="button"
+                    onClick={() => void handleReintentarFacturacion()}
+                    disabled={reintentandoFacturacion}
+                    aria-busy={reintentandoFacturacion}
+                    title="Reintentar la emision de este comprobante sin generar otro numero"
+                    className="ml-2 mt-3 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {reintentandoFacturacion ? 'REINTENTANDO...' : 'REINTENTAR COMPROBANTE'}
+                  </button>
                 )}
                 <button type="button" onClick={onClose} className="ml-2 mt-3 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700">CERRAR</button>
               </div>

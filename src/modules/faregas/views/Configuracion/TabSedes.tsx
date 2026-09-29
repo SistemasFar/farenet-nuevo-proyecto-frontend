@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Edit, Power, PowerOff } from 'lucide-react';
+import { Edit, Power, PowerOff, Search } from 'lucide-react';
 import { faregasConfigApi, type Sede } from '../../services/faregas-config.api';
 import { exportarExcel } from '../../utils/exportar-excel';
+import { Paginacion } from '../components/Paginacion';
 
 const mensajeError = (error: unknown, defecto: string) => error instanceof Error ? error.message : defecto;
 
@@ -9,31 +10,79 @@ export default function TabSedes() {
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'CREATE' | 'EDIT'>('CREATE');
   const [currentSede, setCurrentSede] = useState<Partial<Sede>>({});
-  
-  const loadSedes = async () => {
-    try {
-      setLoading(true);
-      const data = await faregasConfigApi.obtenerSedes();
-      setSedes(data);
-    } catch (err: unknown) {
-      setError(mensajeError(err, 'Error al cargar sedes'));
-    } finally {
-      setLoading(false);
-    }
+
+  // Paginación en backend: 10 por página, con búsqueda por nombre de sede.
+  // Es un catálogo maestro, así que NO lleva filtro de fecha.
+  const [buscar, setBuscar] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [resumen, setResumen] = useState({ items: 0, total: 0, page: 1, limit: 10, totalPages: 0 });
+  // Se incrementa tras crear/editar/activar para recargar sin cambiar filtros.
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  // Debounce: el texto del input cambia en cada pulsación, pero la consulta sólo
+  // se lanza cuando el usuario deja de escribir. El reset a la página 1 va aquí
+  // (y no en el onChange) para que página y búsqueda cambien en la misma tanda
+  // y no se dispare una consulta intermedia con filtros mezclados.
+  const [buscarAplicada, setBuscarAplicada] = useState('');
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      setBuscarAplicada(buscar.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(temporizador);
+  }, [buscar]);
+
+  // Refresca la página actual tras crear, editar o activar/desactivar.
+  const loadSedes = () => setRefreshToken((prev) => prev + 1);
+
+  const aplicarBusqueda = (valor: string) => setBuscar(valor);
+
+  const irAPagina = (nueva: number) => {
+    setPage(nueva);
   };
 
+  const cambiarPageSize = (nuevo: number) => {
+    setPageSize(nuevo);
+    setPage(1);
+  };
+
+  // Un ÚNICO efecto carga los datos. Depende del valor debounced de la búsqueda
+  // (no del texto crudo) para no disparar una request por pulsación, y no
+  // depende de `loadSedes` para no entrar en useEffect -> setState -> useEffect.
   useEffect(() => {
     let cancelado = false;
-    void faregasConfigApi.obtenerSedes()
-      .then((data) => { if (!cancelado) { setSedes(data); setError(''); } })
-      .catch((err: unknown) => { if (!cancelado) setError(mensajeError(err, 'Error al cargar sedes')); })
-      .finally(() => { if (!cancelado) setLoading(false); });
-    return () => { cancelado = true; };
-  }, []);
+    const temporizador = setTimeout(() => {
+      void faregasConfigApi
+        .obtenerSedes({ buscar: buscarAplicada, page, pageSize })
+        .then((data) => {
+          if (cancelado) return;
+          setSedes(data.items);
+          setResumen({
+            items: data.items.length,
+            total: data.total,
+            page: data.page,
+            limit: data.limit,
+            totalPages: data.totalPages
+          });
+          setError('');
+        })
+        .catch((err: unknown) => {
+          if (!cancelado) setError(mensajeError(err, 'Error al cargar sedes'));
+        })
+        .finally(() => {
+          if (!cancelado) setLoading(false);
+        });
+    }, 300);
+    return () => {
+      cancelado = true;
+      clearTimeout(temporizador);
+    };
+  }, [buscarAplicada, page, pageSize, refreshToken]);
 
   const handleCreateSede = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +127,16 @@ export default function TabSedes() {
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <span className="font-semibold text-gray-700">Administración de Sedes</span>
           <div className="flex flex-wrap gap-2">
+            <label className="relative w-full sm:w-72">
+              <span className="mb-1 block text-xs font-bold text-slate-600">Buscar por nombre de sede</span>
+              <Search className="absolute bottom-2.5 left-3 h-4 w-4 text-slate-400" />
+              <input
+                value={buscar}
+                onChange={(e) => aplicarBusqueda(e.target.value)}
+                placeholder="Buscar por nombre de sede"
+                className="w-full rounded border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </label>
             <button
               type="button"
               disabled={loading || sedes.length === 0}
@@ -166,8 +225,22 @@ export default function TabSedes() {
                     </td>
                   </tr>
                 ))}
+                {sedes.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
+                      No se encontraron registros.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+            <Paginacion
+              resumen={resumen}
+              onCambioPagina={irAPagina}
+              onCambioPageSize={cambiarPageSize}
+              etiqueta="sedes"
+              deshabilitado={loading}
+            />
           </div>
         )}
       </div>

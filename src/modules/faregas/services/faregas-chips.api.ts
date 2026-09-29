@@ -77,8 +77,10 @@ export interface VentaDirectaPayload {
   nroDocumento: string;
   nombreRazonSocial: string;
   direccion?: string;
-  email?: string;
-  telefono?: string;
+  // `null` cuando el operador no lo completa: el backend lo trata igual que
+  // un campo ausente y cae al dato del maestro de clientes si lo hubiera.
+  email?: string | null;
+  telefono?: string | null;
   condicionPago: string;
   medioPago: string;
   pagosAgregados: PagoAgregado[];
@@ -240,6 +242,8 @@ export interface DetalleVentaChip {
 export interface FiltrosListadoVentasChips {
   fechaDesde?: string;
   fechaHasta?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface ImpactoTipoChip {
@@ -277,19 +281,38 @@ export const faregasChipsApi = {
     const res = await faregasFetch('/chips/catalogo-fiscales') as { chips: { id: number; codigo: string; nombre: string; }[] };
     return res.chips;
   },
-  listar: async (filtros: { productoInventariableId?:number; estado?:string; buscar?:string } = {}) => {
+  listar: async (filtros: { productoInventariableId?:number; estado?:string; buscar?:string; page?:number; pageSize?:number } = {}) => {
     const params=new URLSearchParams();
     if(filtros.productoInventariableId)params.set('productoInventariableId',String(filtros.productoInventariableId));
     if(filtros.estado)params.set('estado',filtros.estado);
     if(filtros.buscar)params.set('buscar',filtros.buscar);
-    return faregasFetch(`/chips?${params}`) as Promise<{items:Chip[];total:number}>;
+    if(filtros.page)params.set('page',String(filtros.page));
+    if(filtros.pageSize)params.set('pageSize',String(filtros.pageSize));
+    return faregasFetch(`/chips?${params}`) as Promise<{
+      items: Chip[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    }>;
   },
   listarVentas: async (filtros: FiltrosListadoVentasChips = {}) => {
     const params = new URLSearchParams();
     if (filtros.fechaDesde) params.set('fechaDesde', filtros.fechaDesde);
     if (filtros.fechaHasta) params.set('fechaHasta', filtros.fechaHasta);
+    if (filtros.page) params.set('page', String(filtros.page));
+    if (filtros.pageSize) params.set('pageSize', String(filtros.pageSize));
     const query = params.toString();
-    return faregasFetch(`/chips/ventas${query ? `?${query}` : ''}`) as Promise<{ success: boolean; ventas: VentaChipOperacion[] }>;
+    return faregasFetch(`/chips/ventas${query ? `?${query}` : ''}`) as Promise<{
+      success: boolean;
+      items: VentaChipOperacion[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      /** Se conserva por compatibilidad con el consumidor anterior. */
+      ventas: VentaChipOperacion[];
+    }>;
   },
   obtenerDetalleVenta: async (operacionId: number) => faregasFetch(`/chips/ventas/${operacionId}`) as Promise<{ success: boolean; venta: DetalleVentaChip }>,
   resumen: async (productoInventariableId?:number) => {
@@ -309,6 +332,18 @@ export const faregasChipsApi = {
   baja: async (numeroChip:string,referencia:string) => faregasFetch('/chips/bajas',{method:'POST',body:JSON.stringify({numeroChip,referencia})}),
   validarVentaDirecta: async (chips: string[]): Promise<ValidacionVentaDirectaResponse> => faregasFetch('/chips/venta-directa/validar', { method: 'POST', body: JSON.stringify({ chips }) }) as Promise<ValidacionVentaDirectaResponse>,
   ventaDirecta: async (payload: VentaDirectaPayload): Promise<VentaDirectaResponse> => faregasFetch('/chips/venta-directa', { method: 'POST', body: JSON.stringify(payload) }) as Promise<VentaDirectaResponse>,
+  /**
+   * Reintenta la emisión del comprobante de una operación ya registrada.
+   *
+   * Reutiliza la ruta que ya existía y que hasta ahora nadie invocaba
+   * (POST /operaciones/:operacionId/facturacion/reintentar). No crea venta,
+   * ni pago, ni mueve inventario, ni reserva otro correlativo: el backend
+   * reutiliza la serie y el número ya guardados en fg_facturacion.
+   */
+  reintentarFacturacionOperacion: async (operacionId: number) => faregasFetch(
+    `/operaciones/${operacionId}/facturacion/reintentar`,
+    { method: 'POST' }
+  ) as Promise<{ success: boolean; facturacion: VentaDirectaFacturacion }>,
   historial: async (id:number) => (await faregasFetch(`/chips/${id}/movimientos`)).movimientos,
   listarProductosInventariables: async () => (await faregasFetch('/chips/productos')).productos as ProductoInventariable[],
   catalogosProductosInventariables: async () => (await faregasFetch('/chips/productos/catalogos')) as {sedes:Array<{key:string;nombre:string}>},

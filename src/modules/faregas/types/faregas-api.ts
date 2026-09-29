@@ -50,7 +50,8 @@ export interface CrearBorradorFaregasRequest {
 export type PasoBorradorFaregas = 'DATOS_INICIALES' | 'PAGO' | 'VEHICULO' | 'FACTURACION' | 'PREVISUALIZACION' | 'VERIFICACION_EMISION';
 
 export interface ActualizarBorradorFaregasRequest {
-  clienteId?: string;
+  /** fg_certificado.cliente_id es bigint; el id llega como número. */
+  clienteId?: string | number;
   observaciones?: string;
   tarifaCodigo?: string;
 }

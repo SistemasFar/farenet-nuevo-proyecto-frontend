@@ -12,7 +12,6 @@ const categoriaVacia = (): Partial<CategoriaServicio> => ({
   codigo: '',
   nombre: '',
   descripcion: '',
-  orden: 0,
   activo: true
 });
 
@@ -251,13 +250,11 @@ export default function TabCategorias() {
                 { key: 'codigo', header: 'CÓDIGO', width: 24 },
                 { key: 'nombre', header: 'NOMBRE', width: 28 },
                 { key: 'descripcion', header: 'DESCRIPCIÓN', width: 60 },
-                { key: 'orden', header: 'ORDEN', width: 12 },
                 { key: 'estado', header: 'ESTADO', width: 14 }
               ], filtradas.map((categoria) => ({
                 codigo: categoria.codigo,
                 nombre: categoria.nombre,
                 descripcion: categoria.descripcion || '',
-                orden: categoria.orden,
                 estado: categoria.activo ? 'ACTIVA' : 'INACTIVA'
               })))}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -283,7 +280,6 @@ export default function TabCategorias() {
                     <th className="px-4 py-3">Código</th>
                     <th className="px-4 py-3">Nombre</th>
                     <th className="px-4 py-3">Descripción</th>
-                    <th className="px-4 py-3 text-center">Orden</th>
                     <th className="px-4 py-3 text-center">Estado</th>
                     <th className="px-4 py-3 text-center">Acciones</th>
                   </tr>
@@ -294,7 +290,6 @@ export default function TabCategorias() {
                       <td className="px-4 py-3 font-mono font-bold text-gray-700">{categoria.codigo}</td>
                       <td className="px-4 py-3 font-medium text-gray-800">{categoria.nombre}</td>
                       <td className="px-4 py-3 text-gray-600">{categoria.descripcion || '-'}</td>
-                      <td className="px-4 py-3 text-center">{categoria.orden}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`rounded-full px-2 py-1 text-xs font-semibold ${categoria.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                           {categoria.activo ? 'ACTIVA' : 'INACTIVA'}
@@ -312,7 +307,7 @@ export default function TabCategorias() {
                     </tr>
                   ))}
                   {filtradas.length === 0 && (
-                    <tr><td colSpan={6} className="py-6 text-center text-gray-500">No hay categorías que coincidan con los filtros.</td></tr>
+                    <tr><td colSpan={5} className="py-6 text-center text-gray-500">No hay categorías que coincidan con los filtros.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -341,12 +336,6 @@ export default function TabCategorias() {
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Descripción</label>
                 <textarea rows={3} value={actual.descripcion || ''}
                   onChange={(event) => setActual({ ...actual, descripcion: event.target.value })}
-                  className="w-full rounded-lg border p-2" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">Orden</label>
-                <input type="number" required value={actual.orden ?? 0}
-                  onChange={(event) => setActual({ ...actual, orden: Number(event.target.value) })}
                   className="w-full rounded-lg border p-2" />
               </div>
               <div className="flex justify-end gap-3 border-t pt-4">

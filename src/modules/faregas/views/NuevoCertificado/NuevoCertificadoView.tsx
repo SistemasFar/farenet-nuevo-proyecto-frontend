@@ -951,6 +951,19 @@ export function NuevoCertificadoView() {
     if (huboCambios) {
       setTitulares(guardados);
     }
+
+    // fg_certificado_titular guarda el snapshot de TODOS los dueños; el
+    // certificado se enlaza al maestro a través del principal (el de menor
+    // `orden`, que es la misma definición que usa titularPrincipal). Así
+    // fg_certificado.cliente_id deja de quedar NULL y las operaciones
+    // comerciales del certificado heredan la relación desde
+    // faregas-pagos.service.js, que ya copia este valor.
+    const principal = [...guardados].sort((a, b) => a.orden - b.orden)[0];
+    if (principal?.clienteId) {
+      await faregasCertificadosApi.actualizarBorrador(idBorrador, {
+        clienteId: principal.clienteId
+      });
+    }
   };
 
   const guardarExpedienteTecnico = async (idBorrador: number, confirmarMaestro = false) => {

@@ -9,6 +9,9 @@ import {
   type FiltrosFacturacionAdmin,
   type OperacionFacturacionAdmin,
 } from '../../../services/faregas-facturacion-admin.api';
+// Componente de paginacion COMPARTIDO de FAREGAS: misma UI en los tres
+// listados de esta tarea (chips, sedes y comprobantes).
+import { Paginacion } from '../../components/Paginacion';
 
 const fechaLocal = (value: string | null) => value
   ? new Date(value).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
@@ -42,11 +45,20 @@ interface DetalleState {
 
 export default function TabDocumentosFacturacion() {
   const navigate = useNavigate();
-  const [filtros, setFiltros] = useState<FiltrosFacturacionAdmin>({ pagina: 1, limite: 50 });
+  // Listado transaccional: 10 comprobantes por página, paginado en el backend.
+  // La fecha es la LOCAL; HOY se calcula con getters locales, no con toISOString().
+  const hoyLocal = () => {
+    const ahora = new Date();
+    const y = ahora.getFullYear();
+    const m = String(ahora.getMonth() + 1).padStart(2, '0');
+    const d = String(ahora.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const [filtros, setFiltros] = useState<FiltrosFacturacionAdmin>({ pagina: 1, limite: 10, fechaDesde: hoyLocal(), fechaHasta: hoyLocal() });
   const [documentos, setDocumentos] = useState<DocumentoFacturacionAdmin[]>([]);
   const [plantas, setPlantas] = useState<Array<{ key: string; nombre: string; empresaKey: string }>>([]);
   const [empresas, setEmpresas] = useState<Array<{ key: string; nombre: string }>>([]);
-  const [total, setTotal] = useState(0);
+  const [resumen, setResumen] = useState({ items: 0, total: 0, page: 1, limit: 10, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [procesandoId, setProcesandoId] = useState<number | null>(null);
   const [detalle, setDetalle] = useState<DetalleState | null>(null);
@@ -58,7 +70,17 @@ export default function TabDocumentosFacturacion() {
       setDocumentos(response.data.documentos);
       setPlantas(response.data.plantas);
       setEmpresas(response.data.empresas);
-      setTotal(response.data.total);
+      const limite = Number(response.data.limit ?? response.data.limite ?? nuevosFiltros.limite ?? 10);
+      setResumen({
+        items: response.data.documentos.length,
+        total: Number(response.data.total || 0),
+        page: Number(response.data.page ?? response.data.pagina ?? 1),
+        limit: limite,
+        totalPages: Number(
+          response.data.totalPages
+          ?? (response.data.total ? Math.ceil(Number(response.data.total) / limite) : 0)
+        )
+      });
     } catch (error: unknown) {
       await Swal.fire('Facturación', error instanceof Error ? error.message : 'No se pudo cargar la lista.', 'error');
     } finally {
@@ -67,25 +89,38 @@ export default function TabDocumentosFacturacion() {
   };
 
   useEffect(() => {
-    faregasFacturacionAdminApi.listar({ pagina: 1, limite: 50 })
+    const hoy = hoyLocal();
+    faregasFacturacionAdminApi.listar({ pagina: 1, limite: 10, fechaDesde: hoy, fechaHasta: hoy })
       .then((response) => {
         setDocumentos(response.data.documentos);
         setPlantas(response.data.plantas);
         setEmpresas(response.data.empresas);
-        setTotal(response.data.total);
+        const limite = Number(response.data.limit ?? response.data.limite ?? 10);
+        setResumen({
+          items: response.data.documentos.length,
+          total: Number(response.data.total || 0),
+          page: Number(response.data.page ?? response.data.pagina ?? 1),
+          limit: limite,
+          totalPages: Number(
+            response.data.totalPages
+            ?? (response.data.total ? Math.ceil(Number(response.data.total) / limite) : 0)
+          )
+        });
       })
       .catch((error: unknown) => Swal.fire('Facturación', error instanceof Error ? error.message : 'No se pudo cargar la lista.', 'error'))
       .finally(() => setLoading(false));
   }, []);
 
   const buscar = () => {
+    // Cualquier cambio de filtro vuelve a la página 1.
     const siguientes = { ...filtros, pagina: 1 };
     setFiltros(siguientes);
     void cargar(siguientes);
   };
 
+  // "Limpiar" restaura HOY -> HOY, nunca "todo el histórico".
   const limpiar = () => {
-    const vacios: FiltrosFacturacionAdmin = { pagina: 1, limite: 50 };
+    const vacios: FiltrosFacturacionAdmin = { pagina: 1, limite: filtros.limite ?? 10, fechaDesde: hoyLocal(), fechaHasta: hoyLocal() };
     setFiltros(vacios);
     void cargar(vacios);
   };
@@ -139,7 +174,8 @@ export default function TabDocumentosFacturacion() {
   const plantasFiltradas = filtros.empresaKey
     ? plantas.filter((planta) => planta.empresaKey === filtros.empresaKey)
     : plantas;
-  const totalPaginas = Math.max(1, Math.ceil(total / Number(filtros.limite || 50)));
+  // El total y el número de páginas los calcula el backend y llegan en el sobre
+  // de paginación; no se recalculan aquí para no discrepar del COUNT.
 
   return (
     <div className="space-y-4">
@@ -183,7 +219,22 @@ export default function TabDocumentosFacturacion() {
         </table>
       </div>
 
-      <div className="flex items-center justify-between text-sm"><span>{total} comprobante(s)</span><div className="flex items-center gap-2"><button disabled={Number(filtros.pagina || 1) <= 1} onClick={() => { const pagina = Number(filtros.pagina || 1) - 1; const next = { ...filtros, pagina }; setFiltros(next); void cargar(next); }} className="rounded border px-3 py-1 disabled:opacity-40">Anterior</button><span>Página {filtros.pagina || 1} de {totalPaginas}</span><button disabled={Number(filtros.pagina || 1) >= totalPaginas} onClick={() => { const pagina = Number(filtros.pagina || 1) + 1; const next = { ...filtros, pagina }; setFiltros(next); void cargar(next); }} className="rounded border px-3 py-1 disabled:opacity-40">Siguiente</button></div></div>
+      <Paginacion
+        resumen={resumen}
+        etiqueta="comprobantes"
+        deshabilitado={loading}
+        onCambioPagina={(pagina) => {
+          const next = { ...filtros, pagina };
+          setFiltros(next);
+          void cargar(next);
+        }}
+        onCambioPageSize={(limite) => {
+          // Cambiar el tamaño también vuelve a la página 1.
+          const next = { ...filtros, limite, pagina: 1 };
+          setFiltros(next);
+          void cargar(next);
+        }}
+      />
 
       {detalle && <DetalleModal detalle={detalle} onClose={() => setDetalle(null)} />}
     </div>

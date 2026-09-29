@@ -144,6 +144,74 @@ export const faregasProductosApi = {
     const response = await request('/productos');
     return response.productos || [];
   },
+  /**
+   * Productos que TIENEN categoría, agrupados por `categoria_id`.
+   *
+   * La pantalla "Operación y formatos" recorre las categorías y necesita el
+   * producto fiscal de cada una. No debe usar `listar()`, que devuelve una
+   * página del catálogo: una categoría cuyo producto no cae en esa página
+   * aparecería como "0 producto(s)" y se perdería el botón de configurar la
+   * operación. Este listado no está paginado a propósito, porque el conjunto
+   * está acotado por ser sólo los productos con categoría.
+   */
+  listarPorCategoria: async (): Promise<{
+    porCategoria: Record<string, ProductoFacturacion[]>;
+    productos: ProductoFacturacion[];
+    total: number;
+  }> => {
+    const response = await request('/productos/por-categoria');
+    return {
+      porCategoria: response.porCategoria || {},
+      productos: response.productos || [],
+      total: Number(response.total || 0)
+    };
+  },
+  /**
+   * Listado paginado con filtros resueltos en el backend.
+   *
+   * El filtro se aplica ANTES del LIMIT/OFFSET, de modo que un texto de
+   * búsqueda encuentra el producto esté en la página que esté. Filtrar en el
+   * navegador sólo sobre los 10 registros ya cargados devolvía cero
+   * resultados para los productos fuera de esa página.
+   */
+  listarPaginado: async (filtros: {
+    buscar?: string;
+    activo?: boolean;
+    es_para_venta?: boolean;
+    unidad?: string;
+    categoria_id?: number | string;
+    page?: number;
+    pageSize?: number;
+  } = {}): Promise<{
+    items: ProductoFacturacion[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    unidades: string[];
+  }> => {
+    const params = new URLSearchParams();
+    if (filtros.buscar?.trim()) params.set('buscar', filtros.buscar.trim());
+    if (filtros.activo !== undefined) params.set('activo', String(filtros.activo));
+    if (filtros.es_para_venta !== undefined) params.set('es_para_venta', String(filtros.es_para_venta));
+    if (filtros.unidad) params.set('unidad', filtros.unidad);
+    if (filtros.categoria_id) params.set('categoria_id', String(filtros.categoria_id));
+    if (filtros.page) params.set('page', String(filtros.page));
+    if (filtros.pageSize) params.set('pageSize', String(filtros.pageSize));
+    const query = params.toString();
+    const response = await request(`/productos${query ? `?${query}` : ''}`);
+    const items: ProductoFacturacion[] = response.items || response.productos || [];
+    const limit = Number(response.limit || filtros.pageSize || 10);
+    const total = Number(response.total ?? items.length);
+    return {
+      items,
+      total,
+      page: Number(response.page || filtros.page || 1),
+      limit,
+      totalPages: Number(response.totalPages ?? (total > 0 ? Math.ceil(total / limit) : 0)),
+      unidades: response.unidades || []
+    };
+  },
   crear: async (producto: Partial<ProductoFacturacion>): Promise<void> => {
     await request('/productos', { method: 'POST', body: JSON.stringify(producto) });
   },

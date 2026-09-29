@@ -14,6 +14,7 @@ import {
   type ProductoFacturacion
 } from '../../../services/faregas-productos.api';
 import { exportarExcel } from '../../../utils/exportar-excel';
+import { Paginacion } from '../../components/Paginacion';
 
 const productoVacio = (): Partial<ProductoFacturacion> => ({
   codigo_sku: '', descripcion: '', tipo_producto: 'Producto', categoria_dms: null,
@@ -111,6 +112,16 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   const [paraVenta, setParaVenta] = useState('');
   const [unidad, setUnidad] = useState('');
   const [categoria, setCategoria] = useState('');
+  // La búsqueda y los filtros se resuelven en el backend: el texto se aplica
+  // antes del LIMIT/OFFSET, así que un SKU de la página 28 aparece al buscarlo.
+  const [buscarAplicado, setBuscarAplicado] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [resumen, setResumen] = useState({ items: 0, total: 0, page: 1, limit: 10, totalPages: 0 });
+  // Catálogo de unidades completo, lo devuelve el backend junto al listado.
+  const [catalogoUnidades, setCatalogoUnidades] = useState<string[]>([]);
+  // Se incrementa tras crear/editar/eliminar para recargar conservando filtros.
+  const [refreshToken, setRefreshToken] = useState(0);
   const [modal, setModal] = useState(false);
   const [mode, setMode] = useState<'CREATE' | 'EDIT'>('CREATE');
   const [actual, setActual] = useState<Partial<ProductoFacturacion>>(productoVacio());
@@ -118,12 +129,14 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   const [eliminando, setEliminando] = useState<number | null>(null);
   const [productoGuardado, setProductoGuardado] = useState('');
 
+  // Recarga los catálogos de referencia y dispara un refresco del listado.
+  // El listado de productos NO se carga aquí: lo lleva su propio efecto, que
+  // depende de los filtros, para no duplicar peticiones.
   const cargar = async () => {
     try {
       setLoading(true);
       setError('');
-      const [productosData, categoriasData, chipsData, relacionesData] = await Promise.all([
-        faregasProductosApi.listar(),
+      const [categoriasData, chipsData, relacionesData] = await Promise.all([
         faregasConfigApi.obtenerCategorias(true),
         faregasChipsApi.listarCatalogoChipsFiscales().catch(() => []),
 
@@ -131,13 +144,13 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           ? Promise.all([faregasConfigApi.getServicios(), faregasConfigApi.obtenerSedesPorServicio()]).catch(() => null)
           : Promise.resolve(null)
       ]);
-      setProductos(productosData);
       setCategorias(categoriasData);
       setChipsOpciones(chipsData || []);
       if (relacionesData) {
         setServicios(relacionesData[0]);
         setSedesPorServicio(relacionesData[1]);
       }
+      setRefreshToken((prev) => prev + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar productos');
     } finally {
@@ -148,7 +161,6 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   useEffect(() => {
     let cancelado = false;
     void Promise.all([
-      faregasProductosApi.listar(),
       faregasConfigApi.obtenerCategorias(true),
       canViewRelations
         ? Promise.all([faregasConfigApi.getServicios(), faregasConfigApi.obtenerSedesPorServicio()]).catch(() => null)
@@ -156,9 +168,8 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     ,
       faregasChipsApi.listarCatalogoChipsFiscales().catch(() => [])
     ])
-      .then(([productosData, categoriasData, relacionesData, chipsData]) => {
+      .then(([categoriasData, relacionesData, chipsData]) => {
         if (cancelado) return;
-        setProductos(productosData);
         setCategorias(categoriasData);
         setChipsOpciones(chipsData as any || []);
         if (relacionesData) {
@@ -166,10 +177,74 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           setSedesPorServicio(relacionesData[1]);
         }
       })
-      .catch((err) => { if (!cancelado) setError(err instanceof Error ? err.message : 'Error al cargar productos'); })
-      .finally(() => { if (!cancelado) setLoading(false); });
+      .catch((err) => { if (!cancelado) setError(err instanceof Error ? err.message : 'Error al cargar productos'); });
     return () => { cancelado = true; };
   }, [canViewRelations]);
+
+  // Debounce del texto: el input cambia en cada pulsación, pero la consulta
+  // sólo sale cuando el usuario deja de escribir. El reset a la página 1 va
+  // aquí para que texto y página cambien en la misma tanda.
+  useEffect(() => {
+    const temporizador = setTimeout(() => {
+      setBuscarAplicado(buscar.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(temporizador);
+  }, [buscar]);
+
+  // Un ÚNICO efecto carga el listado. Depende del texto debounced (no del
+  // input crudo), así que no hay request storm ni bucle setState -> useEffect.
+  useEffect(() => {
+    let cancelado = false;
+    const cargarProductos = () => {
+      setLoading(true);
+      void faregasProductosApi.listarPaginado({
+        buscar: buscarAplicado || undefined,
+        activo: estado === '' ? undefined : estado === '1',
+        es_para_venta: paraVenta === '' ? undefined : paraVenta === '1',
+        unidad: unidad || undefined,
+        categoria_id: categoria || undefined,
+        page,
+        pageSize
+      })
+        .then((r) => {
+          if (cancelado) return;
+          setProductos(r.items);
+          setResumen({
+            items: r.items.length,
+            total: r.total,
+            page: r.page,
+            limit: r.limit,
+            totalPages: r.totalPages
+          });
+          if (r.unidades.length) setCatalogoUnidades(r.unidades);
+          setError('');
+        })
+        .catch((err: unknown) => {
+          if (!cancelado) setError(err instanceof Error ? err.message : 'Error al cargar productos');
+        })
+        .finally(() => { if (!cancelado) setLoading(false); });
+    };
+
+    // Las categorías, los chips y las relaciones los carga el efecto de arriba:
+    // no dependen de los filtros del listado, así que no se piden aquí.
+    cargarProductos();
+    return () => { cancelado = true; };
+  }, [buscarAplicado, estado, paraVenta, unidad, categoria, page, pageSize, refreshToken]);
+
+  const irAPagina = (nueva: number) => setPage(nueva);
+  const cambiarPageSize = (nuevo: number) => {
+    setPageSize(nuevo);
+    setPage(1);
+  };
+  // Cada filtro devuelve a la página 1.
+  const filtrar = (campo: 'estado' | 'paraVenta' | 'unidad' | 'categoria', valor: string) => {
+    setPage(1);
+    if (campo === 'estado') setEstado(valor);
+    else if (campo === 'paraVenta') setParaVenta(valor);
+    else if (campo === 'unidad') setUnidad(valor);
+    else setCategoria(valor);
+  };
 
   const vinculaciones = useMemo(() => {
     const mapa = new Map<number, { servicios: Set<string>; sedesActivas: Set<string> }>();
@@ -195,19 +270,10 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     ]));
   }, [sedesPorServicio, servicios]);
 
-  const unidades = useMemo(() => [...new Set(productos.map((p) => p.unidad).filter(Boolean) as string[])].sort(), [productos]);
-  const filtrados = useMemo(() => productos.filter((producto) => {
-    const texto = buscar.trim().toLowerCase();
-    const coincideTexto = !texto
-      || producto.codigo_sku.toLowerCase().includes(texto)
-      || producto.descripcion.toLowerCase().includes(texto);
-    const coincideEstado = !estado || (estado === '1' ? producto.activo : !producto.activo);
-    const coincideVenta = !paraVenta || (paraVenta === '1' ? producto.es_para_venta : !producto.es_para_venta);
-    const coincideUnidad = !unidad || producto.unidad === unidad;
-    const coincideCategoria = !categoria
-      || (categoria === 'SIN_CATEGORIA' ? !producto.categoria_id : String(producto.categoria_id || '') === categoria);
-    return coincideTexto && coincideEstado && coincideVenta && coincideUnidad && coincideCategoria;
-  }), [productos, buscar, estado, paraVenta, unidad, categoria]);
+  // El listado ya viene filtrado y paginado del backend: `productos` ES la
+  // página actual del resultado. Filtrar aquí en memoria sólo podía mirar esos
+  // 10 registros, por eso buscar un SKU de otra página devolvía 0 resultados.
+  const unidades = catalogoUnidades;
 
   const guardar = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -312,19 +378,19 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
 
       <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
         <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar código o descripción..." className="rounded-lg border border-slate-300 p-2 text-sm focus:border-[#052A79] focus:outline-none lg:col-span-2" />
-        <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Categoría: Todas</option><option value="SIN_CATEGORIA">Sin categoría</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>
-        <select value={estado} onChange={(e) => setEstado(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Estado: Todos</option><option value="1">Activos</option><option value="0">Inactivos</option></select>
-        <select value={paraVenta} onChange={(e) => setParaVenta(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Para venta: Todos</option><option value="1">Sí</option><option value="0">No</option></select>
-        <select value={unidad} onChange={(e) => setUnidad(e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Unidad: Todas</option>{unidades.map((item) => <option key={item} value={item}>{item}</option>)}</select>
+        <select value={categoria} onChange={(e) => filtrar('categoria', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Categoría: Todas</option><option value="SIN_CATEGORIA">Sin categoría</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>
+        <select value={estado} onChange={(e) => filtrar('estado', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Estado: Todos</option><option value="1">Activos</option><option value="0">Inactivos</option></select>
+        <select value={paraVenta} onChange={(e) => filtrar('paraVenta', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Para venta: Todos</option><option value="1">Sí</option><option value="0">No</option></select>
+        <select value={unidad} onChange={(e) => filtrar('unidad', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Unidad: Todas</option>{unidades.map((item) => <option key={item} value={item}>{item}</option>)}</select>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
-          <div><div className="font-semibold text-gray-700">Productos fiscales</div><div className="text-xs text-slate-500">{filtrados.length} de {productos.length} productos · {vinculaciones.size} vinculados a la operación</div></div>
+          <div><div className="font-semibold text-gray-700">Productos fiscales</div><div className="text-xs text-slate-500">{resumen.total} productos · {vinculaciones.size} vinculados a la operación</div></div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={loading || filtrados.length === 0}
+              disabled={loading || productos.length === 0}
               onClick={() => exportarExcel('faregas_productos', 'Productos', [
                 { key: 'sku', header: 'SKU', width: 18 },
                 { key: 'descripcion', header: 'DESCRIPCIÓN', width: 60 },
@@ -335,7 +401,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
                 { key: 'precio', header: 'PRECIO REFERENCIA', width: 20 },
                 { key: 'venta', header: 'PARA VENTA', width: 14 },
                 { key: 'estado', header: 'ESTADO', width: 14 }
-              ], filtrados.map((producto) => ({
+              ], productos.map((producto) => ({
                 sku: producto.codigo_sku,
                 descripcion: producto.descripcion,
                 categoria: producto.categoria_nombre || 'SIN CATEGORÍA',
@@ -358,7 +424,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           : <div className="max-h-[58vh] overflow-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="sticky top-0 border-b border-gray-200 bg-white text-xs capitalize text-gray-500"><tr><th className="px-3 py-3">SKU / producto</th><th className="px-3 py-3">Datos fiscales</th><th className="px-3 py-3">Uso operativo</th><th className="px-3 py-3 text-center">Sedes activas</th><th className="px-3 py-3 text-right">Precio referencia</th><th className="px-3 py-3 text-center">Estado</th><th className="px-3 py-3 text-center">Acciones</th></tr></thead>
-              <tbody className="divide-y divide-gray-100">{filtrados.map((producto) => {
+              <tbody className="divide-y divide-gray-100">{productos.map((producto) => {
                 const vinculacion = vinculaciones.get(producto.id);
                 return <tr key={producto.id} className="hover:bg-gray-50">
                   <td className="min-w-64 px-3 py-3"><div className="font-mono font-bold text-gray-700">{producto.codigo_sku}</div><div className="mt-1 font-medium text-gray-800">{producto.descripcion}</div><div className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${producto.categoria_id ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{producto.categoria_nombre || 'SIN CATEGORÍA'}</div></td>
@@ -371,6 +437,13 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
                 </tr>;
               })}</tbody>
             </table>
+            <Paginacion
+              resumen={resumen}
+              etiqueta="productos"
+              deshabilitado={loading}
+              onCambioPagina={irAPagina}
+              onCambioPageSize={cambiarPageSize}
+            />
           </div>}
       </div>
 

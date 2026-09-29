@@ -79,6 +79,13 @@ export const faregasFacturacionAdminApi = {
       total: number;
       pagina: number;
       limite: number;
+      // Alias del sobre estándar de paginación de FAREGAS. El backend los
+      // devuelve junto a `pagina`/`limite` para que el componente <Paginacion>
+      // sea el mismo en toda la aplicación. `total` viene del COUNT con los
+      // MISMOS filtros que el SELECT, así que ya es el total filtrado.
+      page: number;
+      limit: number;
+      totalPages: number;
       plantas: Array<{ key: string; nombre: string; empresaKey: string }>;
       empresas: Array<{ key: string; nombre: string }>;
     } }>(`/facturacion/admin/documentos?${params.toString()}`);

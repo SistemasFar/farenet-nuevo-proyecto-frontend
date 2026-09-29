@@ -62,14 +62,18 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
     Promise.all([
       faregasConfigApi.obtenerCategorias(false),
       faregasConfigApi.getServicios(),
-      canViewProducts ? faregasProductosApi.listar() : Promise.resolve([]),
+      // Productos POR CATEGORÍA, no `listar()`: el listado paginado del catálogo
+      // devolvía sólo 10 filas, así que las categorías cuyo producto no caía en
+      // esa página aparecían con "0 producto(s)" y, sin producto, tampoco se
+      // habilitaba el botón "+ Configurar operación".
+      canViewProducts ? faregasProductosApi.listarPorCategoria() : Promise.resolve({ porCategoria: {}, productos: [], total: 0 }),
       canManageTarifas ? faregasTarifasAdminApi.listarSedes() : Promise.resolve([]),
       canManageTarifas ? faregasConfigApi.obtenerSedesPorServicio() : Promise.resolve({})
     ]).then(([categoriasData, serviciosData, productosData, sedesData, relacionesData]) => {
       if (cancelado) return;
       setCategorias(categoriasData);
       setServicios(serviciosData);
-      setProductos(productosData);
+      setProductos(productosData.productos);
       setSedes(sedesData.filter((sede) => sede.activo));
       setSedesPorServicio(relacionesData);
       setError('');

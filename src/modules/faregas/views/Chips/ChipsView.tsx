@@ -3,7 +3,9 @@ import { useOutletContext, useSearchParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { DownloadCloud, Info, Cpu, Boxes, FileText, Search, Trash2 } from 'lucide-react';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { faregasChipsApi, type Chip, type ChipResumen, type FiltrosListadoVentasChips, type ImpactoTipoChip, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
+import { Paginacion } from '../components/Paginacion';
+import { useListadoPaginado } from '../hooks/useListadoPaginado';
+import { faregasChipsApi, type Chip, type ChipResumen, type ImpactoTipoChip, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
 import { ChipScannerInput, parseChipScan } from './ChipScannerInput';
 import { ModalDetalleVentaChips } from './ModalDetalleVentaChips';
 import { ModalVentaChips } from './ModalVentaChips';
@@ -50,6 +52,10 @@ export function ChipsView() {
   const [destino, setDestino] = useState('');
   const [buscar, setBuscar] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
+  // Paginacion del inventario: 10 por pagina, en el backend.
+  const [chipsPagina, setChipsPagina] = useState(1);
+  const [chipsPageSize, setChipsPageSize] = useState(10);
+  const [chipsResumen, setChipsResumen] = useState({ items: 0, total: 0, page: 1, limit: 10, totalPages: 0 });
   const [mensaje, setMensaje] = useState('');
   const [eliminandoTipoId, setEliminandoTipoId] = useState<number | null>(null);  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,12 +87,24 @@ export function ChipsView() {
     try {
       const [r, l, prods, cat] = await Promise.all([
         faregasChipsApi.resumen(selectedProductId === '' ? undefined : Number(selectedProductId)),
-        faregasChipsApi.listar({ buscar, estado: filtroEstado === 'TODOS' ? undefined : filtroEstado }),
+        faregasChipsApi.listar({
+          buscar,
+          estado: filtroEstado === 'TODOS' ? undefined : filtroEstado,
+          page: chipsPagina,
+          pageSize: chipsPageSize
+        }),
         faregasChipsApi.listarProductosInventariables(),
         faregasChipsApi.catalogosProductosInventariables()
       ]);
       setResumen(r);
       setChips(l.items);
+      setChipsResumen({
+        items: l.items.length,
+        total: Number(l.total || 0),
+        page: Number(l.page || chipsPagina),
+        limit: Number(l.limit || chipsPageSize),
+        totalPages: Number(l.totalPages || 0)
+      });
       setProductos(prods);
       setCatalogos(cat);
       if (selectedProductId === '' && prods.length > 0) {
@@ -96,7 +114,19 @@ export function ChipsView() {
     } catch (error: unknown) {
       setError(errorMessage(error));
     }
-  }, [buscar, filtroEstado, selectedProductId]);
+  }, [buscar, filtroEstado, selectedProductId, chipsPagina, chipsPageSize]);
+
+  // Cualquier cambio de filtro del inventario vuelve a la pagina 1.
+  const aplicarFiltroInventario = (campo: 'buscar' | 'estado', valor: string) => {
+    setChipsPagina(1);
+    if (campo === 'buscar') setBuscar(valor);
+    else setFiltroEstado(valor);
+  };
+
+  const cambiarChipsPageSize = (nuevo: number) => {
+    setChipsPageSize(nuevo);
+    setChipsPagina(1);
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => void cargar(), buscar ? 250 : 0);
@@ -382,7 +412,7 @@ export function ChipsView() {
             <div><h2 className="font-bold">Unidades registradas</h2><p className="mt-1 text-xs text-slate-500">Todos los tipos ubicados actualmente en {plantaNombre}.</p></div>
             <div className="flex flex-col sm:flex-row gap-3 sm:ml-auto w-full sm:w-auto">
               <label className="relative w-full sm:w-48"><span className="mb-1 block text-xs font-bold text-slate-600">Estado</span>
-                <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="w-full rounded border border-slate-300 py-[7px] px-3 text-sm focus:border-blue-500 focus:outline-none">
+                <select value={filtroEstado} onChange={e => aplicarFiltroInventario('estado', e.target.value)} className="w-full rounded border border-slate-300 py-[7px] px-3 text-sm focus:border-blue-500 focus:outline-none">
                   <option value="TODOS">Todos</option>
                   <option value="DISPONIBLE">Disponibles</option>
                   <option value="RESERVADO">Reservados</option>
@@ -390,10 +420,16 @@ export function ChipsView() {
                   <option value="BAJA">Bajas</option>
                 </select>
               </label>
-              <label className="relative w-full sm:w-72"><span className="mb-1 block text-xs font-bold text-slate-600">Buscar por código de chip</span><Search className="absolute bottom-2.5 left-3 h-4 w-4 text-slate-400" /><input value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Ej. CHIP001" className="w-full rounded border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" /></label>
+              <label className="relative w-full sm:w-72"><span className="mb-1 block text-xs font-bold text-slate-600">Buscar por código o tipo de chip</span><Search className="absolute bottom-2.5 left-3 h-4 w-4 text-slate-400" /><input value={buscar} onChange={e => aplicarFiltroInventario('buscar', e.target.value)} placeholder="Buscar por código o tipo de chip" className="w-full rounded border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" /></label>
             </div>
           </div>
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr>{modo === 'TRANSFERENCIA' && <th className="w-10 p-3"></th>}<th className="p-3">Código del chip</th><th className="p-3">Tipo</th><th className="p-3">Estado</th><th className="p-3">Sede</th><th className="p-3">Ingreso</th><th className="p-3">Último movimiento</th></tr></thead><tbody>{chips.map(c => <tr key={c.id} className="border-t border-slate-100">{modo === 'TRANSFERENCIA' && <td className="p-3"><input type="checkbox" disabled={c.estado !== 'DISPONIBLE' || Number(c.producto_inventariable_id) !== Number(selectedProductId)} checked={scan.split('\n').some(numero => numero.trim() === c.numero_chip)} onChange={e => { if (e.target.checked) { setScan(prev => prev ? `${prev}\n${c.numero_chip}` : c.numero_chip); } else { setScan(prev => prev.split('\n').map(x => x.trim()).filter(x => x && x !== c.numero_chip).join('\n')); } }} className="rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]" /></td>}<td className="p-3 font-mono font-bold">{c.numero_chip}</td><td className="p-3">{c.producto_nombre}</td><td className="p-3"><span className={`inline-block rounded px-2 py-1 text-[10px] font-bold capitalize tracking-wider ${c.estado === 'DISPONIBLE' ? 'bg-emerald-100 text-emerald-800' : c.estado === 'RESERVADO' ? 'bg-amber-100 text-amber-800' : c.estado === 'VENDIDO' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{c.estado}</span></td><td className="p-3">{c.planta_nombre}</td><td className="p-3">{new Date(c.creado_en).toLocaleString()}</td><td className="p-3">{c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleString() : '-'}</td></tr>)}{!chips.length && <tr><td colSpan={modo === 'TRANSFERENCIA' ? 7 : 6} className="p-10 text-center text-slate-400">No se encontraron chips con ese código.</td></tr>}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr>{modo === 'TRANSFERENCIA' && <th className="w-10 p-3"></th>}<th className="p-3">Código del chip</th><th className="p-3">Tipo</th><th className="p-3">Estado</th><th className="p-3">Sede</th><th className="p-3">Ingreso</th><th className="p-3">Último movimiento</th></tr></thead><tbody>{chips.map(c => <tr key={c.id} className="border-t border-slate-100">{modo === 'TRANSFERENCIA' && <td className="p-3"><input type="checkbox" disabled={c.estado !== 'DISPONIBLE' || Number(c.producto_inventariable_id) !== Number(selectedProductId)} checked={scan.split('\n').some(numero => numero.trim() === c.numero_chip)} onChange={e => { if (e.target.checked) { setScan(prev => prev ? `${prev}\n${c.numero_chip}` : c.numero_chip); } else { setScan(prev => prev.split('\n').map(x => x.trim()).filter(x => x && x !== c.numero_chip).join('\n')); } }} className="rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]" /></td>}<td className="p-3 font-mono font-bold">{c.numero_chip}</td><td className="p-3">{c.producto_nombre}</td><td className="p-3"><span className={`inline-block rounded px-2 py-1 text-[10px] font-bold capitalize tracking-wider ${c.estado === 'DISPONIBLE' ? 'bg-emerald-100 text-emerald-800' : c.estado === 'RESERVADO' ? 'bg-amber-100 text-amber-800' : c.estado === 'VENDIDO' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{c.estado}</span></td><td className="p-3">{c.planta_nombre}</td><td className="p-3">{new Date(c.creado_en).toLocaleString()}</td><td className="p-3">{c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleString() : '-'}</td></tr>)}{!chips.length && <tr><td colSpan={modo === 'TRANSFERENCIA' ? 7 : 6} className="p-10 text-center text-slate-400">No se encontraron registros.</td></tr>}</tbody></table></div>
+          <Paginacion
+            resumen={chipsResumen}
+            onCambioPagina={setChipsPagina}
+            onCambioPageSize={cambiarChipsPageSize}
+            etiqueta="chips"
+          />
         </section>
       </div>
     </>}
@@ -524,50 +560,34 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
   // siendo la autoridad: protege cada ruta con ese mismo permiso.
   const { permisos } = useOutletContext<MainLayoutContext>();
   const puedeVender = Array.isArray(permisos) && permisos.includes('CHIPS_VENDER');
-  const [ventas, setVentas] = useState<VentaChipOperacion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [filtrosAplicados, setFiltrosAplicados] = useState<FiltrosListadoVentasChips>({});
-  const [errorFiltros, setErrorFiltros] = useState('');
 
-  const buscar = () => {
-    if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
-      setErrorFiltros('La fecha Desde no puede ser posterior a la fecha Hasta.');
-      return;
+  // Listado transaccional: abre en HOY -> HOY, 10 por pagina, y pagina en el
+  // backend (LIMIT/OFFSET + COUNT con los mismos filtros).
+  const listado = useListadoPaginado<VentaChipOperacion>({
+    transaccional: true,
+    cargar: async (params) => {
+      const response = await faregasChipsApi.listarVentas({
+        page: Number(params.page || 1),
+        pageSize: Number(params.pageSize || 10),
+        fechaDesde: String(params.fechaDesde || ''),
+        fechaHasta: String(params.fechaHasta || '')
+      });
+      return {
+        items: response.ventas || [],
+        total: Number(response.total || 0),
+        page: Number(response.page || 1),
+        limit: Number(response.limit || 10),
+        totalPages: Number(response.totalPages || 0)
+      };
     }
-    setErrorFiltros('');
-    setFiltrosAplicados({
-      ...(fechaDesde ? { fechaDesde } : {}),
-      ...(fechaHasta ? { fechaHasta } : {})
-    });
-  };
+  });
 
-  const limpiarFiltros = () => {
-    setFechaDesde('');
-    setFechaHasta('');
-    setErrorFiltros('');
-    setFiltrosAplicados({});
-  };
+  const ventas = listado.items;
 
   useEffect(() => {
-    let activo = true;
-    const cargar = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const response = await faregasChipsApi.listarVentas(filtrosAplicados);
-        if (activo && response.success) setVentas(response.ventas);
-      } catch (e: unknown) {
-        if (activo) setError(errorMessage(e));
-      } finally {
-        if (activo) setLoading(false);
-      }
-    };
-    void cargar();
-    return () => { activo = false; };
-  }, [refreshToken, filtrosAplicados]);
+    if (refreshToken > 0) void listado.refrescar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken]);
 
   return (
     <div className="space-y-4">
@@ -585,16 +605,16 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
         <label className="text-xs font-bold text-slate-600">Desde
-          <input type="date" value={fechaDesde} onChange={(event) => setFechaDesde(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700" />
+          <input type="date" value={listado.filtros.fechaDesde || ''} max={listado.filtros.fechaHasta || undefined} onChange={(event) => listado.setFiltro('fechaDesde', event.target.value)} className="mt-1 block rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700" />
         </label>
         <label className="text-xs font-bold text-slate-600">Hasta
-          <input type="date" value={fechaHasta} onChange={(event) => setFechaHasta(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700" />
+          <input type="date" value={listado.filtros.fechaHasta || ''} min={listado.filtros.fechaDesde || undefined} onChange={(event) => listado.setFiltro('fechaHasta', event.target.value)} className="mt-1 block rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700" />
         </label>
-        <button type="button" onClick={buscar} className="rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white hover:bg-[#041c53]">BUSCAR</button>
-        <button type="button" onClick={limpiarFiltros} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">LIMPIAR</button>
+        <button type="button" onClick={() => listado.aplicarFiltros()} className="rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white hover:bg-[#041c53]">BUSCAR</button>
+        <button type="button" onClick={listado.limpiarFiltros} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">LIMPIAR</button>
       </div>
-      {errorFiltros && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{errorFiltros}</p>}
-      {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}
+      {listado.rangoError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{listado.rangoError}</p>}
+      {listado.error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{listado.error}</p>}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
@@ -612,10 +632,10 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {listado.loading ? (
                 <tr><td colSpan={8} className="p-8 text-center text-slate-500">Cargando registros...</td></tr>
               ) : ventas.length === 0 ? (
-                <tr><td colSpan={8} className="p-8 text-center text-slate-500">No se encontraron ventas.</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-slate-500">No se encontraron registros para el rango seleccionado.</td></tr>
               ) : ventas.map((venta) => (
                 <tr key={venta.operacionId} onClick={() => onSelectVenta(venta.operacionId)} className="cursor-pointer border-t border-slate-100 transition hover:bg-blue-50/60">
                   <td className="px-4 py-3 font-bold text-[#052A79]">OP. #{venta.operacionId}</td>
@@ -659,6 +679,13 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
             </tbody>
           </table>
         </div>
+        <Paginacion
+          resumen={listado.resumen}
+          onCambioPagina={listado.irAPagina}
+          onCambioPageSize={listado.cambiarPageSize}
+          etiqueta="ventas"
+          deshabilitado={listado.loading}
+        />
       </div>
     </div>
   );
