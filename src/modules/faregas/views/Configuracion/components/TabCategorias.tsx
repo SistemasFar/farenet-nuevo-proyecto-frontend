@@ -34,7 +34,7 @@ const tieneFacturaProtegida = (impacto: ImpactoCategoria) => impacto.facturacion
 const bloqueosImpacto = (impacto: ImpactoCategoria) => {
   const bloqueos: string[] = [];
   if (impacto.operacionesBloqueadas.length > 0) {
-    bloqueos.push('Hay operaciones de prueba que comparten servicios o productos fiscales con otras categorías.');
+    bloqueos.push('Hay operaciones de prueba que comparten servicios o productos fiscales con otros tipos de certificado.');
   }
   if (impacto.facturacionesBloqueantes.length > 0) {
     bloqueos.push(
@@ -57,7 +57,7 @@ const renderImpactoCategoria = (impacto: ImpactoCategoria) => {
   const formatos = impacto.formatos.map((formato) => `#${formato.id} · ${formato.codigo} — ${formato.nombre} · ${formato.servicios_que_lo_usan} servicio(s) lo usan · se conserva`);
   const operaciones = impacto.operaciones.map((operacion) => `#${operacion.id} · ${operacion.estado || 'sin estado'} · ${operacion.total_detalles} detalle(s)`);
   const certificados = impacto.certificados.map((certificado) => `#${certificado.id} · ${certificado.numero_certificado || 'sin número'} · ${certificado.estado || 'sin estado'} · ${impacto.certificadosAEliminar.includes(certificado.id) ? 'se elimina' : 'se conserva'}`);
-  const bloqueadas = impacto.operacionesBloqueadas.map((operacion) => `#${operacion.operacion_id} · ${operacion.motivo === 'SERVICIO_DE_OTRA_CATEGORIA' ? 'contiene servicios de otra categoría' : 'contiene productos fiscales compartidos'}`);
+  const bloqueadas = impacto.operacionesBloqueadas.map((operacion) => `#${operacion.operacion_id} · ${operacion.motivo === 'SERVICIO_DE_OTRA_CATEGORIA' ? 'contiene servicios de otro tipo de certificado' : 'contiene productos fiscales compartidos'}`);
   const productos = impacto.productos.map((producto) => `#${producto.id} · ${producto.codigo_sku} — ${producto.descripcion}`);
   const facturas = impacto.facturaciones.map((factura) => `#${factura.id} · ${factura.nro_comprobante || 'sin comprobante'} · ${factura.estado || 'sin estado'} · ${factura.entorno_facturador || 'sin entorno'}`);
   const ordenes = impacto.ordenesPago.map((orden) => `#${orden.id} · ${orden.estado || 'sin estado'}`);
@@ -68,10 +68,10 @@ const renderImpactoCategoria = (impacto: ImpactoCategoria) => {
 
   return `<div class="space-y-3 text-left">
     ${limpiaPrueba
-      ? `<p class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800">ELIMINAR DATOS DE PRUEBA (ambiente ${escaparHtml(impacto.ambiente)})<br/>Esta categoría contiene ${impacto.servicios.length} servicio(s), ${impacto.reglasConfiguracion.length} regla(s), ${impacto.tarifas.length} tarifa(s), ${impacto.operaciones.length} operación(es), ${impacto.certificados.length} certificado(s), ${impacto.facturaciones.length} facturación(es), ${impacto.intentosFacturacion.length} intento(s), ${impacto.ordenesPago.length} orden(es) de pago y ${impacto.pagos.length} pago(s).</p>`
+      ? `<p class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800">ELIMINAR DATOS DE PRUEBA (ambiente ${escaparHtml(impacto.ambiente)})<br/>Este tipo de certificado contiene ${impacto.servicios.length} servicio(s), ${impacto.reglasConfiguracion.length} regla(s), ${impacto.tarifas.length} tarifa(s), ${impacto.operaciones.length} operación(es), ${impacto.certificados.length} certificado(s), ${impacto.facturaciones.length} facturación(es), ${impacto.intentosFacturacion.length} intento(s), ${impacto.ordenesPago.length} orden(es) de pago y ${impacto.pagos.length} pago(s).</p>`
       : impacto.requiereConfirmacion
-      ? '<p class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">Esta categoría tiene servicios vinculados y será eliminada junto con sus tarifas, reglas por sede, mappings e historial de prueba. Los productos fiscales se conservarán.</p>'
-      : '<p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">La categoría se eliminará. Los productos fiscales vinculados sólo perderán su clasificación.</p>'}
+      ? '<p class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">Este tipo de certificado tiene servicios vinculados y será eliminado junto con sus tarifas, reglas por sede, mappings e historial de prueba. Los productos fiscales se conservarán.</p>'
+      : '<p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">El tipo de certificado se eliminará. Los productos fiscales vinculados sólo perderán su clasificación.</p>'}
     ${limpiaPrueba
       ? '<p class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">También se eliminarán esos registros LOCALES de prueba. Los correlativos de certificado y las series NO retrocederán. No se llamará a Nubefact ni a SUNAT. Esta acción no se puede deshacer.</p>'
       : ''}
@@ -111,7 +111,7 @@ export default function TabCategorias() {
       setError('');
       setCategorias(await faregasConfigApi.obtenerCategorias());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar categorías');
+      setError(err instanceof Error ? err.message : 'Error al cargar tipos de certificado');
     } finally {
       setLoading(false);
     }
@@ -138,14 +138,14 @@ export default function TabCategorias() {
       setShowModal(false);
       await cargar();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error al guardar categoría');
+      alert(err instanceof Error ? err.message : 'Error al guardar el tipo de certificado');
     } finally {
       setSaving(false);
     }
   };
 
   const cambiarEstado = async (categoria: CategoriaServicio) => {
-    if (!confirm(`¿Seguro que deseas ${categoria.activo ? 'desactivar' : 'activar'} esta categoría?`)) return;
+    if (!confirm(`¿Seguro que deseas ${categoria.activo ? 'desactivar' : 'activar'} este tipo de certificado?`)) return;
     try {
       await faregasConfigApi.cambiarEstadoCategoria(categoria.id, !categoria.activo);
       await cargar();
@@ -164,7 +164,7 @@ export default function TabCategorias() {
           ? 'ELIMINACIÓN BLOQUEADA'
           : limpiaPruebaEnUI(impacto)
             ? 'ELIMINAR DATOS DE PRUEBA'
-            : impacto.requiereConfirmacion ? 'ELIMINAR CATEGORÍA' : 'Eliminar categoría',
+            : impacto.requiereConfirmacion ? 'ELIMINAR TIPO DE CERTIFICADO' : 'Eliminar tipo de certificado',
         html: renderImpactoCategoria(impacto),
         icon: bloqueos.length > 0 ? 'error' : limpiaPruebaEnUI(impacto) ? 'warning' : impacto.requiereConfirmacion ? 'warning' : 'question',
         showCancelButton: bloqueos.length === 0,
@@ -191,7 +191,7 @@ export default function TabCategorias() {
       window.dispatchEvent(new CustomEvent('faregas-categoria-eliminada', {
         detail: { productosDesvinculados: resultado.productosDesvinculados }
       }));
-      const partes = [`La categoría "${categoria.nombre}" fue eliminada.`];
+      const partes = [`El tipo de certificado "${categoria.nombre}" fue eliminado.`];
       if (resultado.serviciosEliminados > 0) {
         partes.push(`${resultado.serviciosEliminados} servicio(s), ${resultado.tarifasEliminadas} tarifa(s), ${resultado.reglasEliminadas} regla(s), ${resultado.operacionesEliminadas} operación(es) y ${resultado.certificadosEliminados} certificado(s) de prueba se eliminaron.`);
       }
@@ -202,7 +202,7 @@ export default function TabCategorias() {
         partes.push(`${resultado.productosDesvinculados} producto(s) fiscales se conservaron y quedaron SIN CATEGORÍA.`);
       }
       await Swal.fire({
-        title: 'Categoría eliminada',
+        title: 'Tipo de certificado eliminado',
         text: partes.join(' '),
         icon: 'success',
         confirmButtonText: 'OK'
@@ -241,12 +241,12 @@ export default function TabCategorias() {
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
-          <span className="font-semibold text-gray-700">Administración de Categorías</span>
+          <span className="font-semibold text-gray-700">Administración de Tipos de Certificado</span>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={loading || filtradas.length === 0}
-              onClick={() => exportarExcel('faregas_categorias', 'Categorías', [
+              onClick={() => exportarExcel('faregas_tipos_certificado', 'Tipos de certificado', [
                 { key: 'codigo', header: 'CÓDIGO', width: 24 },
                 { key: 'nombre', header: 'NOMBRE', width: 28 },
                 { key: 'descripcion', header: 'DESCRIPCIÓN', width: 60 },
@@ -265,12 +265,12 @@ export default function TabCategorias() {
               onClick={() => { setMode('CREATE'); setActual(categoriaVacia()); setShowModal(true); }}
               className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white"
             >
-              + Nueva Categoría
+              + Nuevo Tipo de Certificado
             </button>
           </div>
         </div>
 
-        {loading ? <div className="py-10 text-center">Cargando categorías...</div>
+        {loading ? <div className="py-10 text-center">Cargando tipos de certificado...</div>
           : error ? <div className="py-10 text-center text-red-500">{error}</div>
           : (
             <div className="overflow-x-auto">
@@ -307,7 +307,7 @@ export default function TabCategorias() {
                     </tr>
                   ))}
                   {filtradas.length === 0 && (
-                    <tr><td colSpan={5} className="py-6 text-center text-gray-500">No hay categorías que coincidan con los filtros.</td></tr>
+                    <tr><td colSpan={5} className="py-6 text-center text-gray-500">No hay tipos de certificado que coincidan con los filtros.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -318,7 +318,7 @@ export default function TabCategorias() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-            <h3 className="mb-4 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Nueva Categoría' : 'Editar Categoría'}</h3>
+            <h3 className="mb-4 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Nuevo Tipo de Certificado' : 'Editar Tipo de Certificado'}</h3>
             <form onSubmit={guardar} className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Código</label>

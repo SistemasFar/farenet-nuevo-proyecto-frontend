@@ -145,16 +145,17 @@ describe('lo que NO se tocó', () => {
     expect(fuente).toMatch(/faregasProductosApi\.eliminar\(/);
   });
 
-  it('sigue exportando a Excel con las mismas columnas', () => {
+  it('sigue exportando a Excel con el maestro DMS agrupado', () => {
     expect(VISTA).toMatch(/exportarExcel\('faregas_productos'/);
-    for (const col of ['SKU', 'DESCRIPCIÓN', 'CATEGORÍA', 'UNIDAD', 'AFECTACIÓN IGV',
-      'CUENTA POR COBRAR', 'PRECIO REFERENCIA', 'PARA VENTA', 'ESTADO']) {
+    for (const col of ['SKU', 'DESCRIPCIÓN', 'TIPO DE CERTIFICADO', 'SEDE \/ CATEGORÍA DMS',
+      'UNIDAD', 'AFECTACIÓN IGV', 'CUENTA POR COBRAR', 'PRECIO UNITARIO',
+      'PRECIO VENTA UNITARIO', 'PARA VENTA', 'ESTADO']) {
       expect(VISTA, `falta la columna ${col}`).toMatch(new RegExp(`header: '${col}'`));
     }
   });
 
-  it('conserva la opción "Sin categoría" del filtro', () => {
-    expect(VISTA).toMatch(/<option value="SIN_CATEGORIA">Sin categoría<\/option>/);
+  it('conserva el filtro técnico de registros sin tipo de certificado', () => {
+    expect(VISTA).toMatch(/<option value="SIN_CATEGORIA">Sin tipo de certificado<\/option>/);
   });
 
   it('mantiene el aviso de guardado con el enlace a Tarifas', () => {

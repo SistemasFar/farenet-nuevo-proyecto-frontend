@@ -19,11 +19,13 @@ import { Paginacion } from '../../components/Paginacion';
 const productoVacio = (): Partial<ProductoFacturacion> => ({
   codigo_sku: '', descripcion: '', tipo_producto: 'Producto', categoria_dms: null,
   categoria_id: null,
-  cuenta_por_cobrar: null, unidad: 'NIU', precio_unitario: null,
+  cuenta_por_cobrar: null, codigo_barras: null, unidad: 'NIU', precio_unitario: null,
   precio_referencia: null, valor_referencial_unitario: null,
   codigo_clasificacion_sunat: null, tipo_afectacion_igv: '10',
-  porcentaje_isc: null, disponible_pos: false, es_para_venta: true,
+  codigo_afectacion_isc: null, porcentaje_isc: null,
+  disponible_pos: false, es_para_venta: true,
   es_para_compra: false, tiene_icbper: false, activo: true,
+  imagen_url: null,
   requiere_chip: false, producto_chip_id: null, precio_chip: null
 });
 
@@ -171,7 +173,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
       .then(([categoriasData, relacionesData, chipsData]) => {
         if (cancelado) return;
         setCategorias(categoriasData);
-        setChipsOpciones(chipsData as any || []);
+        setChipsOpciones(chipsData || []);
         if (relacionesData) {
           setServicios(relacionesData[0]);
           setSedesPorServicio(relacionesData[1]);
@@ -278,13 +280,8 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   const guardar = async (event: React.FormEvent) => {
     event.preventDefault();
     const unidadTributaria = String(actual.unidad || '').trim().toUpperCase();
-    const codigoSunat = String(actual.codigo_clasificacion_sunat || '').trim();
     if (actual.es_para_venta && !['NIU', 'ZZ'].includes(unidadTributaria)) {
       alert('La unidad tributaria para venta debe ser NIU o ZZ.');
-      return;
-    }
-    if (codigoSunat && !/^\d{8}$/.test(codigoSunat)) {
-      alert('El código SUNAT es opcional; si se registra, debe tener exactamente 8 dígitos.');
       return;
     }
     try {
@@ -357,6 +354,8 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     }
   };
 
+  const vinculacionActual = actual.id ? vinculaciones.get(actual.id) : undefined;
+
   return (
     <div>
       <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
@@ -378,7 +377,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
 
       <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
         <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar código o descripción..." className="rounded-lg border border-slate-300 p-2 text-sm focus:border-[#052A79] focus:outline-none lg:col-span-2" />
-        <select value={categoria} onChange={(e) => filtrar('categoria', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Categoría: Todas</option><option value="SIN_CATEGORIA">Sin categoría</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>
+        <select value={categoria} onChange={(e) => filtrar('categoria', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Tipo de certificado: Todos</option><option value="SIN_CATEGORIA">Sin tipo de certificado</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>
         <select value={estado} onChange={(e) => filtrar('estado', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Estado: Todos</option><option value="1">Activos</option><option value="0">Inactivos</option></select>
         <select value={paraVenta} onChange={(e) => filtrar('paraVenta', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Para venta: Todos</option><option value="1">Sí</option><option value="0">No</option></select>
         <select value={unidad} onChange={(e) => filtrar('unidad', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Unidad: Todas</option>{unidades.map((item) => <option key={item} value={item}>{item}</option>)}</select>
@@ -394,22 +393,38 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
               onClick={() => exportarExcel('faregas_productos', 'Productos', [
                 { key: 'sku', header: 'SKU', width: 18 },
                 { key: 'descripcion', header: 'DESCRIPCIÓN', width: 60 },
-                { key: 'categoria', header: 'CATEGORÍA', width: 24 },
+                { key: 'tipoCertificado', header: 'TIPO DE CERTIFICADO', width: 24 },
+                { key: 'sedes', header: 'SEDE / CATEGORÍA DMS', width: 35 },
                 { key: 'unidad', header: 'UNIDAD', width: 12 },
                 { key: 'igv', header: 'AFECTACIÓN IGV', width: 18 },
+                { key: 'isc', header: 'AFECTACIÓN ISC', width: 18 },
                 { key: 'cuenta', header: 'CUENTA POR COBRAR', width: 30 },
-                { key: 'precio', header: 'PRECIO REFERENCIA', width: 20 },
+                { key: 'precioUnitario', header: 'PRECIO UNITARIO', width: 18 },
+                { key: 'precioVenta', header: 'PRECIO VENTA UNITARIO', width: 22 },
+                { key: 'valorReferencial', header: 'VALOR REFERENCIAL', width: 20 },
+                { key: 'codigoBarras', header: 'CÓDIGO DE BARRAS', width: 22 },
                 { key: 'venta', header: 'PARA VENTA', width: 14 },
+                { key: 'compra', header: 'PARA COMPRA', width: 14 },
+                { key: 'pos', header: 'DISPONIBLE POS', width: 16 },
+                { key: 'icbper', header: 'ICBPER', width: 12 },
                 { key: 'estado', header: 'ESTADO', width: 14 }
               ], productos.map((producto) => ({
                 sku: producto.codigo_sku,
                 descripcion: producto.descripcion,
-                categoria: producto.categoria_nombre || 'SIN CATEGORÍA',
+                tipoCertificado: producto.categoria_nombre || 'SIN TIPO DE CERTIFICADO',
+                sedes: vinculaciones.get(producto.id)?.sedesActivas.join(', ') || '',
                 unidad: producto.unidad || '',
                 igv: producto.tipo_afectacion_igv || '',
+                isc: [producto.codigo_afectacion_isc, producto.porcentaje_isc == null ? '' : `${producto.porcentaje_isc}%`].filter(Boolean).join(' · '),
                 cuenta: producto.cuenta_por_cobrar || '',
-                precio: producto.precio_referencia,
+                precioUnitario: producto.precio_unitario,
+                precioVenta: producto.precio_referencia,
+                valorReferencial: producto.valor_referencial_unitario,
+                codigoBarras: producto.codigo_barras || '',
                 venta: producto.es_para_venta ? 'SÍ' : 'NO',
+                compra: producto.es_para_compra ? 'SÍ' : 'NO',
+                pos: producto.disponible_pos ? 'SÍ' : 'NO',
+                icbper: producto.tiene_icbper ? 'SÍ' : 'NO',
                 estado: producto.activo ? 'ACTIVO' : 'INACTIVO'
               })))}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -423,16 +438,17 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           : error ? <div className="py-10 text-center text-red-500">{error}</div>
           : <div className="max-h-[58vh] overflow-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 border-b border-gray-200 bg-white text-xs capitalize text-gray-500"><tr><th className="px-3 py-3">SKU / producto</th><th className="px-3 py-3">Datos fiscales</th><th className="px-3 py-3">Uso operativo</th><th className="px-3 py-3 text-center">Sedes activas</th><th className="px-3 py-3 text-right">Precio referencia</th><th className="px-3 py-3 text-center">Estado</th><th className="px-3 py-3 text-center">Acciones</th></tr></thead>
+              <thead className="sticky top-0 border-b border-gray-200 bg-white text-xs capitalize text-gray-500"><tr><th className="px-3 py-3">SKU / producto</th><th className="px-3 py-3">Sede / Categoría DMS</th><th className="px-3 py-3">Datos fiscales</th><th className="px-3 py-3">Datos comerciales</th><th className="px-3 py-3">Flags</th><th className="px-3 py-3">Uso operativo</th><th className="px-3 py-3 text-center">Imagen</th><th className="px-3 py-3 text-center">Acciones</th></tr></thead>
               <tbody className="divide-y divide-gray-100">{productos.map((producto) => {
                 const vinculacion = vinculaciones.get(producto.id);
                 return <tr key={producto.id} className="hover:bg-gray-50">
-                  <td className="min-w-64 px-3 py-3"><div className="font-mono font-bold text-gray-700">{producto.codigo_sku}</div><div className="mt-1 font-medium text-gray-800">{producto.descripcion}</div><div className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${producto.categoria_id ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{producto.categoria_nombre || 'SIN CATEGORÍA'}</div></td>
-                  <td className="min-w-48 px-3 py-3 text-xs"><div>Unidad: <b>{producto.unidad || '-'}</b> · IGV: <b>{producto.tipo_afectacion_igv || '-'}</b></div><div className="mt-1 text-slate-500">SUNAT: {producto.codigo_clasificacion_sunat || 'Opcional / no registrado'}</div><div className="mt-1 text-slate-500">Cuenta: {producto.cuenta_por_cobrar || '-'}</div></td>
+                  <td className="min-w-64 px-3 py-3"><div className="font-mono font-bold text-gray-700">{producto.codigo_sku}</div><div className="mt-1 font-medium text-gray-800">{producto.descripcion}</div><div className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${producto.categoria_id ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{producto.categoria_nombre || 'SIN TIPO DE CERTIFICADO'}</div><div className="mt-1 text-xs text-slate-500">Tipo: {producto.tipo_producto || 'Producto'}</div></td>
+                  <td className="min-w-52 px-3 py-3 text-xs">{vinculacion?.sedesActivas.length ? <div className="font-semibold text-slate-800" title={vinculacion.sedesActivas.join(', ')}>{vinculacion.sedesActivas.join(', ')}</div> : <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">SIN TARIFA ACTIVA</span>}<div className="mt-1 text-slate-500">Derivada de Tarifas por sede</div></td>
+                  <td className="min-w-52 px-3 py-3 text-xs"><div>Unidad: <b>{producto.unidad || '-'}</b> · IGV: <b>{producto.tipo_afectacion_igv || '-'}</b></div><div className="mt-1 text-slate-500">SUNAT: {producto.codigo_clasificacion_sunat || '-'}</div><div className="mt-1 text-slate-500">ISC: {producto.codigo_afectacion_isc || '-'} · {producto.porcentaje_isc == null ? '-' : `${producto.porcentaje_isc}%`}</div><div className="mt-1 text-slate-500">Cuenta: {producto.cuenta_por_cobrar || '-'}</div></td>
+                  <td className="min-w-52 px-3 py-3 text-xs"><div>P. unitario: <b>{producto.precio_unitario == null ? '-' : `S/ ${producto.precio_unitario.toFixed(2)}`}</b></div><div className="mt-1">P. venta: <b>{producto.precio_referencia == null ? '-' : `S/ ${producto.precio_referencia.toFixed(2)}`}</b></div><div className="mt-1">V. referencial: <b>{producto.valor_referencial_unitario == null ? '-' : `S/ ${producto.valor_referencial_unitario.toFixed(2)}`}</b></div><div className="mt-1 text-slate-500">Barras: {producto.codigo_barras || '-'}</div></td>
+                  <td className="min-w-40 px-3 py-3 text-xs"><div><span className={`rounded-full px-2 py-1 font-semibold ${producto.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{producto.activo ? 'ACTIVO' : 'INACTIVO'}</span></div><div className="mt-2 text-slate-600">Venta: {producto.es_para_venta ? 'Sí' : 'No'} · Compra: {producto.es_para_compra ? 'Sí' : 'No'}</div><div className="mt-1 text-slate-600">POS: {producto.disponible_pos ? 'Sí' : 'No'} · ICBPER: {producto.tiene_icbper ? 'Sí' : 'No'}</div></td>
                   <td className="min-w-60 px-3 py-3 text-xs">{vinculacion ? <div className="font-semibold text-slate-800">{vinculacion.servicios.join(', ')}</div> : <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">SIN VINCULAR</span>}</td>
-                  <td className="px-3 py-3 text-center">{vinculacion ? <><div className="font-bold text-slate-800">{vinculacion.sedesActivas.length}</div><div className="max-w-40 truncate text-xs text-slate-500" title={vinculacion.sedesActivas.join(', ')}>{vinculacion.sedesActivas.join(', ') || 'Sin tarifa activa'}</div></> : '-'}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right">{producto.precio_referencia == null ? '-' : `S/ ${producto.precio_referencia.toFixed(2)}`}</td>
-                  <td className="px-3 py-3 text-center"><div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${producto.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{producto.activo ? 'ACTIVO' : 'INACTIVO'}</span></div><div className="mt-2 text-xs text-slate-500">{producto.es_para_venta ? 'Para venta' : 'No vendible'}</div></td>
+                  <td className="px-3 py-3 text-center">{producto.imagen_url ? <img src={producto.imagen_url} alt={producto.descripcion} className="mx-auto h-12 w-12 rounded border border-slate-200 object-cover" /> : <span className="text-xs text-slate-400">Sin imagen</span>}</td>
                   <td className="px-3 py-3 text-center"><div className="flex justify-center gap-2"><button onClick={() => { setMode('EDIT'); setActual(producto); setProductoGuardado(''); setModal(true); }} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-blue-100"><Edit size={18} /></button><button onClick={() => void eliminarProducto(producto)} disabled={eliminando === producto.id} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-red-600 transition-colors hover:bg-red-100 disabled:cursor-wait disabled:opacity-50"><Trash2 size={18} /></button><button onClick={() => void cambiarEstado(producto)} title={producto.activo ? 'Desactivar' : 'Activar'} className={producto.activo ? 'rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-red-100' : 'rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-[#052A79] transition-colors hover:bg-green-100'}>{producto.activo ? <PowerOff size={18} /> : <Power size={18} />}</button></div></td>
                 </tr>;
               })}</tbody>
@@ -447,13 +463,57 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           </div>}
       </div>
 
-      {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"><h3 className="mb-2 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Nuevo producto fiscal' : 'Editar producto fiscal'}</h3><p className="mb-4 text-sm text-slate-600">Aquí se registran únicamente los datos del concepto facturable. La sede, tarifa y operación se asignan después sin duplicar el producto.</p><form onSubmit={guardar} className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2"><div><label className="mb-1 block text-sm font-semibold">Código SKU</label><input required disabled={mode === 'EDIT'} value={actual.codigo_sku || ''} onChange={(e) => setActual({ ...actual, codigo_sku: e.target.value })} className="w-full rounded-lg border p-2 disabled:bg-slate-100" /></div><div><label className="mb-1 block text-sm font-semibold">Categoría</label><select required value={actual.categoria_id || ''} onChange={(e) => setActual({ ...actual, categoria_id: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border bg-white p-2"><option value="">Seleccionar categoría...</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre} ({item.codigo})</option>)}</select></div></div>
-        <div><label className="mb-1 block text-sm font-semibold">Nombre del certificado</label><input required value={actual.descripcion || ''} onChange={(e) => setActual({ ...actual, descripcion: e.target.value })} className="w-full rounded-lg border p-2" /></div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-1"><div><label className="mb-1 block text-sm font-semibold">Precio unitario</label><input type="number" min="0" step="0.0001" value={actual.precio_unitario ?? ''} onChange={(e) => setActual({ ...actual, precio_unitario: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div>{/* Precio referencia */}{/* Valor referencial */}</div>
-        <div className="flex flex-wrap gap-5 border-t pt-4"><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(actual.es_para_venta)} onChange={(e) => setActual({ ...actual, es_para_venta: e.target.checked })} />Es para venta</label><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" disabled={mode === 'EDIT'} checked={Boolean(actual.activo)} onChange={(e) => setActual({ ...actual, activo: e.target.checked })} />Activo</label>
-        </div>
-        <div className="border-t pt-4">
+      {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"><h3 className="mb-2 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Nuevo producto fiscal' : 'Editar producto fiscal'}</h3><p className="mb-4 text-sm text-slate-600">Maestro comercial/fiscal. La sede o Categoría DMS se obtiene de Tarifas por sede; aquí no se crea una relación paralela.</p><form onSubmit={guardar} className="space-y-5">
+        <section className="rounded-xl border border-slate-200 p-4">
+          <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-[#052A79]">Identificación</h4>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div><label className="mb-1 block text-sm font-semibold">Código SKU</label><input required disabled={mode === 'EDIT'} value={actual.codigo_sku || ''} onChange={(e) => setActual({ ...actual, codigo_sku: e.target.value })} className="w-full rounded-lg border p-2 disabled:bg-slate-100" /></div>
+            <div className="md:col-span-2"><label className="mb-1 block text-sm font-semibold">Descripción / Nombre</label><input required value={actual.descripcion || ''} onChange={(e) => setActual({ ...actual, descripcion: e.target.value })} className="w-full rounded-lg border p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">Tipo</label><input value={actual.tipo_producto || 'Producto'} readOnly className="w-full rounded-lg border bg-slate-100 p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">Tipo de certificado</label><select required value={actual.categoria_id || ''} onChange={(e) => setActual({ ...actual, categoria_id: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border bg-white p-2"><option value="">Seleccionar tipo...</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre} ({item.codigo})</option>)}</select></div>
+            <div><label className="mb-1 block text-sm font-semibold">Código de barras</label><input value={actual.codigo_barras || ''} onChange={(e) => setActual({ ...actual, codigo_barras: e.target.value || null })} className="w-full rounded-lg border p-2" /></div>
+          </div>
+          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"><div className="font-semibold">Sede / Categoría DMS</div><div className="mt-1">{vinculacionActual?.sedesActivas.length ? vinculacionActual.sedesActivas.join(', ') : mode === 'CREATE' ? 'Se asigna después desde Tarifas por sede.' : 'Sin tarifa activa asociada.'}</div>{canViewTarifas && onGoToTarifas && <button type="button" onClick={() => { setModal(false); onGoToTarifas(); }} className="mt-2 font-bold text-[#052A79] underline">Administrar en Tarifas por sede</button>}</div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 p-4">
+          <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-[#052A79]">Datos fiscales</h4>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div><label className="mb-1 block text-sm font-semibold">Unidad</label><input value={actual.unidad || ''} maxLength={20} onChange={(e) => setActual({ ...actual, unidad: e.target.value.toUpperCase() || null })} placeholder="NIU" className="w-full rounded-lg border p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">Cuenta por cobrar</label><input value={actual.cuenta_por_cobrar || ''} onChange={(e) => setActual({ ...actual, cuenta_por_cobrar: e.target.value || null })} className="w-full rounded-lg border p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">Código clasificación SUNAT</label><input value={actual.codigo_clasificacion_sunat || ''} maxLength={30} onChange={(e) => setActual({ ...actual, codigo_clasificacion_sunat: e.target.value || null })} className="w-full rounded-lg border p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">Tipo de afectación IGV</label><input value={actual.tipo_afectacion_igv || ''} inputMode="numeric" maxLength={2} pattern="[0-9]{2}" onChange={(e) => setActual({ ...actual, tipo_afectacion_igv: e.target.value || null })} placeholder="10" className="w-full rounded-lg border p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">Código afectación ISC</label><input value={actual.codigo_afectacion_isc || ''} maxLength={20} onChange={(e) => setActual({ ...actual, codigo_afectacion_isc: e.target.value || null })} className="w-full rounded-lg border p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">% ISC</label><input type="number" min="0" step="0.0001" value={actual.porcentaje_isc ?? ''} onChange={(e) => setActual({ ...actual, porcentaje_isc: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 p-4">
+          <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-[#052A79]">Precios</h4>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div><label className="mb-1 block text-sm font-semibold">Precio unitario</label><input type="number" min="0" step="0.0001" value={actual.precio_unitario ?? ''} onChange={(e) => setActual({ ...actual, precio_unitario: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">Precio de venta unitario</label><input type="number" min="0" step="0.0001" value={actual.precio_referencia ?? ''} onChange={(e) => setActual({ ...actual, precio_referencia: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /><p className="mt-1 text-xs text-slate-500">Campo existente: precio_referencia. No cambia la tarifa por sede.</p></div>
+            <div><label className="mb-1 block text-sm font-semibold">Valor referencial unitario</label><input type="number" min="0" step="0.0001" value={actual.valor_referencial_unitario ?? ''} onChange={(e) => setActual({ ...actual, valor_referencial_unitario: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 p-4">
+          <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-[#052A79]">Estado / Comercial</h4>
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(actual.activo)} onChange={(e) => setActual({ ...actual, activo: e.target.checked })} />Activo</label>
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(actual.disponible_pos)} onChange={(e) => setActual({ ...actual, disponible_pos: e.target.checked })} />Disponible en POS</label>
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(actual.es_para_venta)} onChange={(e) => setActual({ ...actual, es_para_venta: e.target.checked })} />Es para venta</label>
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(actual.es_para_compra)} onChange={(e) => setActual({ ...actual, es_para_compra: e.target.checked })} />Es para compra</label>
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={Boolean(actual.tiene_icbper)} onChange={(e) => setActual({ ...actual, tiene_icbper: e.target.checked })} />Tiene ICBPER</label>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 p-4">
+          <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-[#052A79]">Imagen</h4>
+          <div className="flex items-end gap-4"><div className="flex-1"><label className="mb-1 block text-sm font-semibold">URL de imagen</label><input type="url" value={actual.imagen_url || ''} onChange={(e) => setActual({ ...actual, imagen_url: e.target.value || null })} placeholder="https://..." className="w-full rounded-lg border p-2" /></div>{actual.imagen_url ? <img src={actual.imagen_url} alt="Vista previa" className="h-16 w-16 rounded border object-cover" /> : <div className="flex h-16 w-16 items-center justify-center rounded border bg-slate-50 text-center text-xs text-slate-400">Sin imagen</div>}</div>
+        </section>
+
+        <div className="rounded-xl border border-slate-200 p-4">
           <label className="flex items-center gap-2 text-sm font-semibold mb-3">
             <input type="checkbox" checked={Boolean(actual.requiere_chip)} onChange={(e) => {
               const checked = e.target.checked;
@@ -464,7 +524,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
                 precio_chip: checked ? actual.precio_chip : null
               });
             }} />
-            Agregar chip
+            El certificado incluye chip
           </label>
           {actual.requiere_chip && (
             <div>
@@ -475,7 +535,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
                 </select>
               </label>
             </div>
-          )}</div>
+          )}<p className="mt-2 text-xs text-slate-500">El precio del chip se resuelve desde la configuración del tipo de chip; no se duplica aquí.</p></div>
         <div className="flex justify-end gap-3 border-t pt-4"><button type="button" disabled={saving} onClick={() => setModal(false)} className="rounded px-5 py-2 font-semibold text-slate-600 hover:bg-slate-100">Cancelar</button><button type="submit" disabled={saving} className="rounded bg-[#052A79] px-5 py-2 font-bold text-white disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></div></div>}
     </div>

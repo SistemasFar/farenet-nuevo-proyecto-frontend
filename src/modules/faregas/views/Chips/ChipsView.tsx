@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { DownloadCloud, Info, Cpu, Boxes, FileText, Search, Trash2 } from 'lucide-react';
+import { DownloadCloud, Info, Cpu, Boxes, FileText, Search, Trash2, Ban, RefreshCw } from 'lucide-react';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { Paginacion } from '../components/Paginacion';
 import { useListadoPaginado } from '../hooks/useListadoPaginado';
@@ -597,6 +597,7 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
   // siendo la autoridad: protege cada ruta con ese mismo permiso.
   const { permisos } = useOutletContext<MainLayoutContext>();
   const puedeVender = Array.isArray(permisos) && permisos.includes('CHIPS_VENDER');
+  const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
 
   // Listado transaccional: abre en HOY -> HOY, 10 por pagina, y pagina en el
   // backend (LIMIT/OFFSET + COUNT con los mismos filtros).
@@ -625,6 +626,64 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
     if (refreshToken > 0) void listado.refrescar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshToken]);
+
+  const verComprobante = async (venta: VentaChipOperacion) => {
+    if (!venta.facturacion?.enlacePdf?.trim()) {
+      await Swal.fire({
+        icon: 'info',
+        title: 'Comprobante no disponible',
+        text: 'Nubefact todavía no ha proporcionado un PDF para este comprobante.',
+        confirmButtonColor: '#052A79'
+      });
+      return;
+    }
+    window.open(venta.facturacion.enlacePdf, '_blank', 'noopener,noreferrer');
+  };
+
+  const anularComprobante = async (venta: VentaChipOperacion) => {
+    const facturacion = venta.facturacion;
+    if (!facturacion) return;
+    const confirmacion = await Swal.fire({
+      icon: 'warning',
+      title: `🚫 Anular ${facturacion.nroComprobante || 'comprobante'}`,
+      input: 'text',
+      inputLabel: 'Motivo de la anulación',
+      inputPlaceholder: 'Ingrese el motivo',
+      showCancelButton: true,
+      confirmButtonText: 'SOLICITAR ANULACIÓN',
+      cancelButtonText: 'CANCELAR',
+      confirmButtonColor: '#dc2626',
+      inputValidator: value => !value.trim()
+        ? 'El motivo es obligatorio.'
+        : value.trim().length > 100 ? 'El motivo admite como máximo 100 caracteres.' : undefined
+    });
+    if (!confirmacion.isConfirmed) return;
+    try {
+      setAccionEnProceso(venta.operacionId);
+      await faregasChipsApi.generarAnulacionOperacion(venta.operacionId, String(confirmacion.value).trim());
+      await Swal.fire('Solicitud registrada', 'La anulación fue enviada. Su aceptación debe consultarse posteriormente.', 'success');
+      await listado.refrescar();
+    } catch (error) {
+      await Swal.fire('No se pudo anular', errorMessage(error), 'error');
+    } finally {
+      setAccionEnProceso(null);
+    }
+  };
+
+  const consultarAnulacion = async (venta: VentaChipOperacion) => {
+    const anulacionId = venta.facturacion?.anulacionId;
+    if (!anulacionId) return;
+    try {
+      setAccionEnProceso(venta.operacionId);
+      const resultado = await faregasChipsApi.consultarAnulacionOperacion(venta.operacionId, anulacionId);
+      await Swal.fire('Estado actualizado', `La solicitud se encuentra ${resultado.data.estado}.`, 'success');
+      await listado.refrescar();
+    } catch (error) {
+      await Swal.fire('No se pudo consultar', errorMessage(error), 'error');
+    } finally {
+      setAccionEnProceso(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -699,13 +758,36 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
                     {venta.facturacion ? (
                       <div className="space-y-1">
                         <div className="font-bold text-slate-700">{venta.facturacion.nroComprobante || venta.facturacion.estado}</div>
-                        {venta.facturacion.enlacePdf?.trim() ? (
-                          <a href={venta.facturacion.enlacePdf} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="inline-flex h-7 items-center gap-1 rounded border border-red-200 bg-red-50 px-2 text-[11px] font-bold text-red-600 transition hover:bg-red-100">
-                            <FileText size={12} /> VER COMPROBANTE
-                          </a>
-                        ) : (
-                          <span className="text-[10px] text-slate-500">{venta.facturacion.estado}</span>
-                        )}
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            disabled={accionEnProceso === venta.operacionId}
+                            onClick={(event) => { event.stopPropagation(); void verComprobante(venta); }}
+                            title="Ver comprobante"
+                            className="inline-flex h-7 items-center gap-1 rounded border border-blue-200 bg-blue-50 px-2 text-[11px] font-bold text-[#052A79] transition hover:bg-blue-100 disabled:opacity-50"
+                          ><FileText size={13} /> VER</button>
+                          {['BORRADOR', 'PENDIENTE'].includes(String(venta.facturacion.estadoAnulacion || '').toUpperCase()) ? (
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === venta.operacionId || !puedeVender}
+                              onClick={(event) => { event.stopPropagation(); void consultarAnulacion(venta); }}
+                              title="Consultar estado de anulación"
+                              className="inline-flex h-7 items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 text-[11px] font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                            ><RefreshCw size={13} className={accionEnProceso === venta.operacionId ? 'animate-spin' : ''} /> CONSULTAR</button>
+                          ) : String(venta.facturacion.estadoAnulacion || '').toUpperCase() === 'ACEPTADO' || venta.facturacion.estado === 'ANULADO' ? (
+                            <button type="button" disabled title="Comprobante anulado" className="inline-flex h-7 items-center gap-1 rounded border border-slate-200 bg-slate-100 px-2 text-[11px] font-bold text-slate-400">
+                              <Ban size={13} /> ANULADO
+                            </button>
+                          ) : puedeVender && venta.facturacion.anulacionEnPlazo === true ? (
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === venta.operacionId}
+                              onClick={(event) => { event.stopPropagation(); void anularComprobante(venta); }}
+                              title="Anular comprobante"
+                              className="inline-flex h-7 items-center gap-1 rounded border border-red-200 bg-red-50 px-2 text-[11px] font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+                            ><Ban size={13} /> ANULAR</button>
+                          ) : null}
+                        </div>
                       </div>
                     ) : (
                       <span className="text-[10px] text-slate-400">SIN FACTURACIÓN</span>

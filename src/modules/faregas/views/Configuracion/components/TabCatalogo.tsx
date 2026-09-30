@@ -17,7 +17,7 @@ interface Props {
 export default function TabCatalogo({ hasCategorias, hasServicios, hasProductos, hasTarifas, onGoToTarifas }: Props) {
   const tabs = useMemo(() => [
     ...(hasProductos ? [{ id: 'FISCALES' as const, label: 'PRODUCTOS FISCALES', icon: PackageSearch }] : []),
-    ...(hasCategorias ? [{ id: 'CATEGORIAS' as const, label: 'CATEGORÍAS', icon: Tags }] : []),
+    ...(hasCategorias ? [{ id: 'CATEGORIAS' as const, label: 'TIPOS DE CERTIFICADO', icon: Tags }] : []),
     ...(hasServicios && hasCategorias ? [{ id: 'OPERACIONES' as const, label: 'OPERACIÓN Y FORMATOS', icon: FileCheck2 }] : [])
   ], [hasCategorias, hasProductos, hasServicios]);
   
@@ -48,9 +48,9 @@ export default function TabCatalogo({ hasCategorias, hasServicios, hasProductos,
       {activeTab === 'CATEGORIAS' && hasCategorias && (
         <div className="space-y-4">
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-            <p className="font-bold">Categorías operativas</p>
+            <p className="font-bold">Tipos de certificado</p>
             <p className="mt-1">
-              Organizan internamente las operaciones vinculadas a los productos fiscales. No representan un segundo producto ni generan facturación por sí solas.
+              Clasifican funcionalmente los certificados y sus operaciones. No representan categorías DMS, un segundo producto ni generan facturación por sí solas.
             </p>
           </div>
           <TabCategorias />

@@ -35,7 +35,7 @@ export function FaregasConfiguracionView() {
   const hasCorrelativos = hasSeries;
 
   const tabs = [];
-  if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES' });
+  if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES / CATEGORÍAS DMS' });
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
   if (hasTarifas) tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
   if (hasCorrelativos) tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });

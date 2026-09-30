@@ -144,6 +144,13 @@ export interface ComprobanteVentaChip {
   estado: string;
   nroComprobante: string | null;
   enlacePdf: string | null;
+  enlaceXml: string | null;
+  aceptadaSunat: boolean | null;
+  entornoFacturador: string | null;
+  anulacionEnPlazo: boolean;
+  anulacionHastaMs: string | number | null;
+  anulacionId: number | null;
+  estadoAnulacion: string | null;
 }
 
 export interface VentaChipOperacion {
@@ -344,6 +351,14 @@ export const faregasChipsApi = {
     `/operaciones/${operacionId}/facturacion/reintentar`,
     { method: 'POST' }
   ) as Promise<{ success: boolean; facturacion: VentaDirectaFacturacion }>,
+  generarAnulacionOperacion: async (operacionId: number, motivo: string) => faregasFetch(
+    `/chips/ventas/${operacionId}/facturacion/anulaciones`,
+    { method: 'POST', body: JSON.stringify({ tipoDocumento: 'FACTURACION', motivo }) }
+  ) as Promise<{ ok: boolean; data: { id: number; estado: string } }>,
+  consultarAnulacionOperacion: async (operacionId: number, anulacionId: number) => faregasFetch(
+    `/chips/ventas/${operacionId}/facturacion/anulaciones/${anulacionId}/consultar`,
+    { method: 'POST' }
+  ) as Promise<{ ok: boolean; data: { id: number; estado: string } }>,
   historial: async (id:number) => (await faregasFetch(`/chips/${id}/movimientos`)).movimientos,
   listarProductosInventariables: async () => (await faregasFetch('/chips/productos')).productos as ProductoInventariable[],
   catalogosProductosInventariables: async () => (await faregasFetch('/chips/productos/catalogos')) as {sedes:Array<{key:string;nombre:string}>},

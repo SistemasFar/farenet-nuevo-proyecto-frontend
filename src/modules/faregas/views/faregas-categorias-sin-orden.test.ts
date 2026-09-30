@@ -84,7 +84,7 @@ describe('Categorías: el modal ya no pide Orden', () => {
 describe('Categorías: el Excel ya no incluye Orden', () => {
   /** El bloque completo del export: desde la llamada hasta el cierre `})))}`. */
   const bloqueExcel = () => {
-    const m = /exportarExcel\('faregas_categorias'[\s\S]*?\}\)\)\)/.exec(VISTA);
+    const m = /exportarExcel\('faregas_tipos_certificado'[\s\S]*?\}\)\)\)/.exec(VISTA);
     expect(m).not.toBeNull();
     return m![0];
   };
@@ -99,7 +99,7 @@ describe('Categorías: el Excel ya no incluye Orden', () => {
     expect(texto).toMatch(/NOMBRE/);
     expect(texto).toMatch(/DESCRIPCIÓN/);
     expect(texto).toMatch(/ESTADO/);
-    expect(texto).toMatch(/'faregas_categorias', 'Categorías'/);
+    expect(texto).toMatch(/'faregas_tipos_certificado', 'Tipos de certificado'/);
   });
 
   it('el mapeo de filas ya no manda `orden`', () => {
@@ -131,8 +131,8 @@ describe('Categorías: el tipo del frontend ya no expone Orden', () => {
 });
 
 describe('Categorías: lo que NO se tocó', () => {
-  it('sigue habiendo Nueva Categoría, Editar, activar/desactivar y eliminar', () => {
-    expect(VISTA).toMatch(/\+ Nueva Categoría/);
+  it('sigue habiendo Nuevo Tipo de Certificado, Editar, activar/desactivar y eliminar', () => {
+    expect(VISTA).toMatch(/\+ Nuevo Tipo de Certificado/);
     expect(VISTA).toMatch(/setMode\('EDIT'\)/);
     expect(VISTA).toMatch(/setMode\('CREATE'\)/);
     expect(VISTA).toMatch(/cambiarEstadoCategoria/);

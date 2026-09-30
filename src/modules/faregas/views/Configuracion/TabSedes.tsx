@@ -125,7 +125,7 @@ export default function TabSedes() {
     <div>
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-          <span className="font-semibold text-gray-700">Administración de Sedes</span>
+          <span className="font-semibold text-gray-700">Administración de Sedes / Categorías DMS</span>
           <div className="flex flex-wrap gap-2">
             <label className="relative w-full sm:w-72">
               <span className="mb-1 block text-xs font-bold text-slate-600">Buscar por nombre de sede</span>
