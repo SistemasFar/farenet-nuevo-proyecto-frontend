@@ -34,9 +34,10 @@ describe('el bug: la vista filtraba en memoria los productos ya cargados', () =>
     expect(fuente).not.toMatch(/const filtrados =/);
   });
 
-  it('la tabla y el Excel se alimentan de la página del backend, sin refiltrar', () => {
+  it('la tabla usa la página del backend y el Excel solicita el resultado completo', () => {
     const fuente = codigo(VISTA);
     expect(fuente).toMatch(/\{productos\.map\(\(producto\) => \{/);
+    expect(fuente).toMatch(/faregasProductosApi\.listarTodos\(/);
     // Y el contador usa el total del backend, no la longitud de la página.
     expect(fuente).toMatch(/\{resumen\.total\} productos/);
     expect(fuente).not.toMatch(/\{filtrados\.length\} de \{productos\.length\}/);
@@ -145,13 +146,9 @@ describe('lo que NO se tocó', () => {
     expect(fuente).toMatch(/faregasProductosApi\.eliminar\(/);
   });
 
-  it('sigue exportando a Excel con el maestro DMS agrupado', () => {
-    expect(VISTA).toMatch(/exportarExcel\('faregas_productos'/);
-    for (const col of ['SKU', 'DESCRIPCIÓN', 'TIPO DE CERTIFICADO', 'SEDE \/ CATEGORÍA DMS',
-      'UNIDAD', 'AFECTACIÓN IGV', 'CUENTA POR COBRAR', 'PRECIO UNITARIO',
-      'PRECIO VENTA UNITARIO', 'PARA VENTA', 'ESTADO']) {
-      expect(VISTA, `falta la columna ${col}`).toMatch(new RegExp(`header: '${col}'`));
-    }
+  it('sigue exportando el catálogo fiscal mediante el módulo especializado', () => {
+    expect(VISTA).toMatch(/exportarProductosFiscales\(resultadoCompleto\)/);
+    expect(VISTA).not.toMatch(/exportarExcel\('faregas_productos'/);
   });
 
   it('conserva el filtro técnico de registros sin tipo de certificado', () => {

@@ -13,7 +13,7 @@ import {
   type ImpactoProductoFiscal,
   type ProductoFacturacion
 } from '../../../services/faregas-productos.api';
-import { exportarExcel } from '../../../utils/exportar-excel';
+import { exportarProductosFiscales } from '../../../utils/faregas-productos-exportacion';
 import { Paginacion } from '../../components/Paginacion';
 
 const productoVacio = (): Partial<ProductoFacturacion> => ({
@@ -108,6 +108,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   const [servicios, setServicios] = useState<ServicioConfiguracionFaregas[]>([]);
   const [sedesPorServicio, setSedesPorServicio] = useState<Record<number, SedeTarifaAsignada[]>>({});
   const [loading, setLoading] = useState(true);
+  const [exportando, setExportando] = useState(false);
   const [error, setError] = useState('');
   const [buscar, setBuscar] = useState('');
   const [estado, setEstado] = useState('');
@@ -277,6 +278,24 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   // 10 registros, por eso buscar un SKU de otra página devolvía 0 resultados.
   const unidades = catalogoUnidades;
 
+  const exportarProductos = async () => {
+    try {
+      setExportando(true);
+      const resultadoCompleto = await faregasProductosApi.listarTodos({
+        buscar: buscarAplicado || undefined,
+        activo: estado === '' ? undefined : estado === '1',
+        es_para_venta: paraVenta === '' ? undefined : paraVenta === '1',
+        unidad: unidad || undefined,
+        categoria_id: categoria || undefined
+      });
+      exportarProductosFiscales(resultadoCompleto);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo exportar el catálogo de productos.');
+    } finally {
+      setExportando(false);
+    }
+  };
+
   const guardar = async (event: React.FormEvent) => {
     event.preventDefault();
     const unidadTributaria = String(actual.unidad || '').trim().toUpperCase();
@@ -389,47 +408,11 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={loading || productos.length === 0}
-              onClick={() => exportarExcel('faregas_productos', 'Productos', [
-                { key: 'sku', header: 'SKU', width: 18 },
-                { key: 'descripcion', header: 'DESCRIPCIÓN', width: 60 },
-                { key: 'tipoCertificado', header: 'TIPO DE CERTIFICADO', width: 24 },
-                { key: 'sedes', header: 'SEDE / CATEGORÍA DMS', width: 35 },
-                { key: 'unidad', header: 'UNIDAD', width: 12 },
-                { key: 'igv', header: 'AFECTACIÓN IGV', width: 18 },
-                { key: 'isc', header: 'AFECTACIÓN ISC', width: 18 },
-                { key: 'cuenta', header: 'CUENTA POR COBRAR', width: 30 },
-                { key: 'precioUnitario', header: 'PRECIO UNITARIO', width: 18 },
-                { key: 'precioVenta', header: 'PRECIO VENTA UNITARIO', width: 22 },
-                { key: 'valorReferencial', header: 'VALOR REFERENCIAL', width: 20 },
-                { key: 'codigoBarras', header: 'CÓDIGO DE BARRAS', width: 22 },
-                { key: 'venta', header: 'PARA VENTA', width: 14 },
-                { key: 'compra', header: 'PARA COMPRA', width: 14 },
-                { key: 'pos', header: 'DISPONIBLE POS', width: 16 },
-                { key: 'icbper', header: 'ICBPER', width: 12 },
-                { key: 'estado', header: 'ESTADO', width: 14 }
-              ], productos.map((producto) => ({
-                sku: producto.codigo_sku,
-                descripcion: producto.descripcion,
-                tipoCertificado: producto.categoria_nombre || 'SIN TIPO DE CERTIFICADO',
-                sedes: vinculaciones.get(producto.id)?.sedesActivas.join(', ') || '',
-                unidad: producto.unidad || '',
-                igv: producto.tipo_afectacion_igv || '',
-                isc: [producto.codigo_afectacion_isc, producto.porcentaje_isc == null ? '' : `${producto.porcentaje_isc}%`].filter(Boolean).join(' · '),
-                cuenta: producto.cuenta_por_cobrar || '',
-                precioUnitario: producto.precio_unitario,
-                precioVenta: producto.precio_referencia,
-                valorReferencial: producto.valor_referencial_unitario,
-                codigoBarras: producto.codigo_barras || '',
-                venta: producto.es_para_venta ? 'SÍ' : 'NO',
-                compra: producto.es_para_compra ? 'SÍ' : 'NO',
-                pos: producto.disponible_pos ? 'SÍ' : 'NO',
-                icbper: producto.tiene_icbper ? 'SÍ' : 'NO',
-                estado: producto.activo ? 'ACTIVO' : 'INACTIVO'
-              })))}
+              disabled={loading || exportando || resumen.total === 0}
+              onClick={() => void exportarProductos()}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              ↓ Exportar Excel
+              {exportando ? 'Exportando...' : '↓ Exportar Excel'}
             </button>
             <button onClick={() => { setMode('CREATE'); setActual(productoVacio()); setProductoGuardado(''); setModal(true); }} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">+ Nuevo Producto</button>
           </div>

@@ -4,6 +4,7 @@ export interface ExcelColumn {
   key: string;
   header: string;
   width?: number;
+  format?: 'text' | 'decimal2';
 }
 
 interface ZipEntry {
@@ -112,8 +113,9 @@ const columnName = (index: number) => {
   return result;
 };
 
-const cellXml = (value: ExcelCellValue, reference: string, headerCell = false) => {
-  const style = headerCell ? ' s="1"' : '';
+const cellXml = (value: ExcelCellValue, reference: string, styleIndex = 0) => {
+  const style = styleIndex > 0 ? ` s="${styleIndex}"` : '';
+  if (value === null || value === undefined) return `<c r="${reference}"${style}/>`;
   if (typeof value === 'number' && Number.isFinite(value)) return `<c r="${reference}"${style}><v>${value}</v></c>`;
   if (typeof value === 'boolean') return `<c r="${reference}"${style} t="b"><v>${value ? 1 : 0}</v></c>`;
   return `<c r="${reference}"${style} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`;
@@ -129,8 +131,7 @@ const safeSheetName = (value: string) => ['\\', '/', '?', '*', '[', ']', ':']
   .reduce((result, character) => result.replaceAll(character, ' '), value)
   .slice(0, 31) || 'Datos';
 
-export function exportarExcel(
-  fileName: string,
+export function crearExcelBytes(
   sheetName: string,
   columns: ExcelColumn[],
   rows: Array<Record<string, ExcelCellValue>>
@@ -141,9 +142,12 @@ export function exportarExcel(
     const width = Math.min(Math.max(column.width || column.header.length + 2, 10), 60);
     return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
   }).join('');
-  const headerRow = columns.map((column, index) => cellXml(column.header, `${columnName(index)}1`, true)).join('');
+  const headerRow = columns.map((column, index) => cellXml(column.header, `${columnName(index)}1`, 1)).join('');
   const dataRows = rows.map((row, rowIndex) => {
-    const cells = columns.map((column, columnIndex) => cellXml(row[column.key], `${columnName(columnIndex)}${rowIndex + 2}`)).join('');
+    const cells = columns.map((column, columnIndex) => {
+      const styleIndex = column.format === 'text' ? 2 : column.format === 'decimal2' ? 3 : 0;
+      return cellXml(row[column.key], `${columnName(columnIndex)}${rowIndex + 2}`, styleIndex);
+    }).join('');
     return `<row r="${rowIndex + 2}">${cells}</row>`;
   }).join('');
   const worksheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -163,7 +167,27 @@ export function exportarExcel(
     { name: 'xl/styles.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF052A79"/><bgColor indexed="64"/></patternFill></fill><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf></cellXfs></styleSheet>` },
     { name: 'xl/worksheets/sheet1.xml', content: worksheet }
   ];
-  const bytes = zip(files);
+  const styles = files.find((file) => file.name === 'xl/styles.xml');
+  if (styles) {
+    styles.content = styles.content
+      .replace('<cellXfs count="2">', '<cellXfs count="4">')
+      .replace(
+        '</cellXfs></styleSheet>',
+        '<xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+        + '<xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+        + '</cellXfs></styleSheet>'
+      );
+  }
+  return zip(files);
+}
+
+export function exportarExcel(
+  fileName: string,
+  sheetName: string,
+  columns: ExcelColumn[],
+  rows: Array<Record<string, ExcelCellValue>>
+) {
+  const bytes = crearExcelBytes(sheetName, columns, rows);
   const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
