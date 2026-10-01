@@ -5,6 +5,10 @@ import TabTarifas from './components/TabTarifas';
 import TabEmpresas from './components/TabEmpresas';
 import TabCorrelativos from './components/TabCorrelativos';
 
+// SERIES ya no es una pestaña de Configuración: vive en
+// Facturación electrónica > SERIES, con las vistas SERIES NUBEFACT y
+// MAESTRO DMS. Se retira SÓLO la entrada visual; la tabla, los endpoints y el
+// permiso CONFIGURACION_SERIES se conservan intactos.
 type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'EMPRESAS' | 'CORRELATIVOS';
 
 export function FaregasConfiguracionView() {
@@ -33,7 +37,6 @@ export function FaregasConfiguracionView() {
   const hasEmpresas = permisos.includes('CONFIGURACION_EMPRESAS') || hasSedes;
   const hasCatalogo = hasCategorias || hasServicios || hasProductos;
   const hasCorrelativos = hasSeries;
-
   const tabs = [];
   if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES / CATEGORÍAS DMS' });
   if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });

@@ -204,6 +204,18 @@ export const faregasConfigApi = {
     };
   },
 
+  /**
+   * Todas las sedes del filtro, sin paginar. La exportación a Excel debe
+   * escribir el resultado completo (31 sin filtro, 18 con un filtro que
+   * devuelva 18) y no sólo las 10 de la página visible.
+   */
+  obtenerSedesTodos: async (filtros: { buscar?: string } = {}): Promise<Sede[]> => {
+    const params = new URLSearchParams({ todos: '1' });
+    if (filtros.buscar?.trim()) params.set('buscar', filtros.buscar.trim());
+    const response = await api.get(`/api/faregas/config/sedes?${params.toString()}`);
+    return response.items || response.sedes || [];
+  },
+
   crearSede: async (sede: Partial<Sede>): Promise<void> => {
     const response = await api.post('/api/faregas/config/sedes', sede);
     return response;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Edit, Power, PowerOff, Search } from 'lucide-react';
 import { faregasConfigApi, type Sede } from '../../services/faregas-config.api';
-import { exportarExcel } from '../../utils/exportar-excel';
+import { exportarSedesCatalogo } from '../../utils/faregas-sedes-exportacion';
 import { Paginacion } from '../components/Paginacion';
 
 const mensajeError = (error: unknown, defecto: string) => error instanceof Error ? error.message : defecto;
@@ -10,6 +10,9 @@ export default function TabSedes() {
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // La exportación vuelve a consultar el filtro completo: `sedes` sólo
+  // contiene la página visible, así que exportarla recortaría el resultado.
+  const [exportando, setExportando] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'CREATE' | 'EDIT'>('CREATE');
@@ -49,6 +52,25 @@ export default function TabSedes() {
   const cambiarPageSize = (nuevo: number) => {
     setPageSize(nuevo);
     setPage(1);
+  };
+
+  /**
+   * Exporta TODO el resultado del filtro activo, no la página visible.
+   * Pide el conjunto completo al backend (`todos=1`) respetando el mismo
+   * criterio de búsqueda, y de ahí sale el Excel.
+   */
+  const exportarSedes = async () => {
+    try {
+      setExportando(true);
+      const completo = await faregasConfigApi.obtenerSedesTodos({
+        buscar: buscarAplicada || undefined
+      });
+      exportarSedesCatalogo(completo);
+    } catch (err) {
+      setError(mensajeError(err, 'No se pudo exportar el catálogo de sedes.'));
+    } finally {
+      setExportando(false);
+    }
   };
 
   // Un ÚNICO efecto carga los datos. Depende del valor debounced de la búsqueda
@@ -139,29 +161,11 @@ export default function TabSedes() {
             </label>
             <button
               type="button"
-              disabled={loading || sedes.length === 0}
-              onClick={() => exportarExcel('faregas_sedes', 'Sedes', [
-                { key: 'codigo', header: 'CÓDIGO', width: 14 },
-                { key: 'nombre', header: 'NOMBRE', width: 24 },
-                { key: 'direccion', header: 'DIRECCIÓN', width: 60 },
-                { key: 'telefono', header: 'TELÉFONO', width: 22 },
-                { key: 'correo', header: 'CORREO', width: 30 },
-                { key: 'empresa', header: 'EMPRESA', width: 34 },
-                { key: 'tarifas', header: 'TARIFAS', width: 12 },
-                { key: 'estado', header: 'ESTADO', width: 14 }
-              ], sedes.map((sede) => ({
-                codigo: sede.key,
-                nombre: sede.nombre,
-                direccion: sede.direccion || '',
-                telefono: sede.telefono || '',
-                correo: sede.correo || '',
-                empresa: sede.empresa_nombre || '',
-                tarifas: sede.total_tarifas || 0,
-                estado: sede.activo ? 'ACTIVA' : 'INACTIVA'
-              })))}
+              disabled={loading || exportando || sedes.length === 0}
+              onClick={() => exportarSedes()}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              ↓ Exportar Excel
+              {exportando ? 'Exportando...' : '↓ Exportar Excel'}
             </button>
             <button
               onClick={() => {

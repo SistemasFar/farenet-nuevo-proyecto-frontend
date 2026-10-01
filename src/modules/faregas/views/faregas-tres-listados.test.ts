@@ -23,6 +23,7 @@ const FACTURACION = leer('Configuracion', 'components', 'TabDocumentosFacturacio
 const API_CHIPS = leer('..', 'services', 'faregas-chips.api.ts');
 const API_CONFIG = leer('..', 'services', 'faregas-config.api.ts');
 const API_FACT = leer('..', 'services', 'faregas-facturacion-admin.api.ts');
+const API_EXPORT = leer('..', 'utils', 'faregas-sedes-exportacion.ts');
 
 const TRES = [
   ['chips', CHIPS],
@@ -168,7 +169,18 @@ describe('CONFIGURACIÓN: administración de sedes', () => {
     expect(SEDES).toMatch(/setModalMode\('EDIT'\)/);
     expect(SEDES).toMatch(/handleToggleActivo/);
     expect(SEDES).toMatch(/↓ Exportar Excel/);
-    expect(SEDES).toMatch(/exportarExcel\('faregas_sedes'/);
+  });
+
+  it('exporta TODO el resultado del filtro, no la página visible', () => {
+    // El estado `sedes` sólo contiene la página actual, así que la
+    // exportación vuelve a consultar el filtro completo con `todos=1`.
+    expect(SEDES).toMatch(/obtenerSedesTodos\(/);
+    expect(SEDES).toMatch(/buscar: buscarAplicada \|\| undefined/);
+    expect(SEDES).toMatch(/exportarSedesCatalogo\(/);
+    // El módulo de exportación conserva el archivo y la hoja de siempre.
+    expect(API_EXPORT).toMatch(/exportarExcel\('faregas_sedes', 'Sedes'/);
+    // Y no se escribe directamente sobre el estado paginado.
+    expect(SEDES).not.toMatch(/\], sedes\.map\(/);
   });
 
   it('la API de sedes devuelve la página y el total', () => {
