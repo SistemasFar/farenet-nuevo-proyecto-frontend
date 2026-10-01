@@ -23,6 +23,7 @@ const VISTA = leer('Configuracion', 'components', 'TabCertificadosBase.tsx');
 const WRAPPER = leer('Configuracion', 'components', 'TabOperacionesWrapper.tsx');
 const CATALOGO = leer('Configuracion', 'components', 'TabCatalogo.tsx');
 const API = leer('..', 'services', 'faregas-productos.api.ts');
+const API_SEDES = leer('..', 'services', 'faregas-config.api.ts');
 
 const codigo = (t: string) =>
   t.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -118,6 +119,89 @@ describe('la operación se configura aparte, no se inventa', () => {
     const fuente = codigo(VISTA);
     expect(fuente).toMatch(/setAsignarFormatoServicio\(servicio\)/);
     expect(fuente).toMatch(/setEditarFormato\(\{ id: servicio\.formato_id as number, servicio \}\)/);
+  });
+});
+
+describe('el bug: "Sin producto fiscal vinculado" aunque el vínculo exista en la tarifa', () => {
+  /**
+   * Caso real: COLINA + GLP_ANUAL_MOTO. `fg_tarifa.id=179` tiene
+   * `producto_facturacion_id = 14` (SKU 0228) desde siempre, y facturación
+   * resuelve bien. Pero la pantalla decía "Sin producto fiscal vinculado".
+   *
+   * Causa: `fg_producto_facturacion.id` es `bigint`, así que el driver de Postgres
+   * lo devuelve como TEXTO ("14"), mientras que `producto_facturacion_id` llega
+   * como NÚMERO desde el `json_agg` de `obtenerSedesPorServicio()`. El `===`
+   * entre "14" y 14 nunca era verdadero, así que el producto no se encontraba.
+   * Afectaba a 8 operaciones de las 9 con sede activa.
+   */
+  it('normaliza el id de producto antes de compararlo', () => {
+    const fuente = codigo(VISTA);
+    // Sin Number() la comparación sigue fallando por tipo.
+    expect(fuente).not.toMatch(/productos\.find\(\(producto\) => producto\.id === id\)/);
+    expect(fuente).toMatch(/const buscarProductoPorId = \(id: number \| string\) =>/);
+    expect(fuente).toMatch(/Number\(producto\.id\) === Number\(id\)/);
+  });
+
+  it('convierte a número los ids que vienen de la tarifa', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/\.map\(\(id\) => Number\(id\)\)/);
+    // Y descarta nulos y valores no numéricos en lugar de dejar que se cuelen.
+    expect(fuente).toMatch(/id !== null && id !== undefined/);
+    expect(fuente).toMatch(/Number\.isFinite\(id\) && id > 0/);
+  });
+
+  it('usa el mismo comparador en la lista de productos de la operación', () => {
+    const fuente = codigo(VISTA);
+    // El texto "Productos:" se construye con el comparador normalizado, no con
+    // un `===` directo que reproduce el bug.
+    expect(fuente).toMatch(/productoIdsDe\(servicio\.id\)\s*\n?\s*\.map\(\(id\) => buscarProductoPorId\(id\)\)/);
+    expect(fuente).not.toMatch(/\.map\(\(id\) => productos\.find\(\(producto\) => producto\.id === id\)\)/);
+  });
+
+  it('el botón "Configurar operación" también compara normalizado', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/productoIdsDe\(servicio\.id\)\.includes\(Number\(producto\.id\)\)/);
+    expect(fuente).not.toMatch(/productoIdsDe\(servicio\.id\)\.includes\(producto\.id\)/);
+  });
+
+  it('compara la categoría por número, no por tipo', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/Number\(producto\.categoria_id\) === Number\(categoriaId\)/);
+    expect(fuente).toMatch(/Number\(servicio\.categoria_id\) === Number\(categoriaId\)/);
+  });
+
+  it('el texto de "Sin producto fiscal vinculado" se conserva para lo que sí falta', () => {
+    // La corrección no maquilla el caso real: si de verdad no hay producto, sigue
+    // avisando. Sólo deja de mentir cuando el vínculo existe.
+    expect(codigo(VISTA)).toMatch(/'Sin producto fiscal vinculado'/);
+  });
+});
+
+describe('la relación es por operación + sede + producto, no una propiedad global', () => {
+  it('el producto se lee de la tarifa de cada sede', () => {
+    const fuente = codigo(VISTA);
+    // `obtenerSedesPorServicio()` agrupa por `servicio_id` y trae, por fila,
+    // `planta_key` + `tarifa_id` + `producto_facturacion_id`. Esa fila ES la
+    // relación (operación, sede, producto): dos sedes de la misma operación
+    // pueden llevar SKU distintos.
+    expect(fuente).toMatch(/obtenerSedesPorServicio\(\)/);
+  });
+
+  it('el backend expone la relación con sede, tarifa y producto juntos', () => {
+    const fuente = codigo(API_SEDES);
+    expect(fuente).toMatch(/producto_facturacion_id: number \| null/);
+    expect(fuente).toMatch(/tarifa_id: number/);
+    expect(fuente).toMatch(/key: string/);
+  });
+
+  it('el modal edita la tarifa de cada sede, no un producto único de la operación', () => {
+    const modal = codigo(leer('Configuracion', 'components', 'ServicioModal.tsx'));
+    // Un `productoId` por sede, guardado en su tarifa.
+    expect(modal).toMatch(/productoId: string/);
+    expect(modal).toMatch(/Record<string, EstadoSede>/);
+    // Y al guardar, cada sede va a SU tarifa: sin sede con tarifa, se crea una.
+    expect(modal).toMatch(/if \(estado\.tarifaId\) await faregasTarifasAdminApi\.editar\(estado\.tarifaId, datos\)/);
+    expect(modal).toMatch(/else await faregasTarifasAdminApi\.crear\(\{ planta_key: sede\.key, servicio_id: servicioId, \.\.\.datos \}\)/);
   });
 });
 

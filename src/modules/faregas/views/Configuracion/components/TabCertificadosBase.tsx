@@ -98,12 +98,20 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
     });
   }, [buscar, categorias, productos, servicios]);
 
-  const productosDe = (categoriaId: number) => productos.filter((producto) => producto.categoria_id === categoriaId);
-  const serviciosDe = (categoriaId: number) => servicios.filter((servicio) => servicio.categoria_id === categoriaId);
+  const productosDe = (categoriaId: number) => productos.filter((producto) => Number(producto.categoria_id) === Number(categoriaId));
+  const serviciosDe = (categoriaId: number) => servicios.filter((servicio) => Number(servicio.categoria_id) === Number(categoriaId));
   const sedesActivasDe = (servicioId: number) => (sedesPorServicio[servicioId] || []).filter((sede) => sede.activo);
+  // `fg_producto_facturacion.id` es bigint: Postgres lo devuelve como texto, mientras
+  // que `producto_facturacion_id` llega como número desde el JSON de la tarifa. Sin
+  // normalizar, el `===` de abajo nunca encuentra el producto y la operación
+  // muestra "Sin producto fiscal vinculado" aunque el vínculo exista en `fg_tarifa`.
   const productoIdsDe = (servicioId: number) => [...new Set((sedesPorServicio[servicioId] || [])
     .map((sede) => sede.producto_facturacion_id)
-    .filter((id): id is number => Boolean(id)))];
+    .filter((id): id is number | string => id !== null && id !== undefined)
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0))];
+  const buscarProductoPorId = (id: number | string) =>
+    productos.find((producto) => Number(producto.id) === Number(id));
   const recargar = () => { setLoading(true); setVersion((actual) => actual + 1); };
 
   if (loading) return <div className="rounded-xl border bg-white py-14 text-center text-slate-500">Cargando categorías, productos y sedes...</div>;
@@ -132,7 +140,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
             const sedesCategoria = [...new Map(serviciosCategoria.flatMap((servicio) => sedesActivasDe(servicio.id)).map((sede) => [sede.key, sede])).values()];
             const certificaciones = serviciosCategoria.filter((servicio) => servicio.requiere_certificado);
             const servicioDeProducto = (producto: ProductoFacturacion) => serviciosCategoria.find((servicio) =>
-              productoIdsDe(servicio.id).includes(producto.id)
+              productoIdsDe(servicio.id).includes(Number(producto.id))
               || codigoComparable(servicio.codigo) === codigoComparable(producto.codigo_sku)
             );
             const productoPendiente = productosCategoria.find((producto) =>
@@ -189,7 +197,9 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
                     {serviciosCategoria.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No hay una operación configurada. La categoría y sus productos existen, pero todavía no están disponibles en ninguna sede.</div> : (
                       <div className="space-y-2">{serviciosCategoria.map((servicio) => {
                         const sedesServicio = sedesActivasDe(servicio.id);
-                        const productosServicio = productoIdsDe(servicio.id).map((id) => productos.find((producto) => producto.id === id)).filter(Boolean) as ProductoFacturacion[];
+                        const productosServicio = productoIdsDe(servicio.id)
+                          .map((id) => buscarProductoPorId(id))
+                          .filter(Boolean) as ProductoFacturacion[];
                         return (
                           <div key={servicio.id} className="rounded-lg border border-slate-200 p-3">
                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
