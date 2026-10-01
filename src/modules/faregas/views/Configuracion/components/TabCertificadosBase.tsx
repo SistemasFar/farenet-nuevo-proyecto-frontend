@@ -1,5 +1,5 @@
-import { FileText, MapPin, Plus, Tags } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, FileText, MapPin, Plus, Tags } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
   faregasConfigApi,
   type CategoriaServicio,
@@ -25,6 +25,25 @@ interface ModalState {
   productoInicialId?: number | null;
   productoFijoId?: number | null;
 }
+
+type EstadoConfiguracion = '' | 'CONFIGURADOS' | 'SIN_CONFIGURAR';
+type GeneraCertificado = '' | 'SI' | 'NO';
+
+const CATEGORIAS_PRINCIPALES = ['GLP', 'GNV', 'CONFORMIDAD', 'COMPLEMENTARIOS'] as const;
+
+/**
+ * Resaltado visual de la fila de un producto ya configurado, dentro de la sección
+ * PRODUCTOS FISCALES. Es sólo presentación: la condición `usado` es la misma que
+ * decide el badge "CONFIGURADO" / "SIN CONFIGURAR", así que el fondo y el badge
+ * no pueden discrepar.
+ *
+ * Celeste muy suave (`sky-50`) con filete lateral y hover propio, para que al
+ * pasar el cursor no salte al gris que usan las filas sin configurar.
+ */
+const CLASE_FILA_CONFIGURADA = 'bg-sky-50 border-l-4 border-sky-400 hover:bg-sky-100';
+const CLASE_FILA_SIN_CONFIGURAR = 'bg-white border-l-4 border-transparent hover:bg-slate-50';
+const claseFilaProducto = (configurado: boolean) =>
+  `${configurado ? CLASE_FILA_CONFIGURADA : CLASE_FILA_SIN_CONFIGURAR}`;
 
 const nombreFormato = (servicio: ServicioConfiguracionFaregas) => {
   if (!servicio.requiere_certificado) return 'No aplica';
@@ -52,6 +71,13 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [buscar, setBuscar] = useState('');
+  const [categoriaFiltro, setCategoriaFiltro] = useState('');
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoConfiguracion>('');
+  const [sedeFiltro, setSedeFiltro] = useState('');
+  const [generaCertificadoFiltro, setGeneraCertificadoFiltro] = useState<GeneraCertificado>('');
+  const [limiteProductos, setLimiteProductos] = useState(20);
+  const [paginaProductos, setPaginaProductos] = useState<Record<number, number>>({});
+  const [categoriasExpandidas, setCategoriasExpandidas] = useState<Set<number>>(new Set());
   const [modal, setModal] = useState<ModalState | null>(null);
   const [asignarFormatoServicio, setAsignarFormatoServicio] = useState<ServicioConfiguracionFaregas | null>(null);
   const [editarFormato, setEditarFormato] = useState<{ id: number; servicio: ServicioConfiguracionFaregas } | null>(null);
@@ -72,6 +98,9 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
     ]).then(([categoriasData, serviciosData, productosData, sedesData, relacionesData]) => {
       if (cancelado) return;
       setCategorias(categoriasData);
+      setCategoriasExpandidas((actuales) => actuales.size > 0
+        ? actuales
+        : new Set(categoriasData.slice(0, 1).map((categoria) => categoria.id)));
       setServicios(serviciosData);
       setProductos(productosData.productos);
       setSedes(sedesData.filter((sede) => sede.activo));
@@ -85,19 +114,6 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
     return () => { cancelado = true; };
   }, [canManageTarifas, canViewProducts, version]);
 
-  const categoriasVisibles = useMemo(() => {
-    const texto = buscar.trim().toLowerCase();
-    return categorias.filter((categoria) => {
-      if (!texto) return true;
-      const productosCategoria = productos.filter((producto) => producto.categoria_id === categoria.id);
-      const serviciosCategoria = servicios.filter((servicio) => servicio.categoria_id === categoria.id);
-      return categoria.codigo.toLowerCase().includes(texto)
-        || categoria.nombre.toLowerCase().includes(texto)
-        || productosCategoria.some((producto) => `${producto.codigo_sku} ${producto.descripcion}`.toLowerCase().includes(texto))
-        || serviciosCategoria.some((servicio) => `${servicio.codigo} ${servicio.nombre}`.toLowerCase().includes(texto));
-    });
-  }, [buscar, categorias, productos, servicios]);
-
   const productosDe = (categoriaId: number) => productos.filter((producto) => Number(producto.categoria_id) === Number(categoriaId));
   const serviciosDe = (categoriaId: number) => servicios.filter((servicio) => Number(servicio.categoria_id) === Number(categoriaId));
   const sedesActivasDe = (servicioId: number) => (sedesPorServicio[servicioId] || []).filter((sede) => sede.activo);
@@ -107,12 +123,90 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
   // muestra "Sin producto fiscal vinculado" aunque el vínculo exista en `fg_tarifa`.
   const productoIdsDe = (servicioId: number) => [...new Set((sedesPorServicio[servicioId] || [])
     .map((sede) => sede.producto_facturacion_id)
-    .filter((id): id is number | string => id !== null && id !== undefined)
+    .filter((id): id is number => id !== null && id !== undefined)
     .map((id) => Number(id))
     .filter((id) => Number.isFinite(id) && id > 0))];
   const buscarProductoPorId = (id: number | string) =>
     productos.find((producto) => Number(producto.id) === Number(id));
   const recargar = () => { setLoading(true); setVersion((actual) => actual + 1); };
+
+  const reiniciarPaginas = () => setPaginaProductos({});
+  const alternarCategoria = (categoriaId: number) => {
+    setCategoriasExpandidas((actuales) => {
+      const siguientes = new Set(actuales);
+      if (siguientes.has(categoriaId)) siguientes.delete(categoriaId);
+      else siguientes.add(categoriaId);
+      return siguientes;
+    });
+  };
+  const cambiarCategoriaFiltro = (codigo: string) => {
+    setCategoriaFiltro(codigo);
+    reiniciarPaginas();
+    if (codigo) {
+      const coincidencias = categorias
+        .filter((categoria) => codigoComparable(categoria.codigo) === codigo)
+        .map((categoria) => categoria.id);
+      setCategoriasExpandidas(new Set(coincidencias));
+    }
+  };
+
+  const categoriasVisibles = (() => {
+    const texto = buscar.trim().toLowerCase();
+    const hayFiltrosDeContenido = Boolean(texto || estadoFiltro || sedeFiltro || generaCertificadoFiltro);
+
+    return categorias.flatMap((categoria) => {
+      if (categoriaFiltro && codigoComparable(categoria.codigo) !== categoriaFiltro) return [];
+
+      const productosCategoria = productosDe(categoria.id);
+      const serviciosCategoria = serviciosDe(categoria.id);
+      const servicioDeProducto = (producto: ProductoFacturacion) => serviciosCategoria.find((servicio) =>
+        productoIdsDe(servicio.id).includes(Number(producto.id))
+        || codigoComparable(servicio.codigo) === codigoComparable(producto.codigo_sku)
+      );
+      const coincideSede = (servicio: ServicioConfiguracionFaregas | undefined) => !sedeFiltro
+        || Boolean(servicio && sedesActivasDe(servicio.id).some((sede) => sede.key === sedeFiltro));
+      const coincideCertificado = (servicio: ServicioConfiguracionFaregas | undefined) => !generaCertificadoFiltro
+        || Boolean(servicio && (generaCertificadoFiltro === 'SI' ? servicio.requiere_certificado : !servicio.requiere_certificado));
+      const categoriaCoincideTexto = !texto
+        || `${categoria.codigo} ${categoria.nombre}`.toLowerCase().includes(texto);
+
+      const productosFiltrados = productosCategoria.filter((producto) => {
+        const servicio = servicioDeProducto(producto);
+        const configurado = Boolean(servicio);
+        const coincideEstado = !estadoFiltro
+          || (estadoFiltro === 'CONFIGURADOS' ? configurado : !configurado);
+        const coincideTexto = categoriaCoincideTexto
+          || `${producto.codigo_sku} ${producto.descripcion}`.toLowerCase().includes(texto)
+          || Boolean(servicio && `${servicio.codigo} ${servicio.nombre}`.toLowerCase().includes(texto));
+        return coincideEstado && coincideSede(servicio) && coincideCertificado(servicio) && coincideTexto;
+      });
+
+      const serviciosFiltrados = serviciosCategoria.filter((servicio) => {
+        if (estadoFiltro === 'SIN_CONFIGURAR') return false;
+        const coincideTexto = categoriaCoincideTexto
+          || `${servicio.codigo} ${servicio.nombre}`.toLowerCase().includes(texto)
+          || productoIdsDe(servicio.id).some((id) => {
+            const producto = buscarProductoPorId(id);
+            return Boolean(producto && `${producto.codigo_sku} ${producto.descripcion}`.toLowerCase().includes(texto));
+          });
+        return coincideSede(servicio) && coincideCertificado(servicio) && coincideTexto;
+      });
+
+      if (hayFiltrosDeContenido && productosFiltrados.length === 0 && serviciosFiltrados.length === 0) return [];
+
+      const configurados = productosCategoria.filter((producto) => Boolean(servicioDeProducto(producto))).length;
+      return [{
+        categoria,
+        productosCategoria,
+        productosFiltrados,
+        serviciosCategoria,
+        serviciosFiltrados,
+        configurados,
+        sinConfigurar: productosCategoria.length - configurados,
+        servicioDeProducto
+      }];
+    });
+  })();
 
   if (loading) return <div className="rounded-xl border bg-white py-14 text-center text-slate-500">Cargando categorías, productos y sedes...</div>;
   if (error) return <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-center font-semibold text-red-700">{error}</div>;
@@ -125,64 +219,121 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
         <p className="mt-1 text-xs text-blue-700">Las sedes, precios y SKU se guardan en Tarifas por sede; esta vista no crea una configuración paralela.</p>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <input value={buscar} onChange={(event) => setBuscar(event.target.value)} placeholder="Buscar categoría, producto u operación..." className="flex-1 rounded-lg border border-slate-300 p-2 text-sm" />
-        {canManageTarifas && <button type="button" onClick={onGoToTarifas} className="rounded-lg border border-[#052A79] px-4 py-2 text-sm font-bold text-[#052A79] hover:bg-blue-50">Abrir Tarifas por sede</button>}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.5fr)_repeat(4,minmax(145px,0.75fr))_auto]">
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold capitalize text-slate-500">Buscar</span>
+            <input value={buscar} onChange={(event) => { setBuscar(event.target.value); reiniciarPaginas(); }} placeholder="Categoría, SKU u operación..." className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold capitalize text-slate-500">Categoría / Tipo</span>
+            <select value={categoriaFiltro} onChange={(event) => cambiarCategoriaFiltro(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm">
+              <option value="">Todos</option>
+              {CATEGORIAS_PRINCIPALES.map((codigo) => <option key={codigo} value={codigo}>{codigo}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold capitalize text-slate-500">Estado de configuración</span>
+            <select value={estadoFiltro} onChange={(event) => { setEstadoFiltro(event.target.value as EstadoConfiguracion); reiniciarPaginas(); }} className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm">
+              <option value="">Todos</option>
+              <option value="CONFIGURADOS">Configurados</option>
+              <option value="SIN_CONFIGURAR">Sin configurar</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold capitalize text-slate-500">Sede</span>
+            <select value={sedeFiltro} onChange={(event) => { setSedeFiltro(event.target.value); reiniciarPaginas(); }} className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm">
+              <option value="">Todas</option>
+              {sedes.map((sede) => <option key={sede.key} value={sede.key}>{sede.nombre}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-bold capitalize text-slate-500">Genera certificado</span>
+            <select value={generaCertificadoFiltro} onChange={(event) => { setGeneraCertificadoFiltro(event.target.value as GeneraCertificado); reiniciarPaginas(); }} className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm">
+              <option value="">Todos</option>
+              <option value="SI">Sí</option>
+              <option value="NO">No</option>
+            </select>
+          </label>
+          {canManageTarifas && <button type="button" onClick={onGoToTarifas} className="self-end rounded-lg border border-[#052A79] px-4 py-2.5 text-sm font-bold text-[#052A79] hover:bg-blue-50">Abrir Tarifas por sede</button>}
+        </div>
       </div>
 
       {categoriasVisibles.length === 0 ? (
         <div className="rounded-xl border bg-white py-12 text-center text-slate-500">No hay categorías que coincidan con la búsqueda.</div>
       ) : (
         <div className="space-y-4">
-          {categoriasVisibles.map((categoria) => {
-            const productosCategoria = productosDe(categoria.id);
-            const serviciosCategoria = serviciosDe(categoria.id);
+          {categoriasVisibles.map(({ categoria, productosCategoria, productosFiltrados, serviciosCategoria, serviciosFiltrados, configurados, sinConfigurar, servicioDeProducto }) => {
             const sedesCategoria = [...new Map(serviciosCategoria.flatMap((servicio) => sedesActivasDe(servicio.id)).map((sede) => [sede.key, sede])).values()];
-            const certificaciones = serviciosCategoria.filter((servicio) => servicio.requiere_certificado);
-            const servicioDeProducto = (producto: ProductoFacturacion) => serviciosCategoria.find((servicio) =>
-              productoIdsDe(servicio.id).includes(Number(producto.id))
-              || codigoComparable(servicio.codigo) === codigoComparable(producto.codigo_sku)
-            );
-            const productoPendiente = productosCategoria.find((producto) =>
-              producto.activo
-              && !servicioDeProducto(producto)
-            );
+            const expandida = categoriasExpandidas.has(categoria.id);
+            const totalPaginas = Math.max(1, Math.ceil(productosFiltrados.length / limiteProductos));
+            const pagina = Math.min(paginaProductos[categoria.id] || 1, totalPaginas);
+            const desde = (pagina - 1) * limiteProductos;
+            const productosPagina = productosFiltrados.slice(desde, desde + limiteProductos);
+            const cambiarPagina = (siguiente: number) => setPaginaProductos((actuales) => ({ ...actuales, [categoria.id]: siguiente }));
             return (
               <article key={categoria.id} className={`overflow-hidden rounded-xl border bg-white shadow-sm ${categoria.activo ? 'border-slate-200' : 'border-red-200 opacity-75'}`}>
-                <header className="flex flex-col gap-3 border-b bg-slate-50 p-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-start gap-3">
+                <header className="border-b bg-slate-50">
+                  <button type="button" onClick={() => alternarCategoria(categoria.id)} aria-expanded={expandida} className="flex w-full flex-col gap-3 p-4 text-left lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div className="rounded-lg bg-blue-100 p-2 text-[#052A79]"><Tags size={19} /></div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
+                        {expandida ? <ChevronDown size={18} className="text-[#052A79]" /> : <ChevronRight size={18} className="text-[#052A79]" />}
                         <h3 className="font-bold text-[#052A79]">{categoria.nombre}</h3>
                         <span className="rounded-full bg-slate-200 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-700">{categoria.codigo}</span>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${categoria.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{categoria.activo ? 'ACTIVA' : 'INACTIVA'}</span>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500"><span>{productosCategoria.length} producto(s)</span><span>{serviciosCategoria.length} operación(es)</span><span>{certificaciones.length} genera(n) certificado</span></div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-full bg-slate-200 px-2 py-1 font-semibold text-slate-700">Productos: {productosCategoria.length}</span>
+                        <span className="rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-700">Configurados: {configurados}</span>
+                        <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">Sin configurar: {sinConfigurar}</span>
+                        <span className="rounded-full bg-violet-100 px-2 py-1 font-semibold text-violet-700">Operaciones: {serviciosCategoria.length}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600"><MapPin size={15} />{sedesCategoria.length ? sedesCategoria.map((sede) => sede.nombre).join(', ') : 'Sin sedes asignadas'}</div>
-                    {canManageTarifas && canViewProducts && categoria.activo && productoPendiente && <button type="button" onClick={() => setModal({ mode: 'CREATE', categoria, productoInicialId: productoPendiente.id, productoFijoId: productoPendiente.id })} className="flex items-center gap-1 rounded-lg bg-[#052A79] px-3 py-2 text-xs font-bold text-white"><Plus size={15} /> Configurar {productoPendiente.codigo_sku}</button>}
-                  </div>
+                  <div className="flex max-w-xl items-center gap-1.5 text-xs font-semibold text-slate-600"><MapPin size={15} className="shrink-0" /><span className="line-clamp-2">{sedesCategoria.length ? sedesCategoria.map((sede) => sede.nombre).join(', ') : 'Sin sedes asignadas'}</span></div>
+                  </button>
                 </header>
 
-                <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.5fr)]">
-                  <section>
-                    <h4 className="mb-2 text-xs font-bold capitalize text-slate-500">Productos fiscales</h4>
-                    {productosCategoria.length === 0 ? <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Esta categoría todavía no tiene productos fiscales.</div> : (
-                      <div className="grid gap-2 sm:grid-cols-2">{productosCategoria.map((producto) => {
+                {expandida && <div className="space-y-5 p-4">
+                  <section className="overflow-hidden rounded-xl border border-slate-200">
+                    <div className="flex flex-col gap-2 border-b bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h4 className="text-xs font-black tracking-wide text-slate-700">PRODUCTOS FISCALES</h4>
+                        <p className="mt-0.5 text-xs text-slate-500">{productosFiltrados.length} producto(s) según los filtros actuales</p>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                        Mostrar
+                        <select value={limiteProductos} onChange={(event) => { setLimiteProductos(Number(event.target.value)); reiniciarPaginas(); }} className="rounded-md border border-slate-300 bg-white px-2 py-1.5">
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                      </label>
+                    </div>
+                    {productosCategoria.length === 0 ? <div className="m-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Esta categoría todavía no tiene productos fiscales.</div> : productosFiltrados.length === 0 ? (
+                      <div className="p-5 text-center text-sm text-slate-500">No hay productos que coincidan con los filtros.</div>
+                    ) : (
+                      <div className="divide-y divide-slate-200/60">{productosPagina.map((producto) => {
                         const servicioVinculado = servicioDeProducto(producto);
                         const usado = Boolean(servicioVinculado);
-                        return <div key={producto.id} title={producto.descripcion} className={`rounded-lg border p-2.5 text-xs ${usado ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-600'}`}>
-                          <div><b>{producto.codigo_sku}</b><span className="ml-1">{producto.descripcion}</span>{!producto.activo && <b className="ml-1 text-red-600">INACTIVO</b>}</div>
+                        return <div key={producto.id} title={producto.descripcion} className={`flex flex-col gap-2 px-4 py-2.5 transition-colors sm:flex-row sm:items-center sm:justify-between ${claseFilaProducto(usado)}`}>
+                          <div className="min-w-0 text-xs">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <b className="font-mono text-[#052A79]">{producto.codigo_sku}</b>
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${usado ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-800'}`}>{usado ? 'CONFIGURADO' : 'SIN CONFIGURAR'}</span>
+                              {!producto.activo && <b className="text-red-600">INACTIVO</b>}
+                            </div>
+                            <p className="mt-1 line-clamp-2 text-slate-700">{producto.descripcion}</p>
+                          </div>
                           {canManageTarifas && canViewProducts && producto.activo && categoria.activo && (
                             <button
                               type="button"
                               onClick={() => servicioVinculado
                                 ? setModal({ mode: 'EDIT', categoria, servicio: servicioVinculado, productoInicialId: producto.id, productoFijoId: producto.id })
                                 : setModal({ mode: 'CREATE', categoria, productoInicialId: producto.id, productoFijoId: producto.id })}
-                              className="mt-2 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 font-bold text-[#052A79] hover:bg-blue-100"
+                              className="shrink-0 rounded-md border border-blue-200 bg-white px-2.5 py-1.5 text-xs font-bold text-[#052A79] hover:bg-blue-100"
                             >
                               {servicioVinculado ? 'Configurar operación' : '+ Configurar operación'}
                             </button>
@@ -190,30 +341,42 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
                         </div>;
                       })}</div>
                     )}
+                    {productosFiltrados.length > 0 && <div className="flex flex-col gap-2 border-t bg-slate-50 px-4 py-2.5 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                      <span>Mostrando {desde + 1}-{Math.min(desde + limiteProductos, productosFiltrados.length)} de {productosFiltrados.length}</span>
+                      <div className="flex items-center gap-2">
+                        <button type="button" disabled={pagina <= 1} onClick={() => cambiarPagina(pagina - 1)} className="rounded-md border bg-white p-1.5 text-[#052A79] disabled:opacity-40" title="Página anterior"><ChevronLeft size={15} /></button>
+                        <span className="font-semibold">Página {pagina} de {totalPaginas}</span>
+                        <button type="button" disabled={pagina >= totalPaginas} onClick={() => cambiarPagina(pagina + 1)} className="rounded-md border bg-white p-1.5 text-[#052A79] disabled:opacity-40" title="Página siguiente"><ChevronRight size={15} /></button>
+                      </div>
+                    </div>}
                   </section>
 
-                  <section>
-                    <h4 className="mb-2 text-xs font-bold capitalize text-slate-500">Operaciones, certificado y sedes</h4>
-                    {serviciosCategoria.length === 0 ? <div className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No hay una operación configurada. La categoría y sus productos existen, pero todavía no están disponibles en ninguna sede.</div> : (
-                      <div className="space-y-2">{serviciosCategoria.map((servicio) => {
+                  <section className="overflow-hidden rounded-xl border border-slate-200">
+                    <div className="border-b bg-slate-50 px-4 py-3">
+                      <h4 className="text-xs font-black tracking-wide text-slate-700">OPERACIONES CONFIGURADAS</h4>
+                      <p className="mt-0.5 text-xs text-slate-500">{serviciosFiltrados.length} operación(es) según los filtros actuales</p>
+                    </div>
+                    {serviciosCategoria.length === 0 ? <div className="m-3 rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No hay una operación configurada. La categoría y sus productos existen, pero todavía no están disponibles en ninguna sede.</div> : serviciosFiltrados.length === 0 ? (
+                      <div className="p-5 text-center text-sm text-slate-500">No hay operaciones que coincidan con los filtros.</div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">{serviciosFiltrados.map((servicio) => {
                         const sedesServicio = sedesActivasDe(servicio.id);
                         const productosServicio = productoIdsDe(servicio.id)
                           .map((id) => buscarProductoPorId(id))
                           .filter(Boolean) as ProductoFacturacion[];
                         return (
-                          <div key={servicio.id} className="rounded-lg border border-slate-200 p-3">
-                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div key={servicio.id} className="px-4 py-3 hover:bg-slate-50">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2"><b className="text-sm text-slate-800">{servicio.nombre}</b><span className="font-mono text-[10px] text-slate-500">{servicio.codigo}</span>{!servicio.activo && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">INACTIVA</span>}</div>
-                                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                <div className="mt-1.5 flex flex-wrap gap-2 text-xs">
                                   <label className={`flex items-center gap-1.5 rounded-full px-2 py-1 font-bold ${servicio.requiere_certificado ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`} title="El cambio se confirma en la ventana de configuración">
                                     <input type="checkbox" checked={servicio.requiere_certificado} disabled={!canManageTarifas || !canViewProducts} onChange={(event) => setModal({ mode: 'EDIT', categoria, servicio: { ...servicio, requiere_certificado: event.target.checked }, productoInicialId: productosServicio[0]?.id })} className="h-3.5 w-3.5" />
                                     {servicio.requiere_certificado ? 'Genera certificado' : 'No genera certificado'}
                                   </label>
                                   {servicio.requiere_certificado && <span className="flex items-center gap-1 rounded-full bg-violet-100 px-2 py-1 font-bold text-violet-700"><FileText size={13} /> Formato: {nombreFormato(servicio)}</span>}
                                 </div>
-                                <div className="mt-2 text-xs text-slate-500"><b>Productos:</b> {productosServicio.length ? productosServicio.map((producto) => producto.codigo_sku).join(', ') : 'Sin producto fiscal vinculado'}</div>
-                                <div className="mt-1 text-xs text-slate-500"><b>Sedes:</b> {sedesServicio.length ? sedesServicio.map((sede) => sede.nombre).join(', ') : 'Sin sedes activas'}</div>
+                                <div className="mt-2 grid gap-1 text-xs text-slate-500 md:grid-cols-2"><div><b>Productos:</b> {productosServicio.length ? productosServicio.map((producto) => producto.codigo_sku).join(', ') : 'Sin producto fiscal vinculado'}</div><div><b>Sedes:</b> {sedesServicio.length ? sedesServicio.map((sede) => sede.nombre).join(', ') : 'Sin sedes activas'}</div></div>
                               </div>
                               {canManageTarifas && canViewProducts && (
                                 <div className="flex shrink-0 flex-wrap gap-2">
@@ -230,7 +393,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
                       })}</div>
                     )}
                   </section>
-                </div>
+                </div>}
               </article>
             );
           })}

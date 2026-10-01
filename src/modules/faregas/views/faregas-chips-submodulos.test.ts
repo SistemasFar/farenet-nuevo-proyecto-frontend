@@ -23,13 +23,18 @@ const codigo = (t: string) =>
 const SUBMODULOS = ['MENU_CHIPS_INVENTARIO', 'MENU_CHIPS_TIPOS', 'MENU_CHIPS_VENTAS'];
 
 /**
- * Contenido del bloque visual de Chips: desde `{padre && (` hasta su cierre
- * `)}`. Sirve para comprobar que los submódulos se dibujan ahí dentro y no
- * como celdas sueltas de la grilla.
+ * Contenido del bloque visual de un módulo con submódulos: la función
+ * `bloqueModulo`, que se dibuja una vez por módulo. Sirve para comprobar que los
+ * submódulos se pintan ahí dentro y no como celdas sueltas de la grilla.
+ *
+ * Desde 20261001 el bloque es genérico y lo comparten Chips y Facturación: hay
+ * que comprobar el mecanismo, no una lista escrita a mano.
  */
 const bloqueDeChips = (): RegExpExecArray => {
-  const m = /\{padre && \(([\s\S]*?)\n\s*\)\}/.exec(codigo(PERFILES));
-  if (!m) throw new Error('no se encontró el bloque visual de Chips');
+  // El tipo del parámetro contiene paréntesis anidados, así que el cuerpo se
+  // delimita por la llave de cierre al mismo nivel de indentación.
+  const m = /const bloqueModulo = \([\s\S]*?\) => \{([\s\S]*?)\n {32}\};/.exec(codigo(PERFILES));
+  if (!m) throw new Error('no se encontró el bloque visual del módulo padre');
   return m;
 };
 
@@ -109,17 +114,23 @@ describe('Editar Perfil ofrece los submódulos bajo Chips', () => {
       expect(bloque![0]).toMatch(new RegExp(`'${sub}'`));
     }
     expect(codigo(PERFILES)).toMatch(/const PERMISO_CHIPS = 'MENU_CHIPS';/);
+    // Y queda registrado en la tabla de módulos con submódulos, que es la que
+    // dibuja los bloques. Facturación se suma a esa misma tabla.
+    expect(codigo(PERFILES)).toMatch(/const MODULOS_CON_SUBMODULOS = \[/);
+    expect(codigo(PERFILES)).toMatch(/padre: PERMISO_CHIPS, hijos: SUBMODULOS_CHIPS as readonly string\[\]/);
   });
 
   it('los submódulos no se listan sueltos: se anidan bajo Chips', () => {
-    expect(codigo(PERFILES)).toMatch(/const esSubmodulo = \(clave: string\) => \(SUBMODULOS_CHIPS as readonly string\[\]\)\.includes\(clave\);/);
+    expect(codigo(PERFILES)).toMatch(/const esSubmodulo = \(clave: string\) =>/);
     // `lista` ya no contiene ningún submódulo, y `otros` (la grilla) los excluye
     // por partida doble: no hay ruta por la que se mezclen con otros módulos.
     expect(codigo(PERFILES)).toMatch(/const lista = permisos\.filter\(\(p: any\) => !esSubmodulo\(p\.clave\)\);/);
-    expect(codigo(PERFILES)).toMatch(/const hijos = permisos\.filter\(\(p: any\) => esSubmodulo\(p\.clave\)\);/);
+    expect(codigo(PERFILES)).toMatch(/const otros = lista\.filter\(\(p: any\) =>/);
+    expect(codigo(PERFILES)).toMatch(/!MODULOS_CON_SUBMODULOS\.some\(\(m\) => m\.padre === p\.clave\)\);/);
     // Los hijos se dibujan dentro del bloque del padre, no como celdas sueltas.
     const bloque = bloqueDeChips();
-    expect(bloque![1]).toMatch(/\{hijos\.map\(\(h: any\) => casilla\(h, true\)\)\}/);
+    expect(bloque![1]).toMatch(/const hijos = permisos\.filter\(\(p: any\) => modulo\.hijos\.includes\(p\.clave\)\);/);
+    expect(bloque![1]).toMatch(/\{hijos\.map\(\(h: any\) => casilla\(h, true, padreActivo\)\)\}/);
   });
 
   it('los submódulos se ven indentados bajo su padre', () => {
@@ -130,13 +141,12 @@ describe('Editar Perfil ofrece los submódulos bajo Chips', () => {
   it('Chips ocupa un bloque propio de ancho completo', () => {
     // Si se quedara dentro de la grilla de dos columnas, sus hijos caerían en
     // la celda siguiente junto a Configuración u otros módulos.
-    expect(codigo(PERFILES)).toMatch(/const padre = lista\.find\(\(p: any\) => p\.clave === PERMISO_CHIPS\);/);
-    expect(codigo(PERFILES)).toMatch(/const otros = lista\.filter\(\(p: any\) => p\.clave !== PERMISO_CHIPS\);/);
+    expect(codigo(PERFILES)).toMatch(/const padre = lista\.find\(\(p: any\) => p\.clave === modulo\.padre\);/);
     const bloque = bloqueDeChips();
-    expect(bloque[1]).toMatch(/\{hijos\.map\(\(h: any\) => casilla\(h, true\)\)\}/);
+    expect(bloque[1]).toMatch(/\{hijos\.map\(\(h: any\) => casilla\(h, true, padreActivo\)\)\}/);
     // Los demás módulos siguen en la grilla de dos columnas.
     expect(codigo(PERFILES)).toMatch(/grid grid-cols-1 gap-2 sm:grid-cols-2/);
-    expect(codigo(PERFILES)).toMatch(/\{otros\.map\(\(p: any\) => casilla\(p, false\)\)\}/);
+    expect(codigo(PERFILES)).toMatch(/\{otros\.map\(\(p: any\) => casilla\(p, false, true\)\)\}/);
   });
 
   it('los submódulos se ven secundarios respecto a los módulos', () => {
@@ -151,18 +161,18 @@ describe('Editar Perfil ofrece los submódulos bajo Chips', () => {
     expect(fondo, 'los hijos deberían tener fondo propio, distinto al de los módulos').not.toBeNull();
   });
 
-  it('los submódulos no se dibujan fuera del bloque de Chips', () => {
-    // El mapa de los hijos sólo puede aparecer dentro del bloque del padre.
-    const usos = codigo(PERFILES).match(/casilla\(h, true\)/g) || [];
+  it('los submódulos no se dibujan fuera del bloque de su padre', () => {
+    // El mapa de los hijos sólo puede aparecer dentro de bloqueModulo.
+    const usos = codigo(PERFILES).match(/casilla\(h, true, padreActivo\)/g) || [];
     expect(usos.length).toBe(1);
-    expect(bloqueDeChips()[1]).toMatch(/casilla\(h, true\)/);
+    expect(bloqueDeChips()[1]).toMatch(/casilla\(h, true, padreActivo\)/);
     // Y la grilla de los demás módulos nunca recibe un submódulo.
     expect(codigo(PERFILES)).not.toMatch(/otros[\s\S]{0,240}?esSubmodulo/);
   });
 
-  it('sin Chips marcado, los submódulos quedan deshabilitados', () => {
-    expect(codigo(PERFILES)).toMatch(/const padreActivo = isSistemas \|\| marcados\.includes\(PERMISO_CHIPS\);/);
-    // Un submódulo se bloquea si el padre no está activo.
+  it('sin el padre marcado, los submódulos quedan deshabilitados', () => {
+    expect(codigo(PERFILES)).toMatch(/const padreActivo = isSistemas \|\| marcados\.includes\(modulo\.padre\);/);
+    // Un submódulo se bloquea si su padre no está activo.
     expect(codigo(PERFILES)).toMatch(/const bloqueado = isSistemas \|\| \(hijo && !padreActivo\);/);
   });
 });
@@ -182,8 +192,9 @@ describe('la regla padre -> hijos se cumple al guardar', () => {
     const todos = ['MENU_CHIPS', ...SUBMODULOS];
     const r = toggle(todos, 'MENU_CHIPS');
     expect(r).toEqual([]);
-    // Y el guardado real se valida contra esta misma expectativa.
-    expect(codigo(PERFILES)).toMatch(/p !== PERMISO_CHIPS && !SUBMODULOS_CHIPS\.includes\(p as any\)/);
+    // Y el guardado real se valida contra esta misma expectativa: filtra por el
+    // padre y por los hijos del módulo al que pertenece.
+    expect(codigo(PERFILES)).toMatch(/permisos: current\.filter\(\(p: string\) => p !== clave && !modulo\.hijos\.includes\(p\)\)/);
   });
 
   it('desmarcar Chips conserva los permisos que no son de chips', () => {
@@ -198,7 +209,7 @@ describe('la regla padre -> hijos se cumple al guardar', () => {
     const r = toggle([], 'MENU_CHIPS');
     expect(r).toEqual(['MENU_CHIPS']);
     // Y el código real coincide con esa regla: sólo añade la clave del padre.
-    expect(codigo(PERFILES)).toMatch(/if \(clave === PERMISO_CHIPS\) \{\s*setFormData\(\{ \.\.\.formData, permisos: \[\.\.\.current, clave\] \}\);/);
+    expect(codigo(PERFILES)).toMatch(/if \(modulo\) \{\s*setFormData\(\{ \.\.\.formData, permisos: \[\.\.\.current, clave\] \}\);/);
   });
 
   it('los submódulos se pueden marcar y desmarcar por separado', () => {

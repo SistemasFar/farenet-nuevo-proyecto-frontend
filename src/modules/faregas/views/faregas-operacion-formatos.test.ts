@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -53,13 +54,11 @@ describe('el bug: la vista pedía una página del catálogo', () => {
     expect(codigo(VISTA)).toMatch(/setProductos\(productosData\.productos\)/);
   });
 
-  it('el botón de configurar operación depende del producto, y el producto ya llega', () => {
-    // Si `productosCategoria` viene vacía, `productoPendiente` es undefined y el
-    // botón no se pinta: la operación se vuelve inc configurable desde la vista.
+  it('el botón superior redundante fue retirado y cada producto conserva su acción', () => {
     const fuente = codigo(VISTA);
-    expect(fuente).toMatch(/const productoPendiente = productosCategoria\.find/);
-    expect(fuente).toMatch(/productoPendiente && <button/);
-    expect(fuente).toMatch(/Configurar \{productoPendiente\.codigo_sku\}/);
+    expect(fuente).not.toMatch(/const productoPendiente = productosCategoria\.find/);
+    expect(fuente).not.toMatch(/Configurar \{productoPendiente\.codigo_sku\}/);
+    expect(fuente).toMatch(/servicioVinculado \? 'Configurar operación' : '\+ Configurar operación'/);
   });
 
   it('cada producto de la categoría puede configurar su operación', () => {
@@ -71,14 +70,14 @@ describe('el bug: la vista pedía una página del catálogo', () => {
 });
 
 describe('lo que la pantalla calcula por categoría', () => {
-  it('cuenta productos, operaciones ygeneradores de certificado', () => {
+  it('cuenta productos, configurados, pendientes y operaciones', () => {
     const fuente = codigo(VISTA);
     expect(fuente).toMatch(/const productosCategoria = productosDe\(categoria\.id\)/);
     expect(fuente).toMatch(/const serviciosCategoria = serviciosDe\(categoria\.id\)/);
-    expect(fuente).toMatch(/const certificaciones = serviciosCategoria\.filter\(\(servicio\) => servicio\.requiere_certificado\)/);
-    expect(fuente).toMatch(/\{productosCategoria\.length\} producto\(s\)/);
-    expect(fuente).toMatch(/\{serviciosCategoria\.length\} operación\(es\)/);
-    expect(fuente).toMatch(/\{certificaciones\.length\} genera\(n\) certificado/);
+    expect(fuente).toMatch(/Productos: \{productosCategoria\.length\}/);
+    expect(fuente).toMatch(/Configurados: \{configurados\}/);
+    expect(fuente).toMatch(/Sin configurar: \{sinConfigurar\}/);
+    expect(fuente).toMatch(/Operaciones: \{serviciosCategoria\.length\}/);
   });
 
   it('muestra el nombre real del formato cuando la operación lo tiene', () => {
@@ -90,8 +89,8 @@ describe('lo que la pantalla calcula por categoría', () => {
 
   it('muestra las sedes de la operación y avisa cuando no hay', () => {
     const fuente = codigo(VISTA);
-    expect(fuente).toMatch(/sedesCategoria\.length \? sedesCategoria\.map\(\(sede\) => sede\.nombre\)\.join\('\, '\) : 'Sin sedes asignadas'/);
-    expect(fuente).toMatch(/sedesServicio\.length \? sedesServicio\.map\(\(sede\) => sede\.nombre\)\.join\('\, '\) : 'Sin sedes activas'/);
+    expect(fuente).toMatch(/sedesCategoria\.length \? sedesCategoria\.map\(\(sede\) => sede\.nombre\)\.join\(', '\) : 'Sin sedes asignadas'/);
+    expect(fuente).toMatch(/sedesServicio\.length \? sedesServicio\.map\(\(sede\) => sede\.nombre\)\.join\(', '\) : 'Sin sedes activas'/);
   });
 
   it('avisa cuando la categoría no tiene operaciones configuradas', () => {
@@ -100,6 +99,47 @@ describe('lo que la pantalla calcula por categoría', () => {
 
   it('avisa cuando la categoría no tiene productos fiscales', () => {
     expect(codigo(VISTA)).toMatch(/Esta categoría todavía no tiene productos fiscales\./);
+  });
+});
+
+describe('organización visual, filtros y límite', () => {
+  it('combina los cuatro filtros solicitados con el buscador', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/Categoría \/ Tipo/);
+    expect(fuente).toMatch(/Estado de configuración/);
+    expect(fuente).toMatch(/Genera certificado/);
+    expect(fuente).toMatch(/value=\{sedeFiltro\}/);
+    expect(fuente).toMatch(/estadoFiltro.*sedeFiltro.*generaCertificadoFiltro/s);
+  });
+
+  it('separa productos fiscales de operaciones configuradas', () => {
+    expect(VISTA).toContain('PRODUCTOS FISCALES');
+    expect(VISTA).toContain('OPERACIONES CONFIGURADAS');
+    expect(VISTA).toMatch(/productosPagina\.map/);
+    expect(VISTA).toMatch(/serviciosFiltrados\.map/);
+  });
+
+  it('las categorías son colapsables y sólo la primera se abre inicialmente', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/categoriasExpandidas/);
+    expect(fuente).toMatch(/new Set\(categoriasData\.slice\(0, 1\)\.map/);
+    expect(fuente).toMatch(/alternarCategoria\(categoria\.id\)/);
+    expect(fuente).toMatch(/aria-expanded=\{expandida\}/);
+  });
+
+  it('filtra antes de paginar y permite 20, 50 o 100 productos', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/productosFiltrados\.slice\(desde, desde \+ limiteProductos\)/);
+    expect(fuente).toMatch(/<option value=\{20\}>20<\/option>/);
+    expect(fuente).toMatch(/<option value=\{50\}>50<\/option>/);
+    expect(fuente).toMatch(/<option value=\{100\}>100<\/option>/);
+    expect(fuente).toMatch(/Página \{pagina\} de \{totalPaginas\}/);
+  });
+
+  it('preserva Configurar operación, Editar formato y Agregar formato', () => {
+    expect(VISTA).toContain('+ Configurar operación');
+    expect(VISTA).toContain('Editar formato');
+    expect(VISTA).toContain('Agregar formato');
   });
 });
 
@@ -202,6 +242,68 @@ describe('la relación es por operación + sede + producto, no una propiedad glo
     // Y al guardar, cada sede va a SU tarifa: sin sede con tarifa, se crea una.
     expect(modal).toMatch(/if \(estado\.tarifaId\) await faregasTarifasAdminApi\.editar\(estado\.tarifaId, datos\)/);
     expect(modal).toMatch(/else await faregasTarifasAdminApi\.crear\(\{ planta_key: sede\.key, servicio_id: servicioId, \.\.\.datos \}\)/);
+  });
+});
+
+describe('el resaltado visual de los productos ya configurados', () => {
+  /**
+  * Petición: dentro de "PRODUCTOS FISCALES", las filas con badge "CONFIGURADO"
+  * deben verse resaltadas con un fondo celeste ligero en toda la fila. Las
+  * "SIN CONFIGURAR" conservan el estilo normal.
+  *
+  * El resaltado NO puede tener su propia condición: si se desincroniza del badge,
+  * la pantalla volvería a mentir. Por eso ambas cosas leen el mismo `usado`.
+  */
+  it('el resaltado se decide con la MISMA variable que el badge', () => {
+    const fuente = codigo(VISTA);
+    // `usado` es la variable que ya pintaba "CONFIGURADO"; no se crea otra.
+    expect(fuente).toMatch(/const usado = Boolean\(servicioVinculado\)/);
+    expect(fuente).toMatch(/claseFilaProducto\(usado\)/);
+    // Y el badge sigue leyendo el mismo `usado`, sin condiciones paralelas.
+    expect(fuente).toMatch(/\{usado \? 'CONFIGURADO' : 'SIN CONFIGURAR'\}/);
+  });
+
+  it('la fila configurada usa fondo celeste con filete lateral', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/CLASE_FILA_CONFIGURADA = 'bg-sky-50 border-l-4 border-sky-400 hover:bg-sky-100'/);
+  });
+
+  it('la fila sin configurar conserva el estilo normal', () => {
+    const fuente = codigo(VISTA);
+    // Fondo blanco y hover neutro, como antes del resaltado.
+    expect(fuente).toMatch(/CLASE_FILA_SIN_CONFIGURAR = 'bg-white border-l-4 border-transparent hover:bg-slate-50'/);
+  });
+
+  it('el helper devuelve una clase u otra, nunca una mezcla', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/const claseFilaProducto = \(configurado: boolean\) =>/);
+    expect(fuente).toMatch(/configurado \? CLASE_FILA_CONFIGURADA : CLASE_FILA_SIN_CONFIGURAR/);
+  });
+
+  it('la transición de color se aplica sólo a la fila de producto', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/transition-colors sm:flex-row sm:items-center sm:justify-between \$\{claseFilaProducto\(usado\)\}/);
+  });
+
+  it('NO se toca la sección OPERACIONES CONFIGURADAS', () => {
+    const fuente = codigo(VISTA);
+    // La sección de operaciones no debe usar el helper ni el celeste.
+    const desde = fuente.indexOf('OPERACIONES CONFIGURADAS');
+    assert.ok(desde > -1, 'debe seguir existiendo la sección de operaciones');
+    const bloque = fuente.slice(desde);
+    assert.doesNotMatch(bloque, /claseFilaProducto/);
+    assert.doesNotMatch(bloque, /sky-50|border-sky-400/);
+    // Y conserva su hover original.
+    assert.match(bloque, /className="px-4 py-3 hover:bg-slate-50"/);
+  });
+
+  it('mantiene el badge y el botón "Configurar operación" intactos', () => {
+    const fuente = codigo(VISTA);
+    expect(fuente).toMatch(/bg-blue-100 text-blue-700/);
+    expect(fuente).toMatch(/bg-amber-100 text-amber-800/);
+    expect(fuente).toMatch(/servicioVinculado \? 'Configurar operación' : '\+ Configurar operación'/);
+    // El botón sigue con su propio estilo, legible sobre el fondo celeste.
+    expect(fuente).toMatch(/border-blue-200 bg-white px-2\.5 py-1\.5 text-xs font-bold text-\[#052A79\] hover:bg-blue-100/);
   });
 });
 

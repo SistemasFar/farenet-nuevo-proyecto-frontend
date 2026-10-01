@@ -30,7 +30,10 @@ describe('Configuración: nomenclatura alineada con DMS sin cambiar el modelo', 
   });
 
   it('Facturación electrónica muestra UNA sola pantalla de series', () => {
-    expect(facturacion).toContain("pestana('SERIES', 'SERIES')");
+    // La pestaña SERIES se declara en la tabla de pestañas con su permiso; ya no
+    // se escribe como llamada literal a `pestana(...)` porque las tres se dibujan
+    // por iteración (así cada una puede depender de su submódulo).
+    expect(facturacion).toContain("id: 'SERIES', permiso: 'MENU_FACTURACION_SERIES', label: 'SERIES'");
     expect(facturacion).toContain('<TabSeries />');
     // NO hay barra interna de subpestañas: series es un módulo, no dos.
     expect(facturacion).not.toContain('SERIES NUBEFACT');
