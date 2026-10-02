@@ -13,6 +13,11 @@ export function UsuariosView() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Filtro de estado del listado de usuarios. Por defecto sólo los activos: los
+  // inactivos se conservan (su auditoría es real) pero no se ven en el día a día.
+  type EstadoUsuario = 'ACTIVOS' | 'INACTIVOS' | 'TODOS';
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoUsuario>('ACTIVOS');
+
   // Maestros
   const [tiposDocumento, setTiposDocumento] = useState<MaestroUsuario[]>([]);
   const [paises, setPaises] = useState<MaestroUsuario[]>([]);
@@ -262,9 +267,19 @@ export function UsuariosView() {
   ] as const;
   const PERMISO_FACTURACION = 'MENU_FACTURACION';
 
+  const SUBMODULOS_CONFIGURACION = [
+    'MENU_CONFIGURACION_SEDES',
+    'MENU_CONFIGURACION_CATALOGO',
+    'MENU_CONFIGURACION_TARIFAS',
+    'MENU_CONFIGURACION_CORRELATIVOS',
+    'MENU_CONFIGURACION_EMPRESAS'
+  ] as const;
+  const PERMISO_CONFIGURACION = 'MENU_CONFIGURACION';
+
   const MODULOS_CON_SUBMODULOS = [
     { padre: PERMISO_CHIPS, hijos: SUBMODULOS_CHIPS as readonly string[] },
-    { padre: PERMISO_FACTURACION, hijos: SUBMODULOS_FACTURACION as readonly string[] }
+    { padre: PERMISO_FACTURACION, hijos: SUBMODULOS_FACTURACION as readonly string[] },
+    { padre: PERMISO_CONFIGURACION, hijos: SUBMODULOS_CONFIGURACION as readonly string[] }
   ];
 
   const togglePermiso = (clave: string) => {
@@ -296,14 +311,23 @@ export function UsuariosView() {
   };
 
   // Filter Data
-  const filteredUsuarios = usuarios.filter(u =>
-    (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.perfil_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.nombres || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.apellidos || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.nombreRazonSocial || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.nroDocumento || '').includes(searchQuery)
-  );
+  //
+  // `estadoFiltro` separa activos de inactivos. Por defecto se ve sólo la gente
+  // que puede operar: los usuarios desactivados —porque se limpiaron sus datos
+  // de prueba pero su auditoría se conserva— siguen existiendo y se pueden
+  // consultar, pero no ensucian el listado diario.
+  const filteredUsuarios = usuarios.filter(u => {
+    if (estadoFiltro === 'ACTIVOS' && u.estado === false) return false;
+    if (estadoFiltro === 'INACTIVOS' && u.estado !== false) return false;
+    return (
+      (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.perfil_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.nombres || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.apellidos || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.nombreRazonSocial || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.nroDocumento || '').includes(searchQuery)
+    );
+  });
 
   const filteredPerfiles = perfiles.filter(p =>
     p.clave.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -364,7 +388,20 @@ export function UsuariosView() {
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
           />
-          <div className="flex gap-2 md:col-span-2">
+          <div className="flex gap-2 md:col-span-1">
+            <select
+              value={estadoFiltro}
+              disabled={activeTab !== 'usuarios'}
+              title={activeTab !== 'usuarios' ? 'El filtro de estado sólo aplica al listado de usuarios' : undefined}
+              onChange={(e) => { setEstadoFiltro(e.target.value as EstadoUsuario); setPage(1); }}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#052A79] disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              <option value="ACTIVOS">Sólo activos</option>
+              <option value="INACTIVOS">Sólo inactivos</option>
+              <option value="TODOS">Todos</option>
+            </select>
+          </div>
+          <div className="flex gap-2 md:col-span-1">
             <button className="rounded-lg bg-[#052A79] px-6 py-2 text-sm font-semibold text-white">
               Buscar
             </button>
@@ -842,13 +879,17 @@ export function UsuariosView() {
                                 const casilla = (p: any, hijo: boolean, padreActivo: boolean) => {
                                     const activo = isSistemas || marcados.includes(p.clave);
                                     const bloqueado = isSistemas || (hijo && !padreActivo);
-                                    const nombrePadre = MODULOS_CON_SUBMODULOS.find(
-                                        (m) => m.padre === MODULOS_CON_SUBMODULOS.find(
-                                            (o) => o.hijos.includes(p.clave))?.padre)?.padre;
+                                    const clavePadre = MODULOS_CON_SUBMODULOS.find(
+                                        (o) => o.hijos.includes(p.clave))?.padre;
+                                    const etiquetaPadre = clavePadre === PERMISO_FACTURACION
+                                        ? 'Facturación'
+                                        : clavePadre === PERMISO_CONFIGURACION
+                                            ? 'Configuración'
+                                            : 'Chips';
                                     return (
                                         <label key={p.clave}
                                             className={`flex items-center gap-2 text-sm p-2 rounded border ${hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
-                                            title={hijo && !padreActivo && !isSistemas ? `Active primero ${nombrePadre === PERMISO_FACTURACION ? 'Facturación' : 'Chips'}` : undefined}>
+                                            title={hijo && !padreActivo && !isSistemas ? `Active primero ${etiquetaPadre}` : undefined}>
                                             <input type="checkbox"
                                                 className="h-4 w-4 text-[#052a79]"
                                                 checked={activo}

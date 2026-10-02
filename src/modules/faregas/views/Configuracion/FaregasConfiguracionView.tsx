@@ -38,11 +38,21 @@ export function FaregasConfiguracionView() {
   const hasCatalogo = hasCategorias || hasServicios || hasProductos;
   const hasCorrelativos = hasSeries;
   const tabs = [];
-  if (hasSedes) tabs.push({ id: 'SEDES', label: 'SEDES / CATEGORÍAS DMS' });
-  if (hasCatalogo) tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
-  if (hasTarifas) tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
-  if (hasCorrelativos) tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });
-  if (hasEmpresas) tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
+  if (permisos.includes('MENU_CONFIGURACION_SEDES') && hasSedes) {
+    tabs.push({ id: 'SEDES', label: 'SEDES / CATEGORÍAS DMS' });
+  }
+  if (permisos.includes('MENU_CONFIGURACION_CATALOGO') && hasCatalogo) {
+    tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
+  }
+  if (permisos.includes('MENU_CONFIGURACION_TARIFAS') && hasTarifas) {
+    tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
+  }
+  if (permisos.includes('MENU_CONFIGURACION_CORRELATIVOS') && hasCorrelativos) {
+    tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });
+  }
+  if (permisos.includes('MENU_CONFIGURACION_EMPRESAS') && hasEmpresas) {
+    tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
+  }
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
     ? activeTab
     : tabs[0]?.id as ConfigTab | undefined;
