@@ -1,7 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Edit, Trash2 } from 'lucide-react';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 import type { MaestroUsuario } from '../../types/faregas-api';
+
+import {
+  atributosDocumento,
+  EMAIL_MAXIMO,
+  esRuc,
+  normalizarSoloDigitos,
+  normalizarTelefono,
+  primerCampoConError,
+  tieneErrores,
+  REGLAS_DOCUMENTO,
+  TELEFONO_MAXIMO,
+  validarDireccion,
+  validarDocumento,
+  validarEmail,
+  validarFormularioUsuario,
+  validarNombre,
+  validarTelefono,
+  validarUsername,
+  type CampoUsuario,
+  type ErroresUsuario,
+} from './usuariosValidacion';
 
 export function UsuariosView() {
   const [activeTab, setActiveTab] = useState<'usuarios' | 'perfiles'>('usuarios');
@@ -11,6 +32,40 @@ export function UsuariosView() {
   const [permisos, setPermisos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Errores por campo. Cada input inválido se marca en rojo y muestra su mensaje
+  // debajo; el error global queda para los fallos que no son de un campo (409,
+  // 500, o el rechazo del backend).
+  const [erroresCampo, setErroresCampo] = useState<ErroresUsuario>({});
+  const refsCampos = useRef<Partial<Record<CampoUsuario, HTMLElement | null>>>({});
+
+  // Marca un campo al vuelo. `soloSiHayError` evita ensuciar el formulario antes
+  // de que el operador haya tocado el campo.
+  const registrarError = (campo: CampoUsuario, valor: string, soloSiHayError = true) => {
+    setErroresCampo((actual) => {
+      const siguiente = { ...actual };
+      if (valor) siguiente[campo] = valor;
+      else delete siguiente[campo];
+      if (!soloSiHayError) return siguiente;
+      return siguiente;
+    });
+  };
+
+  const registrarRef = (campo: CampoUsuario) => (elemento: HTMLElement | null) => {
+    refsCampos.current[campo] = elemento;
+  };
+
+  /** Clases del input: sólo cambia el borde cuando el campo tiene error. */
+  const claseInput = (campo: CampoUsuario) =>
+    `w-full border rounded p-2 text-sm focus:outline-none ${
+      erroresCampo[campo]
+        ? 'border-red-400 focus:border-red-500 bg-red-50/40'
+        : 'border-slate-300 focus:border-[#052a79]'
+    }`;
+
+  const mensajeCampo = (campo: CampoUsuario) =>
+    erroresCampo[campo] ? (
+      <p className="mt-1 text-[11px] font-semibold text-red-600">{erroresCampo[campo]}</p>
+    ) : null;
   const [saving, setSaving] = useState(false);
 
   // Filtro de estado del listado de usuarios. Por defecto sólo los activos: los
@@ -136,6 +191,9 @@ export function UsuariosView() {
       });
     }
     setShowModal(true);
+    // Cada apertura de modal arranca sin errores marcados.
+    setError('');
+    setErroresCampo({});
   };
 
   const handlePaisChange = async (paisKey: string) => {
@@ -195,39 +253,32 @@ export function UsuariosView() {
     e.preventDefault();
     setError('');
 
-    // Validaciones
-    if (formData.password && formData.password !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden');
+    // Se valida el formulario COMPLETO antes de tocar la red. Si algo falla no
+    // se hace request: no tiene sentido mandar datos que ya sabemos inválidos.
+    const errores = validarFormularioUsuario(formData, modalMode === 'crear' ? 'crear' : 'editar');
+    setErroresCampo(errores);
+    if (tieneErrores(errores)) {
+      // Se lleva al operador al primer campo inválido de arriba hacia abajo.
+      const primero = primerCampoConError(errores);
+      const elemento = primero ? refsCampos.current[primero] : null;
+      if (elemento) {
+        elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        (elemento as HTMLElement & { focus?: () => void }).focus?.();
+      }
       return;
-    }
-    
-    // Validar longitudes
-    if (formData.nroDocumento) {
-        if (formData.tipoDocumentoKey === '01' && formData.nroDocumento.length !== 8) { // DNI
-            setError('El DNI debe tener exactamente 8 dígitos.');
-            return;
-        }
-        if (formData.tipoDocumentoKey === '06' && formData.nroDocumento.length !== 11) { // RUC
-            setError('El RUC debe tener exactamente 11 dígitos.');
-            return;
-        }
     }
 
     setSaving(true);
     try {
       const payloadUsuario = { ...formData };
       if (modalMode === 'crear') {
-        if (!formData.password) {
-          setError('Contraseña requerida');
-          setSaving(false);
-          return;
-        }
         // El backend aplica el valor canónico USER cuando no se envía user_type.
         delete payloadUsuario.user_type;
         await faregasUsuariosApi.crearUsuario(payloadUsuario);
       } else {
         // En edición se conserva el tipo original internamente; solo se oculta el selector.
         await faregasUsuariosApi.actualizarUsuario(selectedUsername, payloadUsuario);
+        // Contraseña vacía significa "no cambiar": es el comportamiento previo.
         if (formData.password) {
           await faregasUsuariosApi.cambiarPassword(formData.username, formData.password);
         }
@@ -235,6 +286,10 @@ export function UsuariosView() {
       setShowModal(false);
       cargarDatos();
     } catch (e: any) {
+      // El backend devuelve 400 con el detalle campo a campo; se marca igual que
+      // la validación local para que el mensaje no se pierda.
+      const delBackend = e.response?.data?.errores;
+      if (delBackend && typeof delBackend === 'object') setErroresCampo(delBackend);
       setError(e.response?.data?.message || e.message || 'Error al guardar');
     } finally {
       setSaving(false);
@@ -473,7 +528,7 @@ export function UsuariosView() {
                     <tr key={u.username} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-semibold text-gray-900">{u.username}</td>
                       <td className="px-4 py-3">
-                          {u.tipoDocumentoKey === '06' ? u.nombreRazonSocial : `${u.nombres || ''} ${u.apellidos || ''}`.trim()}
+                          {esRuc(u.tipoDocumentoKey) ? u.nombreRazonSocial : `${u.nombres || ''} ${u.apellidos || ''}`.trim()}
                       </td>
                       <td className="px-4 py-3">{u.nroDocumento || '-'}</td>
                       <td className="px-4 py-3">{u.user_type}</td>
@@ -625,9 +680,17 @@ export function UsuariosView() {
                                 <div className="grid grid-cols-1 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Username <span className="text-red-500">*</span></label>
-                                        <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                                            minLength={3} pattern="^[a-zA-Z0-9_.-]+$" title="El usuario debe tener al menos 3 caracteres y no contener espacios"
-                                            value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} disabled={modalMode === 'editar'} />
+                                        <input type="text" ref={registrarRef('username')} className={claseInput('username')}
+                                            aria-invalid={erroresCampo.username ? true : undefined}
+                                            value={formData.username}
+                                            onChange={e => {
+                                                const valor = e.target.value.trim();
+                                                setFormData({ ...formData, username: valor });
+                                                if (valor) registrarError('username', validarUsername(valor), false);
+                                            }}
+                                            onBlur={e => registrarError('username', validarUsername(e.target.value.trim()))}
+                                            disabled={modalMode === 'editar'} />
+                                        {mensajeCampo('username')}
                                     </div>
                                 </div>
                             </div>
@@ -638,41 +701,76 @@ export function UsuariosView() {
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Tipo de Documento <span className="text-red-500">*</span></label>
-                                        <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                                            value={formData.tipoDocumentoKey} onChange={e => setFormData({ ...formData, tipoDocumentoKey: e.target.value })}>
+                                        <select ref={registrarRef('tipoDocumentoKey')} className={`${claseInput('tipoDocumentoKey')} bg-white`}
+                                            aria-invalid={erroresCampo.tipoDocumentoKey ? true : undefined}
+                                            value={formData.tipoDocumentoKey}
+                                            onChange={e => {
+                                                // Al cambiar de tipo, el documento ya escrito puede
+                                                // dejar de ser valido: se revalida en el momento.
+                                                const tipoDocumentoKey = e.target.value;
+                                                setFormData({ ...formData, tipoDocumentoKey });
+                                                setErroresCampo((actual) => {
+                                                    const siguiente = { ...actual };
+                                                    const errorDoc = validarDocumento(tipoDocumentoKey, formData.nroDocumento);
+                                                    if (errorDoc) siguiente.nroDocumento = errorDoc;
+                                                    else delete siguiente.nroDocumento;
+                                                    return siguiente;
+                                                });
+                                            }}>
                                             <option value="">Seleccione...</option>
                                             {tiposDocumento.map(t => <option key={t.key} value={t.key}>{t.nombre}</option>)}
                                         </select>
+                                        {mensajeCampo('tipoDocumentoKey')}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nro Documento <span className="text-red-500">*</span></label>
-                                        <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                                            minLength={8} maxLength={15} pattern="^[0-9a-zA-Z]+$" title="Ingrese un número de documento válido (sin guiones ni espacios)"
-                                            value={formData.nroDocumento} onChange={e => setFormData({ ...formData, nroDocumento: e.target.value })} />
+                                        <input type="text" ref={registrarRef('nroDocumento')} className={claseInput('nroDocumento')}
+                                            inputMode={atributosDocumento(formData.tipoDocumentoKey).inputMode}
+                                            maxLength={atributosDocumento(formData.tipoDocumentoKey).maxLength}
+                                            aria-invalid={erroresCampo.nroDocumento ? true : undefined}
+                                            value={formData.nroDocumento}
+                                            onChange={e => {
+                                                // En DNI y RUC se deja solo lo digitado: no
+                                                // tiene sentido que el campo acepte letras.
+                                                const numerico = REGLAS_DOCUMENTO[String(formData.tipoDocumentoKey || '').toLowerCase()]?.soloDigitos;
+                                                const valor = numerico ? normalizarSoloDigitos(e.target.value) : e.target.value;
+                                                setFormData({ ...formData, nroDocumento: valor });
+                                                if (valor) registrarError('nroDocumento', validarDocumento(formData.tipoDocumentoKey, valor), false);
+                                            }}
+                                            onBlur={e => registrarError('nroDocumento', validarDocumento(formData.tipoDocumentoKey, e.target.value))} />
+                                        {mensajeCampo('nroDocumento')}
                                     </div>
                                 </div>
 
-                                {formData.tipoDocumentoKey !== '06' ? (
+                                {!esRuc(formData.tipoDocumentoKey) ? (
                                     <div className="grid grid-cols-2 gap-4 mb-4">
                                         <div>
                                             <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nombres <span className="text-red-500">*</span></label>
-                                            <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                                                minLength={2} pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$" title="Solo letras y espacios (min. 2 caracteres)"
-                                                value={formData.nombres} onChange={e => setFormData({ ...formData, nombres: e.target.value })} />
+                                            <input type="text" ref={registrarRef('nombres')} className={claseInput('nombres')}
+                                                aria-invalid={erroresCampo.nombres ? true : undefined}
+                                                value={formData.nombres}
+                                                onChange={e => setFormData({ ...formData, nombres: e.target.value })}
+                                                onBlur={e => registrarError('nombres', validarNombre(e.target.value, 'nombre'))} />
+                                            {mensajeCampo('nombres')}
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Apellidos <span className="text-red-500">*</span></label>
-                                            <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                                                minLength={2} pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$" title="Solo letras y espacios (min. 2 caracteres)"
-                                                value={formData.apellidos} onChange={e => setFormData({ ...formData, apellidos: e.target.value })} />
+                                            <input type="text" ref={registrarRef('apellidos')} className={claseInput('apellidos')}
+                                                aria-invalid={erroresCampo.apellidos ? true : undefined}
+                                                value={formData.apellidos}
+                                                onChange={e => setFormData({ ...formData, apellidos: e.target.value })}
+                                                onBlur={e => registrarError('apellidos', validarNombre(e.target.value, 'apellido'))} />
+                                            {mensajeCampo('apellidos')}
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="mb-4">
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Razón Social <span className="text-red-500">*</span></label>
-                                        <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                                            minLength={3} title="Ingrese una razón social válida (min. 3 caracteres)"
-                                            value={formData.nombreRazonSocial} onChange={e => setFormData({ ...formData, nombreRazonSocial: e.target.value })} />
+                                        <input type="text" ref={registrarRef('nombreRazonSocial')} className={claseInput('nombreRazonSocial')}
+                                            aria-invalid={erroresCampo.nombreRazonSocial ? true : undefined}
+                                            value={formData.nombreRazonSocial}
+                                            onChange={e => setFormData({ ...formData, nombreRazonSocial: e.target.value })} />
+                                        {mensajeCampo('nombreRazonSocial')}
                                     </div>
                                 )}
                             </div>
@@ -683,13 +781,19 @@ export function UsuariosView() {
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Contraseña {modalMode === 'editar' && '(opcional)'}</label>
-                                        <input type="password" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
-                                            value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+                                        <input type="password" ref={registrarRef('password')} className={claseInput('password')}
+                                            aria-invalid={erroresCampo.password ? true : undefined}
+                                            value={formData.password}
+                                            onChange={e => setFormData({ ...formData, password: e.target.value, confirmPassword: e.target.value })} />
+                                        {mensajeCampo('password')}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Confirmar Contraseña</label>
-                                        <input type="password" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
-                                            value={formData.confirmPassword} onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} />
+                                        <input type="password" ref={registrarRef('confirmPassword')} className={claseInput('confirmPassword')}
+                                            aria-invalid={erroresCampo.confirmPassword ? true : undefined}
+                                            value={formData.confirmPassword}
+                                            onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} />
+                                        {mensajeCampo('confirmPassword')}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -744,21 +848,41 @@ export function UsuariosView() {
                                 </div>
                                 <div className="mb-4">
                                     <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Dirección <span className="text-red-500">*</span></label>
-                                    <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                                        minLength={5} title="Ingrese una dirección válida (min. 5 caracteres)"
-                                        value={formData.direccion} onChange={e => setFormData({ ...formData, direccion: e.target.value })} />
+                                    <input type="text" ref={registrarRef('direccion')} className={claseInput('direccion')}
+                                        aria-invalid={erroresCampo.direccion ? true : undefined}
+                                        value={formData.direccion}
+                                        onChange={e => setFormData({ ...formData, direccion: e.target.value })}
+                                        onBlur={e => registrarError('direccion', validarDireccion(e.target.value))} />
+                                    {mensajeCampo('direccion')}
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Teléfono <span className="text-red-500">*</span></label>
-                                        <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                                            minLength={6} pattern="^[0-9+\-\s]+$" title="Ingrese un número de teléfono válido"
-                                            value={formData.telefono} onChange={e => setFormData({ ...formData, telefono: e.target.value })} />
+                                        <input type="tel" ref={registrarRef('telefono')} className={claseInput('telefono')}
+                                            inputMode="numeric"
+                                            maxLength={TELEFONO_MAXIMO}
+                                            aria-invalid={erroresCampo.telefono ? true : undefined}
+                                            value={formData.telefono}
+                                            onChange={e => {
+                                                // Solo digitos y como maximo 9: no se pueden
+                                                // escribir letras, espacios ni signos, ni un
+                                                // digito de mas.
+                                                const valor = normalizarTelefono(e.target.value);
+                                                setFormData({ ...formData, telefono: valor });
+                                                if (valor) registrarError('telefono', validarTelefono(valor), false);
+                                            }}
+                                            onBlur={e => registrarError('telefono', validarTelefono(e.target.value))} />
+                                        {mensajeCampo('telefono')}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Email</label>
-                                        <input type="email" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none"
-                                            value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                                        <input type="email" ref={registrarRef('email')} className={claseInput('email')}
+                                            maxLength={EMAIL_MAXIMO}
+                                            aria-invalid={erroresCampo.email ? true : undefined}
+                                            value={formData.email}
+                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                            onBlur={e => registrarError('email', validarEmail(e.target.value))} />
+                                        {mensajeCampo('email')}
                                     </div>
                                 </div>
                             </div>

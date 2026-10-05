@@ -127,26 +127,44 @@ export function CajaStep({
           <p className="mt-1 text-xs text-slate-500">Catálogo disponible para {catalogo?.sede.nombre || plantaNombre}.</p>
         </div>
 
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            value={busqueda}
-            onChange={(event) => setBusqueda(event.target.value)}
-            placeholder="Buscar servicio..."
-            aria-label="Buscar servicio"
-            className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white pl-12 pr-4 text-sm font-semibold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0"
-          />
-        </div>
-
-        {catalogo && catalogo.categorias.length > 0 && (
-          <div className="flex flex-wrap gap-2" aria-label="Categorías de servicio">
-            <button type="button" onClick={() => setCategoriaActiva('TODOS')} className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition ${categoriaActiva === 'TODOS' ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>TODOS</button>
-            {catalogo.categorias.map((categoria) => (
-              <button key={categoria.codigo} type="button" onClick={() => setCategoriaActiva(categoria.codigo)} className={`rounded-full border px-3 py-1.5 text-[11px] font-black capitalize transition ${categoriaActiva === categoria.codigo ? 'border-[#052a79] bg-[#052a79] text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-[#052a79]/40'}`}>{categoria.nombre}</button>
-            ))}
+        {/* Buscador y tipo de certificado viven en la misma fila: antes los chips
+            de categoría ocupaban una fila entera y la cabecera quedaba
+            visualmente cargada. El filtro NO cambió: sigue siendo
+            `categoriaActiva`, exclusivo, y se combina con `busqueda` porque los
+            dos filtros se aplican al mismo listado. Las opciones salen de
+            `catalogo.categorias`, igual que los chips; no hay ninguna lista
+            hardcodeada. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(event) => setBusqueda(event.target.value)}
+              placeholder="Buscar servicio..."
+              aria-label="Buscar servicio"
+              className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white pl-12 pr-4 text-sm font-semibold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0"
+            />
           </div>
-        )}
+
+          {catalogo && catalogo.categorias.length > 0 && (
+            <div className="sm:w-60 sm:shrink-0">
+              <label htmlFor="tipo-certificado" className="sr-only">Tipo de certificado</label>
+              <select
+                id="tipo-certificado"
+                value={categoriaActiva}
+                onChange={(event) => setCategoriaActiva(event.target.value)}
+                aria-label="Tipo de certificado"
+                className="h-10 w-full rounded-xl border-2 border-slate-200 bg-white px-3 text-sm font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0"
+              >
+                <option value="TODOS">Todos</option>
+                {catalogo.categorias.map((categoria) => (
+                  <option key={categoria.codigo} value={categoria.codigo}>{categoria.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
 
         {loading ? (
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-500">Cargando servicios disponibles...</div>
