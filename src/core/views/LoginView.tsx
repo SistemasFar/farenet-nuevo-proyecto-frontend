@@ -97,8 +97,8 @@ export function LoginView({
       </div>
 
       <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
-        <div className="mb-4 text-center w-full min-w-max">
-          <h1 className="text-4xl whitespace-nowrap font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
+        <div className="mb-4 text-center w-full">
+          <h1 className="text-4xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
             SISTEMA EN LÍNEA
           </h1>
         </div>
