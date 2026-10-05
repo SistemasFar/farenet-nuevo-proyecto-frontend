@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, FileText, Loader2, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, FileText, Loader2, RefreshCw, X, Ban } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasChipsApi, type DetalleVentaChip } from '../../services/faregas-chips.api';
 import { esComprobanteReintentable } from './facturacionReintento';
@@ -16,10 +16,16 @@ const estadoClass = (estado: string | null | undefined) => {
 
 export function ModalDetalleVentaChips({
   operacionId,
-  onClose
+  onClose,
+  onAnular,
+  puedeVender,
+  anulando
 }: {
   operacionId: number;
   onClose: () => void;
+  onAnular?: (operacionId: number, nroComprobante: string | null) => Promise<boolean>;
+  puedeVender?: boolean;
+  anulando?: boolean;
 }) {
   const [detalle, setDetalle] = useState<DetalleVentaChip | null>(null);
   const [loading, setLoading] = useState(true);

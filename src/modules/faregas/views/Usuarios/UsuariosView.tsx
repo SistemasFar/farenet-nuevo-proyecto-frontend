@@ -325,7 +325,6 @@ export function UsuariosView() {
   const SUBMODULOS_CONFIGURACION = [
     'MENU_CONFIGURACION_SEDES',
     'MENU_CONFIGURACION_CATALOGO',
-    'MENU_CONFIGURACION_TARIFAS',
     'MENU_CONFIGURACION_CORRELATIVOS',
     'MENU_CONFIGURACION_EMPRESAS'
   ] as const;
@@ -998,7 +997,7 @@ export function UsuariosView() {
                                 // Los submódulos no se listan sueltos: se anidan bajo su padre.
                                 const lista = permisos.filter((p: any) => !esSubmodulo(p.clave));
                                 const otros = lista.filter((p: any) =>
-                                    !MODULOS_CON_SUBMODULOS.some((m) => m.padre === p.clave));
+                                    !MODULOS_CON_SUBMODULOS.some((m) => m.padre === p.clave) && p.clave !== 'MENU_CONFIGURACION_TARIFAS');
 
                                 const casilla = (p: any, hijo: boolean, padreActivo: boolean) => {
                                     const activo = isSistemas || marcados.includes(p.clave);

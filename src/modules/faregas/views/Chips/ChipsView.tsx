@@ -68,7 +68,7 @@ export function ChipsView() {
   const [chips, setChips] = useState<Chip[]>([]);
   const [productos, setProductos] = useState<ProductoInventariable[]>([]);
   const [catalogos, setCatalogos] = useState<{ sedes: { key: string, nombre: string }[] }>({ sedes: [] });
-  
+
   const [scan, setScan] = useState('');
   const [modo, setModo] = useState<'INGRESO' | 'TRANSFERENCIA'>('INGRESO');
   const [destino, setDestino] = useState('');
@@ -222,6 +222,7 @@ export function ChipsView() {
       await cargar();
     } catch (error: unknown) {
       alert('Error al guardar el producto: ' + errorMessage(error));
+      return false;
     } finally {
       setSavingProduct(false);
     }
@@ -303,6 +304,7 @@ export function ChipsView() {
       await cargar();
     } catch (error: unknown) {
       alert('Error al guardar los cambios: ' + errorMessage(error));
+      return false;
     } finally {
       setSavingProduct(false);
     }
@@ -328,7 +330,7 @@ export function ChipsView() {
         width: '42rem'
       });
       if (bloqueos.length > 0) return;
-      if (!confirmacion.isConfirmed) return;
+      if (!confirmacion.isConfirmed) return false;
 
       const resultado = await faregasChipsApi.eliminarTipoChip(prod.id);
       if (Number(selectedProductId) === prod.id) setSelectedProductId(null);
@@ -340,13 +342,14 @@ export function ChipsView() {
       await Swal.fire({ title: 'Tipo de chip eliminado', text: partes.join(' '), icon: 'success', confirmButtonText: 'OK' });
     } catch (error) {
       await Swal.fire({ title: 'No se pudo eliminar', text: errorMessage(error), icon: 'error', confirmButtonText: 'CERRAR' });
+      return false;
     } finally {
       setEliminandoTipoId(null);
     }
   };
 
   const cards = [['Total', resumen.total], ['Disponibles', resumen.disponibles], ['Reservados', resumen.reservados], ['Vendidos', resumen.vendidos]];
-  
+
   return <div className="space-y-5">
     <div>
       <h1 className="text-xl font-bold text-slate-900">Inventario de chips</h1>
@@ -471,7 +474,7 @@ export function ChipsView() {
       </div>
     </>}
 
-    {detalleOperacionId !== null && <ModalDetalleVentaChips operacionId={detalleOperacionId} onClose={() => setDetalleOperacionId(null)} />}
+    {detalleOperacionId !== null && <ModalDetalleVentaChips operacionId={detalleOperacionId} onClose={() => setDetalleOperacionId(null)} onAnular={anularComprobante} puedeVender={puedeVender} anulando={accionEnProceso === detalleOperacionId} />}
     {showVentaModal && <ModalVentaChips onClose={() => setShowVentaModal(false)} onVentaExitosa={() => { setVentasRefreshToken((value) => value + 1); void cargar(); }} />}
     {(showProductModal || editingProductoId) && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
@@ -640,12 +643,12 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
     window.open(venta.facturacion.enlacePdf, '_blank', 'noopener,noreferrer');
   };
 
-  const anularComprobante = async (venta: VentaChipOperacion) => {
-    const facturacion = venta.facturacion;
-    if (!facturacion) return;
+  const anularComprobante = async (operacionId: number, nroComprobante: string | null): Promise<boolean> => {
+
+
     const confirmacion = await Swal.fire({
       icon: 'warning',
-      title: `🚫 Anular ${facturacion.nroComprobante || 'comprobante'}`,
+      title: `🚫 Anular ${nroComprobante || 'comprobante'}`,
       input: 'text',
       inputLabel: 'Motivo de la anulación',
       inputPlaceholder: 'Ingrese el motivo',
@@ -657,14 +660,16 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
         ? 'El motivo es obligatorio.'
         : value.trim().length > 100 ? 'El motivo admite como máximo 100 caracteres.' : undefined
     });
-    if (!confirmacion.isConfirmed) return;
+    if (!confirmacion.isConfirmed) return false;
     try {
-      setAccionEnProceso(venta.operacionId);
-      await faregasChipsApi.generarAnulacionOperacion(venta.operacionId, String(confirmacion.value).trim());
+      setAccionEnProceso(operacionId);
+      await faregasChipsApi.generarAnulacionOperacion(operacionId, String(confirmacion.value).trim());
       await Swal.fire('Solicitud registrada', 'La anulación fue enviada. Su aceptación debe consultarse posteriormente.', 'success');
       await listado.refrescar();
+      return true;
     } catch (error) {
       await Swal.fire('No se pudo anular', errorMessage(error), 'error');
+      return false;
     } finally {
       setAccionEnProceso(null);
     }
@@ -678,8 +683,10 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
       const resultado = await faregasChipsApi.consultarAnulacionOperacion(venta.operacionId, anulacionId);
       await Swal.fire('Estado actualizado', `La solicitud se encuentra ${resultado.data.estado}.`, 'success');
       await listado.refrescar();
+      return true;
     } catch (error) {
       await Swal.fire('No se pudo consultar', errorMessage(error), 'error');
+      return false;
     } finally {
       setAccionEnProceso(null);
     }
@@ -782,7 +789,7 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
                             <button
                               type="button"
                               disabled={accionEnProceso === venta.operacionId}
-                              onClick={(event) => { event.stopPropagation(); void anularComprobante(venta); }}
+                              onClick={(event) => { event.stopPropagation(); void anularComprobante(venta.operacionId, venta.facturacion!.nroComprobante); }}
                               title="Anular comprobante"
                               className="inline-flex h-7 items-center gap-1 rounded border border-red-200 bg-red-50 px-2 text-[11px] font-bold text-red-600 transition hover:bg-red-100 disabled:opacity-50"
                             ><Ban size={13} /> ANULAR</button>

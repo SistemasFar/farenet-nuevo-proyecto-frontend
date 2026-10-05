@@ -15,13 +15,12 @@ const MIGRACION = readFileSync(resolve(
 const SUBMODULOS = [
   'MENU_CONFIGURACION_SEDES',
   'MENU_CONFIGURACION_CATALOGO',
-  'MENU_CONFIGURACION_TARIFAS',
   'MENU_CONFIGURACION_CORRELATIVOS',
   'MENU_CONFIGURACION_EMPRESAS'
 ];
 
-describe('Editar Perfil divide Configuración en cinco submódulos', () => {
-  it('declara los cinco hijos bajo MENU_CONFIGURACION', () => {
+describe('Editar Perfil divide Configuración en cuatro submódulos', () => {
+  it('declara los cuatro hijos bajo MENU_CONFIGURACION', () => {
     expect(PERFILES).toContain("const PERMISO_CONFIGURACION = 'MENU_CONFIGURACION';");
     expect(PERFILES).toMatch(/padre: PERMISO_CONFIGURACION, hijos: SUBMODULOS_CONFIGURACION/);
     for (const permiso of SUBMODULOS) expect(PERFILES).toContain(`'${permiso}'`);
