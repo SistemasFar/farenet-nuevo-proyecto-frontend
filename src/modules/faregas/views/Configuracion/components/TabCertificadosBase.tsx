@@ -410,6 +410,10 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
 
       {editarFormato && <FormatoDetalleModal formatoId={editarFormato.id} contextoOperacion={editarFormato.servicio} onFormatoChanged={(formato) => {
         setEditarFormato((actual) => actual ? { id: formato.id, servicio: { ...actual.servicio, formato_id: formato.id, formato_codigo: formato.codigo, formato_nombre: formato.nombre, formato_motor: formato.motor } } : null);
+      }} onChangeBase={() => {
+        const serv = editarFormato.servicio;
+        setEditarFormato(null);
+        setAsignarFormatoServicio(serv);
       }} onClose={() => { setEditarFormato(null); recargar(); }} />}
     </div>
   );

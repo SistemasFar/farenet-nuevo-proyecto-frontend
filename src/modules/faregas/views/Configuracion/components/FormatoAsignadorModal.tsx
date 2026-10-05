@@ -9,7 +9,11 @@ interface Props {
   onAsignado: (formato: Formato) => void;
 }
 
-const mensajeError = (error: unknown) => error instanceof Error ? error.message : 'No se pudo completar la operación.';
+const mensajeError = (error: unknown) => {
+  const msg = error instanceof Error ? error.message : 'No se pudo completar la operación.';
+  if (msg.includes('FORMATO_INCOMPATIBLE_CON_TIPO_CERTIFICADO')) return 'La base seleccionada no corresponde al tipo de certificado de esta operación.';
+  return msg;
+};
 
 export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }: Props) {
   const [formatos, setFormatos] = useState<Formato[]>([]);
