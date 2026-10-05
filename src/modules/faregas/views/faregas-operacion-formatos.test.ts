@@ -144,8 +144,8 @@ describe('organización visual, filtros y límite', () => {
 });
 
 describe('la operación se configura aparte, no se inventa', () => {
-  it('explica en la propia pantalla que las sedes y precios viven en Tarifas', () => {
-    expect(VISTA).toMatch(/Las sedes, precios y SKU se guardan en Tarifas por sede/);
+  it('explica en la propia pantalla dónde viven las sedes y precios', () => {
+    expect(VISTA).toMatch(/Las sedes, precios y SKU se guardan en Operación y Formatos/);
     expect(VISTA).toMatch(/esta vista no crea una configuración paralela/);
   });
 

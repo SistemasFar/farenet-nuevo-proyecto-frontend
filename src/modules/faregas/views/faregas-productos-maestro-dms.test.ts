@@ -5,10 +5,12 @@ import path from 'node:path';
 const leer = (...partes: string[]) => fs.readFileSync(path.join(__dirname, ...partes), 'utf8');
 const VISTA = leer('Configuracion', 'components', 'TabProductos.tsx');
 const API = leer('..', 'services', 'faregas-productos.api.ts');
+const VINCULACION = leer('..', 'utils', 'faregas-productos-vinculacion.ts');
 
 describe('Productos fiscales alineados al maestro DMS', () => {
-  it('muestra una tabla agrupada y la sede como Categoría DMS', () => {
-    expect(VISTA).toContain('Sede / Categoría DMS');
+  it('muestra una tabla agrupada y las sedes funcionales vinculadas', () => {
+    expect(VISTA).toContain('Sedes vinculadas');
+    expect(VISTA).not.toContain('Sede / Categoría DMS');
     expect(VISTA).toContain('Datos fiscales');
     expect(VISTA).toContain('Datos comerciales');
     expect(VISTA).toContain('Flags');
@@ -18,8 +20,8 @@ describe('Productos fiscales alineados al maestro DMS', () => {
 
   it('deriva las sedes desde las relaciones de tarifas y no edita categoria_dms', () => {
     expect(VISTA).toContain('sedesPorServicio');
-    expect(VISTA).toContain('tarifa.producto_facturacion_id');
-    expect(VISTA).toContain('Derivada de Tarifas por sede');
+    expect(VINCULACION).toContain('tarifa.producto_facturacion_id');
+    expect(VINCULACION).not.toMatch(/categoria_dms\s*[=.]/);
     expect(VISTA).not.toMatch(/setActual\([^\n]+categoria_dms/);
     expect(VISTA).not.toContain('sede_id');
   });

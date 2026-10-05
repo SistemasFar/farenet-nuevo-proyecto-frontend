@@ -45,7 +45,7 @@ export function FaregasConfiguracionView() {
     tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
   }
   if (permisos.includes('MENU_CONFIGURACION_TARIFAS') && hasTarifas) {
-    tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
+    // tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
   }
   if (permisos.includes('MENU_CONFIGURACION_CORRELATIVOS') && hasCorrelativos) {
     tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });

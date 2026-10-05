@@ -216,7 +216,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
         <p className="font-bold">Categorías, operación y formatos</p>
         <p className="mt-1">Aquí aparecen todas las categorías. Cada operación indica si genera certificado, qué formato utiliza y en qué sedes se ofrece.</p>
-        <p className="mt-1 text-xs text-blue-700">Las sedes, precios y SKU se guardan en Tarifas por sede; esta vista no crea una configuración paralela.</p>
+        <p className="mt-1 text-xs text-blue-700">Las sedes, precios y SKU se guardan en Operación y Formatos; esta vista no crea una configuración paralela.</p>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -255,7 +255,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
               <option value="NO">No</option>
             </select>
           </label>
-          {canManageTarifas && <button type="button" onClick={onGoToTarifas} className="self-end rounded-lg border border-[#052A79] px-4 py-2.5 text-sm font-bold text-[#052A79] hover:bg-blue-50">Abrir Tarifas por sede</button>}
+          {canManageTarifas && <button type="button" onClick={onGoToTarifas} className="self-end rounded-lg border border-[#052A79] px-4 py-2.5 text-sm font-bold text-[#052A79] hover:bg-blue-50">Abrir Operación y Formatos</button>}
         </div>
       </div>
 

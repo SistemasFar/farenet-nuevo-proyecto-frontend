@@ -155,8 +155,8 @@ describe('lo que NO se tocó', () => {
     expect(VISTA).toMatch(/<option value="SIN_CATEGORIA">Sin tipo de certificado<\/option>/);
   });
 
-  it('mantiene el aviso de guardado con el enlace a Tarifas', () => {
+  it('mantiene el aviso de guardado con el enlace a Operación y Formatos', () => {
     expect(VISTA).toMatch(/guardado\./);
-    expect(VISTA).toMatch(/Vincular en Tarifas por sede/);
+    expect(VISTA).toMatch(/Vincular en Operación y Formatos/);
   });
 });

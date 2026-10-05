@@ -42,7 +42,7 @@ export default function TabCatalogo({ hasCategorias, hasServicios, hasProductos,
       </div>
 
       {activeTab === 'FISCALES' && hasProductos && (
-        <TabProductos canViewRelations={hasServicios} canViewTarifas={hasTarifas} onGoToTarifas={onGoToTarifas} />
+        <TabProductos canViewRelations={hasProductos || hasServicios} canViewTarifas={hasTarifas} onGoToTarifas={onGoToTarifas} />
       )}
 
       {activeTab === 'CATEGORIAS' && hasCategorias && (

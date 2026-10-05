@@ -14,6 +14,10 @@ import {
   type ProductoFacturacion
 } from '../../../services/faregas-productos.api';
 import { exportarProductosFiscales } from '../../../utils/faregas-productos-exportacion';
+import {
+  construirVinculacionesOperativas,
+  obtenerVinculacionProducto
+} from '../../../utils/faregas-productos-vinculacion';
 import { Paginacion } from '../../components/Paginacion';
 
 const productoVacio = (): Partial<ProductoFacturacion> => ({
@@ -94,11 +98,6 @@ interface Props {
   canViewRelations?: boolean;
   canViewTarifas?: boolean;
   onGoToTarifas?: () => void;
-}
-
-interface VinculacionOperativa {
-  servicios: string[];
-  sedesActivas: string[];
 }
 
 export default function TabProductos({ canViewRelations = false, canViewTarifas = false, onGoToTarifas }: Props) {
@@ -249,29 +248,10 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     else setCategoria(valor);
   };
 
-  const vinculaciones = useMemo(() => {
-    const mapa = new Map<number, { servicios: Set<string>; sedesActivas: Set<string> }>();
-    for (const servicio of servicios) {
-      for (const tarifa of sedesPorServicio[servicio.id] || []) {
-        if (!tarifa.producto_facturacion_id) continue;
-        const actualVinculacion = mapa.get(tarifa.producto_facturacion_id) || {
-          servicios: new Set<string>(),
-          sedesActivas: new Set<string>()
-        };
-        actualVinculacion.servicios.add(servicio.nombre);
-        if (tarifa.activo) actualVinculacion.sedesActivas.add(tarifa.nombre);
-        mapa.set(tarifa.producto_facturacion_id, actualVinculacion);
-      }
-    }
-
-    return new Map<number, VinculacionOperativa>([...mapa.entries()].map(([productoId, relacion]) => [
-      productoId,
-      {
-        servicios: [...relacion.servicios].sort(),
-        sedesActivas: [...relacion.sedesActivas].sort()
-      }
-    ]));
-  }, [sedesPorServicio, servicios]);
+  const vinculaciones = useMemo(
+    () => construirVinculacionesOperativas(servicios, sedesPorServicio),
+    [sedesPorServicio, servicios]
+  );
 
   // El listado ya viene filtrado y paginado del backend: `productos` ES la
   // página actual del resultado. Filtrar aquí en memoria sólo podía mirar esos
@@ -373,7 +353,9 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     }
   };
 
-  const vinculacionActual = actual.id ? vinculaciones.get(actual.id) : undefined;
+  const vinculacionActual = actual.id
+    ? obtenerVinculacionProducto(vinculaciones, actual.id)
+    : undefined;
 
   return (
     <div>
@@ -382,15 +364,15 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           <Link2 className="mt-0.5 shrink-0" size={19} />
           <div>
             <p className="font-bold">Este es el catálogo principal de lo que FAREGAS factura.</p>
-            <p className="mt-1 text-blue-800">Cada SKU contiene los datos tributarios enviados a Nubefact. La sede, el precio y la operación interna se vinculan una sola vez desde Tarifas por sede.</p>
+            <p className="mt-1 text-blue-800">Cada SKU contiene los datos tributarios enviados a Nubefact. La sede, el precio y la operación interna se vinculan una sola vez desde Operación y Formatos.</p>
           </div>
         </div>
       </div>
 
       {productoGuardado && (
         <div className="mb-4 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 sm:flex-row sm:items-center sm:justify-between">
-          <div><span className="font-bold">SKU {productoGuardado} guardado.</span> {canViewTarifas ? 'Ahora puedes asignarlo a una sede, precio y operación.' : 'La vinculación operativa requiere permiso de Tarifas por sede.'}</div>
-          {canViewTarifas && onGoToTarifas && <button type="button" onClick={onGoToTarifas} className="shrink-0 rounded-lg bg-[#052A79] px-4 py-2 font-bold text-white">Vincular en Tarifas por sede</button>}
+          <div><span className="font-bold">SKU {productoGuardado} guardado.</span> {canViewTarifas ? 'Ahora puedes asignarlo a una sede, precio y operación.' : 'La vinculación operativa requiere permiso de Operación y Formatos.'}</div>
+          {canViewTarifas && onGoToTarifas && <button type="button" onClick={onGoToTarifas} className="shrink-0 rounded-lg bg-[#052A79] px-4 py-2 font-bold text-white">Vincular en Operación y Formatos</button>}
         </div>
       )}
 
@@ -421,12 +403,12 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           : error ? <div className="py-10 text-center text-red-500">{error}</div>
           : <div className="max-h-[58vh] overflow-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 border-b border-gray-200 bg-white text-xs capitalize text-gray-500"><tr><th className="px-3 py-3">SKU / producto</th><th className="px-3 py-3">Sede / Categoría DMS</th><th className="px-3 py-3">Datos fiscales</th><th className="px-3 py-3">Datos comerciales</th><th className="px-3 py-3">Flags</th><th className="px-3 py-3">Uso operativo</th><th className="px-3 py-3 text-center">Imagen</th><th className="px-3 py-3 text-center">Acciones</th></tr></thead>
+              <thead className="sticky top-0 border-b border-gray-200 bg-white text-xs capitalize text-gray-500"><tr><th className="px-3 py-3">SKU / producto</th><th className="px-3 py-3">Sedes vinculadas</th><th className="px-3 py-3">Datos fiscales</th><th className="px-3 py-3">Datos comerciales</th><th className="px-3 py-3">Flags</th><th className="px-3 py-3">Uso operativo</th><th className="px-3 py-3 text-center">Imagen</th><th className="px-3 py-3 text-center">Acciones</th></tr></thead>
               <tbody className="divide-y divide-gray-100">{productos.map((producto) => {
-                const vinculacion = vinculaciones.get(producto.id);
+                const vinculacion = obtenerVinculacionProducto(vinculaciones, producto.id);
                 return <tr key={producto.id} className="hover:bg-gray-50">
                   <td className="min-w-64 px-3 py-3"><div className="font-mono font-bold text-gray-700">{producto.codigo_sku}</div><div className="mt-1 font-medium text-gray-800">{producto.descripcion}</div><div className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${producto.categoria_id ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{producto.categoria_nombre || 'SIN TIPO DE CERTIFICADO'}</div><div className="mt-1 text-xs text-slate-500">Tipo: {producto.tipo_producto || 'Producto'}</div></td>
-                  <td className="min-w-52 px-3 py-3 text-xs">{vinculacion?.sedesActivas.length ? <div className="font-semibold text-slate-800" title={vinculacion.sedesActivas.join(', ')}>{vinculacion.sedesActivas.join(', ')}</div> : <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">SIN TARIFA ACTIVA</span>}<div className="mt-1 text-slate-500">Derivada de Tarifas por sede</div></td>
+                  <td className="min-w-52 px-3 py-3 text-xs">{vinculacion?.sedesActivas.length ? <div className="font-semibold text-slate-800" title={vinculacion.sedesActivas.join(', ')}>{vinculacion.sedesActivas.join(', ')}</div> : <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">SIN VINCULAR</span>}<div className="mt-1 text-slate-500"></div></td>
                   <td className="min-w-52 px-3 py-3 text-xs"><div>Unidad: <b>{producto.unidad || '-'}</b> · IGV: <b>{producto.tipo_afectacion_igv || '-'}</b></div><div className="mt-1 text-slate-500">SUNAT: {producto.codigo_clasificacion_sunat || '-'}</div><div className="mt-1 text-slate-500">ISC: {producto.codigo_afectacion_isc || '-'} · {producto.porcentaje_isc == null ? '-' : `${producto.porcentaje_isc}%`}</div><div className="mt-1 text-slate-500">Cuenta: {producto.cuenta_por_cobrar || '-'}</div></td>
                   <td className="min-w-52 px-3 py-3 text-xs"><div>P. unitario: <b>{producto.precio_unitario == null ? '-' : `S/ ${producto.precio_unitario.toFixed(2)}`}</b></div><div className="mt-1">P. venta: <b>{producto.precio_referencia == null ? '-' : `S/ ${producto.precio_referencia.toFixed(2)}`}</b></div><div className="mt-1">V. referencial: <b>{producto.valor_referencial_unitario == null ? '-' : `S/ ${producto.valor_referencial_unitario.toFixed(2)}`}</b></div><div className="mt-1 text-slate-500">Barras: {producto.codigo_barras || '-'}</div></td>
                   <td className="min-w-40 px-3 py-3 text-xs"><div><span className={`rounded-full px-2 py-1 font-semibold ${producto.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{producto.activo ? 'ACTIVO' : 'INACTIVO'}</span></div><div className="mt-2 text-slate-600">Venta: {producto.es_para_venta ? 'Sí' : 'No'} · Compra: {producto.es_para_compra ? 'Sí' : 'No'}</div><div className="mt-1 text-slate-600">POS: {producto.disponible_pos ? 'Sí' : 'No'} · ICBPER: {producto.tiene_icbper ? 'Sí' : 'No'}</div></td>
@@ -446,7 +428,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           </div>}
       </div>
 
-      {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"><h3 className="mb-2 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Nuevo producto fiscal' : 'Editar producto fiscal'}</h3><p className="mb-4 text-sm text-slate-600">Maestro comercial/fiscal. La sede o Categoría DMS se obtiene de Tarifas por sede; aquí no se crea una relación paralela.</p><form onSubmit={guardar} className="space-y-5">
+      {modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl"><h3 className="mb-2 text-xl font-bold text-[#052A79]">{mode === 'CREATE' ? 'Nuevo producto fiscal' : 'Editar producto fiscal'}</h3><p className="mb-4 text-sm text-slate-600">Maestro comercial/fiscal. La sede o Categoría DMS se obtiene de Operación y Formatos; aquí no se crea una relación paralela.</p><form onSubmit={guardar} className="space-y-5">
         <section className="rounded-xl border border-slate-200 p-4">
           <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-[#052A79]">Identificación</h4>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -456,7 +438,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
             <div><label className="mb-1 block text-sm font-semibold">Tipo de certificado</label><select required value={actual.categoria_id || ''} onChange={(e) => setActual({ ...actual, categoria_id: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border bg-white p-2"><option value="">Seleccionar tipo...</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre} ({item.codigo})</option>)}</select></div>
             <div><label className="mb-1 block text-sm font-semibold">Código de barras</label><input value={actual.codigo_barras || ''} onChange={(e) => setActual({ ...actual, codigo_barras: e.target.value || null })} className="w-full rounded-lg border p-2" /></div>
           </div>
-          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"><div className="font-semibold">Sede / Categoría DMS</div><div className="mt-1">{vinculacionActual?.sedesActivas.length ? vinculacionActual.sedesActivas.join(', ') : mode === 'CREATE' ? 'Se asigna después desde Tarifas por sede.' : 'Sin tarifa activa asociada.'}</div>{canViewTarifas && onGoToTarifas && <button type="button" onClick={() => { setModal(false); onGoToTarifas(); }} className="mt-2 font-bold text-[#052A79] underline">Administrar en Tarifas por sede</button>}</div>
+          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"><div className="font-semibold">Sedes vinculadas</div><div className="mt-1">{vinculacionActual?.sedesActivas.length ? vinculacionActual.sedesActivas.join(', ') : mode === 'CREATE' ? 'Se asigna después desde Operación y Formatos.' : 'SIN VINCULAR asociada.'}</div>{canViewTarifas && onGoToTarifas && <button type="button" onClick={() => { setModal(false); onGoToTarifas(); }} className="mt-2 font-bold text-[#052A79] underline">Configurar en Operación y Formatos</button>}</div>
         </section>
 
         <section className="rounded-xl border border-slate-200 p-4">
