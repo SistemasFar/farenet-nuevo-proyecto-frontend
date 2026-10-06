@@ -47,8 +47,13 @@ export const createCustomCertificateVariable = (value: string): CustomCertificat
   return { key, label, grupo: 'Personalizadas', tipo: 'text', demo: `{{${key}}}` };
 };
 
-export const isHtmlCertificateVersionEditable = (version: { estado: string; motor: string }, formatoProtegido: boolean) =>
-  version.estado === 'BORRADOR' && version.motor === 'HTML_DINAMICO' && !formatoProtegido;
+export const isHtmlCertificateVersionEditable = (
+  version: { estado: string; motor: string },
+  formatoProtegido: boolean,
+  canEditProtected = false
+) => version.estado === 'BORRADOR'
+  && version.motor === 'HTML_DINAMICO'
+  && (!formatoProtegido || canEditProtected);
 
 const BLOCKED_ELEMENTS = 'script, iframe, object, embed, applet, form, input, button, textarea, select';
 const URL_ATTRIBUTES = new Set(['href', 'src', 'xlink:href', 'formaction']);
@@ -167,6 +172,15 @@ export const parseCertificateDocument = (rawHtml = ''): { bodyHtml: string; shel
   };
 };
 
+// Dentro del diseñador no existe un elemento <body> por documento: TipTap
+// edita únicamente su contenido. Convertimos ese selector en :scope para que
+// tipografía, márgenes y relleno oficiales se apliquen al contenedor aislado
+// del certificado sin filtrarse al resto de la aplicación.
+export const scopeCertificateDocumentCss = (css = '') => String(css).replace(
+  /(^|[},])(\s*)body(?=\s*(?:[,{.#[:]))/gim,
+  '$1$2:scope'
+);
+
 export const serializeCertificateDocument = (bodyHtml: string, shell: CertificateDocumentShell) => {
   const parser = new DOMParser();
   const document = parser.parseFromString('<!DOCTYPE html><html><head></head><body></body></html>', 'text/html');
@@ -174,6 +188,16 @@ export const serializeCertificateDocument = (bodyHtml: string, shell: Certificat
   document.head.innerHTML = shell.headHtml;
   Object.entries(shell.bodyAttributes).forEach(([name, value]) => document.body.setAttribute(name, value));
   document.body.innerHTML = bodyHtml;
+
+  // ProseMirror añade un párrafo vacío de salida después de ciertos bloques
+  // complejos. Fuera del lienzo editable ese nodo puede crear una hoja extra.
+  while (
+    document.body.lastElementChild?.tagName === 'P'
+    && !document.body.lastElementChild.textContent?.trim()
+    && !document.body.lastElementChild.querySelector('img, br, hr')
+  ) {
+    document.body.lastElementChild.remove();
+  }
 
   document.querySelectorAll('[data-faregas-editable-slot], [data-active-slot]').forEach((element) => {
     element.removeAttribute('data-faregas-editable-slot');

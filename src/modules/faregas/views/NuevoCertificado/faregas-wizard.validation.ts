@@ -1,5 +1,6 @@
 import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { CampoFormatoDinamicoFaregas } from '../../types/faregas-api';
+import { combustiblesGnvSonEquivalentes, pesosGnvSonIguales } from './gnv-conversion';
 
 type DatosAsistente = {
   tipoCertificado: TipoCertificadoFaregas;
@@ -84,7 +85,7 @@ export const validarExpedienteTecnico = ({
 
   if (tipoCertificado === 'GNV_ANUAL') {
     agregarFaltantes(errores, vehiculo, [['color', 'el color']]);
-    agregarFaltantes(errores, gnv, [['tallerAutorizadoId', 'el taller autorizado'], ['fechaVigencia', 'la vigencia GNV']]);
+    agregarFaltantes(errores, gnv, [['fechaVigencia', 'la vigencia GNV']]);
     const verificaciones = gnv.verificaciones || [];
     if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
       errores.push('Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
@@ -351,7 +352,6 @@ export const validarDatosEspecificos = ({
   const errores: ErroresCampo = {};
 
   if (tipo === 'GNV_ANUAL') {
-    if (vacio(gnv.tallerAutorizadoId)) marcar(errores, 'gnv.tallerAutorizadoId', 'Seleccione el taller autorizado.');
     if (vacio(gnv.fechaVigencia)) marcar(errores, 'gnv.fechaVigencia', 'Complete la vigencia del certificado GNV.');
     const verificaciones = gnv.verificaciones || [];
     if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
@@ -360,7 +360,7 @@ export const validarDatosEspecificos = ({
   }
 
   if (tipo === 'GLP_ANUAL') {
-    if (vacio(glp.tallerAutorizadoId)) marcar(errores, 'glp.tallerAutorizadoId', 'Seleccione el taller autorizado.');
+    if (vacio(glp.tallerAutorizadoId)) marcar(errores, 'Seleccione el taller autorizado.');
     if (vacio(glp.fechaVigencia)) marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
     if (vacio(glp.expedienteTecnico)) marcar(errores, 'glp.expedienteTecnico', 'Complete el número de expediente técnico.');
 
@@ -566,14 +566,14 @@ export const CAMPOS_VISIBLES_COMUNES = [
  * "(Opcional)" y el backend tampoco lo exige. Marcarlo en rojo contradiría lo
  * que el propio formulario afirma al operador.
  */
-export const CAMPOS_VISIBLES_GNV = ['gnv.tallerAutorizadoId', 'gnv.fechaVigencia'] as const;
+export const CAMPOS_VISIBLES_GNV = ['gnv.fechaVigencia'] as const;
 export const CAMPOS_VISIBLES_GNV_INICIAL = [
   'gnv.combustiblePosterior', 'gnv.pesoNetoPosterior',
 ] as const;
 
 /** Bloque B, sección GLP (idem para INICIAL). */
 export const CAMPOS_VISIBLES_GLP = [
-  'glp.tallerAutorizadoId', 'glp.fechaVigencia', 'glp.expedienteTecnico',
+  'glp.fechaVigencia', 'glp.expedienteTecnico',
 ] as const;
 export const CAMPOS_VISIBLES_GLP_INICIAL = [
   'glp.pesoNetoPosterior', 'glp.cargaUtilPosterior',
@@ -684,12 +684,28 @@ export const validarFormularioVehiculoVisible = ({
 
   const esInicial = String(modalidad || '').toUpperCase() === 'INICIAL';
 
-  // Las claves de las secciones ya vienen cualificadas (glp.tallerAutorizadoId),
-  // así que la raíz debe exponerlas en su primer segmento. Sin esto se buscaría
-  // gnv.gnv.tallerAutorizadoId y el campo se marcaría siempre como vacío.
+  // Las claves de cada sección ya vienen cualificadas (por ejemplo,
+  // gnv.fechaVigencia), así que la raíz debe exponer el grupo en su primer
+  // segmento para validar el campo correcto.
   if (tipoCertificado === 'GNV_ANUAL') {
     marcarVacias(errores, { gnv }, CAMPOS_VISIBLES_GNV);
-    if (esInicial) marcarVacias(errores, { gnv }, CAMPOS_VISIBLES_GNV_INICIAL);
+    if (esInicial) {
+      marcarVacias(errores, { gnv }, CAMPOS_VISIBLES_GNV_INICIAL);
+      if (combustiblesGnvSonEquivalentes(vehiculo.combustible, gnv.combustiblePosterior)) {
+        marcar(
+          errores,
+          'gnv.combustiblePosterior',
+          'El combustible después de la conversión debe ser diferente al combustible original.'
+        );
+      }
+      if (pesosGnvSonIguales(vehiculo.pesoNeto, gnv.pesoNetoPosterior)) {
+        marcar(
+          errores,
+          'gnv.pesoNetoPosterior',
+          'El peso neto después de la conversión debe ser diferente al peso original.'
+        );
+      }
+    }
   }
   if (tipoCertificado === 'GLP_ANUAL') {
     marcarVacias(errores, { glp }, CAMPOS_VISIBLES_GLP);

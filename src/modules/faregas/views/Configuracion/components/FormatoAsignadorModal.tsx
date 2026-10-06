@@ -80,6 +80,7 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
       // El backend explica por qué no se puede eliminar (protegido, en uso o
       // con variantes), en vez de un error genérico de base de datos.
       setError(mensajeError(cause));
+    } finally {
       setSaving(false);
     }
   };

@@ -15,6 +15,7 @@ import { ServicioModal } from './ServicioModal';
 interface Props {
   canViewProducts: boolean;
   canManageTarifas: boolean;
+  canManageFormats: boolean;
   onGoToTarifas: () => void;
 }
 
@@ -62,7 +63,7 @@ const codigoComparable = (value: string | null | undefined) => String(value || '
   .replace(/[^A-Z0-9_]+/g, '_')
   .replace(/^_+|_+$/g, '');
 
-export default function TabCertificadosBase({ canViewProducts, canManageTarifas, onGoToTarifas }: Props) {
+export default function TabCertificadosBase({ canViewProducts, canManageTarifas, canManageFormats, onGoToTarifas }: Props) {
   const [categorias, setCategorias] = useState<CategoriaServicio[]>([]);
   const [productos, setProductos] = useState<ProductoFacturacion[]>([]);
   const [servicios, setServicios] = useState<ServicioConfiguracionFaregas[]>([]);
@@ -408,7 +409,7 @@ export default function TabCertificadosBase({ canViewProducts, canManageTarifas,
         recargar();
       }} />}
 
-      {editarFormato && <FormatoDetalleModal formatoId={editarFormato.id} contextoOperacion={editarFormato.servicio} onFormatoChanged={(formato) => {
+      {editarFormato && <FormatoDetalleModal formatoId={editarFormato.id} contextoOperacion={editarFormato.servicio} canManageProtected={canManageFormats} onFormatoChanged={(formato) => {
         setEditarFormato((actual) => actual ? { id: formato.id, servicio: { ...actual.servicio, formato_id: formato.id, formato_codigo: formato.codigo, formato_nombre: formato.nombre, formato_motor: formato.motor } } : null);
       }} onChangeBase={() => {
         const serv = editarFormato.servicio;

@@ -89,6 +89,22 @@ export const faregasFormatosApi = {
     }) as Promise<{ version: FormatoVersion }>;
   },
 
+  crearVersionOficialProtegida: async (formatoId: number): Promise<{
+    version: FormatoVersion;
+    reutilizada: boolean;
+    origen: 'VERSION_VIGENTE' | 'FUENTE_OFICIAL_PROTEGIDA' | 'PLANTILLA_FAREGAS' | 'BORRADOR_EXISTENTE';
+    message: string;
+  }> => {
+    return faregasFetch(`/formatos/${formatoId}/versiones/protegido`, {
+      method: 'POST',
+    }) as Promise<{
+      version: FormatoVersion;
+      reutilizada: boolean;
+      origen: 'VERSION_VIGENTE' | 'FUENTE_OFICIAL_PROTEGIDA' | 'PLANTILLA_FAREGAS' | 'BORRADOR_EXISTENTE';
+      message: string;
+    }>;
+  },
+
   importarWordComoHtml: async (formatoId: number, file: File): Promise<{ version: FormatoVersion; advertencias: string[] }> => {
     const formData = new FormData();
     formData.append('archivo', file);

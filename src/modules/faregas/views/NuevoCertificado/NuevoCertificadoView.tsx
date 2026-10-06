@@ -261,7 +261,6 @@ export function NuevoCertificadoView() {
 
   const [titulares, setTitulares] = useState<TitularState[]>([]);
   const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
-  const [talleres, setTalleres] = useState<any[]>([]);
   const [isEmitido, setIsEmitido] = useState(false);
   const [vehiculoOrigen, setVehiculoOrigen] = useState<'FARENET' | 'FAREGAS' | 'MIXTO' | 'BORRADOR' | 'MANUAL'>('MANUAL');
   const [expedienteError, setExpedienteError] = useState('');
@@ -629,14 +628,12 @@ export function NuevoCertificadoView() {
     try {
       setLoading(true);
       setExpedienteError('');
-      const [maestrosResponse, verificacionesResponse, talleresResponse] = await Promise.all([
+      const [maestrosResponse, verificacionesResponse] = await Promise.all([
         maestrosApi.obtenerMaestrosVehiculoAsync(),
         faregasCertificadosApi.obtenerCatalogoVerificaciones(),
-        faregasCertificadosApi.obtenerTalleres(),
       ]);
       setMaestrosVehiculo(maestrosResponse.data);
       setCatalogoVerificaciones(verificacionesResponse.data ?? verificacionesResponse);
-      setTalleres(talleresResponse.data ?? []);
     } catch (err: any) {
       const message = err.message || 'No se pudieron cargar los catálogos del expediente técnico';
       setExpedienteError(message);
@@ -1013,7 +1010,6 @@ export function NuevoCertificadoView() {
     await guardarExpedienteTecnico(idBorrador, confirmarMaestro);
     if (formCaja.tipoCertificado === 'GNV_ANUAL') {
       await faregasCertificadosApi.guardarGnv(idBorrador, {
-        tallerAutorizadoId: formGnv.tallerAutorizadoId || null,
         vigenciaHasta: formGnv.fechaVigencia || formGnv.vigencia_hasta || null,
         modalidad: formCaja.modalidadCertificado || null,
         numeroChip: formGnv.numeroChip || formGnv.numero_chip || null,
@@ -1757,7 +1753,6 @@ export function NuevoCertificadoView() {
               setFormFacturacion={setFormFacturacion}
               onRemoveTitular={eliminarTitularBorrador}
               catalogoVerificaciones={catalogoVerificaciones}
-              talleres={talleres}
               vehiculoOrigen={vehiculoOrigen}
               maestrosVehiculo={maestrosVehiculo}
               categoriaVehicular={formCaja.categoria}

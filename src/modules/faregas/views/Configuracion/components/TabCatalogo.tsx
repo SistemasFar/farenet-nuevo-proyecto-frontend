@@ -61,6 +61,7 @@ export default function TabCatalogo({ hasCategorias, hasServicios, hasProductos,
         <TabOperacionesWrapper 
           canViewProducts={hasProductos} 
           canManageTarifas={hasTarifas} 
+          canManageFormats={hasServicios}
           onGoToTarifas={onGoToTarifas} 
         />
       )}

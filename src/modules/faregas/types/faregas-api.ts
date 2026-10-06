@@ -293,10 +293,12 @@ export interface VerificacionFaregasRequest {
 }
 
 export interface GuardarGnvFaregasRequest {
-  tallerAutorizadoId?: number | string | null;
   vigenciaHasta?: NullableText;
   modalidad?: NullableText;
   numeroChip?: NullableText;
+  observaciones?: NullableText;
+  combustiblePosterior?: NullableText;
+  pesoNetoPosterior?: NullableNumberInput;
 }
 
 export interface GuardarVerificacionesFaregasRequest {

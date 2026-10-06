@@ -29,6 +29,7 @@ import {
   isHtmlCertificateVersionEditable,
   parseCertificateDocument,
   sanitizePastedHtml,
+  scopeCertificateDocumentCss,
   serializeCertificateDocument,
   type FaregasVariableAttributes
 } from './certificate-designer';
@@ -38,6 +39,7 @@ interface Props {
   formato: Formato;
   version: FormatoVersion;
   onBack: () => void;
+  canEditProtected?: boolean;
 }
 
 type PanelTab = 'VARIABLES' | 'IMAGENES' | 'PROPIEDADES';
@@ -45,7 +47,7 @@ type PanelTab = 'VARIABLES' | 'IMAGENES' | 'PROPIEDADES';
 const mensajeError = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
 const limiteTabla = (value: number) => Math.max(1, Math.min(20, Number.isFinite(value) ? value : 1));
 
-export default function FormatoHtmlVariablesEditor({ formato, version, onBack }: Props) {
+export default function FormatoHtmlVariablesEditor({ formato, version, onBack, canEditProtected = false }: Props) {
   const [variables, setVariables] = useState<VariableCatalogo[]>([]);
   const [loadingVariables, setLoadingVariables] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,10 +74,14 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const editable = isHtmlCertificateVersionEditable(version, formato.es_protegido);
+  const editable = isHtmlCertificateVersionEditable(version, formato.es_protegido, canEditProtected);
   const parsedDocument = useMemo(
     () => parseCertificateDocument(version.configuracion?.html || '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head><body><p></p></body></html>'),
     [version.configuracion?.html]
+  );
+  const scopedDocumentCss = useMemo(
+    () => scopeCertificateDocumentCss(parsedDocument.shell.documentCss),
+    [parsedDocument.shell.documentCss]
   );
 
   const editor = useEditor({
@@ -312,9 +318,11 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack }:
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <main className="flex flex-1 justify-center overflow-auto bg-slate-200 p-6">
-          {parsedDocument.shell.documentCss && <style>{`@scope (.faregas-document-root) { ${parsedDocument.shell.documentCss} }`}</style>}
-          <section className="certificate-designer-page faregas-document-root bg-white shadow-xl">
-            <EditorContent editor={editor} className="certificate-designer-editor" />
+          {scopedDocumentCss && <style>{`@scope (.faregas-document-root) { ${scopedDocumentCss} }`}</style>}
+          <section className="certificate-designer-page bg-white shadow-xl">
+            <div className="certificate-designer-document-root faregas-document-root">
+              <EditorContent editor={editor} className="certificate-designer-editor" />
+            </div>
           </section>
         </main>
 

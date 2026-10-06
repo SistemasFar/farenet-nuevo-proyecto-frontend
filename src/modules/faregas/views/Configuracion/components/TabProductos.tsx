@@ -112,7 +112,6 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   const [buscar, setBuscar] = useState('');
   const [estado, setEstado] = useState('');
   const [paraVenta, setParaVenta] = useState('');
-  const [unidad, setUnidad] = useState('');
   const [categoria, setCategoria] = useState('');
   // La búsqueda y los filtros se resuelven en el backend: el texto se aplica
   // antes del LIMIT/OFFSET, así que un SKU de la página 28 aparece al buscarlo.
@@ -204,7 +203,6 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
         buscar: buscarAplicado || undefined,
         activo: estado === '' ? undefined : estado === '1',
         es_para_venta: paraVenta === '' ? undefined : paraVenta === '1',
-        unidad: unidad || undefined,
         categoria_id: categoria || undefined,
         page,
         pageSize
@@ -232,7 +230,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     // no dependen de los filtros del listado, así que no se piden aquí.
     cargarProductos();
     return () => { cancelado = true; };
-  }, [buscarAplicado, estado, paraVenta, unidad, categoria, page, pageSize, refreshToken]);
+  }, [buscarAplicado, estado, paraVenta, categoria, page, pageSize, refreshToken]);
 
   const irAPagina = (nueva: number) => setPage(nueva);
   const cambiarPageSize = (nuevo: number) => {
@@ -240,11 +238,10 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     setPage(1);
   };
   // Cada filtro devuelve a la página 1.
-  const filtrar = (campo: 'estado' | 'paraVenta' | 'unidad' | 'categoria', valor: string) => {
+  const filtrar = (campo: 'estado' | 'paraVenta' | 'categoria', valor: string) => {
     setPage(1);
     if (campo === 'estado') setEstado(valor);
     else if (campo === 'paraVenta') setParaVenta(valor);
-    else if (campo === 'unidad') setUnidad(valor);
     else setCategoria(valor);
   };
 
@@ -265,7 +262,6 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
         buscar: buscarAplicado || undefined,
         activo: estado === '' ? undefined : estado === '1',
         es_para_venta: paraVenta === '' ? undefined : paraVenta === '1',
-        unidad: unidad || undefined,
         categoria_id: categoria || undefined
       });
       exportarProductosFiscales(resultadoCompleto);
@@ -377,11 +373,10 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
       )}
 
       <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
-        <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar código o descripción..." className="rounded-lg border border-slate-300 p-2 text-sm focus:border-[#052A79] focus:outline-none lg:col-span-2" />
+        <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar código, descripción o sede..." className="rounded-lg border border-slate-300 p-2 text-sm focus:border-[#052A79] focus:outline-none lg:col-span-2" />
         <select value={categoria} onChange={(e) => filtrar('categoria', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Tipo de certificado: Todos</option><option value="SIN_CATEGORIA">Sin tipo de certificado</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>
         <select value={estado} onChange={(e) => filtrar('estado', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Estado: Todos</option><option value="1">Activos</option><option value="0">Inactivos</option></select>
         <select value={paraVenta} onChange={(e) => filtrar('paraVenta', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Para venta: Todos</option><option value="1">Sí</option><option value="0">No</option></select>
-        <select value={unidad} onChange={(e) => filtrar('unidad', e.target.value)} className="rounded-lg border border-slate-300 bg-white p-2 text-sm focus:border-[#052A79] focus:outline-none"><option value="">Unidad: Todas</option>{unidades.map((item) => <option key={item} value={item}>{item}</option>)}</select>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">

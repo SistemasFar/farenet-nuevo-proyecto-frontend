@@ -1,17 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { DownloadCloud, Info, Cpu, Boxes, FileText, Search, Trash2, Ban, RefreshCw } from 'lucide-react';
+import readXlsxFile from 'read-excel-file/browser';
+import { Cpu, Boxes, FileText, Search, Trash2, Ban, RefreshCw, ScanLine, FileSpreadsheet, ListOrdered } from 'lucide-react';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { Paginacion } from '../components/Paginacion';
 import { useListadoPaginado } from '../hooks/useListadoPaginado';
 import { faregasChipsApi, type Chip, type ChipResumen, type ImpactoTipoChip, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
-import { ChipScannerInput, parseChipScan } from './ChipScannerInput';
+import { ChipScannerInput } from './ChipScannerInput';
+import { extraerCodigosDeHoja, generarCodigosPorRango, parseChipScan } from './chips-ingreso-masivo';
 import { ModalDetalleVentaChips } from './ModalDetalleVentaChips';
 import { ModalVentaChips } from './ModalVentaChips';
 
 const empty: ChipResumen = { total: 0, disponibles: 0, reservados: 0, vendidos: 0, baja: 0, precio: 0, stockPermitido: false, ventaHabilitada: false, mappingFiscalCompleto: false };
 type EditableSede = { precio: number; stockPermitido: boolean; ventaHabilitada: boolean; productoFacturacionId?: number };
+type MetodoIngreso = 'ESCANEO' | 'EXCEL' | 'RANGO';
+const SEDES_TRANSFERENCIA_CHIPS = ['13', '98', '160'];
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
 
 const escaparHtml = (value: string) => value.replace(/[&<>'"]/g, (caracter) => ({
@@ -71,7 +75,12 @@ export function ChipsView() {
 
   const [scan, setScan] = useState('');
   const [modo, setModo] = useState<'INGRESO' | 'TRANSFERENCIA'>('INGRESO');
+  const [metodoIngreso, setMetodoIngreso] = useState<MetodoIngreso>('ESCANEO');
   const [destino, setDestino] = useState('');
+  const [archivoImportado, setArchivoImportado] = useState('');
+  const [cargandoArchivo, setCargandoArchivo] = useState(false);
+  const archivoInputRef = useRef<HTMLInputElement>(null);
+  const [rango, setRango] = useState({ prefijo: 'CHIP', desde: '1', hasta: '200', digitos: '3' });
   const [buscar, setBuscar] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
   // Paginacion del inventario: 10 por pagina, en el backend.
@@ -104,6 +113,7 @@ export function ChipsView() {
   const [selectedProductId, setSelectedProductId] = useState<number | ''>('');
 
   const parsed = useMemo(() => parseChipScan(scan), [scan]);
+  const sedeTransferenciaHabilitada = SEDES_TRANSFERENCIA_CHIPS.includes(String(plantaKey));
 
   const cargar = useCallback(async () => {
     try {
@@ -176,6 +186,7 @@ export function ChipsView() {
       if (modo === 'INGRESO') {
         await faregasChipsApi.ingresar(Number(selectedProductId), parsed.validos);
       } else {
+        if (!sedeTransferenciaHabilitada) throw new Error('Los chips sólo pueden transferirse entre COLINA, SURCO y SURQUILLO.');
         if (!destino) throw new Error('Seleccione la sede destino.');
         await faregasChipsApi.transferir(Number(selectedProductId), destino, parsed.validos);
       }
@@ -183,6 +194,55 @@ export function ChipsView() {
       setScan('');
       await cargar();
     } catch (error: unknown) { setError(errorMessage(error)); } finally { setLoading(false); }
+  };
+
+  const seleccionarMetodoIngreso = (metodo: MetodoIngreso) => {
+    setMetodoIngreso(metodo);
+    setError('');
+    setMensaje('');
+  };
+
+  const importarArchivoChips = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = event.target.files?.[0];
+    event.target.value = '';
+    if (!archivo) return;
+
+    setError('');
+    setMensaje('');
+    setCargandoArchivo(true);
+    try {
+      const extension = archivo.name.split('.').pop()?.toLowerCase();
+      let filas: unknown[][];
+      if (extension === 'csv' || extension === 'txt') {
+        const contenido = await archivo.text();
+        filas = contenido.split(/\r?\n/).map((linea) => linea.split(/[;,\t]/));
+      } else {
+        filas = await readXlsxFile(archivo) as unknown[][];
+      }
+
+      const codigos = extraerCodigosDeHoja(filas);
+      if (codigos.length === 0) throw new Error('El archivo no contiene códigos de chip. Use una columna llamada CÓDIGO, CHIP, NÚMERO o SERIAL.');
+      setScan(codigos.join('\n'));
+      setArchivoImportado(archivo.name);
+      setMensaje(`${codigos.length} código(s) cargado(s) desde ${archivo.name}. Revise el resumen y confirme el lote.`);
+    } catch (error: unknown) {
+      setArchivoImportado('');
+      setError(`No se pudo leer el archivo. ${errorMessage(error)}`);
+    } finally {
+      setCargandoArchivo(false);
+    }
+  };
+
+  const crearListaDesdeRango = () => {
+    setError('');
+    setMensaje('');
+    try {
+      const codigos = generarCodigosPorRango(rango);
+      setScan(codigos.join('\n'));
+      setMensaje(`Rango preparado: ${codigos[0]} hasta ${codigos[codigos.length - 1]} (${codigos.length} códigos).`);
+    } catch (error: unknown) {
+      setError(errorMessage(error));
+    }
   };
 
   const abrirModalCrearProducto = () => {
@@ -333,7 +393,7 @@ export function ChipsView() {
       if (!confirmacion.isConfirmed) return false;
 
       const resultado = await faregasChipsApi.eliminarTipoChip(prod.id);
-      if (Number(selectedProductId) === prod.id) setSelectedProductId(null);
+      if (Number(selectedProductId) === prod.id) setSelectedProductId('');
       await cargar();
       const partes = [`El tipo de chip "${resultado.nombre}" fue eliminado.`];
       if (resultado.configuracionesSedeEliminadas > 0) partes.push(`${resultado.configuracionesSedeEliminadas} configuración(es) por sede.`);
@@ -397,7 +457,7 @@ export function ChipsView() {
             </div>
             <p className="mt-3 text-xs text-slate-500">Clasificación: <b>{prod.tipo}</b></p>
             {(() => {
-              const sede = (prod.sedes || []).find((s: any) => s.plantaKey === plantaKey);
+              const sede = (prod.sedes || []).find((s) => s.plantaKey === plantaKey);
               return sede?.precio
                 ? <p className="mt-1 text-xs font-bold text-emerald-700">Precio en esta sede: S/ {Number(sede.precio).toFixed(2)}</p>
                 : <p className="mt-1 text-xs text-amber-600">Sin precio configurado en esta sede</p>;
@@ -433,7 +493,30 @@ export function ChipsView() {
 
       <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex gap-2"><button onClick={() => setModo('INGRESO')} className={`rounded px-3 py-2 text-xs font-bold ${modo === 'INGRESO' ? 'bg-[#052A79] text-white' : 'bg-slate-100'}`}>Ingresar stock</button><button onClick={() => setModo('TRANSFERENCIA')} className={`rounded px-3 py-2 text-xs font-bold ${modo === 'TRANSFERENCIA' ? 'bg-[#052A79] text-white' : 'bg-slate-100'}`}>Transferir</button></div>
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => { setModo('INGRESO'); setDestino(''); setError(''); setMensaje(''); }}
+              className={`rounded-lg px-3 py-2.5 text-xs font-bold ${modo === 'INGRESO' ? 'bg-[#052A79] text-white' : 'bg-slate-100 text-slate-700'}`}
+            >
+              INGRESAR CHIPS
+            </button>
+            <button
+              type="button"
+              disabled={!sedeTransferenciaHabilitada}
+              onClick={() => { setModo('TRANSFERENCIA'); setError(''); setMensaje(''); }}
+              className={`rounded-lg px-3 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${modo === 'TRANSFERENCIA' ? 'bg-[#052A79] text-white' : 'bg-slate-100 text-slate-700'}`}
+            >
+              TRANSFERIR ENTRE SEDES
+            </button>
+          </div>
+
+          {!sedeTransferenciaHabilitada && (
+            <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+              Las transferencias de chips sólo están disponibles en COLINA, SURCO y SURQUILLO.
+            </p>
+          )}
+
           <div className="mb-3">
             <label className="mb-1 block text-sm font-bold text-slate-700">Tipo de chip a {modo === 'INGRESO' ? 'ingresar' : 'transferir'}</label>
             <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value ? Number(e.target.value) : '')} className="w-full rounded border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none">
@@ -441,10 +524,115 @@ export function ChipsView() {
               {productos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.codigo})</option>)}
             </select>
           </div>
-          {modo === 'TRANSFERENCIA' && <select value={destino} onChange={e => setDestino(e.target.value)} className="mb-3 w-full rounded border border-slate-300 p-2 text-sm"><option value="">Seleccione sede destino</option>{catalogos.sedes.filter(p => p.key !== plantaKey).map(p => <option key={p.key} value={p.key}>{p.nombre}</option>)}</select>}
-          <ChipScannerInput value={scan} onChange={setScan} />
+
+          {modo === 'INGRESO' && (
+            <div className="mb-4">
+              <p className="mb-2 text-sm font-bold text-slate-700">¿Cómo recibirá los códigos?</p>
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  onClick={() => seleccionarMetodoIngreso('ESCANEO')}
+                  className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${metodoIngreso === 'ESCANEO' ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-slate-200 hover:bg-slate-50'}`}
+                >
+                  <ScanLine className="h-5 w-5 shrink-0" />
+                  <span><b className="block text-xs">ESCANEAR CÓDIGOS</b><small className="text-[11px] text-slate-500">Pase cada chip con el lector; se acumulan en un solo lote.</small></span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => seleccionarMetodoIngreso('EXCEL')}
+                  className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${metodoIngreso === 'EXCEL' ? 'border-emerald-500 bg-emerald-50 text-emerald-900' : 'border-slate-200 hover:bg-slate-50'}`}
+                >
+                  <FileSpreadsheet className="h-5 w-5 shrink-0" />
+                  <span><b className="block text-xs">IMPORTAR EXCEL O CSV</b><small className="text-[11px] text-slate-500">Carga de una vez la lista entregada por el proveedor.</small></span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => seleccionarMetodoIngreso('RANGO')}
+                  className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${metodoIngreso === 'RANGO' ? 'border-amber-500 bg-amber-50 text-amber-900' : 'border-slate-200 hover:bg-slate-50'}`}
+                >
+                  <ListOrdered className="h-5 w-5 shrink-0" />
+                  <span><b className="block text-xs">INGRESAR RANGO CONSECUTIVO</b><small className="text-[11px] text-slate-500">Úselo sólo si el proveedor confirma que no existen saltos.</small></span>
+                </button>
+              </div>
+
+              {metodoIngreso === 'EXCEL' && (
+                <div className="mt-3 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/50 p-4 text-center">
+                  <input
+                    ref={archivoInputRef}
+                    type="file"
+                    accept=".xlsx,.csv,.txt"
+                    onChange={importarArchivoChips}
+                    className="hidden"
+                  />
+                  <p className="text-xs font-semibold text-slate-700">El código debe estar en una columna llamada CÓDIGO, CHIP, NÚMERO o SERIAL.</p>
+                  <button
+                    type="button"
+                    disabled={cargandoArchivo}
+                    onClick={() => archivoInputRef.current?.click()}
+                    className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    {cargandoArchivo ? 'LEYENDO ARCHIVO...' : 'SELECCIONAR ARCHIVO'}
+                  </button>
+                  {archivoImportado && <p className="mt-2 truncate text-xs text-emerald-700">Archivo: {archivoImportado}</p>}
+                </div>
+              )}
+
+              {metodoIngreso === 'RANGO' && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="col-span-2 text-xs font-bold text-slate-700">Prefijo
+                      <input value={rango.prefijo} onChange={(event) => setRango((actual) => ({ ...actual, prefijo: event.target.value.toUpperCase() }))} placeholder="CHIP" className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm" />
+                    </label>
+                    <label className="text-xs font-bold text-slate-700">Desde
+                      <input type="number" min="0" value={rango.desde} onChange={(event) => setRango((actual) => ({ ...actual, desde: event.target.value }))} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm" />
+                    </label>
+                    <label className="text-xs font-bold text-slate-700">Hasta
+                      <input type="number" min="0" value={rango.hasta} onChange={(event) => setRango((actual) => ({ ...actual, hasta: event.target.value }))} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm" />
+                    </label>
+                    <label className="col-span-2 text-xs font-bold text-slate-700">Dígitos del número
+                      <input type="number" min="1" max="15" value={rango.digitos} onChange={(event) => setRango((actual) => ({ ...actual, digitos: event.target.value }))} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm" />
+                    </label>
+                  </div>
+                  <button type="button" onClick={crearListaDesdeRango} className="mt-3 w-full rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600">CREAR LISTA DEL RANGO</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {modo === 'TRANSFERENCIA' && (
+            <div className="mb-3">
+              <label className="mb-1 block text-sm font-bold text-slate-700">Sede que recibirá los chips</label>
+              <select value={destino} onChange={e => setDestino(e.target.value)} className="w-full rounded border border-slate-300 p-2 text-sm">
+                <option value="">Seleccione COLINA, SURCO o SURQUILLO</option>
+                {catalogos.sedes.filter(p => p.key !== plantaKey).map(p => <option key={p.key} value={p.key}>{p.nombre}</option>)}
+              </select>
+              <p className="mt-1 text-xs text-slate-500">No se permite transferir chips a otras sedes.</p>
+            </div>
+          )}
+
+          <ChipScannerInput
+            value={scan}
+            onChange={setScan}
+            rows={metodoIngreso === 'ESCANEO' || modo === 'TRANSFERENCIA' ? 7 : 5}
+            etiquetaValidos={modo === 'INGRESO' ? 'Listos para ingresar' : 'Listos para transferir'}
+            placeholder={modo === 'TRANSFERENCIA'
+              ? 'Escanee o seleccione los chips que serán transferidos'
+              : metodoIngreso === 'ESCANEO'
+                ? 'Escanee cada chip; el lector debe enviar Enter después de cada código'
+                : 'Aquí aparecerán los códigos cargados. Puede revisarlos antes de confirmar.'}
+          />
           {error && <p className="mt-3 text-sm text-red-700">{error}</p>}{mensaje && <p className="mt-3 text-sm text-emerald-700">{mensaje}</p>}
-          <button disabled={loading || selectedProductId === ''} onClick={confirmar} className="mt-4 w-full rounded-lg bg-emerald-600 px-4 py-2 font-bold text-white disabled:opacity-50">{loading ? 'Procesando...' : 'Confirmar'}</button>
+          <button
+            disabled={loading || selectedProductId === '' || parsed.validos.length === 0 || parsed.duplicados.length > 0 || parsed.errores.length > 0 || (modo === 'TRANSFERENCIA' && (!destino || !sedeTransferenciaHabilitada))}
+            onClick={confirmar}
+            className="mt-4 w-full rounded-lg bg-emerald-600 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading
+              ? 'PROCESANDO LOTE...'
+              : modo === 'INGRESO'
+                ? `INGRESAR LOTE (${parsed.validos.length})`
+                : `TRANSFERIR LOTE (${parsed.validos.length})`}
+          </button>
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white shadow-sm">

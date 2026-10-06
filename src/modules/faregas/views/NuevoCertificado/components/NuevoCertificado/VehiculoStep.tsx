@@ -17,6 +17,8 @@ import {
 } from '../../../../utils/vehiculo-formatters';
 import { MensajeError, propsCampo, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
 import { camposObligatoriosVisibles } from '../../faregas-wizard.validation';
+import { alternarIncumplimientoGnv, marcarTodasVerificacionesGnvComoCumple } from '../../gnv-verificaciones';
+import { combustiblesGnvSonEquivalentes, pesosGnvSonIguales } from '../../gnv-conversion';
 
 /** Clase original de los campos del paso; el error sólo sustituye el color. */
 const CLASE_CAMPO = 'w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
@@ -43,7 +45,6 @@ interface VehiculoStepProps {
   setFormFacturacion: React.Dispatch<React.SetStateAction<FormFacturacionState>>;
   onRemoveTitular?: (titular: TitularState) => Promise<void>;
   catalogoVerificaciones?: any;
-  talleres?: any[];
   vehiculoOrigen?: 'FARENET' | 'FAREGAS' | 'MIXTO' | 'BORRADOR' | 'MANUAL';
   maestrosVehiculo?: any;
   categoriaVehicular: string;
@@ -74,7 +75,6 @@ export function VehiculoStep({
   setFormFacturacion,
   onRemoveTitular,
   catalogoVerificaciones,
-  talleres,
   vehiculoOrigen = 'MANUAL',
   maestrosVehiculo,
   categoriaVehicular,
@@ -94,6 +94,14 @@ export function VehiculoStep({
   const required = (campo: string) => (obligatorio.has(campo) ? ' *' : '');
   const esError = (campo: string) => Boolean(erroresCampo[campo]);
   const limpiar = (campo: string) => onCorregirCampo?.(campo);
+  const verificacionesGnv = Array.isArray(formGnv.verificaciones) ? formGnv.verificaciones : [];
+  const todasVerificacionesGnvCumplen = verificacionesGnv.length === 8
+    && verificacionesGnv.every((item: any) => item.cumple === true);
+  const existeVerificacionGnvNoCumple = verificacionesGnv.some((item: any) => item.cumple === false);
+  const combustibleGnvSinCambio = modalidadCertificado === 'INICIAL'
+    && combustiblesGnvSonEquivalentes(formVehiculo.combustible, formGnv.combustiblePosterior);
+  const pesoGnvSinCambio = modalidadCertificado === 'INICIAL'
+    && pesosGnvSonIguales(formVehiculo.pesoNeto, formGnv.pesoNetoPosterior);
   
   // Initialize verificaciones based on catalog
   useEffect(() => {
@@ -144,6 +152,8 @@ export function VehiculoStep({
     const { name, value } = e.target;
     let finalValue = value.toUpperCase();
     limpiar(name);
+    if (name === 'combustible') limpiar('gnv.combustiblePosterior');
+    if (name === 'pesoNeto') limpiar('gnv.pesoNetoPosterior');
     
     switch (name) {
       case 'vin': finalValue = formatVIN(finalValue); break;
@@ -188,7 +198,7 @@ export function VehiculoStep({
   const handleGnv = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     let finalValue = value.toUpperCase();
-    limpiar(name);
+    limpiar(`gnv.${name}`);
     if (name === 'numeroChip') {
       finalValue = formatAlfanumerico(finalValue, 15);
     } else if (name === 'pesoNetoPosterior') {
@@ -197,7 +207,7 @@ export function VehiculoStep({
     setFormGnv((prev: any) => ({ ...prev, [name]: finalValue }));
   };
 
-  const handleConformidad = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleConformidad = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     let finalValue = value.toUpperCase();
     limpiar(`conformidad.${name}`);
@@ -215,6 +225,22 @@ export function VehiculoStep({
     const nv = [...(formGnv.verificaciones || [])];
     nv[idx] = { ...nv[idx], [campo]: valor };
     setFormGnv((prev: any) => ({ ...prev, verificaciones: nv }));
+  };
+
+  const marcarTodasGnvComoCumple = () => {
+    limpiar('gnv.verificaciones');
+    setFormGnv((prev: any) => ({
+      ...prev,
+      verificaciones: marcarTodasVerificacionesGnvComoCumple(prev.verificaciones)
+    }));
+  };
+
+  const alternarIncumplimiento = (idx: number) => {
+    limpiar('gnv.verificaciones');
+    setFormGnv((prev: any) => ({
+      ...prev,
+      verificaciones: alternarIncumplimientoGnv(prev.verificaciones, idx)
+    }));
   };
 
   const handleVerificacionGlp = (idx: number, campo: string, valor: any) => {
@@ -434,23 +460,13 @@ export function VehiculoStep({
         {tipoCertificado === 'GLP_ANUAL' && (
           <div className="space-y-6">
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD</label>
                 <div className="flex min-h-[42px] items-center justify-between rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-2">
                   <span className="font-black text-[#052a79]">{modalidadCertificado || 'NO DEFINIDA'}</span>
                   <span className="text-[10px] font-bold capitalize text-blue-500">Seleccionada en datos iniciales</span>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO <span className="text-red-500">*</span></label>
-                <select name="tallerAutorizadoId" value={formGlp.tallerAutorizadoId || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.tallerAutorizadoId'))} data-campo-error={esError('glp.tallerAutorizadoId') ? true : undefined}>
-            <MensajeError campo="glp.tallerAutorizadoId" errores={erroresCampo} />
-                  <option value="">-- SELECCIONAR --</option>
-                  {talleres?.map(t => (
-                    <option key={t.id} value={t.id}>{t.nombre}</option>
-                  ))}
-                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA <span className="text-red-500">*</span></label>
@@ -578,16 +594,6 @@ export function VehiculoStep({
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">TALLER AUTORIZADO <span className="text-red-500">*</span></label>
-                <select name="tallerAutorizadoId" value={formGnv.tallerAutorizadoId || ''} onChange={handleGnv} className={claseConError(CLASE_CAMPO, esError('gnv.tallerAutorizadoId'))} data-campo-error={esError('gnv.tallerAutorizadoId') ? true : undefined}>
-            <MensajeError campo="gnv.tallerAutorizadoId" errores={erroresCampo} />
-                  <option value="">-- SELECCIONAR --</option>
-                  {talleres?.map(t => (
-                    <option key={t.id} value={t.id}>{t.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA <span className="text-red-500">*</span></label>
                 <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} className={claseConError(CLASE_CAMPO, esError('gnv.fechaVigencia'))} data-campo-error={esError('gnv.fechaVigencia') ? true : undefined} />
             <MensajeError campo="gnv.fechaVigencia" errores={erroresCampo} />
@@ -610,73 +616,93 @@ export function VehiculoStep({
               <>
                 {/* CARACTERÍSTICAS DE CONVERSIÓN GNV */}
                 <div className="mt-8">
-                  <h5 className="font-bold text-[#052a79] mb-3 border-b border-blue-100 pb-2">CARACTERÍSTICAS DE CONVERSIÓN GNV</h5>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-50 text-slate-600">
-                        <tr>
-                          <th className="p-3 font-bold">Característica</th>
-                          <th className="p-3 font-bold border-l border-slate-200 bg-slate-100">Antes (Original)</th>
-                          <th className="p-3 font-bold border-l border-slate-200 bg-amber-50 text-amber-800">Después (Conversión)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-t border-slate-200">
-                          <td className="p-3 font-semibold text-slate-800">COMBUSTIBLE</td>
-                          <td className="p-3 border-l border-slate-200 bg-slate-50">
-                            <select
-                              name="combustible"
-                              value={formVehiculo.combustible || ''}
-                              onChange={handleVehiculo}
-                              className="w-64 p-1.5 border-2 border-slate-300 rounded bg-white text-slate-700 font-bold focus:border-[#f59e0b] focus:ring-0 text-xs"
+                  <h5 className="mb-1 border-b border-blue-100 pb-2 font-bold text-[#052a79]">CAMBIO REALIZADO EN LA CONVERSIÓN GNV</h5>
+                  <p className="mb-3 text-xs text-slate-500">
+                    Verifique el dato original y registre cómo queda el vehículo. El valor de después no puede ser igual al de antes.
+                  </p>
+
+                  <div className="grid items-stretch gap-3 lg:grid-cols-[1fr_auto_1fr]">
+                    <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <h6 className="text-xs font-black text-slate-700">1. ANTES DE LA CONVERSIÓN</h6>
+                        <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600">DATO ORIGINAL</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-slate-500">COMBUSTIBLE</label>
+                          <div className="min-h-[38px] rounded border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                            {formVehiculo.combustible || 'SIN REGISTRAR'}
+                          </div>
+                          <p className="mt-1 text-[10px] text-slate-400">Se toma de los datos del vehículo.</p>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-slate-500">PESO NETO (kg)</label>
+                          <div className="min-h-[38px] rounded border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                            {formVehiculo.pesoNeto || 'SIN REGISTRAR'}
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <div className="flex items-center justify-center text-2xl font-black text-amber-500" aria-hidden="true">
+                      <span className="hidden lg:inline">→</span>
+                      <span className="lg:hidden">↓</span>
+                    </div>
+
+                    <section className="rounded-lg border-2 border-amber-200 bg-amber-50/40 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <h6 className="text-xs font-black text-amber-900">2. DESPUÉS DE LA CONVERSIÓN</h6>
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-800">DEBE CAMBIAR</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-amber-900">COMBUSTIBLE RESULTANTE *</label>
+                          <select
+                            name="combustiblePosterior"
+                            value={formGnv.combustiblePosterior || ''}
+                            onChange={handleGnv}
+                            className={claseConError(CLASE_TABLA, esError('gnv.combustiblePosterior') || combustibleGnvSinCambio)}
+                            data-campo-error={(esError('gnv.combustiblePosterior') || combustibleGnvSinCambio) ? true : undefined}
+                          >
+                            <option value="">-- SELECCIONE EL RESULTADO --</option>
+                            <option
+                              value="BI - COMBUSTIBLE GNV"
+                              disabled={combustiblesGnvSonEquivalentes(formVehiculo.combustible, 'BI - COMBUSTIBLE GNV')}
                             >
-                              <option value="">-- SELECCIONAR --</option>
-                              {maestrosVehiculo?.combustibles?.map((c: any) => (
-                                <option key={c.id} value={c.nombre}>{c.nombre}</option>
-                              ))}
-                              {!maestrosVehiculo?.combustibles && (
-                                <>
-                                  <option value="GASOLINA">GASOLINA</option>
-                                  <option value="DIESEL">DIESEL</option>
-                                  <option value="PETROLEO">PETROLEO</option>
-                                </>
-                              )}
-                            </select>
-                          </td>
-                          <td className="p-3 border-l border-slate-200 bg-amber-50/30">
-                            <select
-                              name="combustiblePosterior"
-                              value={formGnv.combustiblePosterior || ''}
-                              onChange={handleGnv}
-                              className={claseConError(CLASE_TABLA, esError('gnv.combustiblePosterior'))}
-                              data-campo-error={esError('gnv.combustiblePosterior') ? true : undefined}
+                              BI - COMBUSTIBLE GNV
+                            </option>
+                            <option
+                              value="DUAL GNV"
+                              disabled={combustiblesGnvSonEquivalentes(formVehiculo.combustible, 'DUAL GNV')}
                             >
-                              <option value="">-- SELECCIONAR --</option>
-                              <option value="BI - COMBUSTIBLE GNV">BI - COMBUSTIBLE GNV</option>
-                              <option value="DUAL GNV">DUAL GNV</option>
-                            </select>
+                              DUAL GNV
+                            </option>
+                          </select>
+                          {combustibleGnvSinCambio ? (
+                            <p className="mt-1 text-xs font-semibold text-red-600">El resultado no puede ser el mismo combustible original.</p>
+                          ) : (
                             <MensajeError campo="gnv.combustiblePosterior" errores={erroresCampo} />
-                          </td>
-                        </tr>
-                        <tr className="border-t border-slate-200">
-                          <td className="p-3 font-semibold text-slate-800">PESO NETO (Kg.)</td>
-                          <td className="p-3 border-l border-slate-200 bg-slate-50">
-                            <input value={formVehiculo.pesoNeto || ''} readOnly className="w-32 p-1.5 border border-slate-200 rounded bg-slate-100 text-slate-500 text-xs capitalize" title="Modificar en la sección de Vehículo" />
-                          </td>
-                          <td className="p-3 border-l border-slate-200 bg-amber-50/30">
-                            <input
-                              name="pesoNetoPosterior"
-                              value={formGnv.pesoNetoPosterior || ''}
-                              onChange={handleGnv}
-                              className={claseConError(CLASE_TABLA, esError('gnv.pesoNetoPosterior'))}
-                              data-campo-error={esError('gnv.pesoNetoPosterior') ? true : undefined}
-                              placeholder="Ej. 1453"
-                            />
+                          )}
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-amber-900">NUEVO PESO NETO (kg) *</label>
+                          <input
+                            name="pesoNetoPosterior"
+                            value={formGnv.pesoNetoPosterior || ''}
+                            onChange={handleGnv}
+                            inputMode="decimal"
+                            className={claseConError(CLASE_TABLA, esError('gnv.pesoNetoPosterior') || pesoGnvSinCambio)}
+                            data-campo-error={(esError('gnv.pesoNetoPosterior') || pesoGnvSinCambio) ? true : undefined}
+                            placeholder="Ej. 1453"
+                          />
+                          {pesoGnvSinCambio ? (
+                            <p className="mt-1 text-xs font-semibold text-red-600">El nuevo peso no puede ser igual al peso original.</p>
+                          ) : (
                             <MensajeError campo="gnv.pesoNetoPosterior" errores={erroresCampo} />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                          )}
+                        </div>
+                      </div>
+                    </section>
                   </div>
                 </div>
 
@@ -763,20 +789,68 @@ export function VehiculoStep({
             )}
 
             <div>
-              <h5 className="font-bold text-slate-700 mb-3 mt-6">VERIFICACIONES DE INSPECCIÓN ANUAL GNV</h5>
-              <div className="space-y-3">
-                 {formGnv.verificaciones?.map((verif: any, idx: number) => (
-                  <div key={idx} className={`flex flex-col gap-2 bg-slate-50 p-3 rounded border ${verif.cumple === null ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200'}`}>
-                    <p className="text-sm font-semibold text-slate-800">{verif.codigo}) {verif.descripcion}</p>
-                    <div className="flex items-center gap-6 mt-1">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name={`gnv-verif-${idx}`} checked={verif.cumple === true} onChange={() => handleVerificacionGnv(idx, 'cumple', true)} className="w-4 h-4 text-[#052a79]" />
-                        <span className="text-xs font-bold text-slate-700">CUMPLE</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" name={`gnv-verif-${idx}`} checked={verif.cumple === false} onChange={() => handleVerificacionGnv(idx, 'cumple', false)} className="w-4 h-4 text-red-600" />
-                        <span className="text-xs font-bold text-red-600">NO CUMPLE</span>
-                      </label>
+              <div className="mb-3 mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h5 className="font-bold text-[#052a79]">VERIFICACIONES DE INSPECCIÓN ANUAL GNV</h5>
+                    <p className="mt-1 text-xs text-blue-800">Si la inspección es conforme, usa un solo botón. Sólo modifica el punto que presente una observación.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={marcarTodasGnvComoCumple}
+                    className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-700"
+                  >
+                    ✓ MARCAR LOS 8 COMO CUMPLE
+                  </button>
+                </div>
+                <p className={`mt-3 text-xs font-bold ${
+                  todasVerificacionesGnvCumplen
+                    ? 'text-emerald-700'
+                    : existeVerificacionGnvNoCumple
+                      ? 'text-red-700'
+                      : 'text-amber-700'
+                }`}>
+                  {todasVerificacionesGnvCumplen
+                    ? 'Resultado: todos los puntos cumplen.'
+                    : existeVerificacionGnvNoCumple
+                      ? 'Resultado: existen puntos que no cumplen.'
+                      : 'Resultado pendiente de evaluación.'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {verificacionesGnv.map((verif: any, idx: number) => (
+                  <div key={idx} className={`flex flex-col gap-2 rounded-lg border p-3 ${
+                    verif.cumple === false
+                      ? 'border-red-300 bg-red-50'
+                      : verif.cumple === true
+                        ? 'border-emerald-200 bg-emerald-50/40'
+                        : 'border-slate-200 bg-slate-50'
+                  }`}>
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <p className="text-sm font-semibold leading-5 text-slate-800">{verif.codigo}) {verif.descripcion}</p>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+                          verif.cumple === false
+                            ? 'bg-red-100 text-red-700'
+                            : verif.cumple === true
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {verif.cumple === false ? 'NO CUMPLE' : verif.cumple === true ? 'CUMPLE' : 'PENDIENTE'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => alternarIncumplimiento(idx)}
+                          className={`rounded-md border px-2.5 py-1 text-[10px] font-bold transition ${
+                            verif.cumple === false
+                              ? 'border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-50'
+                              : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                          }`}
+                        >
+                          {verif.cumple === false ? 'MARCAR CUMPLE' : 'REPORTAR NO CUMPLE'}
+                        </button>
+                      </div>
                     </div>
                     {verif.cumple === false && (
                       <input value={verif.observacion || ''} onChange={e => handleVerificacionGnv(idx, 'observacion', e.target.value)} className="w-full p-2 border-2 border-red-300 rounded-md text-slate-800 text-xs mt-2" placeholder="Indicar observación obligatoria..." />
@@ -790,50 +864,66 @@ export function VehiculoStep({
 
         {/* --- DATOS CONFORMIDAD --- */}
         {tipoCertificado === 'CONFORMIDAD' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE CONFORMIDAD *</label>
-                <select name="tipoConformidad" value={formConformidad.tipoConformidad || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoConformidad'))} data-campo-error={esError('conformidad.tipoConformidad') ? true : undefined}>
-            <MensajeError campo="conformidad.tipoConformidad" errores={erroresCampo} />
-                  <option value="">-- SELECCIONAR --</option>
-                  <option value="MODIFICACION">MODIFICACIÓN</option>
-                  <option value="MONTAJE">MONTAJE</option>
-                  <option value="FABRICACION">FABRICACIÓN</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TRÁMITE *</label>
-                <input name="tipoTramite" value={formConformidad.tipoTramite || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoTramite'))} data-campo-error={esError('conformidad.tipoTramite') ? true : undefined} />
-            <MensajeError campo="conformidad.tipoTramite" errores={erroresCampo} />
-              </div>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              <p className="font-bold">Completa los 6 datos que aparecerán en el certificado.</p>
+              <p className="mt-1 text-xs leading-5 text-blue-800">Primero indica el trabajo realizado; después explica qué característica se certifica y por qué.</p>
             </div>
 
-            <div className="bg-white p-4 rounded-lg border border-slate-200">
-              <h5 className="font-bold text-slate-700 mb-3">CARACTERÍSTICAS REGISTRABLES Y MOTIVO</h5>
-              <div className="space-y-4">
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <h5 className="mb-4 font-bold text-[#052a79]">1. Tipo de trabajo realizado</h5>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">CARACTERÍSTICA A CERTIFICAR *</label>
-                  <input name="caracteristicaRegistrable" value={formConformidad.caracteristicaRegistrable || ''} onChange={handleConformidad} maxLength={300} className={claseConError(CLASE_CAMPO, esError('conformidad.caracteristicaRegistrable'))} data-campo-error={esError('conformidad.caracteristicaRegistrable') ? true : undefined} placeholder="EJ: NÚMERO DE EJES" />
-            <MensajeError campo="conformidad.caracteristicaRegistrable" errores={erroresCampo} />
+                  <label className="mb-1 block text-xs font-bold text-slate-600">¿QUÉ TRABAJO SE CERTIFICA?{required('conformidad.tipoConformidad')}</label>
+                  <select name="tipoConformidad" value={formConformidad.tipoConformidad || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoConformidad'))} data-campo-error={esError('conformidad.tipoConformidad') ? true : undefined}>
+                    <option value="">SELECCIONAR TIPO</option>
+                    <option value="MODIFICACION">MODIFICACIÓN</option>
+                    <option value="MONTAJE">MONTAJE</option>
+                    <option value="FABRICACION">FABRICACIÓN</option>
+                  </select>
+                  <MensajeError campo="conformidad.tipoConformidad" errores={erroresCampo} />
+                  <p className="mt-1 text-xs text-slate-500">Selecciona una sola opción.</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">MOTIVO *</label>
-                  <input name="motivo" value={formConformidad.motivo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.motivo'))} data-campo-error={esError('conformidad.motivo') ? true : undefined} placeholder="EJ: RECTIFICACIÓN" />
-            <MensajeError campo="conformidad.motivo" errores={erroresCampo} />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">USO ORIGINAL DEL VEHÍCULO *</label>
-                  <input name="usoOriginalVehiculo" value={formConformidad.usoOriginalVehiculo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.usoOriginalVehiculo'))} data-campo-error={esError('conformidad.usoOriginalVehiculo') ? true : undefined} />
-            <MensajeError campo="conformidad.usoOriginalVehiculo" errores={erroresCampo} />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">DESCRIPCIÓN / OBSERVACIONES COMPLEMENTARIAS *</label>
-                  <input name="descripcion" value={formConformidad.descripcion || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.descripcion'))} data-campo-error={esError('conformidad.descripcion') ? true : undefined} />
-            <MensajeError campo="conformidad.descripcion" errores={erroresCampo} />
+                  <label className="mb-1 block text-xs font-bold text-slate-600">TRÁMITE SOLICITADO{required('conformidad.tipoTramite')}</label>
+                  <input name="tipoTramite" value={formConformidad.tipoTramite || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoTramite'))} data-campo-error={esError('conformidad.tipoTramite') ? true : undefined} placeholder="EJ.: RECTIFICACIÓN DE CARACTERÍSTICAS" />
+                  <MensajeError campo="conformidad.tipoTramite" errores={erroresCampo} />
+                  <p className="mt-1 text-xs text-slate-500">Escribe el nombre del trámite presentado.</p>
                 </div>
               </div>
-            </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <h5 className="mb-4 font-bold text-[#052a79]">2. Detalle que aparecerá en el certificado</h5>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-slate-600">¿QUÉ CARACTERÍSTICA SE CERTIFICA?{required('conformidad.caracteristicaRegistrable')}</label>
+                  <input name="caracteristicaRegistrable" value={formConformidad.caracteristicaRegistrable || ''} onChange={handleConformidad} maxLength={300} className={claseConError(CLASE_CAMPO, esError('conformidad.caracteristicaRegistrable'))} data-campo-error={esError('conformidad.caracteristicaRegistrable') ? true : undefined} placeholder="EJ.: NÚMERO DE EJES, CARROCERÍA O PESO" />
+                  <MensajeError campo="conformidad.caracteristicaRegistrable" errores={erroresCampo} />
+                  <p className="mt-1 text-xs text-slate-500">Indica el dato registrable que se está verificando o corrigiendo.</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-600">MOTIVO DE LA SOLICITUD{required('conformidad.motivo')}</label>
+                    <input name="motivo" value={formConformidad.motivo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.motivo'))} data-campo-error={esError('conformidad.motivo') ? true : undefined} placeholder="EJ.: DATO INCORRECTO EN LA TARJETA" />
+                    <MensajeError campo="conformidad.motivo" errores={erroresCampo} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-600">USO ORIGINAL DEL VEHÍCULO{required('conformidad.usoOriginalVehiculo')}</label>
+                    <input name="usoOriginalVehiculo" value={formConformidad.usoOriginalVehiculo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.usoOriginalVehiculo'))} data-campo-error={esError('conformidad.usoOriginalVehiculo') ? true : undefined} placeholder="EJ.: TRANSPORTE DE PERSONAS" />
+                    <MensajeError campo="conformidad.usoOriginalVehiculo" errores={erroresCampo} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-slate-600">DESCRIPCIÓN COMPLEMENTARIA{required('conformidad.descripcion')}</label>
+                  <textarea name="descripcion" value={formConformidad.descripcion || ''} onChange={handleConformidad} maxLength={500} rows={3} className={claseConError(`${CLASE_CAMPO} resize-y normal-case`, esError('conformidad.descripcion'))} data-campo-error={esError('conformidad.descripcion') ? true : undefined} placeholder="DESCRIBE BREVEMENTE LA MODIFICACIÓN, MONTAJE O FABRICACIÓN REALIZADA." />
+                  <MensajeError campo="conformidad.descripcion" errores={erroresCampo} />
+                  <p className="mt-1 text-right text-xs text-slate-400">{String(formConformidad.descripcion || '').length}/500</p>
+                </div>
+              </div>
+            </section>
           </div>
         )}
       </div>
