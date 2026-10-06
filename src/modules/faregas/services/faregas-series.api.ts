@@ -1,3 +1,4 @@
+import { faregasFetch } from './faregas-http-client';
 export type TipoComprobanteFaregas =
   | 'FACTURA'
   | 'BOLETA'
@@ -97,18 +98,7 @@ export type FiltrosMaestroSeries = {
 };
 
 const request = async (path: string, options: RequestInit = {}) => {
-  const token = sessionStorage.getItem('faregasAccessToken')?.trim();
-  const response = await fetch(`${BASE_URL}/faregas/config${path}`, {
-    ...options,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers
-    }
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Error al administrar series.');
-  return data;
+  return faregasFetch(`/config${path}`, options);
 };
 
 /**

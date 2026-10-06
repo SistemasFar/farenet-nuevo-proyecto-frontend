@@ -164,17 +164,9 @@ export default function FormatoDetalleModal({
   const previsualizar = async (version: FormatoVersion) => {
     if (!formato) return;
     try {
-      const token = sessionStorage.getItem('faregasAccessToken');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const response = await fetch(`${apiUrl}/faregas/formatos/${formato.id}/versiones/${version.id}/preview`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || 'No se pudo obtener la previsualización.');
-      }
-      if (version.motor === 'HTML_DINAMICO') {
-        const payload = await response.json();
+      const htmlPreview = await faregasFormatosApi.obtenerPreviewHtml(formato.id, version.id);
+        if (version.motor === 'HTML_DINAMICO') {
+          const payload = { html: htmlPreview };
         setPreviewHtml(payload.html);
         return;
       }

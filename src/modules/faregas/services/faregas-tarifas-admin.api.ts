@@ -1,3 +1,4 @@
+import { faregasFetch } from './faregas-http-client';
 export interface TarifaSede {
   key: string;
   nombre: string;
@@ -61,18 +62,7 @@ export interface ProductoTarifa {
 }
 
 const request = async (path: string, options: RequestInit = {}) => {
-  const token = sessionStorage.getItem('faregasAccessToken')?.trim();
-  const response = await fetch(`${BASE_URL}/faregas/config${path}`, {
-    ...options,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers
-    }
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Error al administrar tarifas.');
-  return data;
+  return faregasFetch(`/config${path}`, options);
 };
 
 export const faregasTarifasAdminApi = {
