@@ -1,58 +1,10 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000/api';
-const getAuthHeaders = (): Record<string, string> => {
-  const token = sessionStorage.getItem('faregasAccessToken')?.trim();
-  if (!token || token === 'null' || token === 'undefined') return {};
-  return { Authorization: `Bearer ${token}` };
-};
+import { faregasFetch } from './faregas-http-client';
 
 const api = {
-  get: async (path: string) => {
-    const res = await fetch(`${BASE_URL}${path.replace('/api', '')}`, { headers: getAuthHeaders() });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || 'Error GET ' + path);
-    }
-    return res.json();
-  },
-  post: async (path: string, body: unknown) => {
-    const res = await fetch(`${BASE_URL}${path.replace('/api', '')}`, {
-      method: 'POST',
-      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || 'Error POST ' + path);
-    }
-    return res.json();
-  },
-  put: async (path: string, body: unknown) => {
-    const res = await fetch(`${BASE_URL}${path.replace('/api', '')}`, {
-      method: 'PUT',
-      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || 'Error PUT ' + path);
-    }
-    return res.json();
-  },
-  delete: async (path: string, body?: unknown) => {
-    const res = await fetch(`${BASE_URL}${path.replace('/api', '')}`, {
-      method: 'DELETE',
-      headers: {
-        ...getAuthHeaders(),
-        ...(body ? { 'Content-Type': 'application/json' } : {})
-      },
-      ...(body ? { body: JSON.stringify(body) } : {})
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.message || 'Error DELETE ' + path);
-    }
-    return res.json();
-  }
+  get: async (path: string) => faregasFetch(path.replace('/api/faregas', '')),
+  post: async (path: string, body: unknown) => faregasFetch(path.replace('/api/faregas', ''), { method: 'POST', body: JSON.stringify(body) }),
+  put: async (path: string, body: unknown) => faregasFetch(path.replace('/api/faregas', ''), { method: 'PUT', body: JSON.stringify(body) }),
+  delete: async (path: string, body?: unknown) => faregasFetch(path.replace('/api/faregas', ''), { method: 'DELETE', body: body ? JSON.stringify(body) : undefined })
 };
 
 export interface Sede {

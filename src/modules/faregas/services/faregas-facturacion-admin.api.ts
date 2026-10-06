@@ -1,15 +1,7 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:3000/api';
-
-const headers = (): HeadersInit => {
-  const token = sessionStorage.getItem('faregasAccessToken')?.trim();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { faregasFetch } from './faregas-http-client';
 
 const request = async <T>(path: string): Promise<T> => {
-  const response = await fetch(`${BASE_URL}/faregas/certificados${path}`, { headers: headers() });
-  const body = await response.json().catch(() => ({})) as { message?: string } & T;
-  if (!response.ok) throw new Error(body.message || 'No se pudo consultar la facturación.');
-  return body;
+  return faregasFetch(`/certificados${path}`) as Promise<T>;
 };
 
 export interface DocumentoFacturacionAdmin {

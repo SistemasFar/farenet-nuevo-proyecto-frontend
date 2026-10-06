@@ -5,6 +5,9 @@ import './index.css'
 import App from './App.tsx'
 import { EmpresaProvider } from './context/EmpresaContext'
 
+
+
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <EmpresaProvider>

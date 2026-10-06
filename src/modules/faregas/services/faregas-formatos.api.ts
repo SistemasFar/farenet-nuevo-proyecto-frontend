@@ -1,5 +1,4 @@
 import { faregasFetch } from './faregas-http-client';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export interface Formato {
   id: number;
@@ -68,7 +67,7 @@ export const faregasFormatosApi = {
     formData.append('archivo', file);
     
     const token = sessionStorage.getItem('faregasAccessToken');
-    const res = await fetch(`${API_URL}/faregas/formatos/${formatoId}/versiones`, {
+    const res = await faregasFetch(`/formatos/${formatoId}/versiones`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`
@@ -94,7 +93,7 @@ export const faregasFormatosApi = {
     const formData = new FormData();
     formData.append('archivo', file);
     const token = sessionStorage.getItem('faregasAccessToken');
-    const res = await fetch(`${API_URL}/faregas/formatos/${formatoId}/versiones/html/importar-docx`, {
+    const res = await faregasFetch(`/formatos/${formatoId}/versiones/html/importar-docx`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData

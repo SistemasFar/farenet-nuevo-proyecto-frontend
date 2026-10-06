@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import { authApi } from '@/services/api';
 import { NetworkStatus } from '@/components/NetworkStatus';
 import { BackendStatus } from '@/components/BackendStatus';
@@ -27,6 +28,8 @@ interface LoginViewProps {
 export function LoginView({
   onRequireEmpresa
 }: LoginViewProps) {
+  const location = useLocation();
+  const sessionExpired = location.state?.sessionExpired;
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -97,11 +100,19 @@ export function LoginView({
       </div>
 
       <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
-        <div className="mb-4 text-center w-full">
+                <div className="mb-4 text-center w-full">
           <h1 className="text-4xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
             SISTEMA EN LÍNEA
           </h1>
         </div>
+
+        {sessionExpired && (
+          <div className="mb-4 w-full rounded bg-amber-500/90 p-3 text-center border-l-4 border-amber-600 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-500">
+            <p className="text-sm font-semibold text-white">
+              Tu sesión ha expirado. Inicia sesión nuevamente para continuar.
+            </p>
+          </div>
+        )}
 
         
 

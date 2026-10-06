@@ -107,7 +107,10 @@ export default function App() {
     return () => window.removeEventListener('updatePlantasDisponibles', handleUpdate);
   }, []);
   const limpiarSesionFrontend = useCallback(() => {
-    sessionStorage.clear();
+    [
+      'accessToken', 'user', 'plantasDisponibles', 'empresaSeleccionada', 'plantaSeleccionada', 'permisos',
+      'faregasAccessToken', 'faregasUser', 'faregasPlanta', 'faregasPreToken', 'faregasPlantasDisponibles'
+    ].forEach(k => sessionStorage.removeItem(k));
     plantaSession.limpiar();
     permisosSession.limpiar();
     limpiarEmpresa();
@@ -119,6 +122,10 @@ export default function App() {
     setPlantasDisponibles([]);
     navigate('/login', { replace: true });
   }, [limpiarEmpresa, navigate]);
+
+
+
+
 
   useEffect(() => {
     const restaurarSesion = async () => {
