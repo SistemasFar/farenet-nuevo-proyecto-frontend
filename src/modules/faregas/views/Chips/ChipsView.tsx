@@ -6,11 +6,13 @@ import { Cpu, Boxes, FileText, Search, Trash2, Ban, RefreshCw, ScanLine, FileSpr
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { Paginacion } from '../components/Paginacion';
 import { useListadoPaginado } from '../hooks/useListadoPaginado';
-import { faregasChipsApi, type Chip, type ChipResumen, type ImpactoTipoChip, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
+import { faregasChipsApi, type Chip, type ChipResumen, type ImpactoTipoChip, type MovimientoInventarioCantidad, type ProductoFiscalChipOpcion, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
 import { ChipScannerInput } from './ChipScannerInput';
 import { extraerCodigosDeHoja, generarCodigosPorRango, parseChipScan } from './chips-ingreso-masivo';
+import { mostrarPrecioVentaFiscal, obtenerProductoFiscalChip } from './chips-producto-fiscal';
 import { ModalDetalleVentaChips } from './ModalDetalleVentaChips';
 import { ModalVentaChips } from './ModalVentaChips';
+import { esProductoCantidad, etiquetaControlInventario } from './inventario-control';
 
 const empty: ChipResumen = { total: 0, disponibles: 0, reservados: 0, vendidos: 0, baja: 0, precio: 0, stockPermitido: false, ventaHabilitada: false, mappingFiscalCompleto: false };
 type EditableSede = { precio: number; stockPermitido: boolean; ventaHabilitada: boolean; productoFacturacionId?: number };
@@ -54,9 +56,9 @@ export function ChipsView() {
   const puedeVentas = lista.includes('MENU_CHIPS_VENTAS');
 
   const PESTANAS = useMemo(() => ([
-    { id: 'INVENTARIO', permiso: puedeInventario, etiqueta: 'INVENTARIO DE CHIPS', Icono: Cpu },
-    { id: 'PRODUCTOS', permiso: puedeTipos, etiqueta: 'TIPOS DE CHIP', Icono: Boxes },
-    { id: 'VENTAS', permiso: puedeVentas, etiqueta: 'VENTAS DE CHIPS', Icono: FileText }
+    { id: 'INVENTARIO', permiso: puedeInventario, etiqueta: 'INVENTARIO', Icono: Cpu },
+    { id: 'PRODUCTOS', permiso: puedeTipos, etiqueta: 'TIPOS DE PRODUCTO', Icono: Boxes },
+    { id: 'VENTAS', permiso: puedeVentas, etiqueta: 'VENTAS', Icono: FileText }
   ] as const).filter((p) => p.permiso), [puedeInventario, puedeTipos, puedeVentas]);
 
   // Si la URL pide una pestaña que el perfil no tiene, se cae a la primera
@@ -71,7 +73,7 @@ export function ChipsView() {
   const [resumen, setResumen] = useState<ChipResumen>(empty);
   const [chips, setChips] = useState<Chip[]>([]);
   const [productos, setProductos] = useState<ProductoInventariable[]>([]);
-  const [catalogos, setCatalogos] = useState<{ sedes: { key: string, nombre: string }[] }>({ sedes: [] });
+  const [catalogos, setCatalogos] = useState<{ sedes: { key: string, nombre: string }[]; productosFiscales: ProductoFiscalChipOpcion[] }>({ sedes: [], productosFiscales: [] });
 
   const [scan, setScan] = useState('');
   const [modo, setModo] = useState<'INGRESO' | 'TRANSFERENCIA'>('INGRESO');
@@ -111,9 +113,14 @@ export function ChipsView() {
 
   // Selected product in Inventory tab (for scanning/transferring)
   const [selectedProductId, setSelectedProductId] = useState<number | ''>('');
+  const [cantidadIngreso, setCantidadIngreso] = useState('');
+  const [referenciaIngreso, setReferenciaIngreso] = useState('');
+  const [movimientosCantidad, setMovimientosCantidad] = useState<MovimientoInventarioCantidad[]>([]);
 
   const parsed = useMemo(() => parseChipScan(scan), [scan]);
-  const sedeTransferenciaHabilitada = SEDES_TRANSFERENCIA_CHIPS.includes(String(plantaKey));
+  const productoSeleccionado = useMemo(() => productos.find((producto) => producto.id === Number(selectedProductId)), [productos, selectedProductId]);
+  const esCantidad = esProductoCantidad(productoSeleccionado);
+  const sedeAlmacenHabilitada = SEDES_TRANSFERENCIA_CHIPS.includes(String(plantaKey));
 
   const cargar = useCallback(async () => {
     try {
@@ -123,7 +130,7 @@ export function ChipsView() {
       const resumenP = puedeInventario
         ? faregasChipsApi.resumen(selectedProductId === '' ? undefined : Number(selectedProductId))
         : Promise.resolve(empty);
-      const chipsP = puedeInventario
+      const chipsP = puedeInventario && !esCantidad
         ? faregasChipsApi.listar({
             buscar,
             estado: filtroEstado === 'TODOS' ? undefined : filtroEstado,
@@ -131,15 +138,18 @@ export function ChipsView() {
             pageSize: chipsPageSize
           })
         : Promise.resolve({ items: [] as Chip[], total: 0, page: 1, limit: 10, totalPages: 0 });
+      const movimientosP = puedeInventario && esCantidad && selectedProductId !== ''
+        ? faregasChipsApi.listarMovimientosCantidad(Number(selectedProductId))
+        : Promise.resolve([] as MovimientoInventarioCantidad[]);
       // El catálogo de tipos lo usan las dos primeras pestañas.
       const prodsP = (puedeInventario || puedeTipos)
         ? faregasChipsApi.listarProductosInventariables()
         : Promise.resolve([] as ProductoInventariable[]);
-      const catP = puedeInventario
+      const catP = (puedeInventario || puedeTipos)
         ? faregasChipsApi.catalogosProductosInventariables()
-        : Promise.resolve({ sedes: [] as { key: string; nombre: string }[] });
+        : Promise.resolve({ sedes: [] as { key: string; nombre: string }[], productosFiscales: [] as ProductoFiscalChipOpcion[] });
 
-      const [r, l, prods, cat] = await Promise.all([resumenP, chipsP, prodsP, catP]);
+      const [r, l, prods, cat, movimientos] = await Promise.all([resumenP, chipsP, prodsP, catP, movimientosP]);
       setResumen(r);
       setChips(l.items);
       setChipsResumen({
@@ -151,6 +161,7 @@ export function ChipsView() {
       });
       setProductos(prods);
       setCatalogos(cat);
+      setMovimientosCantidad(movimientos);
       if (selectedProductId === '' && prods.length > 0) {
         const defaultProd = prods.find(p => p.codigo === 'CHIP') || prods[0];
         setSelectedProductId(defaultProd.id);
@@ -158,7 +169,7 @@ export function ChipsView() {
     } catch (error: unknown) {
       setError(errorMessage(error));
     }
-  }, [buscar, filtroEstado, selectedProductId, chipsPagina, chipsPageSize, puedeInventario, puedeTipos]);
+  }, [buscar, filtroEstado, selectedProductId, chipsPagina, chipsPageSize, puedeInventario, puedeTipos, esCantidad]);
 
   // Cualquier cambio de filtro del inventario vuelve a la pagina 1.
   const aplicarFiltroInventario = (campo: 'buscar' | 'estado', valor: string) => {
@@ -177,6 +188,28 @@ export function ChipsView() {
     return () => window.clearTimeout(timer);
   }, [buscar, filtroEstado, cargar]);
 
+  const confirmarCantidad = async () => {
+    setError(''); setMensaje('');
+    const cant = Number(cantidadIngreso);
+    if (!cant || cant <= 0 || !Number.isInteger(cant)) {
+      setError('Ingrese una cantidad válida y entera mayor a 0.');
+      return;
+    }
+    if (selectedProductId === '') { setError('Seleccione un producto.'); return; }
+    try {
+      setLoading(true);
+      await faregasChipsApi.ingresarCantidad(Number(selectedProductId), cant, referenciaIngreso);
+      setMensaje(`Se registraron exitosamente ${cant} unidades.`);
+      setCantidadIngreso('');
+      setReferenciaIngreso('');
+      await cargar();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const confirmar = async () => {
     setError(''); setMensaje('');
     if (!parsed.validos.length || parsed.duplicados.length || parsed.errores.length) { setError('Corrija duplicados o lecturas inválidas antes de confirmar.'); return; }
@@ -186,7 +219,7 @@ export function ChipsView() {
       if (modo === 'INGRESO') {
         await faregasChipsApi.ingresar(Number(selectedProductId), parsed.validos);
       } else {
-        if (!sedeTransferenciaHabilitada) throw new Error('Los chips sólo pueden transferirse entre COLINA, SURCO y SURQUILLO.');
+        if (!sedeAlmacenHabilitada) throw new Error('Los chips sólo pueden transferirse entre COLINA, SURCO y SURQUILLO.');
         if (!destino) throw new Error('Seleccione la sede destino.');
         await faregasChipsApi.transferir(Number(selectedProductId), destino, parsed.validos);
       }
@@ -194,6 +227,27 @@ export function ChipsView() {
       setScan('');
       await cargar();
     } catch (error: unknown) { setError(errorMessage(error)); } finally { setLoading(false); }
+  };
+
+  const registrarIngresoCantidad = async () => {
+    setError(''); setMensaje('');
+    const cantidad = Number(cantidadIngreso);
+    if (selectedProductId === '' || !Number.isInteger(cantidad) || cantidad <= 0) {
+      setError('Ingrese una cantidad entera mayor a cero.');
+      return;
+    }
+    try {
+      setLoading(true);
+      const resultado = await faregasChipsApi.ingresarCantidad(Number(selectedProductId), cantidad, referenciaIngreso.trim() || undefined);
+      setCantidadIngreso('');
+      setReferenciaIngreso('');
+      setMensaje(`Ingreso registrado. Stock disponible: ${resultado.movimiento.stock}.`);
+      await cargar();
+    } catch (error: unknown) {
+      setError(errorMessage(error));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const seleccionarMetodoIngreso = (metodo: MetodoIngreso) => {
@@ -260,17 +314,19 @@ export function ChipsView() {
       if (!newProductCodigo) throw new Error('El código es obligatorio.');
       if (!newProductName) throw new Error('El nombre es obligatorio.');
 
-      const sedeConfig = newProductSedes[plantaKey];
       const payload = {
         codigo: newProductCodigo,
         nombre: newProductName,
         tipo: newProductTipo,
-        sedes: sedeConfig && (sedeConfig.precio > 0 || sedeConfig.ventaHabilitada) ? [{
-          plantaKey,
-          precio: sedeConfig.precio,
-          stockPermitido: sedeConfig.stockPermitido,
-          ventaHabilitada: sedeConfig.ventaHabilitada
-        }] : []
+        sedes: Object.entries(newProductSedes)
+          .filter(([, sede]) => Boolean(sede.productoFacturacionId) || sede.ventaHabilitada)
+          .map(([sedeKey, sede]) => ({
+            plantaKey: sedeKey,
+            precio: sede.precio,
+            stockPermitido: sede.stockPermitido,
+            ventaHabilitada: sede.ventaHabilitada,
+            productoFacturacionId: sede.productoFacturacionId
+          }))
       };
 
       await faregasChipsApi.crearProductoInventariable(payload);
@@ -296,7 +352,7 @@ export function ChipsView() {
     const sedesConfig: Record<string, EditableSede> = {};
     (prod.sedes || []).forEach(s => {
       sedesConfig[s.plantaKey] = {
-        precio: Number(s.precio),
+        precio: Number(s.precioVenta ?? s.precio ?? 0),
         stockPermitido: s.stockPermitido,
         ventaHabilitada: s.ventaHabilitada,
         productoFacturacionId: s.productoFacturacionId || undefined
@@ -304,15 +360,6 @@ export function ChipsView() {
     });
     setEditProductSedes(sedesConfig);
     setShowProductModal(true);
-  };
-
-  const establecerVentaEnTodasLasSedes = (ventaHabilitada: boolean) => {
-    setEditProductSedes(prev => Object.fromEntries(
-      Object.entries(prev).map(([plantaKey, sede]) => [
-        plantaKey,
-        { ...sede, ventaHabilitada }
-      ])
-    ));
   };
 
   useEffect(() => {
@@ -328,7 +375,7 @@ export function ChipsView() {
       const sedesConfig: Record<string, EditableSede> = {};
       (prod.sedes || []).forEach((sede) => {
         sedesConfig[sede.plantaKey] = {
-          precio: Number(sede.precio),
+          precio: Number(sede.precioVenta ?? sede.precio ?? 0),
           stockPermitido: sede.stockPermitido,
           ventaHabilitada: sede.ventaHabilitada,
           productoFacturacionId: sede.productoFacturacionId || undefined,
@@ -412,8 +459,8 @@ export function ChipsView() {
 
   return <div className="space-y-5">
     <div>
-      <h1 className="text-xl font-bold text-slate-900">Inventario de chips</h1>
-      <p className="text-sm text-slate-500">Control de seriales físicos y movimientos de stock de la sede {plantaNombre}.</p>
+      <h1 className="text-xl font-bold text-slate-900">Inventario</h1>
+      <p className="text-sm text-slate-500">Control de productos físicos serializados y por cantidad de la sede {plantaNombre}.</p>
     </div>
 
     <div className="grid grid-cols-1 gap-2 rounded-xl bg-slate-200 p-1 sm:grid-cols-3">
@@ -428,10 +475,10 @@ export function ChipsView() {
     {activeTab === 'PRODUCTOS' && <div className="space-y-4">
       <div className="flex flex-col justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 sm:flex-row sm:items-center">
         <div>
-          <p className="font-bold">Catálogo de tipos de chip</p>
-          <p className="mt-1">Aquí se administra el tipo físico del chip, su precio y disponibilidad de venta por sede. La configuración fiscal se administra en Configuración.</p>
+          <p className="font-bold">Catálogo de tipos de producto</p>
+          <p className="mt-1">Cada producto indica si se controla por serial o por cantidad. El precio mostrado proviene del producto fiscal vinculado.</p>
         </div>
-        <button onClick={abrirModalCrearProducto} className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 font-bold text-white shadow transition hover:bg-blue-700">AGREGAR TIPO DE CHIP</button>
+        <button onClick={abrirModalCrearProducto} className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 font-bold text-white shadow transition hover:bg-blue-700">AGREGAR TIPO SERIALIZADO</button>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {productos.map((prod) => (
@@ -441,7 +488,7 @@ export function ChipsView() {
                 <h2 className="font-bold capitalize text-[#052A79]">{prod.nombre}</h2>
                 <p className="mt-1 font-mono text-xs text-slate-500">{prod.codigo}</p>
               </div>
-              <div className="flex shrink-0 items-center gap-3">
+              {prod.tipo === 'CANTIDAD' ? <span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">CONFIGURACIÓN PROTEGIDA</span> : <div className="flex shrink-0 items-center gap-3">
                 <button className="text-xs font-bold text-blue-600 hover:underline" onClick={() => openEditModal(prod)}>Editar tipo</button>
                 <button
                   type="button"
@@ -453,13 +500,13 @@ export function ChipsView() {
                 >
                   <Trash2 size={16} />
                 </button>
-              </div>
+              </div>}
             </div>
-            <p className="mt-3 text-xs text-slate-500">Clasificación: <b>{prod.tipo}</b></p>
+            <p className="mt-3 text-xs text-slate-500">Control: <b>{etiquetaControlInventario(prod.tipo)}</b></p>
             {(() => {
               const sede = (prod.sedes || []).find((s) => s.plantaKey === plantaKey);
               return sede?.precio
-                ? <p className="mt-1 text-xs font-bold text-emerald-700">Precio en esta sede: S/ {Number(sede.precio).toFixed(2)}</p>
+                ? <div className="mt-1 space-y-1 text-xs"><p><span className="text-slate-500">Sede:</span> <b>{sede.plantaNombre}</b></p><p><span className="text-slate-500">Producto fiscal:</span> <b>{sede.productoFiscalCodigo} — {sede.productoFiscalDescripcion}</b></p><p className="font-bold text-emerald-700">P. venta: S/ {Number(sede.precioVenta ?? sede.precio).toFixed(2)}</p></div>
                 : <p className="mt-1 text-xs text-amber-600">Sin precio configurado en esta sede</p>;
             })()}
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-sm">
@@ -475,12 +522,12 @@ export function ChipsView() {
     {activeTab === 'INVENTARIO' && <>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-4">
-          <h2 className="font-bold text-slate-800">Cantidades por tipo en {plantaNombre}</h2>
-          <p className="mt-1 text-xs text-slate-500">El conteo corresponde a la ubicación actual de cada serial.</p>
+          <h2 className="font-bold text-slate-800">Cantidades por producto en {plantaNombre}</h2>
+          <p className="mt-1 text-xs text-slate-500">Los serializados se cuentan por unidad; los productos por cantidad se calculan desde su kardex.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr><th className="p-3">Código</th><th className="p-3">Tipo de chip</th><th className="p-3 text-center">Disponibles</th><th className="p-3 text-center">Reservados</th><th className="p-3 text-center">Vendidos</th><th className="p-3 text-center">Total</th></tr></thead>
+            <thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr><th className="p-3">Código</th><th className="p-3">Producto</th><th className="p-3 text-center">Disponibles</th><th className="p-3 text-center">Reservados</th><th className="p-3 text-center">Vendidos</th><th className="p-3 text-center">Stock</th></tr></thead>
             <tbody>{productos.map((prod) => <tr key={prod.id} onClick={() => setSelectedProductId(prod.id)} className={`cursor-pointer border-t border-slate-100 hover:bg-blue-50 ${Number(selectedProductId) === prod.id ? 'bg-blue-50' : ''}`}><td className="p-3 font-mono font-bold">{prod.codigo}</td><td className="p-3 font-medium">{prod.nombre}</td><td className="p-3 text-center font-bold text-emerald-700">{Number(prod.disponiblesSede || 0)}</td><td className="p-3 text-center font-bold text-amber-700">{Number(prod.reservadosSede || 0)}</td><td className="p-3 text-center">{Number(prod.vendidosSede || 0)}</td><td className="p-3 text-center text-lg font-black text-[#052A79]">{Number(prod.stockSede || 0)}</td></tr>)}</tbody>
           </table>
         </div>
@@ -493,17 +540,36 @@ export function ChipsView() {
 
       <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          {esCantidad ? (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-black text-[#052A79]">INGRESAR STOCK</p>
+                <p className="mt-1 text-xs text-slate-500">{productoSeleccionado?.nombre}. Este producto se controla por cantidad y no requiere escaneo.</p>
+              </div>
+              <label className="block text-sm font-bold text-slate-700">Cantidad
+                <input type="number" min="1" step="1" value={cantidadIngreso} onChange={(event) => setCantidadIngreso(event.target.value)} placeholder="Ej. 100" className="mt-1 w-full rounded-lg border border-slate-300 p-3 text-lg font-bold" />
+              </label>
+              <label className="block text-sm font-bold text-slate-700">Referencia (opcional)
+                <input value={referenciaIngreso} maxLength={250} onChange={(event) => setReferenciaIngreso(event.target.value)} placeholder="Guía, lote o documento de ingreso" className="mt-1 w-full rounded-lg border border-slate-300 p-3 text-sm" />
+              </label>
+              {error && <p className="text-sm text-red-700">{error}</p>}{mensaje && <p className="text-sm text-emerald-700">{mensaje}</p>}
+              <button type="button" disabled={loading || !Number.isInteger(Number(cantidadIngreso)) || Number(cantidadIngreso) <= 0} onClick={() => void registrarIngresoCantidad()} className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
+                {loading ? 'REGISTRANDO...' : 'REGISTRAR INGRESO'}
+              </button>
+            </div>
+          ) : <>
           <div className="mb-4 grid grid-cols-2 gap-2">
             <button
               type="button"
+              disabled={!sedeAlmacenHabilitada}
               onClick={() => { setModo('INGRESO'); setDestino(''); setError(''); setMensaje(''); }}
-              className={`rounded-lg px-3 py-2.5 text-xs font-bold ${modo === 'INGRESO' ? 'bg-[#052A79] text-white' : 'bg-slate-100 text-slate-700'}`}
+              className={`rounded-lg px-3 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${modo === 'INGRESO' && sedeAlmacenHabilitada ? 'bg-[#052A79] text-white' : 'bg-slate-100 text-slate-700'}`}
             >
-              INGRESAR CHIPS
+              INGRESAR PRODUCTOS
             </button>
             <button
               type="button"
-              disabled={!sedeTransferenciaHabilitada}
+              disabled={!sedeAlmacenHabilitada}
               onClick={() => { setModo('TRANSFERENCIA'); setError(''); setMensaje(''); }}
               className={`rounded-lg px-3 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${modo === 'TRANSFERENCIA' ? 'bg-[#052A79] text-white' : 'bg-slate-100 text-slate-700'}`}
             >
@@ -511,21 +577,25 @@ export function ChipsView() {
             </button>
           </div>
 
-          {!sedeTransferenciaHabilitada && (
-            <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
-              Las transferencias de chips sólo están disponibles en COLINA, SURCO y SURQUILLO.
-            </p>
+          {!sedeAlmacenHabilitada && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900">
+              <p className="text-sm font-black">SEDE SIN ALMACÉN DE CHIPS</p>
+              <p className="mt-2 text-xs leading-5">
+                {plantaNombre} sólo puede consultar su información histórica. El ingreso y la transferencia de chips están habilitados únicamente en COLINA, SURCO y SURQUILLO.
+              </p>
+            </div>
           )}
 
+          {sedeAlmacenHabilitada && <>
           <div className="mb-3">
             <label className="mb-1 block text-sm font-bold text-slate-700">Tipo de chip a {modo === 'INGRESO' ? 'ingresar' : 'transferir'}</label>
             <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value ? Number(e.target.value) : '')} className="w-full rounded border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none">
-              <option value="">Seleccione un tipo de chip</option>
+              <option value="">Seleccione un tipo de producto</option>
               {productos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.codigo})</option>)}
             </select>
           </div>
 
-          {modo === 'INGRESO' && (
+          {modo === 'INGRESO' && !esCantidad && (
             <div className="mb-4">
               <p className="mb-2 text-sm font-bold text-slate-700">¿Cómo recibirá los códigos?</p>
               <div className="grid gap-2">
@@ -599,14 +669,38 @@ export function ChipsView() {
             </div>
           )}
 
+          {modo === 'INGRESO' && esCantidad && (
+            <div className="mb-4">
+              <p className="mb-2 text-sm font-bold text-slate-700">INGRESAR CANTIDAD</p>
+              <div className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <label className="text-xs font-bold text-slate-700">Cantidad
+                  <input type="number" min="1" step="1" value={cantidadIngreso} onChange={(event) => setCantidadIngreso(event.target.value)} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm" placeholder="Ej: 100" />
+                </label>
+                <label className="text-xs font-bold text-slate-700 mt-2">Motivo o referencia (Opcional)
+                  <input type="text" value={referenciaIngreso} onChange={(event) => setReferenciaIngreso(event.target.value)} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm" placeholder="Factura, guía, lote, etc." />
+                </label>
+                <button type="button" onClick={confirmarCantidad} disabled={loading} className="mt-4 w-full rounded-lg bg-[#052A79] px-4 py-3 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-50">REGISTRAR INGRESO</button>
+              </div>
+            </div>
+          )}
+
           {modo === 'TRANSFERENCIA' && (
-            <div className="mb-3">
-              <label className="mb-1 block text-sm font-bold text-slate-700">Sede que recibirá los chips</label>
+            <div className="mb-3 space-y-3">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-blue-600">Sede de origen</p>
+                <p className="mt-1 text-sm font-black text-[#052A79]">{plantaNombre} <span className="text-xs font-semibold text-blue-600">(sede activa)</span></p>
+                <p className="mt-1 text-xs text-blue-700">Los chips saldrán del inventario de esta sede.</p>
+              </div>
+              <div>
+              <label className="mb-1 block text-sm font-bold text-slate-700">Sede destino <span className="text-red-500">*</span></label>
               <select value={destino} onChange={e => setDestino(e.target.value)} className="w-full rounded border border-slate-300 p-2 text-sm">
-                <option value="">Seleccione COLINA, SURCO o SURQUILLO</option>
+                <option value="">Seleccione una sede diferente a {plantaNombre}</option>
                 {catalogos.sedes.filter(p => p.key !== plantaKey).map(p => <option key={p.key} value={p.key}>{p.nombre}</option>)}
               </select>
-              <p className="mt-1 text-xs text-slate-500">No se permite transferir chips a otras sedes.</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {plantaNombre} no aparece porque ya es la sede de origen. Sólo puede elegir entre las otras sedes autorizadas.
+              </p>
+              </div>
             </div>
           )}
 
@@ -623,7 +717,7 @@ export function ChipsView() {
           />
           {error && <p className="mt-3 text-sm text-red-700">{error}</p>}{mensaje && <p className="mt-3 text-sm text-emerald-700">{mensaje}</p>}
           <button
-            disabled={loading || selectedProductId === '' || parsed.validos.length === 0 || parsed.duplicados.length > 0 || parsed.errores.length > 0 || (modo === 'TRANSFERENCIA' && (!destino || !sedeTransferenciaHabilitada))}
+            disabled={loading || selectedProductId === '' || parsed.validos.length === 0 || parsed.duplicados.length > 0 || parsed.errores.length > 0 || (modo === 'TRANSFERENCIA' && (!destino || !sedeAlmacenHabilitada))}
             onClick={confirmar}
             className="mt-4 w-full rounded-lg bg-emerald-600 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -633,9 +727,18 @@ export function ChipsView() {
                 ? `INGRESAR LOTE (${parsed.validos.length})`
                 : `TRANSFERIR LOTE (${parsed.validos.length})`}
           </button>
+          </>}
+          </>}
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          {esCantidad ? <>
+            <div className="border-b border-slate-200 p-4"><h2 className="font-bold">Kardex de movimientos</h2><p className="mt-1 text-xs text-slate-500">Cada ingreso y venta queda registrado; el stock no se edita directamente.</p></div>
+            <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="p-3">Fecha</th><th className="p-3">Movimiento</th><th className="p-3 text-right">Cantidad</th><th className="p-3">Referencia</th><th className="p-3">Usuario</th></tr></thead><tbody>
+              {movimientosCantidad.map((movimiento) => <tr key={movimiento.id} className="border-t border-slate-100"><td className="p-3">{new Date(movimiento.fechaCreacion).toLocaleString()}</td><td className="p-3"><span className={`rounded px-2 py-1 text-xs font-bold ${movimiento.sentido === 'ENTRADA' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'}`}>{movimiento.tipoMovimiento}</span></td><td className={`p-3 text-right font-black ${movimiento.sentido === 'ENTRADA' ? 'text-emerald-700' : 'text-red-700'}`}>{movimiento.sentido === 'ENTRADA' ? '+' : '-'}{movimiento.cantidad}</td><td className="p-3">{movimiento.referencia || '—'}</td><td className="p-3">{movimiento.usuario}</td></tr>)}
+              {movimientosCantidad.length === 0 && <tr><td colSpan={5} className="p-10 text-center text-slate-400">Todavía no hay movimientos. El stock inicial es 0.</td></tr>}
+            </tbody></table></div>
+          </> : <>
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-end">
             <div><h2 className="font-bold">Unidades registradas</h2><p className="mt-1 text-xs text-slate-500">Todos los tipos ubicados actualmente en {plantaNombre}.</p></div>
             <div className="flex flex-col sm:flex-row gap-3 sm:ml-auto w-full sm:w-auto">
@@ -651,13 +754,14 @@ export function ChipsView() {
               <label className="relative w-full sm:w-72"><span className="mb-1 block text-xs font-bold text-slate-600">Buscar por código o tipo de chip</span><Search className="absolute bottom-2.5 left-3 h-4 w-4 text-slate-400" /><input value={buscar} onChange={e => aplicarFiltroInventario('buscar', e.target.value)} placeholder="Buscar por código o tipo de chip" className="w-full rounded border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none" /></label>
             </div>
           </div>
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr>{modo === 'TRANSFERENCIA' && <th className="w-10 p-3"></th>}<th className="p-3">Código del chip</th><th className="p-3">Tipo</th><th className="p-3">Estado</th><th className="p-3">Sede</th><th className="p-3">Ingreso</th><th className="p-3">Último movimiento</th></tr></thead><tbody>{chips.map(c => <tr key={c.id} className="border-t border-slate-100">{modo === 'TRANSFERENCIA' && <td className="p-3"><input type="checkbox" disabled={c.estado !== 'DISPONIBLE' || Number(c.producto_inventariable_id) !== Number(selectedProductId)} checked={scan.split('\n').some(numero => numero.trim() === c.numero_chip)} onChange={e => { if (e.target.checked) { setScan(prev => prev ? `${prev}\n${c.numero_chip}` : c.numero_chip); } else { setScan(prev => prev.split('\n').map(x => x.trim()).filter(x => x && x !== c.numero_chip).join('\n')); } }} className="rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]" /></td>}<td className="p-3 font-mono font-bold">{c.numero_chip}</td><td className="p-3">{c.producto_nombre}</td><td className="p-3"><span className={`inline-block rounded px-2 py-1 text-[10px] font-bold capitalize tracking-wider ${c.estado === 'DISPONIBLE' ? 'bg-emerald-100 text-emerald-800' : c.estado === 'RESERVADO' ? 'bg-amber-100 text-amber-800' : c.estado === 'VENDIDO' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{c.estado}</span></td><td className="p-3">{c.planta_nombre}</td><td className="p-3">{new Date(c.creado_en).toLocaleString()}</td><td className="p-3">{c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleString() : '-'}</td></tr>)}{!chips.length && <tr><td colSpan={modo === 'TRANSFERENCIA' ? 7 : 6} className="p-10 text-center text-slate-400">No se encontraron registros.</td></tr>}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs capitalize text-slate-500"><tr>{modo === 'TRANSFERENCIA' && <th className="w-10 p-3"></th>}<th className="p-3">Código del producto</th><th className="p-3">Tipo</th><th className="p-3">Estado</th><th className="p-3">Sede</th><th className="p-3">Ingreso</th><th className="p-3">Último movimiento</th></tr></thead><tbody>{chips.map(c => <tr key={c.id} className="border-t border-slate-100">{modo === 'TRANSFERENCIA' && <td className="p-3"><input type="checkbox" disabled={c.estado !== 'DISPONIBLE' || Number(c.producto_inventariable_id) !== Number(selectedProductId)} checked={scan.split('\n').some(numero => numero.trim() === c.numero_chip)} onChange={e => { if (e.target.checked) { setScan(prev => prev ? `${prev}\n${c.numero_chip}` : c.numero_chip); } else { setScan(prev => prev.split('\n').map(x => x.trim()).filter(x => x && x !== c.numero_chip).join('\n')); } }} className="rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]" /></td>}<td className="p-3 font-mono font-bold">{c.numero_chip}</td><td className="p-3">{c.producto_nombre}</td><td className="p-3"><span className={`inline-block rounded px-2 py-1 text-[10px] font-bold capitalize tracking-wider ${c.estado === 'DISPONIBLE' ? 'bg-emerald-100 text-emerald-800' : c.estado === 'RESERVADO' ? 'bg-amber-100 text-amber-800' : c.estado === 'VENDIDO' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-700'}`}>{c.estado}</span></td><td className="p-3">{c.planta_nombre}</td><td className="p-3">{new Date(c.creado_en).toLocaleString()}</td><td className="p-3">{c.ultimo_movimiento ? new Date(c.ultimo_movimiento).toLocaleString() : '-'}</td></tr>)}{!chips.length && <tr><td colSpan={modo === 'TRANSFERENCIA' ? 7 : 6} className="p-10 text-center text-slate-400">No se encontraron registros.</td></tr>}</tbody></table></div>
           <Paginacion
             resumen={chipsResumen}
             onCambioPagina={setChipsPagina}
             onCambioPageSize={cambiarChipsPageSize}
             etiqueta="chips"
           />
+          </>}
         </section>
       </div>
     </>}
@@ -667,7 +771,7 @@ export function ChipsView() {
     {(showProductModal || editingProductoId) && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
         <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="text-lg font-bold text-slate-900">{editingProductoId ? 'Editar tipo de chip' : 'Agregar tipo de chip'}</h2><p className="mt-1 text-xs text-slate-500">Se administran aquí los datos físicos, el precio y la venta por sede. La configuración fiscal se realiza en Configuración.</p></div><button onClick={() => { setShowProductModal(false); setEditingProductoId(null); }} className="text-slate-400 hover:text-slate-600">✕</button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="text-lg font-bold text-slate-900">{editingProductoId ? 'Editar tipo serializado' : 'Agregar tipo serializado'}</h2><p className="mt-1 text-xs text-slate-500">Los productos por cantidad se crean mediante configuración controlada para impedir habilitarlos en sedes incorrectas.</p></div><button onClick={() => { setShowProductModal(false); setEditingProductoId(null); }} className="text-slate-400 hover:text-slate-600">✕</button></div>
           <div className="space-y-4 p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Código del tipo</label><input type="text" disabled={!!editingProductoId} value={editingProductoId ? editProductCodigo : newProductCodigo} onChange={(e) => setNewProductCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))} placeholder="Ej. SUPERCHIP" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100" /></div>
@@ -676,100 +780,59 @@ export function ChipsView() {
             <div>
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Nombre del tipo de chip</label><input type="text" value={editingProductoId ? editProductName : newProductName} onChange={(e) => editingProductoId ? setEditProductName(e.target.value) : setNewProductName(e.target.value)} placeholder="Ej. Superchip GNV" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" /></div>
             </div>
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <p className="mb-3 text-sm font-bold text-amber-800">Precio en esta sede ({plantaNombre})</p>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-slate-600">S/</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={editingProductoId
-                    ? (editProductSedes[plantaKey]?.precio ?? '')
-                    : (newProductSedes[plantaKey]?.precio ?? '')}
-                  onChange={(e) => {
-                    const precio = parseFloat(e.target.value) || 0;
-                    if (editingProductoId) {
-                      setEditProductSedes(prev => ({
-                        ...prev,
-                        [plantaKey]: {
-                          precio,
-                          stockPermitido: prev[plantaKey]?.stockPermitido ?? true,
-                          ventaHabilitada: prev[plantaKey]?.ventaHabilitada ?? true,
-                          productoFacturacionId: prev[plantaKey]?.productoFacturacionId,
-                        }
-                      }));
-                    } else {
-                      setNewProductSedes(prev => ({
-                        ...prev,
-                        [plantaKey]: {
-                          precio,
-                          stockPermitido: prev[plantaKey]?.stockPermitido ?? true,
-                          ventaHabilitada: prev[plantaKey]?.ventaHabilitada ?? false,
-                        }
-                      }));
-                    }
-                  }}
-                  className="w-36 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-                <p className="text-xs text-amber-700">Este precio se usará al calcular el total en la venta de chips.</p>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm font-bold text-[#052A79]">Producto fiscal y venta por sede</p>
+              <p className="mt-1 text-xs text-slate-600">El precio es de solo lectura y proviene de <b>Configuración → Catálogo → P. venta</b>.</p>
+              <div className="mt-4 space-y-3">
+                {catalogos.sedes.map((sede) => {
+                  const estado = editingProductoId ? editProductSedes[sede.key] : newProductSedes[sede.key];
+                  const productoFiscal = obtenerProductoFiscalChip(catalogos.productosFiscales, estado?.productoFacturacionId);
+                  const actualizar = (cambios: Partial<EditableSede>) => {
+                    const aplicar = (prev: Record<string, EditableSede>) => ({
+                      ...prev,
+                      [sede.key]: {
+                        precio: prev[sede.key]?.precio ?? 0,
+                        stockPermitido: prev[sede.key]?.stockPermitido ?? true,
+                        ventaHabilitada: prev[sede.key]?.ventaHabilitada ?? false,
+                        productoFacturacionId: prev[sede.key]?.productoFacturacionId,
+                        ...cambios
+                      }
+                    });
+                    if (editingProductoId) setEditProductSedes(aplicar);
+                    else setNewProductSedes(aplicar);
+                  };
+                  return <div key={sede.key} className="grid gap-3 rounded-lg border border-blue-100 bg-white p-3 md:grid-cols-[110px_1fr_120px]">
+                    <div>
+                      <div className="text-xs font-bold uppercase text-slate-500">Sede</div>
+                      <div className="mt-1 font-bold text-slate-800">{sede.nombre}</div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-slate-600">Producto fiscal vinculado</label>
+                      <select
+                        value={estado?.productoFacturacionId || ''}
+                        onChange={(e) => {
+                          const id = Number(e.target.value) || undefined;
+                          const producto = catalogos.productosFiscales.find((item) => item.id === id);
+                          actualizar({ productoFacturacionId: id, precio: producto?.precioVenta || 0 });
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                      >
+                        <option value="">Sin producto fiscal</option>
+                        {catalogos.productosFiscales.map((producto) => <option key={producto.id} value={producto.id}>{producto.codigoSku} — {producto.descripcion}</option>)}
+                      </select>
+                      <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-slate-700">
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={estado?.stockPermitido ?? true} onChange={(e) => actualizar({ stockPermitido: e.target.checked })} /> Stock permitido</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" disabled={!estado?.productoFacturacionId} checked={estado?.ventaHabilitada ?? false} onChange={(e) => actualizar({ ventaHabilitada: e.target.checked })} /> Venta habilitada</label>
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 p-3 text-center">
+                      <div className="text-xs font-bold text-emerald-700">P. venta</div>
+                      <div className="mt-1 text-lg font-black text-emerald-800">{mostrarPrecioVentaFiscal(productoFiscal)}</div>
+                      <div className="text-[10px] text-emerald-700">Derivado del catálogo</div>
+                    </div>
+                  </div>;
+                })}
               </div>
-              <label className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={editingProductoId
-                    ? editProductSedes[plantaKey]?.ventaHabilitada ?? false
-                    : newProductSedes[plantaKey]?.ventaHabilitada ?? false}
-                  onChange={(e) => {
-                    const ventaHabilitada = e.target.checked;
-                    if (editingProductoId) {
-                      setEditProductSedes(prev => {
-                        const sedeActual = prev[plantaKey] || { precio: 0, stockPermitido: true };
-                        return {
-                          ...prev,
-                          [plantaKey]: { ...sedeActual, ventaHabilitada }
-                        };
-                      });
-                    } else {
-                      setNewProductSedes(prev => {
-                        const sedeActual = prev[plantaKey] || { precio: 0, stockPermitido: true };
-                        return {
-                          ...prev,
-                          [plantaKey]: { ...sedeActual, ventaHabilitada }
-                        };
-                      });
-                    }
-                  }}
-                  className="h-4 w-4 rounded border-slate-300 text-[#052A79] focus:ring-[#052A79]"
-                />
-                Venta habilitada para {plantaNombre}
-              </label>
-              <p className="mt-1 text-xs text-slate-500">El cambio se aplica solo a {plantaNombre}; las demás sedes conservan su configuración.</p>
-              {editingProductoId && Object.keys(editProductSedes).length > 0 && (
-                <div className="mt-4 rounded-lg border border-blue-200 bg-white p-3">
-                  <p className="text-xs font-bold text-slate-700">
-                    Venta habilitada: {Object.values(editProductSedes).filter((sede) => sede.ventaHabilitada).length} / {Object.keys(editProductSedes).length} sedes
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => establecerVentaEnTodasLasSedes(true)}
-                      className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
-                    >
-                      HABILITAR EN TODAS LAS SEDES
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => establecerVentaEnTodasLasSedes(false)}
-                      className="rounded-lg bg-slate-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700"
-                    >
-                      DESHABILITAR EN TODAS LAS SEDES
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">Solo se modifica ventaHabilitada; los precios y demás datos de cada sede se conservan.</p>
-                </div>
-              )}
             </div>
           </div>
           <div className="flex justify-end gap-3 rounded-b-2xl border-t border-slate-200 bg-slate-50 p-5"><button onClick={() => { setShowProductModal(false); setEditingProductoId(null); }} disabled={savingProduct} className="rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200">Cancelar</button><button onClick={editingProductoId ? handleEditarProducto : handleCrearProducto} disabled={savingProduct || (editingProductoId ? !editProductName : (!newProductName || !newProductCodigo))} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow hover:bg-blue-700 disabled:opacity-50">{savingProduct ? 'Guardando...' : 'Guardar'}</button></div>
@@ -885,11 +948,11 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
       <div className="flex items-center justify-between border-b border-slate-200 pb-2">
         <div>
           <h2 className="text-lg font-bold text-slate-800">Operaciones recientes</h2>
-          <p className="text-xs text-slate-500">Listado canónico de chips vendidos</p>
+          <p className="text-xs text-slate-500">Listado canónico de productos físicos vendidos</p>
         </div>
         {puedeVender && (
           <button onClick={() => setShowVentaModal(true)} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#041c53]">
-            + Vender Chips
+            + Nueva venta
           </button>
         )}
       </div>
@@ -916,7 +979,8 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
                 <th className="px-4 py-3 font-bold">FECHA Y HORA</th>
                 <th className="px-4 py-3 font-bold">DNI / RUC</th>
                 <th className="px-4 py-3 font-bold">NOMBRES / RAZÓN SOCIAL</th>
-                <th className="px-4 py-3 font-bold">CHIPS VENDIDOS</th>
+                <th className="px-4 py-3 font-bold">PRODUCTO VENDIDO</th>
+                <th className="px-4 py-3 font-bold text-center">CANTIDAD</th>
                 <th className="px-4 py-3 font-bold">ESTADO DE VENTA</th>
                 <th className="px-4 py-3 font-bold text-right">TOTAL</th>
                 <th className="px-4 py-3 font-bold text-center">COMPROBANTE</th>
@@ -924,9 +988,9 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
             </thead>
             <tbody>
               {listado.loading ? (
-                <tr><td colSpan={8} className="p-8 text-center text-slate-500">Cargando registros...</td></tr>
+                <tr><td colSpan={9} className="p-8 text-center text-slate-500">Cargando registros...</td></tr>
               ) : ventas.length === 0 ? (
-                <tr><td colSpan={8} className="p-8 text-center text-slate-500">No se encontraron registros para el rango seleccionado.</td></tr>
+                <tr><td colSpan={9} className="p-8 text-center text-slate-500">No se encontraron registros para el rango seleccionado.</td></tr>
               ) : ventas.map((venta) => (
                 <tr key={venta.operacionId} onClick={() => onSelectVenta(venta.operacionId)} className="cursor-pointer border-t border-slate-100 transition hover:bg-blue-50/60">
                   <td className="px-4 py-3 font-bold text-[#052A79]">OP. #{venta.operacionId}</td>
@@ -941,7 +1005,13 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
                       {venta.chips.map((chip) => (
                         <span key={chip} className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-800">{chip}</span>
                       ))}
+                      {venta.chips.length === 0 && (venta.productos || []).map((producto, index) => (
+                        <span key={`${producto.codigo}-${index}`} className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">{producto.descripcion}</span>
+                      ))}
                     </div>
+                  </td>
+                  <td className="px-4 py-3 text-center font-bold text-slate-700">
+                    {venta.chips.length > 0 ? venta.chips.length : (venta.productos || []).reduce((sum, p) => sum + Number(p.cantidad), 0)}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${venta.estadoVenta === 'PAGADO' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : venta.estadoVenta === 'ANULADO' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>

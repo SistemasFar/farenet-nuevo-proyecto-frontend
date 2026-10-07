@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasChipsApi } from '../../services/faregas-chips.api';
-import type { ValidacionVentaDirectaResponse, VentaDirectaFacturacion, VentaDirectaResponse } from '../../services/faregas-chips.api';
+import type { ProductoInventariable, ValidacionVentaDirectaResponse, VentaDirectaFacturacion, VentaDirectaResponse } from '../../services/faregas-chips.api';
 import { faregasClientesApi } from '../../services/faregas-clientes.api';
 import { ChipScannerInput } from './ChipScannerInput';
 import { parseChipScan } from './chips-ingreso-masivo';
@@ -11,6 +11,7 @@ import { PagoStep } from '../NuevoCertificado/components/NuevoCertificado/PagoSt
 import { maestrosApi } from '@/services/api';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../NuevoCertificado/NuevoCertificadoView';
+import { entradaVentaCantidad, esProductoCantidad, etiquetaControlInventario } from './inventario-control';
 
 const crearFormPagoVacio = (): FormPagoState => ({
   importe: '',
@@ -67,6 +68,9 @@ export function ModalVentaChips({
   onVentaExitosa: (result: VentaDirectaResponse) => void;
 }) {
   const [scan, setScan] = useState('');
+  const [productos, setProductos] = useState<ProductoInventariable[]>([]);
+  const [productoInventariableId, setProductoInventariableId] = useState<number | ''>('');
+  const [cantidad, setCantidad] = useState('1');
   const [tipoComprobante, setTipoComprobante] = useState('BOLETA');
   const [tipoDocumentoCliente, setTipoDocumentoCliente] = useState('DNI');
   const [nroDocumento, setNroDocumento] = useState('');
@@ -103,17 +107,18 @@ export function ModalVentaChips({
   }, [resultadoVenta]);
 
   const parsed = parseChipScan(scan);
+  const productoSeleccionado = productos.find((producto) => producto.id === Number(productoInventariableId));
+  const esCantidad = esProductoCantidad(productoSeleccionado);
   const chipsValidados = resultadoValidacion?.items.filter((item) => item.validoParaVenta) ?? [];
   const totalMonto = resultadoValidacion?.totalEstimado ?? 0;
   const hayErrorDeEscaneo = parsed.errores.length > 0 || parsed.duplicados.length > 0;
-  const validacionCompleta = Boolean(
-    resultadoValidacion
-    && !hayErrorDeEscaneo
-    && resultadoValidacion.items.length === parsed.validos.length
+  const validacionCompleta = Boolean(resultadoValidacion
     && resultadoValidacion.items.length > 0
     && resultadoValidacion.items.every((item) => item.validoParaVenta)
     && totalMonto > 0
-  );
+    && (esCantidad
+      ? resultadoValidacion.cantidadValidos === Number(cantidad)
+      : !hayErrorDeEscaneo && resultadoValidacion.items.length === parsed.validos.length));
   const totalPagado = pagosAgregados.reduce((sum, pago) => {
     const importe = Number(pago.importe);
     return sum + (Number.isFinite(importe) ? importe : 0);
@@ -143,6 +148,16 @@ export function ModalVentaChips({
         console.error("Error al cargar maestros pago:", err);
         setErrorPago('No se pudieron cargar los medios de pago.');
       });
+  }, []);
+
+  useEffect(() => {
+    faregasChipsApi.listarProductosInventariables()
+      .then((lista) => {
+        setProductos(lista);
+        const inicial = lista.find((producto) => producto.codigo === 'CHIP') || lista[0];
+        if (inicial) setProductoInventariableId(inicial.id);
+      })
+      .catch(() => setErrorValidacion('No se pudieron cargar los productos disponibles para esta sede.'));
   }, []);
 
   const limpiarPagos = () => {
@@ -209,6 +224,22 @@ export function ModalVentaChips({
     setMensaje('');
   };
 
+  const limpiarValidacionInventario = () => {
+    setResultadoValidacion(null);
+    setResultadoVenta(null);
+    limpiarPagos();
+    setError('');
+    setErrorValidacion('');
+    setMensaje('');
+  };
+
+  const seleccionarProducto = (id: number | '') => {
+    setProductoInventariableId(id);
+    setScan('');
+    setCantidad('1');
+    limpiarValidacionInventario();
+  };
+
   const handleValidarChips = async () => {
     if (parsed.validos.length === 0) {
       setErrorValidacion('Escanee al menos un chip con formato válido.');
@@ -233,6 +264,24 @@ export function ModalVentaChips({
       setResultadoValidacion(result);
     } catch (e: unknown) {
       setErrorValidacion(e instanceof Error ? e.message : 'No se pudieron validar los chips.');
+    } finally {
+      setValidandoChips(false);
+    }
+  };
+
+  const handleValidarCantidad = async () => {
+    const cantidadNumerica = Number(cantidad);
+    if (productoInventariableId === '' || !Number.isInteger(cantidadNumerica) || cantidadNumerica <= 0) {
+      setErrorValidacion('Ingrese una cantidad entera mayor a cero.');
+      return;
+    }
+    setValidandoChips(true);
+    limpiarValidacionInventario();
+    try {
+      const result = await faregasChipsApi.validarVentaDirecta(entradaVentaCantidad(Number(productoInventariableId), cantidadNumerica));
+      setResultadoValidacion(result);
+    } catch (e: unknown) {
+      setErrorValidacion(e instanceof Error ? e.message : 'No se pudo validar el stock.');
     } finally {
       setValidandoChips(false);
     }
@@ -274,7 +323,7 @@ export function ModalVentaChips({
     try {
       setError('');
       setMensaje('');
-      if (!validacionCompleta) throw new Error('Valide nuevamente los chips antes de confirmar la venta.');
+      if (!validacionCompleta) throw new Error('Valide nuevamente el inventario antes de confirmar la venta.');
       if (errorFiscalDocumento) throw new Error(errorFiscalDocumento);
       if (!datosFiscalesValidos) throw new Error('Complete nombre y dirección fiscal, con un máximo de 100 caracteres.');
       if (condicionPago === 'CONTADO' && pendiente > toleranciaMonto) {
@@ -297,7 +346,9 @@ export function ModalVentaChips({
         condicionPago,
         medioPago: pagosAgregados[0]?.tipo || 'EFECTIVO',
         pagosAgregados,
-        chips: chipsValidados.map((item) => item.numeroChip)
+        ...(esCantidad
+          ? { productoInventariableId: Number(productoInventariableId), cantidad: Number(cantidad) }
+          : { chips: chipsValidados.map((item) => String(item.numeroChip)) })
       });
       const estado = response.facturacion?.estado || response.facturacionEstado;
 
@@ -406,7 +457,7 @@ export function ModalVentaChips({
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-2 backdrop-blur-sm sm:p-4 lg:p-6">
       <div className="my-2 w-full max-w-[1400px] rounded-2xl bg-white shadow-xl sm:my-4">
         <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:px-5">
-          <h2 className="text-xl font-bold text-slate-900">Venta Directa de Chips</h2>
+          <h2 className="text-xl font-bold text-slate-900">Venta de inventario</h2>
           <button onClick={onClose} disabled={loadingVenta || validandoChips} className="text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Cerrar">✕</button>
         </div>
 
@@ -490,32 +541,29 @@ export function ModalVentaChips({
           </div>
 
           <div className="space-y-3">
-            <h3 className="font-bold text-sm text-slate-700 border-b pb-2">2. Chips a vender</h3>
-            <p className="text-xs text-slate-500">Escanee los códigos y presione VALIDAR CHIPS. Solo el resultado del inventario habilita el pago.</p>
-            <ChipScannerInput
-              value={scan}
-              onChange={handleScanChange}
-              rows={5}
-              disabled={validandoChips || loadingVenta || ventaRegistrada}
-              ariaBusy={validandoChips}
-              etiquetaValidos="Formato válido"
-            />
+            <h3 className="font-bold text-sm text-slate-700 border-b pb-2">2. Productos a vender</h3>
+            <label className="block text-sm font-bold text-slate-700">Producto
+              <select value={productoInventariableId} disabled={ventaRegistrada} onChange={(event) => seleccionarProducto(event.target.value ? Number(event.target.value) : '')} className="mt-1 w-full rounded-lg border border-slate-300 p-2 disabled:bg-slate-100">
+                <option value="">Seleccione un producto</option>
+                {productos.map((producto) => <option key={producto.id} value={producto.id}>{producto.nombre} — {etiquetaControlInventario(producto.tipo)}</option>)}
+              </select>
+            </label>
 
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => void handleValidarChips()}
-                disabled={parsed.validos.length === 0 || validandoChips || loadingVenta || ventaRegistrada}
-                aria-busy={validandoChips}
-                className="rounded-lg bg-[#052A79] px-4 py-2 text-xs font-bold text-white shadow transition hover:bg-[#041e56] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {validandoChips ? 'VALIDANDO CHIPS...' : 'VALIDAR CHIPS'}
-              </button>
-            </div>
+            {esCantidad ? <>
+              <p className="text-xs text-slate-500">Ingrese la cantidad. No se solicita ni se genera ningún serial.</p>
+              <label className="block text-sm font-bold text-slate-700">Cantidad
+                <input type="number" min="1" step="1" value={cantidad} disabled={validandoChips || loadingVenta || ventaRegistrada} onChange={(event) => { setCantidad(event.target.value); limpiarValidacionInventario(); }} className="mt-1 w-full rounded-lg border border-slate-300 p-3 text-lg font-bold disabled:bg-slate-100" />
+              </label>
+              <div className="flex justify-end"><button type="button" onClick={() => void handleValidarCantidad()} disabled={!Number.isInteger(Number(cantidad)) || Number(cantidad) <= 0 || validandoChips || loadingVenta || ventaRegistrada} className="rounded-lg bg-[#052A79] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{validandoChips ? 'VALIDANDO STOCK...' : 'VALIDAR STOCK'}</button></div>
+            </> : <>
+              <p className="text-xs text-slate-500">Escanee los códigos y presione VALIDAR CHIPS. Sólo el resultado del inventario habilita el pago.</p>
+              <ChipScannerInput value={scan} onChange={handleScanChange} rows={5} disabled={validandoChips || loadingVenta || ventaRegistrada} ariaBusy={validandoChips} etiquetaValidos="Formato válido" />
+              <div className="flex justify-end"><button type="button" onClick={() => void handleValidarChips()} disabled={parsed.validos.length === 0 || validandoChips || loadingVenta || ventaRegistrada} aria-busy={validandoChips} className="rounded-lg bg-[#052A79] px-4 py-2 text-xs font-bold text-white shadow transition hover:bg-[#041e56] disabled:cursor-not-allowed disabled:opacity-50">{validandoChips ? 'VALIDANDO CHIPS...' : 'VALIDAR CHIPS'}</button></div>
+            </>}
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-600">Chips válidos:</span>
+                <span className="text-slate-600">{esCantidad ? 'Cantidad válida:' : 'Chips válidos:'}</span>
                 <span className="font-bold">{resultadoValidacion?.cantidadValidos ?? 0}</span>
               </div>
               <div className="mt-1 flex items-center justify-between text-sm">
@@ -526,17 +574,18 @@ export function ModalVentaChips({
 
             {resultadoValidacion && (
               <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-slate-200" aria-live="polite">
-                {resultadoValidacion.items.map((item) => (
-                  <div key={item.numeroChip} className={`rounded-lg border p-3 ${item.validoParaVenta ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
+                {resultadoValidacion.items.map((item, index) => (
+                  <div key={item.numeroChip || `${item.productoInventariableId}-${index}`} className={`rounded-lg border p-3 ${item.validoParaVenta ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-mono text-sm font-bold text-slate-800">{item.numeroChip}</p>
+                        <p className="text-sm font-bold text-slate-800">{item.numeroChip || item.productoNombre}</p>
                         <p className={`text-sm font-bold ${item.validoParaVenta ? 'text-emerald-700' : 'text-red-700'}`}>
                           {item.validoParaVenta ? '✓ Disponible' : `✕ ${item.motivo || 'No válido para la venta'}`}
                         </p>
                         {item.existe && (
                           <p className="text-xs text-slate-600">
                             {item.productoNombre || 'Producto no disponible'}{item.plantaNombre ? ` · ${item.plantaNombre}` : ''}
+                            {item.cantidad != null ? ` · Cantidad ${item.cantidad} · Stock ${item.disponible ?? 0}` : ''}
                           </p>
                         )}
                       </div>

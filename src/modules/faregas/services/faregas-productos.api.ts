@@ -9,6 +9,7 @@ export interface ProductoFacturacion {
   categoria_codigo?: string | null;
   categoria_nombre?: string | null;
   sedes_faregas?: string[];
+  usos_operativos?: string[];
   cuenta_por_cobrar?: string | null;
   codigo_barras?: string | null;
   unidad?: string | null;

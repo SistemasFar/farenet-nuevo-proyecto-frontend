@@ -60,3 +60,12 @@ export const obtenerVinculacionProducto = (
   const id = normalizarId(productoId);
   return id === null ? undefined : vinculaciones.get(id);
 };
+
+export const combinarVinculacionProducto = (
+  vinculacion: VinculacionOperativa | undefined,
+  sedesCatalogo: string[] = [],
+  usosCatalogo: string[] = []
+): VinculacionOperativa => ({
+  sedesActivas: [...new Set([...(vinculacion?.sedesActivas || []), ...sedesCatalogo])].sort(),
+  servicios: [...new Set([...(vinculacion?.servicios || []), ...usosCatalogo])].sort()
+});

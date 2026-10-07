@@ -22,11 +22,22 @@ export interface ProductoInventariableSede {
   plantaKey: string;
   plantaNombre: string;
   precio: number | string;
+  precioLegacy?: number | string;
+  precioVenta?: number | string | null;
   stockPermitido: boolean;
   ventaHabilitada: boolean;
   productoFacturacionId?: number | null;
   productoFiscalCodigo?: string | null;
   productoFiscalDescripcion?: string | null;
+  productoFiscalActivo?: boolean;
+  productoFiscalParaVenta?: boolean;
+}
+
+export interface ProductoFiscalChipOpcion {
+  id: number;
+  codigoSku: string;
+  descripcion: string;
+  precioVenta: number;
 }
 
 export interface ProductoInventariable {
@@ -44,6 +55,17 @@ export interface ProductoInventariable {
   reservadosSede: number;
   vendidosSede: number;
   bajasSede: number;
+}
+
+export interface MovimientoInventarioCantidad {
+  id: number;
+  tipoMovimiento: 'INGRESO' | 'VENTA' | 'AJUSTE' | 'DEVOLUCION';
+  sentido: 'ENTRADA' | 'SALIDA';
+  cantidad: number;
+  usuario: string;
+  referencia: string | null;
+  operacionDetalleId: number | null;
+  fechaCreacion: string;
 }
 
 
@@ -84,7 +106,9 @@ export interface VentaDirectaPayload {
   condicionPago: string;
   medioPago: string;
   pagosAgregados: PagoAgregado[];
-  chips: string[];
+  chips?: string[];
+  productoInventariableId?: number;
+  cantidad?: number;
 }
 
 export interface CrearProductoInventariablePayload {
@@ -113,7 +137,7 @@ export interface ChipDisponibilidad {
 }
 
 export interface ValidacionChipVentaDirecta {
-  numeroChip: string;
+  numeroChip: string | null;
   existe: boolean;
   estado: ChipEstado | null;
   plantaKey: string | null;
@@ -129,10 +153,13 @@ export interface ValidacionChipVentaDirecta {
   validoParaVenta: boolean;
   codigo: string | null;
   motivo: string | null;
+  cantidad?: number;
+  disponible?: number;
 }
 
 export interface ValidacionVentaDirectaResponse {
   success: boolean;
+  modo?: 'SERIALIZADO' | 'CANTIDAD';
   items: ValidacionChipVentaDirecta[];
   totalEstimado: number;
   cantidadSolicitados: number;
@@ -160,6 +187,7 @@ export interface VentaChipOperacion {
   documentoCliente: string | null;
   nombreCliente: string | null;
   chips: string[];
+  productos?: Array<{ codigo: string | null; descripcion: string | null; cantidad: number; serial: string | null }>;
   estadoVenta: string;
   importeTotal: number;
   facturacion: ComprobanteVentaChip | null;
@@ -337,7 +365,9 @@ export const faregasChipsApi = {
   ingresar: async (productoInventariableId:number,numeros:string[],referencia?:string) => faregasFetch('/chips/ingresos',{method:'POST',body:JSON.stringify({productoInventariableId,numeros,referencia})}),
   transferir: async (productoInventariableId:number,destinoKey:string,numeros:string[],referencia?:string) => faregasFetch('/chips/transferencias',{method:'POST',body:JSON.stringify({productoInventariableId,destinoKey,numeros,referencia})}),
   baja: async (numeroChip:string,referencia:string) => faregasFetch('/chips/bajas',{method:'POST',body:JSON.stringify({numeroChip,referencia})}),
-  validarVentaDirecta: async (chips: string[]): Promise<ValidacionVentaDirectaResponse> => faregasFetch('/chips/venta-directa/validar', { method: 'POST', body: JSON.stringify({ chips }) }) as Promise<ValidacionVentaDirectaResponse>,
+  validarVentaDirecta: async (entrada: string[] | { productoInventariableId: number; cantidad: number }): Promise<ValidacionVentaDirectaResponse> => faregasFetch('/chips/venta-directa/validar', { method: 'POST', body: JSON.stringify(Array.isArray(entrada) ? { chips: entrada } : entrada) }) as Promise<ValidacionVentaDirectaResponse>,
+  ingresarCantidad: async (productoInventariableId:number,cantidad:number,referencia?:string) => faregasFetch('/chips/inventario-cantidad/ingresos',{method:'POST',body:JSON.stringify({productoInventariableId,cantidad,referencia})}) as Promise<{success:boolean;movimiento:MovimientoInventarioCantidad & {stock:number}}>,
+  listarMovimientosCantidad: async (productoInventariableId:number) => (await faregasFetch(`/chips/inventario-cantidad/${productoInventariableId}/movimientos`)).movimientos as MovimientoInventarioCantidad[],
   ventaDirecta: async (payload: VentaDirectaPayload): Promise<VentaDirectaResponse> => faregasFetch('/chips/venta-directa', { method: 'POST', body: JSON.stringify(payload) }) as Promise<VentaDirectaResponse>,
   /**
    * Reintenta la emisión del comprobante de una operación ya registrada.
@@ -361,7 +391,10 @@ export const faregasChipsApi = {
   ) as Promise<{ ok: boolean; data: { id: number; estado: string } }>,
   historial: async (id:number) => (await faregasFetch(`/chips/${id}/movimientos`)).movimientos,
   listarProductosInventariables: async () => (await faregasFetch('/chips/productos')).productos as ProductoInventariable[],
-  catalogosProductosInventariables: async () => (await faregasFetch('/chips/productos/catalogos')) as {sedes:Array<{key:string;nombre:string}>},
+  catalogosProductosInventariables: async () => (await faregasFetch('/chips/productos/catalogos')) as {
+    sedes: Array<{key:string;nombre:string}>;
+    productosFiscales: ProductoFiscalChipOpcion[];
+  },
   crearProductoInventariable: async (payload:CrearProductoInventariablePayload) => faregasFetch('/chips/productos',{method:'POST',body:JSON.stringify(payload)}),
   editarProductoInventariable: async (id:number, payload:CrearProductoInventariablePayload) => faregasFetch(`/chips/productos/${id}`,{method:'PUT',body:JSON.stringify(payload)}),
   obtenerImpactoTipoChip: async (id:number) => (await faregasFetch(`/chips/productos/${id}/impacto`)).impacto as ImpactoTipoChip,

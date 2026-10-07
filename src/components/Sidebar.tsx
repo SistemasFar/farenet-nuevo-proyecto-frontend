@@ -228,7 +228,7 @@ const menuItems: MenuItem[] = [
 
   {
     key: 'chips', path: '/chips',
-    label: 'CHIPS',
+    label: 'INVENTARIO',
     permisos: ['MENU_CHIPS', 'CHIPS_VER'],
     icon: (
       <svg

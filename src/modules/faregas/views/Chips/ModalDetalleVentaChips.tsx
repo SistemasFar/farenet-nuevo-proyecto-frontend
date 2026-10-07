@@ -90,7 +90,7 @@ export function ModalDetalleVentaChips({
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Detalle de venta de chips</h2>
+            <h2 className="text-xl font-bold text-slate-900">Detalle de venta de productos</h2>
             <p className="text-xs text-slate-500">Operación #{operacionId} · Solo lectura</p>
           </div>
           <button type="button" onClick={onClose} disabled={loading} className="text-slate-400 hover:text-slate-700 disabled:opacity-50" aria-label="Cerrar">
@@ -123,7 +123,7 @@ export function ModalDetalleVentaChips({
               </section>
 
               <section>
-                <h3 className="border-b border-slate-200 pb-2 text-sm font-bold text-slate-700">2. Chips vendidos</h3>
+                <h3 className="border-b border-slate-200 pb-2 text-sm font-bold text-slate-700">2. Productos vendidos</h3>
                 <div className="mt-3 space-y-3">
                   {detalle.detalles.map((item) => (
                     <div key={item.id} className="rounded-xl border border-slate-200 p-4">
@@ -135,7 +135,7 @@ export function ModalDetalleVentaChips({
                         {item.chip && <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${estadoClass(item.chip.estado)}`}>{item.chip.estado}</span>}
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600 sm:grid-cols-4">
-                        <div><span className="block text-slate-400">Tipo de chip</span><b>{item.descripcion || item.tipoItem || '—'}</b></div>
+                        <div><span className="block text-slate-400">Tipo de producto</span><b>{item.descripcion || item.tipoItem || '—'}</b></div>
                         <div><span className="block text-slate-400">Precio aplicado</span><b>{money(item.precioUnitario)}</b></div>
                         <div><span className="block text-slate-400">Cantidad</span><b>{item.cantidad}</b></div>
                         <div><span className="block text-slate-400">Sede</span><b>{item.chip?.sedeNombre || detalle.plantaKey}</b></div>
