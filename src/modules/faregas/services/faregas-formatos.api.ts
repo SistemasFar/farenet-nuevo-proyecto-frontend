@@ -10,6 +10,7 @@ export interface Formato {
   tiene_version_vigente: boolean;
   formato_padre_id?: number | null;
   formato_padre_nombre?: string;
+  formato_padre_codigo?: string;
 }
 
 export interface FormatoVersion {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { faregasConfigApi, type ServicioConfiguracionFaregas } from '../../../services/faregas-config.api';
 import { faregasFormatosApi, type Formato } from '../../../services/faregas-formatos.api';
+import { formatoCompatibleConServicio } from './servicio-certificado-variantes';
 
 interface Props {
   servicio: ServicioConfiguracionFaregas;
@@ -27,7 +28,9 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
     let cancelado = false;
     faregasFormatosApi.listarFormatos()
       .then((resultado) => {
-        if (!cancelado) setFormatos(resultado.filter((formato) => formato.activo));
+        if (!cancelado) setFormatos(resultado.filter((formato) =>
+          formato.activo && formatoCompatibleConServicio(servicio, formato)
+        ));
       })
       .catch((cause: unknown) => {
         if (!cancelado) setError(mensajeError(cause));
@@ -36,7 +39,7 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
         if (!cancelado) setLoading(false);
       });
     return () => { cancelado = true; };
-  }, []);
+  }, [servicio]);
 
   const formatosVisibles = useMemo(() => {
     const texto = filtro.trim().toLowerCase();
@@ -58,7 +61,9 @@ export default function FormatoAsignadorModal({ servicio, onClose, onAsignado }:
 
   const cargarFormatos = async () => {
     const resultado = await faregasFormatosApi.listarFormatos();
-    setFormatos(resultado.filter((formato) => formato.activo));
+    setFormatos(resultado.filter((formato) =>
+      formato.activo && formatoCompatibleConServicio(servicio, formato)
+    ));
   };
 
   const eliminarFormato = async (formato: Formato) => {

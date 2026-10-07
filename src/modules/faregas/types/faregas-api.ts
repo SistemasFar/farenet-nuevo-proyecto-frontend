@@ -471,8 +471,15 @@ export interface CampoFormatoDinamicoFaregas {
   key: string;
   label: string;
   grupo: string;
+  optionalGroup?: string;
   tipo: 'text' | 'date';
   requerido: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  patternError?: string;
+  inputMode?: string;
+  soloDigitos?: boolean;
   valor: string;
 }
 

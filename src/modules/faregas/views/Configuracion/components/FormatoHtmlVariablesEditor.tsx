@@ -9,6 +9,7 @@ import {
   Eye,
   Image as ImageIcon,
   Italic,
+  PencilLine,
   Plus,
   Redo2,
   Save,
@@ -23,14 +24,20 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { faregasFormatosApi, type Formato, type FormatoVersion, type VariableCatalogo } from '../../../services/faregas-formatos.api';
 import {
+  applyCertificatePageMargins,
   collectCertificateVariables,
+  canCreateEditableHtmlDraft,
+  certificatePageMarginsCss,
   createCustomCertificateVariable,
   createCertificateDesignerExtensions,
+  getCertificatePageMargins,
   isHtmlCertificateVersionEditable,
+  normalizeCertificatePageMargin,
   parseCertificateDocument,
   sanitizePastedHtml,
   scopeCertificateDocumentCss,
   serializeCertificateDocument,
+  type CertificatePageMarginsMm,
   type FaregasVariableAttributes
 } from './certificate-designer';
 import './CertificateDesigner.css';
@@ -39,6 +46,7 @@ interface Props {
   formato: Formato;
   version: FormatoVersion;
   onBack: () => void;
+  onOpenVersion?: (version: FormatoVersion) => void;
   canEditProtected?: boolean;
 }
 
@@ -47,10 +55,11 @@ type PanelTab = 'VARIABLES' | 'IMAGENES' | 'PROPIEDADES';
 const mensajeError = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
 const limiteTabla = (value: number) => Math.max(1, Math.min(20, Number.isFinite(value) ? value : 1));
 
-export default function FormatoHtmlVariablesEditor({ formato, version, onBack, canEditProtected = false }: Props) {
+export default function FormatoHtmlVariablesEditor({ formato, version, onBack, onOpenVersion, canEditProtected = false }: Props) {
   const [variables, setVariables] = useState<VariableCatalogo[]>([]);
   const [loadingVariables, setLoadingVariables] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creatingDraft, setCreatingDraft] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -79,9 +88,13 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack, c
     () => parseCertificateDocument(version.configuracion?.html || '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head><body><p></p></body></html>'),
     [version.configuracion?.html]
   );
+  const [pageMargins, setPageMargins] = useState<CertificatePageMarginsMm>(() => getCertificatePageMargins(
+    version.configuracion?.margenes_pagina_mm,
+    parsedDocument.shell.documentCss
+  ));
   const scopedDocumentCss = useMemo(
-    () => scopeCertificateDocumentCss(parsedDocument.shell.documentCss),
-    [parsedDocument.shell.documentCss]
+    () => scopeCertificateDocumentCss(`${parsedDocument.shell.documentCss}\n${certificatePageMarginsCss(pageMargins)}`),
+    [pageMargins, parsedDocument.shell.documentCss]
   );
 
   const editor = useEditor({
@@ -188,15 +201,35 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack, c
     setActiveVariable(null);
   };
 
+  const updatePageMargin = (side: keyof CertificatePageMarginsMm, value: number) => {
+    if (!editable) return;
+    setPageMargins((current) => ({
+      ...current,
+      [side]: normalizeCertificatePageMargin(value, current[side])
+    }));
+    setDirty(true);
+  };
+
+  const applyPageMarginPreset = (value: number) => {
+    if (!editable) return;
+    const normalized = normalizeCertificatePageMargin(value);
+    setPageMargins({ top: normalized, right: normalized, bottom: normalized, left: normalized });
+    setDirty(true);
+  };
+
   const save = async () => {
     if (!editable) return;
     setSaving(true);
     setError('');
     try {
-      const html = serializeCertificateDocument(editor.getHTML(), parsedDocument.shell);
+      const html = serializeCertificateDocument(
+        editor.getHTML(),
+        applyCertificatePageMargins(parsedDocument.shell, pageMargins)
+      );
       await faregasFormatosApi.guardarConfiguracion(formato.id, version.id, {
         ...(version.configuracion || {}),
         html,
+        margenes_pagina_mm: pageMargins,
         variables_usadas: collectCertificateVariables(html),
         variables_personalizadas: customVariables
       });
@@ -219,6 +252,20 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack, c
       setError(mensajeError(cause));
     } finally {
       setLoadingPreview(false);
+    }
+  };
+
+  const createEditableDraft = async () => {
+    if (!canCreateEditableHtmlDraft(version, formato.es_protegido) || !onOpenVersion) return;
+    setCreatingDraft(true);
+    setError('');
+    try {
+      const result = await faregasFormatosApi.crearVersionHtml(formato.id, 'ULTIMA_VERSION');
+      onOpenVersion(result.version);
+    } catch (cause) {
+      setError(mensajeError(cause));
+    } finally {
+      setCreatingDraft(false);
     }
   };
 
@@ -256,6 +303,11 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack, c
         </div>
         <div className="flex items-center gap-2">
           {!editable && <span className="rounded bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">SOLO LECTURA</span>}
+          {canCreateEditableHtmlDraft(version, formato.es_protegido) && onOpenVersion && (
+            <button type="button" disabled={creatingDraft} onClick={() => void createEditableDraft()} className="flex items-center gap-2 rounded bg-[#052A79] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              <PencilLine size={16} /> {creatingDraft ? 'Creando borrador…' : 'Editar en borrador'}
+            </button>
+          )}
           <button type="button" disabled={loadingPreview} onClick={() => void preview()} className="flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50"><Eye size={16} /> {loadingPreview ? 'Cargando…' : 'Preview Render'}</button>
           <button type="button" disabled={!editable || saving || !dirty} onClick={() => void save()} className="flex items-center gap-2 rounded bg-green-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-45"><Save size={16} /> {saving ? 'Guardando…' : 'Guardar'}</button>
         </div>
@@ -347,6 +399,53 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack, c
 
             {panelTab === 'PROPIEDADES' && <>
               <h3 className="font-bold text-slate-800">Propiedades</h3>
+              <section className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <h4 className="text-sm font-bold text-slate-800">Márgenes de página</h4>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Aumenta los valores para dejar más espacio en blanco alrededor del contenido. La medida está en milímetros.</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {([
+                    ['top', 'Superior'],
+                    ['right', 'Derecho'],
+                    ['bottom', 'Inferior'],
+                    ['left', 'Izquierdo']
+                  ] as const).map(([side, label]) => (
+                    <label key={side} className="text-xs font-semibold text-slate-600">
+                      {label}
+                      <div className="mt-1 flex items-center rounded border border-slate-300 bg-white focus-within:border-blue-500">
+                        <input
+                          type="number"
+                          min={0}
+                          max={50}
+                          step={1}
+                          disabled={!editable}
+                          value={pageMargins[side]}
+                          onChange={(event) => updatePageMargin(side, Number(event.target.value))}
+                          className="min-w-0 flex-1 rounded-l px-2 py-2 text-sm outline-none disabled:bg-slate-100"
+                        />
+                        <span className="pr-2 text-[11px] text-slate-400">mm</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-1.5">
+                  {([
+                    [10, 'Estrecho'],
+                    [15, 'Normal'],
+                    [20, 'Amplio']
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={!editable}
+                      onClick={() => applyPageMarginPreset(value)}
+                      className="rounded border border-slate-300 bg-white px-2 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-blue-50 disabled:opacity-50"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-amber-700">Un margen muy amplio reduce el espacio útil y podría enviar contenido a una segunda página.</p>
+              </section>
               {activeVariable ? <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm"><p className="text-xs font-bold capitalize text-amber-700">Variable</p><p className="mt-2 font-semibold">{activeVariable.label}</p><p className="mt-1 font-mono text-xs text-slate-600">{activeVariable.key}</p><p className="mt-2 text-xs"><b>Origen:</b> {activeVariable.source}</p><p className="mt-1 text-xs"><b>Fallback:</b> {activeVariable.fallback || 'Sin fallback'}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setPanelTab('VARIABLES')} className="rounded bg-blue-700 px-3 py-1.5 text-xs font-bold text-white">Cambiar</button><button type="button" disabled={!editable} onClick={removeVariable} className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50">Quitar variable</button></div></div> : inTable ? <div className="mt-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Seleccionaste una tabla. Sus herramientas de filas, columnas, combinación y alineación aparecen bajo la barra principal.</div> : <p className="mt-3 text-sm text-slate-500">Selecciona texto, una variable o una celda para ver sus propiedades.</p>}
             </>}
           </div>

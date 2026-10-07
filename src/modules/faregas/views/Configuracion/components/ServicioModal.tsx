@@ -3,16 +3,19 @@ import {
   faregasConfigApi,
   type CategoriaServicio,
   type SedeTarifaAsignada,
-  type ServicioConfiguracionFaregas,
-  type TipoFlujoServicioFaregas
+  type ServicioConfiguracionFaregas
 } from '../../../services/faregas-config.api';
 import type { ProductoFacturacion } from '../../../services/faregas-productos.api';
 import {
   faregasTarifasAdminApi,
   type TarifaSede
 } from '../../../services/faregas-tarifas-admin.api';
-
-type VarianteCertificado = 'GNV_INICIAL' | 'GNV_ANUAL' | 'GLP_INICIAL' | 'GLP_ANUAL' | 'CONFORMIDAD' | 'TALLER_GNV_INICIAL' | 'TALLER_GNV_ANUAL' | 'TALLER_GLP_INICIAL' | 'TALLER_GLP_ANUAL';
+import {
+  configuracionVariante,
+  opcionesVariantesPorCategoria,
+  varianteDesdeServicio,
+  type VarianteCertificado
+} from './servicio-certificado-variantes';
 
 interface EstadoSede {
   seleccionada: boolean;
@@ -35,36 +38,6 @@ interface Props {
   onClose: () => void;
   onSaved: () => void;
 }
-
-const varianteDesdeServicio = (servicio: Partial<ServicioConfiguracionFaregas>): VarianteCertificado | '' => {
-  if (servicio.tipo_certificado_clave === 'GNV_ANUAL' && servicio.modalidad === 'INICIAL') return 'GNV_INICIAL';
-  if (servicio.tipo_certificado_clave === 'GNV_ANUAL' && servicio.modalidad === 'ANUAL') return 'GNV_ANUAL';
-  if (servicio.tipo_certificado_clave === 'GLP_ANUAL' && servicio.modalidad === 'INICIAL') return 'GLP_INICIAL';
-  if (servicio.tipo_certificado_clave === 'GLP_ANUAL' && servicio.modalidad === 'ANUAL') return 'GLP_ANUAL';
-  if (servicio.tipo_certificado_clave === 'CONFORMIDAD') return 'CONFORMIDAD';
-  if (servicio.tipo_flujo === 'TALLER_INSPECCION') {
-      if (servicio.tipo_certificado_clave === 'GNV_ANUAL' && servicio.modalidad === 'INICIAL') return 'TALLER_GNV_INICIAL';
-      if (servicio.tipo_certificado_clave === 'GNV_ANUAL' && servicio.modalidad === 'ANUAL') return 'TALLER_GNV_ANUAL';
-      if (servicio.tipo_certificado_clave === 'GLP_ANUAL' && servicio.modalidad === 'INICIAL') return 'TALLER_GLP_INICIAL';
-      if (servicio.tipo_certificado_clave === 'GLP_ANUAL' && servicio.modalidad === 'ANUAL') return 'TALLER_GLP_ANUAL';
-      return '';
-      }
-  return '';
-  };
-
-const configuracionVariante = (variante: VarianteCertificado | '') => {
-  switch (variante) {
-    case 'GNV_INICIAL': return { tipo_flujo: 'CERTIFICACION', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'INICIAL' as const };
-    case 'GNV_ANUAL': return { tipo_flujo: 'CERTIFICACION', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL' as const };
-    case 'GLP_INICIAL': return { tipo_flujo: 'CERTIFICACION', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'INICIAL' as const };
-    case 'GLP_ANUAL': return { tipo_flujo: 'CERTIFICACION', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL' as const };
-    case 'CONFORMIDAD': return { tipo_flujo: 'CERTIFICACION', tipo_certificado_clave: 'CONFORMIDAD', modalidad: null };
-    case 'TALLER_GNV_INICIAL': return { tipo_flujo: 'TALLER_INSPECCION', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'INICIAL' as const };
-    case 'TALLER_GNV_ANUAL': return { tipo_flujo: 'TALLER_INSPECCION', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL' as const };
-    case 'TALLER_GLP_INICIAL': return { tipo_flujo: 'TALLER_INSPECCION', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'INICIAL' as const };
-    case 'TALLER_GLP_ANUAL': return { tipo_flujo: 'TALLER_INSPECCION', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL' as const };
-  }
-};
 
 const codigoTecnico = (codigo: string) => codigo
   .trim()
@@ -99,6 +72,10 @@ export function ServicioModal({
   const [nombre, setNombre] = useState(initialData.nombre || productoInicial?.descripcion || categoria.nombre);
   const [generaCertificado, setGeneraCertificado] = useState(Boolean(initialData.requiere_certificado));
   const [variante, setVariante] = useState<VarianteCertificado | ''>(varianteDesdeServicio(initialData));
+  const opcionesVariantes = useMemo(
+    () => opcionesVariantesPorCategoria(categoria.codigo),
+    [categoria.codigo]
+  );
   const [requiereVehiculo, setRequiereVehiculo] = useState(initialData.requiere_vehiculo ?? Boolean(initialData.requiere_certificado));
   const orden = initialData.orden ?? 10;
   const productosSeleccionables = useMemo(() => productos.filter((producto) =>
@@ -199,7 +176,7 @@ export function ServicioModal({
         if (generaCertificado && !variante) throw new Error('Debe seleccionar una variante válida');
       const payload: Partial<ServicioConfiguracionFaregas> = {
         codigo: codigoTecnico(codigo), nombre: nombre.trim(), categoria_id: categoria.id,
-        tipo_flujo: (certificado ? certificado.tipo_flujo : 'SERVICIO_COMPLEMENTARIO') as TipoFlujoServicioFaregas,
+        tipo_flujo: certificado ? certificado.tipo_flujo : 'SERVICIO_COMPLEMENTARIO',
         requiere_certificado: generaCertificado,
         tipo_certificado_clave: certificado?.tipo_certificado_clave || null,
         modalidad: certificado?.modalidad || null,
@@ -257,10 +234,9 @@ export function ServicioModal({
             <div className="grid gap-4 md:grid-cols-2">
               <label className="flex cursor-pointer items-center gap-3 rounded-lg border bg-slate-50 p-3 text-sm font-bold text-slate-800"><input type="checkbox" checked={generaCertificado} onChange={(event) => { setGeneraCertificado(event.target.checked); if (event.target.checked) setRequiereVehiculo(true); }} className="h-5 w-5" />Genera certificado</label>
               {generaCertificado && <label className="text-sm font-semibold text-slate-700">Tipo de certificado<select value={variante} onChange={(event) => setVariante(event.target.value as VarianteCertificado)} className="mt-1 w-full rounded-lg border bg-white p-2"><option value="">-- Seleccione una variante --</option>
-                      <option value="GNV_INICIAL">GNV Inicial</option><option value="GNV_ANUAL">GNV Anual</option><option value="GLP_INICIAL">GLP Inicial</option><option value="GLP_ANUAL">GLP Anual</option><option value="CONFORMIDAD">Conformidad</option><option value="TALLER_GNV_INICIAL">Taller GNV Inicial</option>
-                      <option value="TALLER_GNV_ANUAL">Taller GNV Anual</option>
-                      <option value="TALLER_GLP_INICIAL">Taller GLP Inicial</option>
-                      <option value="TALLER_GLP_ANUAL">Taller GLP Anual</option></select></label>}
+                      {opcionesVariantes.map((opcion) => (
+                        <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
+                      ))}</select></label>}
               <label className="flex items-center gap-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={requiereVehiculo} onChange={(event) => setRequiereVehiculo(event.target.checked)} className="h-4 w-4" />Requiere vehículo en planta</label>
             </div>
             {generaCertificado && (

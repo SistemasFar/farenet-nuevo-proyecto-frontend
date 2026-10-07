@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { faregasConfigApi, type ServicioConfiguracionFaregas } from '../../../services/faregas-config.api';
 import { faregasFormatosApi, type Formato, type FormatoVersion } from '../../../services/faregas-formatos.api';
 import FormatosVariablesEditor from './FormatosVariablesEditor';
+import { presentacionRelacionFormato } from './servicio-certificado-variantes';
 
 const FormatoHtmlVariablesEditor = lazy(() => import('./FormatoHtmlVariablesEditor'));
 
@@ -277,9 +278,11 @@ export default function FormatoDetalleModal({
 
   if (formato && editorVersion) {
     return editorVersion.motor === 'HTML_DINAMICO'
-      ? <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-slate-100 text-slate-500">Cargando diseñador…</div>}><FormatoHtmlVariablesEditor formato={formato} version={editorVersion} canEditProtected={canManageProtected} onBack={() => { setEditorVersion(null); void cargarVersiones(formato.id); }} /></Suspense>
+      ? <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-slate-100 text-slate-500">Cargando diseñador…</div>}><FormatoHtmlVariablesEditor key={editorVersion.id} formato={formato} version={editorVersion} canEditProtected={canManageProtected} onOpenVersion={(nuevaVersion) => { setEditorVersion(nuevaVersion); void cargarVersiones(formato.id); }} onBack={() => { setEditorVersion(null); void cargarVersiones(formato.id); }} /></Suspense>
       : <FormatosVariablesEditor formato={formato} version={editorVersion} onBack={() => { setEditorVersion(null); void cargarVersiones(formato.id); }} />;
   }
+
+  const relacionFormato = formato ? presentacionRelacionFormato(formato) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -305,10 +308,10 @@ export default function FormatoDetalleModal({
                     {formato.es_protegido && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">SISTEMA / PROTEGIDO</span>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">Base: {formato.formato_padre_nombre || formato.nombre}</span>
+                    <span className="rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">{relacionFormato?.etiqueta}: {relacionFormato?.valor}</span>
                     {contextoOperacion && onChangeBase && (
                       <button type="button" onClick={onChangeBase} className="rounded border border-indigo-200 bg-white px-2 py-0.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-50">
-                        Cambiar certificado base
+                        {relacionFormato?.accion}
                       </button>
                     )}
                   </div>
