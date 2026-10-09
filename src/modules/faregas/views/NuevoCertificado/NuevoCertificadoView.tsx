@@ -21,7 +21,7 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { validarDatosInicialesCampos, validarPasoExpedienteTecnico, validarPasoPago, validarDatosFacturacionCampos, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
+import { validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { useErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual as indicePaso } from './faregas-emision';
@@ -1159,8 +1159,8 @@ export function NuevoCertificadoView() {
    *
    * Devuelve true cuando el avance queda bloqueado.
    */
-  const exigirVehiculoCompleto = (): boolean => {
-    const erroresCampo = validarFormularioVehiculoVisible({
+  const obtenerErroresVehiculo = (): Record<string, string> =>
+    validarFormularioVehiculoVisible({
       tipoCertificado: formCaja.tipoCertificado as TipoCertificadoFaregas,
       modalidad: formCaja.modalidadCertificado,
       caja: formCaja,
@@ -1171,7 +1171,65 @@ export function NuevoCertificadoView() {
       conformidad: formConformidad,
       facturacion: formFacturacion,
     });
-    return bloquearPaso(erroresCampo);
+
+  const obtenerErroresDatosTecnicos = () => {
+    if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
+      return {
+        campos: {} as Record<string, string>,
+        resumen: formatoFormulario
+          ? validarFormularioFormatoDinamico(formatoFormulario.campos, formatoValores)
+          : [formatoFormularioError || 'No se pudo cargar el formulario dinámico del formato.'],
+      };
+    }
+
+    return {
+      campos: obtenerErroresVehiculo(),
+      resumen: [] as string[],
+    };
+  };
+
+  /**
+   * Valida exclusivamente el contenido de Vehículo y Datos Técnicos. Cuando un
+   * borrador antiguo ya estaba ubicado en Previsualización o Facturación, lo
+   * devuelve al paso técnico en vez de permitir que esa posición guardada
+   * omita los campos obligatorios.
+   */
+  const exigirDatosTecnicosCompletos = (regresarAlPasoTecnico = false): boolean => {
+    const { campos, resumen } = obtenerErroresDatosTecnicos();
+    const tieneErroresCampo = Object.keys(campos).length > 0;
+    const estaIncompleto = tieneErroresCampo || resumen.length > 0;
+    if (!estaIncompleto) {
+      limpiarErroresPaso();
+      return false;
+    }
+
+    if (regresarAlPasoTecnico) {
+      if (tieneErroresCampo) registrarErrores(campos);
+      setMinimumEditableStepIndex((actual) => Math.min(actual, 2));
+      setCurrentStepIndex(2);
+    }
+
+    if (resumen.length > 0) {
+      mostrarErroresPaso(resumen);
+    } else {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Complete los campos obligatorios',
+        text: regresarAlPasoTecnico
+          ? 'El borrador tiene datos incompletos. Regresamos a Vehículo y Datos Técnicos para que corrija los campos marcados en rojo.'
+          : 'Los campos marcados en rojo deben corregirse para continuar.',
+        confirmButtonColor: '#052a79',
+      });
+    }
+
+    if (tieneErroresCampo) {
+      if (regresarAlPasoTecnico) {
+        window.setTimeout(enfocarPrimerError, 0);
+      } else {
+        enfocarPrimerError();
+      }
+    }
+    return true;
   };
 
   const irSiguientePaso = async () => {
@@ -1238,19 +1296,10 @@ export function NuevoCertificadoView() {
           mostrarErroresPaso([e.message || 'No se pudo validar el chip seleccionado.']);
           return;
         }
-        const esDinamico = formCaja.tipo_flujo === 'TALLER_INSPECCION';
-        if (esDinamico) {
-          // El formulario dinámico define sus propias variables: se conserva el
-          // resumen en Swal porque cada campo se pinta desde el motor de
-          // formatos y no desde un control con nombre fijo.
-          const erroresDinamico = formatoFormulario
-            ? validarFormularioFormatoDinamico(formatoFormulario.campos, formatoValores)
-            : [formatoFormularioError || 'No se pudo cargar el formulario dinámico del formato.'];
-          if (mostrarErroresPaso(erroresDinamico)) return;
-        } else {
-          // Regla única: todo control visible y editable debe estar completo.
-          if (exigirVehiculoCompleto()) return;
-        }
+        // Regla única: todo control visible y editable de Vehículo y Datos
+        // Técnicos debe estar completo, tanto en formularios vehiculares como
+        // en los formatos dinámicos de inspección de taller.
+        if (exigirDatosTecnicosCompletos()) return;
         setIsSavingStep(true);
         try {
           if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
@@ -1304,6 +1353,7 @@ export function NuevoCertificadoView() {
           setIsSavingStep(false);
         }
       } else if (STEPS[currentStepIndex].id === 'previsualizacion' && certificadoId) {
+        if (exigirDatosTecnicosCompletos(true)) return;
         await persistirPaso(certificadoId, 'FACTURACION');
       }
       const siguiente = currentStepIndex + 1;
@@ -1607,6 +1657,18 @@ export function NuevoCertificadoView() {
     return <div className="p-8 text-center text-red-500">{error}</div>;
   }
 
+  const pasoPosteriorADatosTecnicos = currentStepIndex >= indicePaso('PREVISUALIZACION');
+  const datosTecnicosIncompletos = !soloLectura
+    && pasoPosteriorADatosTecnicos
+    && (() => {
+      const { campos, resumen } = obtenerErroresDatosTecnicos();
+      return Object.keys(campos).length > 0 || resumen.length > 0;
+    })();
+
+  const volverACorregirDatosTecnicos = () => {
+    exigirDatosTecnicosCompletos(true);
+  };
+
   return (
     <div className="faregas-certificate-wizard w-full bg-white rounded-2xl shadow-xl border-t-[4px] border-solid border-t-[#f59e0b] overflow-hidden flex flex-col" style={{ borderImage: "linear-gradient(to right, #fde047 0%, #f59e0b 50%, #b45309 100%) 1" }}>
 
@@ -1812,14 +1874,36 @@ export function NuevoCertificadoView() {
         {STEPS[currentStepIndex].id === 'previsualizacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no tiene un certificado emitido para previsualizar.</p>
         )}
-        {STEPS[currentStepIndex].id === 'previsualizacion' && (!soloLectura || certificadoEstado === 'EMITIDO') && (
+        {STEPS[currentStepIndex].id === 'previsualizacion' && datosTecnicosIncompletos && (
+          <div role="alert" className="mx-auto max-w-2xl rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center shadow-sm">
+            <h3 className="text-lg font-black text-amber-900">Faltan datos del vehículo o del expediente técnico</h3>
+            <p className="mt-2 text-sm text-amber-800">
+              No se puede mostrar una previsualización válida ni continuar a facturación hasta completar todos los campos obligatorios.
+            </p>
+            <button type="button" onClick={volverACorregirDatosTecnicos} className="mt-5 rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">
+              CORREGIR VEHÍCULO Y DATOS TÉCNICOS
+            </button>
+          </div>
+        )}
+        {STEPS[currentStepIndex].id === 'previsualizacion' && !datosTecnicosIncompletos && (!soloLectura || certificadoEstado === 'EMITIDO') && (
           <PrevisualizacionCertificadoStep certificadoId={certificadoId} />
         )}
         </fieldset>
         {STEPS[currentStepIndex].id === 'facturacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no llegó a emitirse.</p>
         )}
-        {STEPS[currentStepIndex].id === 'facturacion' && (!soloLectura || certificadoEstado === 'EMITIDO') && (
+        {STEPS[currentStepIndex].id === 'facturacion' && datosTecnicosIncompletos && (
+          <div role="alert" className="mx-auto max-w-2xl rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center shadow-sm">
+            <h3 className="text-lg font-black text-amber-900">La emisión está bloqueada por datos incompletos</h3>
+            <p className="mt-2 text-sm text-amber-800">
+              Complete primero Vehículo y Datos Técnicos. Ningún certificado puede facturarse o emitirse con campos obligatorios vacíos.
+            </p>
+            <button type="button" onClick={volverACorregirDatosTecnicos} className="mt-5 rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">
+              CORREGIR VEHÍCULO Y DATOS TÉCNICOS
+            </button>
+          </div>
+        )}
+        {STEPS[currentStepIndex].id === 'facturacion' && !datosTecnicosIncompletos && (!soloLectura || certificadoEstado === 'EMITIDO') && (
           <FacturacionEmisionStep
             certificadoId={certificadoId}
             certificadoEstado={certificadoEstado}

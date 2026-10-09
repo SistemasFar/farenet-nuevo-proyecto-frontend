@@ -94,7 +94,6 @@ export function ChipsView() {
   const [loading, setLoading] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showVentaModal, setShowVentaModal] = useState(false);
-  const [detalleOperacionId, setDetalleOperacionId] = useState<number | null>(null);
   const [ventasRefreshToken, setVentasRefreshToken] = useState(0);
 
   // New Product Modal State
@@ -518,7 +517,7 @@ export function ChipsView() {
       </div>
     </div>}
 
-    {activeTab === 'VENTAS' && <TabVentas setShowVentaModal={setShowVentaModal} onSelectVenta={setDetalleOperacionId} refreshToken={ventasRefreshToken} />}
+    {activeTab === 'VENTAS' && <TabVentas setShowVentaModal={setShowVentaModal} refreshToken={ventasRefreshToken} />}
     {activeTab === 'INVENTARIO' && <>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-4">
@@ -766,7 +765,6 @@ export function ChipsView() {
       </div>
     </>}
 
-    {detalleOperacionId !== null && <ModalDetalleVentaChips operacionId={detalleOperacionId} onClose={() => setDetalleOperacionId(null)} onAnular={anularComprobante} puedeVender={puedeVender} anulando={accionEnProceso === detalleOperacionId} />}
     {showVentaModal && <ModalVentaChips onClose={() => setShowVentaModal(false)} onVentaExitosa={() => { setVentasRefreshToken((value) => value + 1); void cargar(); }} />}
     {(showProductModal || editingProductoId) && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
@@ -845,13 +843,14 @@ export function ChipsView() {
 
 
 
-function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShowVentaModal: (v: boolean) => void; onSelectVenta: (operacionId: number) => void; refreshToken: number }) {
+function TabVentas({ setShowVentaModal, refreshToken }: { setShowVentaModal: (v: boolean) => void; refreshToken: number }) {
   // El botón se refleja con el permiso real CHIPS_VENDER. Si luego se retira el
   // permiso del perfil, el botón desaparece sin tocar código. El backend sigue
   // siendo la autoridad: protege cada ruta con ese mismo permiso.
   const { permisos } = useOutletContext<MainLayoutContext>();
   const puedeVender = Array.isArray(permisos) && permisos.includes('CHIPS_VENDER');
   const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
+  const [detalleOperacionId, setDetalleOperacionId] = useState<number | null>(null);
 
   // Listado transaccional: abre en HOY -> HOY, 10 por pagina, y pagina en el
   // backend (LIMIT/OFFSET + COUNT con los mismos filtros).
@@ -992,7 +991,7 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
               ) : ventas.length === 0 ? (
                 <tr><td colSpan={9} className="p-8 text-center text-slate-500">No se encontraron registros para el rango seleccionado.</td></tr>
               ) : ventas.map((venta) => (
-                <tr key={venta.operacionId} onClick={() => onSelectVenta(venta.operacionId)} className="cursor-pointer border-t border-slate-100 transition hover:bg-blue-50/60">
+                <tr key={venta.operacionId} onClick={() => setDetalleOperacionId(venta.operacionId)} className="cursor-pointer border-t border-slate-100 transition hover:bg-blue-50/60">
                   <td className="px-4 py-3 font-bold text-[#052A79]">OP. #{venta.operacionId}</td>
                   <td className="px-4 py-3">{new Date(venta.creadoEn).toLocaleString()}</td>
                   <td className="px-4 py-3 font-medium">
@@ -1071,6 +1070,15 @@ function TabVentas({ setShowVentaModal, onSelectVenta, refreshToken }: { setShow
           deshabilitado={listado.loading}
         />
       </div>
+      {detalleOperacionId !== null && (
+        <ModalDetalleVentaChips
+          operacionId={detalleOperacionId}
+          onClose={() => setDetalleOperacionId(null)}
+          onAnular={anularComprobante}
+          puedeVender={puedeVender}
+          anulando={accionEnProceso === detalleOperacionId}
+        />
+      )}
     </div>
   );
 }

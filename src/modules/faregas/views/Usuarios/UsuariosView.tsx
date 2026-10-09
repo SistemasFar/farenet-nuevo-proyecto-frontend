@@ -90,6 +90,10 @@ export function UsuariosView() {
   const [modalMode, setModalMode] = useState<'crear' | 'editar'>('crear');
   const [formData, setFormData] = useState<any>({});
   const [selectedUsername, setSelectedUsername] = useState('');
+  const [detalleSedes, setDetalleSedes] = useState<{
+    usuario: string;
+    sedes: Array<{ key: string; nombre: string }>;
+  } | null>(null);
 
   const currentUsername = JSON.parse(sessionStorage.getItem('faregasUser') || '{}').username;
 
@@ -542,10 +546,25 @@ export function UsuariosView() {
                         {u.perfil_id === 'SISTEMAS' ? (
                           <span className="text-xs font-semibold text-gray-500">Todas</span>
                         ) : (
-                          <div className="flex flex-wrap gap-1 max-w-[150px]">
-                            {u.sedes?.map((s: any) => (
-                              <span key={s.key} className="rounded border border-gray-200 bg-gray-50 px-1 py-0.5 text-[10px] text-gray-600">{s.nombre}</span>
+                          <div
+                            className="flex max-w-[260px] items-center gap-1 whitespace-nowrap"
+                            title={(u.sedes || []).map((s: any) => s.nombre).join(', ')}
+                          >
+                            {u.sedes?.slice(0, 2).map((s: any) => (
+                              <span key={s.key} className="max-w-[110px] truncate rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] text-gray-600">
+                                {s.nombre}
+                              </span>
                             ))}
+                            {u.sedes?.length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => setDetalleSedes({ usuario: u.username, sedes: u.sedes.slice(2) })}
+                                className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-[#052A79] hover:bg-blue-100"
+                                title={`Ver ${u.sedes.length - 2} sedes adicionales`}
+                              >
+                                +{u.sedes.length - 2} más
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -642,6 +661,42 @@ export function UsuariosView() {
       </div>
 
       {/* Modals */}
+      {detalleSedes && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="detalle-sedes-titulo"
+          onClick={() => setDetalleSedes(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-4 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="detalle-sedes-titulo" className="text-sm font-bold text-[#052A79]">Sedes adicionales</h2>
+                <p className="mt-0.5 text-xs text-slate-500">Usuario: {detalleSedes.usuario}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetalleSedes(null)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-50"
+                aria-label="Cerrar detalle de sedes"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="mt-4 flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">
+              {detalleSedes.sedes.map((sede) => (
+                <span key={sede.key} className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-700">
+                  {sede.nombre}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">

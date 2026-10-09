@@ -3,6 +3,7 @@ import type { PlantaAsignada } from '@/types/auth';
 import { useEmpresa } from '@/context/EmpresaContext';
 
 import bgFarenet from '@/assets/images/farenet1.png';
+import faregasLogo from '@/assets/images/faregas_logo.png';
 
 interface SelectPlantaViewProps {
   plantas: PlantaAsignada[];
@@ -34,8 +35,8 @@ export function SelectPlantaView({
     try {
       setLoading(true);
       await onConfirmPlanta(selectedKey);
-    } catch (err: any) {
-      setError(err.message || 'No se pudo confirmar la sede seleccionada.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'No se pudo confirmar la sede seleccionada.');
     } finally {
       setLoading(false);
     }
@@ -43,40 +44,29 @@ export function SelectPlantaView({
 
   return (
     <div
-      className="flex min-h-screen flex-col items-center justify-center p-4 select-none bg-cover bg-center bg-no-repeat relative"
+      className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-y-auto bg-cover bg-[position:55%_center] bg-no-repeat px-3 py-5 sm:px-4 sm:py-8"
       style={{ backgroundImage: `url(${bgFarenet})` }}
     >
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"></div>
 
-      <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
-        <div className="mb-4 text-center">
+      <div className="relative z-10 flex w-full max-w-md flex-col items-center">
+        <div className="mb-4 w-full text-center sm:mb-5">
           {isFaregas ? (
-            <div className="flex items-center justify-center select-none drop-shadow-lg mb-2">
-              <h1 className="text-[4.5rem] font-black tracking-[0.02em] text-gold-3d leading-none" style={{ fontFamily: '"Impact", "Arial Black", sans-serif' }}>FARE</h1>
-              <div className="mx-1 mt-1">
-                <svg width="45" height="60" viewBox="0 0 100 130" className="drop-shadow-md">
-                  <path d="M 50,0 C 50,0 10,70 10,95 C 10,117 28,130 50,130 C 72,130 90,117 90,95 C 90,70 50,0 50,0 Z" fill="#25a5e3" />
-                  <path d="M 52,40 C 52,40 75,75 75,100 C 75,115 65,125 50,125 C 60,110 50,90 48,70 C 47,60 52,40 52,40 Z" fill="#e6201b" />
-                  <path d="M 54,65 C 54,65 67,85 67,105 C 67,115 60,120 52,120 C 58,110 52,95 50,85 C 49,80 54,65 54,65 Z" fill="#fbd304" />
-                  <path d="M 20,95 C 20,80 35,45 45,25 C 35,45 25,75 25,95 C 25,105 32,115 40,120 C 30,115 20,105 20,95 Z" fill="#69c8f5" opacity="0.8" />
-                </svg>
-              </div>
-              <h1 className="text-[4.5rem] font-black tracking-[0.02em] text-gold-3d leading-none" style={{ fontFamily: '"Impact", "Arial Black", sans-serif' }}>GAS</h1>
-            </div>
+            <img src={faregasLogo} alt="FARE GAS" className="mx-auto h-auto w-[min(82vw,420px)] max-w-full select-none drop-shadow-[0_5px_8px_rgba(0,0,0,0.55)]" />
           ) : (
             <h1 className="text-5xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
               FARENET
             </h1>
           )}
 
-          <h2 className="mt-2 text-lg font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+          <h2 className="mt-3 text-lg font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] sm:text-xl">
             Seleccionar Sede
           </h2>
         </div>
 
-        <div className="w-full rounded-xl bg-white/10 backdrop-blur-md border border-white/20 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+        <div className="w-full rounded-2xl border border-white/20 bg-slate-950/35 p-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] backdrop-blur-md sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-xs text-slate-200 text-center font-medium drop-shadow-sm">
+            <p className="text-center text-sm font-medium leading-5 text-slate-100 drop-shadow-sm">
               Elige la sede desde la que vas a operar en esta sesión.
             </p>
 
@@ -104,7 +94,7 @@ export function SelectPlantaView({
                   setSelectedKey(e.target.value);
                   setError(null);
                 }}
-                className="w-full rounded border border-white/10 bg-white/15 px-4 py-3 text-sm text-white outline-none transition focus:border-white/30 focus:bg-white/25 cursor-pointer appearance-none disabled:opacity-50"
+                className="min-h-12 w-full cursor-pointer appearance-none rounded-lg border border-white/20 bg-slate-900/70 px-4 py-3 text-base text-white outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-300/30 disabled:opacity-50"
                 style={{ colorScheme: 'dark' }}
               >
                 <option value="" className="text-slate-800 bg-white">
@@ -127,7 +117,7 @@ export function SelectPlantaView({
               <button
                 type="submit"
                 disabled={loading || plantas.length === 0}
-                className="w-full rounded-xl bg-gold-3d py-3 text-sm font-black capitalize tracking-wider shadow-lg transition disabled:opacity-50"
+                className="min-h-12 w-full rounded-xl bg-gold-3d px-4 py-3 text-base font-black tracking-wide shadow-lg transition disabled:opacity-50"
               >
                 {loading ? 'Confirmando...' : 'Confirmar Sede'}
               </button>
@@ -136,7 +126,7 @@ export function SelectPlantaView({
                 type="button"
                 onClick={onCancel}
                 disabled={loading}
-                className="w-full text-center text-xs text-slate-300 hover:text-white transition-colors py-1 underline underline-offset-4 disabled:opacity-50"
+                className="min-h-11 w-full rounded-lg px-3 py-2 text-center text-sm text-slate-200 underline underline-offset-4 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
               >
                 ← Volver al Login
               </button>

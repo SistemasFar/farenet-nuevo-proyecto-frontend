@@ -8,11 +8,13 @@ const normalizarTexto = (valor: unknown) => String(valor ?? '')
  * Compara combustibles por su significado y no por la puntuación usada.
  * Ejemplo: "BI COMBUSTIBLE/GNV" y "BI - COMBUSTIBLE GNV" son lo mismo.
  */
-export const combustiblesGnvSonEquivalentes = (antes: unknown, despues: unknown): boolean => {
+export const combustiblesSonEquivalentes = (antes: unknown, despues: unknown): boolean => {
   const combustibleAntes = normalizarTexto(antes);
   const combustibleDespues = normalizarTexto(despues);
   return Boolean(combustibleAntes && combustibleDespues && combustibleAntes === combustibleDespues);
 };
+
+export const combustiblesGnvSonEquivalentes = combustiblesSonEquivalentes;
 
 /** Compara pesos escritos con punto o coma, tolerando sólo redondeo decimal. */
 export const pesosGnvSonIguales = (antes: unknown, despues: unknown): boolean => {
@@ -21,4 +23,3 @@ export const pesosGnvSonIguales = (antes: unknown, despues: unknown): boolean =>
   if (!Number.isFinite(pesoAntes) || !Number.isFinite(pesoDespues)) return false;
   return Math.abs(pesoAntes - pesoDespues) < 0.001;
 };
-

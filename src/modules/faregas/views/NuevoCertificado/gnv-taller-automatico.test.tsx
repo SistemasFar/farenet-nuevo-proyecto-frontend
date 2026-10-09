@@ -1,10 +1,9 @@
-import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import { alternarIncumplimientoGnv, marcarTodasVerificacionesGnvComoCumple } from './gnv-verificaciones';
 import { validarDatosEspecificos, validarFormularioVehiculoVisible } from './faregas-wizard.validation';
-import { combustiblesGnvSonEquivalentes, pesosGnvSonIguales } from './gnv-conversion';
+import { combustiblesGnvSonEquivalentes, combustiblesSonEquivalentes, pesosGnvSonIguales } from './gnv-conversion';
 
 const renderGnv = (
   modalidad: 'INICIAL' | 'ANUAL',
@@ -97,6 +96,11 @@ describe('taller GNV automático por sede', () => {
     expect(combustiblesGnvSonEquivalentes('GASOLINA', 'BI - COMBUSTIBLE GNV')).toBe(false);
   });
 
+  it('reconoce como equivalentes las variantes escritas de BI-COMBUSTIBLE GLP', () => {
+    expect(combustiblesSonEquivalentes('BI COMBUSTIBLE/GLP', 'BI-COMBUSTIBLE GLP')).toBe(true);
+    expect(combustiblesSonEquivalentes('GASOLINA', 'BI-COMBUSTIBLE GLP')).toBe(false);
+  });
+
   it('reconoce el mismo peso aunque tenga distinta cantidad de decimales', () => {
     expect(pesosGnvSonIguales('1301.000', '1301')).toBe(true);
     expect(pesosGnvSonIguales('1301', '1450')).toBe(false);
@@ -132,5 +136,89 @@ describe('taller GNV automático por sede', () => {
     });
     expect(errores['gnv.combustiblePosterior']).toContain('diferente');
     expect(errores['gnv.pesoNetoPosterior']).toContain('diferente');
+  });
+
+  it('bloquea GLP inicial cuando el combustible original ya es BI-COMBUSTIBLE GLP', () => {
+    const errores = validarFormularioVehiculoVisible({
+      tipoCertificado: 'GLP_ANUAL',
+      modalidad: 'INICIAL',
+      caja: {},
+      vehiculo: { combustible: 'BI COMBUSTIBLE/GLP' },
+      titulares: [],
+      gnv: {},
+      glp: {},
+      conformidad: {},
+      facturacion: {}
+    });
+
+    expect(errores.combustible).toContain('diferente');
+  });
+
+  it('GLP inicial acepta un combustible original distinto al resultado', () => {
+    const errores = validarFormularioVehiculoVisible({
+      tipoCertificado: 'GLP_ANUAL',
+      modalidad: 'INICIAL',
+      caja: {},
+      vehiculo: { combustible: 'GASOLINA' },
+      titulares: [],
+      gnv: {},
+      glp: {},
+      conformidad: {},
+      facturacion: {}
+    });
+
+    expect(errores.combustible).toBeUndefined();
+  });
+
+  it('bloquea GLP si cualquier dato visible del cilindro o regulador está incompleto', () => {
+    const errores = validarFormularioVehiculoVisible({
+      tipoCertificado: 'GLP_ANUAL',
+      modalidad: 'ANUAL',
+      caja: {},
+      vehiculo: {},
+      titulares: [],
+      gnv: {},
+      glp: {
+        tallerAutorizadoId: '12',
+        fechaVigencia: '2027-10-09',
+        expedienteTecnico: 'EXP-1',
+        verificaciones: Array.from({ length: 7 }, (_, indice) => ({ codigo: String(indice), cumple: true })),
+        componentes: [
+          { componente: 'CILINDRO', marca: 'FABRICANTE', modelo: '', capacidadLitros: '111', mesFabricacion: '12', anioFabricacion: '2025', numeroSerie: 'SER-1' },
+          { componente: 'REGULADOR', marca: 'FABRICANTE', modelo: 'REG-1', numeroSerie: '' },
+        ],
+      },
+      conformidad: {},
+      facturacion: {},
+    });
+
+    expect(errores['glp.componentes.CILINDRO.modelo']).toBeDefined();
+    expect(errores['glp.componentes.REGULADOR.numeroSerie']).toBeDefined();
+  });
+
+  it('bloquea GNV inicial si falta cualquier dato de los componentes instalados', () => {
+    const errores = validarFormularioVehiculoVisible({
+      tipoCertificado: 'GNV_ANUAL',
+      modalidad: 'INICIAL',
+      caja: {},
+      vehiculo: { combustible: 'GASOLINA', pesoNeto: '1301' },
+      titulares: [],
+      gnv: {
+        fechaVigencia: '2027-10-09',
+        combustiblePosterior: 'BI - COMBUSTIBLE GNV',
+        pesoNetoPosterior: '1450',
+        verificaciones: Array.from({ length: 8 }, (_, indice) => ({ codigo: String(indice), cumple: true })),
+        componentes: [
+          { componente: 'REDUCTOR', marca: '', numeroSerie: 'RED-1', capacidadLitros: 'NO APLICA', mesFabricacion: '10', anioFabricacion: '2025' },
+          { componente: 'CILINDRO', marca: 'FABRICANTE', numeroSerie: 'CIL-1', capacidadLitros: '80', mesFabricacion: '', anioFabricacion: '' },
+        ],
+      },
+      glp: {},
+      conformidad: {},
+      facturacion: {},
+    });
+
+    expect(errores['gnv.componentes.REDUCTOR.marca']).toBeDefined();
+    expect(errores['gnv.componentes.CILINDRO.fechaFabricacion']).toBeDefined();
   });
 });

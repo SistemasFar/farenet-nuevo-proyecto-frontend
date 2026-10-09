@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../../Dashboard/MainLayout';
 import TabSeries from './TabSeries';
@@ -36,17 +36,16 @@ export default function TabFacturacion({ plantaKey, plantaNombre }: { plantaKey:
   // `PREPARACION` era la pestaña fija inicial. Con submódulos puede no existir, y
   // los permisos llegan de forma asíncrona desde el contexto, así que el estado
   // se corrige cada vez que cambia el conjunto autorizado.
-  const [vista, setVista] = useState<VistaFacturacion>(permitidas[0] ?? 'DOCUMENTOS');
-  useEffect(() => {
-    if (permitidas.length > 0 && !permitidas.includes(vista)) {
-      setVista(permitidas[0]);
-    }
-  }, [permitidas, vista]);
+  const [vistaSeleccionada, setVistaSeleccionada] = useState<VistaFacturacion>('PREPARACION');
+  const vista = permitidas.includes(vistaSeleccionada)
+    ? vistaSeleccionada
+    : (permitidas[0] ?? 'DOCUMENTOS');
 
   const pestana = (id: VistaFacturacion, label: string) => (
     <button
+      key={id}
       type="button"
-      onClick={() => setVista(id)}
+      onClick={() => setVistaSeleccionada(id)}
       className={`rounded-lg px-4 py-2 text-sm font-bold ${vista === id ? 'bg-[#052a79] text-white' : 'bg-slate-100 text-slate-600'}`}
     >
       {label}
@@ -54,8 +53,10 @@ export default function TabFacturacion({ plantaKey, plantaNombre }: { plantaKey:
   );
 
   return <div className="space-y-5">
-    <div className="flex gap-2 border-b pb-3">
-      {visibles.map((p) => pestana(p.id, p.label))}
+    <div className="-mx-1 overflow-x-auto px-1">
+      <div className="flex min-w-max gap-2 border-b border-slate-200 pb-3">
+        {visibles.map((p) => pestana(p.id, p.label))}
+      </div>
     </div>
     {vista === 'PREPARACION' && <NubefactReadinessPanel plantaKey={plantaKey} plantaNombre={plantaNombre} />}
     {vista === 'SERIES' && <TabSeries />}

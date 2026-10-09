@@ -7,7 +7,7 @@ export function FaregasFacturacionView() {
 
   return (
     <div className="space-y-4">
-      <header className="mb-6">
+      <header className="mb-4 sm:mb-6">
         <h1 className="text-xl font-bold text-gray-800">Facturación electrónica</h1>
         <p className="text-sm text-gray-500">
           Preparación de NubeFact, administración de series y seguimiento de comprobantes.
@@ -15,7 +15,7 @@ export function FaregasFacturacionView() {
       </header>
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           <TabFacturacion plantaKey={plantaKey} plantaNombre={plantaNombre} />
         </div>
       </section>

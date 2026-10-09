@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import faregasLogo from '@/assets/images/faregas_logo.png';
 
 interface MenuItem {
   path: string;
@@ -15,6 +16,8 @@ interface SidebarProps {
   permisos: string[];
   perfilId: string; // ✨ 1. Agregamos el perfilId al contrato de props del Sidebar
   isFaregas?: boolean;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 
   onMouseEnterSidebar: () => void;
   onMouseLeaveSidebar: () => void;
@@ -299,10 +302,13 @@ export function Sidebar({
   permisos,
   perfilId, // ✨ 2. Desestructuramos la nueva prop recibida
   isFaregas,
+  mobileOpen = false,
+  onCloseMobile,
 
   onMouseEnterSidebar,
   onMouseLeaveSidebar
 }: SidebarProps) {
+  const showExpandedContent = mobileOpen || !collapsed;
   
   // 🔐 ✨ AQUÍ SE LIBERA EL BLOQUEO ✨ 🔐
   let menuVisible = menuItems.filter((item) => {
@@ -375,40 +381,43 @@ export function Sidebar({
     <aside
       onMouseEnter={onMouseEnterSidebar}
       onMouseLeave={onMouseLeaveSidebar}
-      className="bg-[#052a79] flex h-screen flex-col overflow-hidden transition-[width,padding] duration-300 ease-in-out shadow-xl border-r border-blue-900"
-      style={{
-        width: collapsed ? '90px' : '290px',
-        padding: collapsed ? '0 8px' : '0 20px'
-      }}
+      aria-hidden={!mobileOpen ? undefined : false}
+      className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(82vw,300px)] flex-col overflow-hidden border-r border-blue-900 bg-[#052a79] px-4 shadow-2xl transition-[transform,width,padding] duration-300 ease-in-out md:relative md:z-auto md:h-screen md:translate-x-0 md:shadow-xl ${
+        mobileOpen ? 'translate-x-0' : '-translate-x-full'
+      } ${
+        collapsed ? 'md:w-[90px] md:px-2' : 'md:w-[290px] md:px-5'
+      }`}
     >
-      <div className="flex items-center justify-center px-5 pt-6 pb-4 border-b border-blue-800/50">
+      <div className="relative flex min-h-[76px] items-center justify-center border-b border-blue-800/50 px-2 pb-4 pt-5">
         <Link
           to={isFaregas ? '/faregas/inicio' : '/inicio'}
+          onClick={onCloseMobile}
           className="flex w-full items-center justify-center cursor-pointer"
         >
-          {collapsed ? (
+          {!showExpandedContent ? (
             <div className="h-10 w-10 bg-gold-3d rounded-full flex items-center justify-center font-black text-white text-xl shadow-md select-none">
               {isFaregas ? 'FG' : 'F'}
             </div>
           ) : isFaregas ? (
-            <div className="flex items-center justify-center select-none drop-shadow-md">
-              <h1 className="text-[2.6rem] font-black tracking-[0.02em] text-gold-3d leading-none" style={{ fontFamily: '"Impact", "Arial Black", sans-serif' }}>FARE</h1>
-              <div className="mx-1 mt-1">
-                <svg width="25" height="35" viewBox="0 0 100 130" className="drop-shadow-md">
-                  <path d="M 50,0 C 50,0 10,70 10,95 C 10,117 28,130 50,130 C 72,130 90,117 90,95 C 90,70 50,0 50,0 Z" fill="#25a5e3" />
-                  <path d="M 52,40 C 52,40 75,75 75,100 C 75,115 65,125 50,125 C 60,110 50,90 48,70 C 47,60 52,40 52,40 Z" fill="#e6201b" />
-                  <path d="M 54,65 C 54,65 67,85 67,105 C 67,115 60,120 52,120 C 58,110 52,95 50,85 C 49,80 54,65 54,65 Z" fill="#fbd304" />
-                  <path d="M 20,95 C 20,80 35,45 45,25 C 35,45 25,75 25,95 C 25,105 32,115 40,120 C 30,115 20,105 20,95 Z" fill="#69c8f5" opacity="0.8" />
-                </svg>
-              </div>
-              <h1 className="text-[2.6rem] font-black tracking-[0.02em] text-gold-3d leading-none" style={{ fontFamily: '"Impact", "Arial Black", sans-serif' }}>GAS</h1>
-            </div>
+            <img
+              src={faregasLogo}
+              alt="FAREGAS"
+              className="h-auto w-full max-w-[220px] select-none object-contain drop-shadow-md"
+            />
           ) : (
             <h1 className="text-3xl font-black tracking-tight text-gold-3d font-serif select-none drop-shadow-md">
               FARENET
             </h1>
           )}
         </Link>
+        <button
+          type="button"
+          onClick={onCloseMobile}
+          className="absolute -right-1 top-2 flex h-10 w-10 items-center justify-center rounded-xl text-2xl text-white/80 transition hover:bg-white/10 hover:text-white md:hidden"
+          aria-label="Cerrar menú"
+        >
+          ×
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -421,6 +430,7 @@ export function Sidebar({
               return (
                 <li key={item.key}>
                   <Link to={linkPath}
+                    onClick={onCloseMobile}
                     
                     className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
                       isActive
@@ -432,7 +442,7 @@ export function Sidebar({
                       {item.icon}
                     </span>
 
-                    {!collapsed && (
+                    {showExpandedContent && (
                       <span className="truncate capitalize tracking-wide text-xs">
                         {item.label}
                       </span>

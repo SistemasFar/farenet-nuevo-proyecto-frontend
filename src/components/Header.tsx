@@ -20,6 +20,13 @@ interface HeaderProps {
   isFaregas?: boolean;
 }
 
+interface FaregasUsuarioResumen {
+  username: string;
+  nombreRazonSocial?: string;
+  nombres?: string;
+  apellidos?: string;
+}
+
 function routeToTitle(tabId: string): string {
   const map: Record<string, string> = {
     inicio: 'Inicio',
@@ -31,7 +38,11 @@ function routeToTitle(tabId: string): string {
     recibos: 'Recibos',
     usuarios: 'Usuarios',
     empresas: 'Empresas',
-    descuentos: 'Descuentos'
+    descuentos: 'Descuentos',
+    auditoria: 'Auditoría',
+    chips: 'Inventario',
+    configuracion: 'Configuración',
+    facturacion: 'Facturación'
   };
 
   return map[tabId] ?? 'Panel';
@@ -66,8 +77,8 @@ export function Header({
     if (isFaregas && user?.username) {
       import('../modules/faregas/services/faregas-usuarios.api')
         .then(({ faregasUsuariosApi }) => faregasUsuariosApi.obtenerUsuarios())
-        .then((usuarios: any[]) => {
-          const u = usuarios.find((x: any) => x.username === user.username);
+        .then((usuarios: FaregasUsuarioResumen[]) => {
+          const u = usuarios.find((x) => x.username === user.username);
           if (u) {
             if (u.nombreRazonSocial) {
               setNombreOperador(u.nombreRazonSocial);
@@ -82,8 +93,7 @@ export function Header({
 
   const userName = String(nombreOperador || user?.nombreCompleto || user?.username || 'OPERADOR').toUpperCase();
 
-  const userInitial =
-    userName.trim()[0]?.toUpperCase() ?? 'U';
+  const userInitial = Array.from(userName.trim())[0]?.toUpperCase().slice(0, 1) || 'U';
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -116,33 +126,34 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-[#0033a0] text-white shadow-md">
-      <div className="flex items-center justify-between gap-4 px-6 py-3.5">
-        <div className="flex items-center gap-4 min-w-0">
+      <div className="flex min-h-[64px] items-center justify-between gap-2 px-3 py-2.5 sm:px-4 md:gap-4 md:px-6 md:py-3.5">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3 md:gap-4">
           <button
             type="button"
             onClick={onToggleSidebar}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 text-white hover:bg-white/10 transition"
-            title="Expandir o fijar menú"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 text-white transition hover:bg-white/10 md:h-11 md:w-11"
+            title="Abrir menú"
+            aria-label="Abrir menú"
           >
             ☰
           </button>
 
           <div className="leading-tight min-w-0">
-            <div className="text-[10px] font-bold text-slate-300 capitalize tracking-widest mb-0.5 opacity-90">
+            <div className="mb-0.5 hidden text-[10px] font-bold capitalize tracking-widest text-slate-300 opacity-90 sm:block">
               {empresaSeleccionada ? `${empresaSeleccionada.nombre} [${empresaSeleccionada.key}]` : 'EMPRESA NO SELECCIONADA'}
             </div>
-            <div className="text-lg font-black tracking-wide text-gold-3d capitalize truncate">
-              SEDE ACTIVA: {plantaName || 'SIN SEDE'}
+            <div className="truncate text-sm font-black tracking-wide text-gold-3d sm:text-base md:text-lg">
+              <span className="hidden sm:inline">SEDE ACTIVA: </span>{plantaName || 'SIN SEDE'}
             </div>
 
-            <div className="text-xs font-semibold text-gold-3d tracking-wider truncate">
+            <div className="hidden truncate text-xs font-semibold tracking-wider text-gold-3d sm:block">
               Código de sede: {plantaSeleccionada || 'N/A'} · {pageTitle}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          <div className="hidden items-center gap-3 sm:flex">
             <NetworkStatus />
             <BackendStatus />
           </div>
@@ -154,9 +165,12 @@ export function Header({
               className="flex items-center gap-3 text-white"
             >
               <span
-                className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-white/10 text-sm font-extrabold border border-white/20"
+                className="bg-gold-3d flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-amber-300 text-base font-black text-white"
+                aria-label={`Inicial del operador: ${userInitial}`}
               >
-                <span className="text-gold-3d">{userInitial}</span>
+                <span className="block w-[1ch] max-w-[1ch] overflow-hidden text-center leading-none text-white">
+                  {userInitial.slice(0, 1)}
+                </span>
               </span>
 
               <span className="text-sm font-bold tracking-wide hidden md:inline">
@@ -165,7 +179,7 @@ export function Header({
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 mt-3 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl z-50">
+              <div className="absolute right-0 z-50 mt-3 w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
                 <div className="px-3 py-2 border-b border-slate-100 mb-3">
                   <span className="block text-xs font-bold text-slate-400 capitalize">
                     Operador

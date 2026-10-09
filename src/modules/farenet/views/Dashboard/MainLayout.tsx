@@ -40,10 +40,16 @@ export function MainLayout({
     return localStorage.getItem('sidebarPinned') === 'true';
   });
   const [sidebarHover, setSidebarHover] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const sidebarCollapsed = !sidebarPinned && !sidebarHover;
 
   const toggleSidebar = () => {
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setMobileMenuOpen((prev) => !prev);
+      return;
+    }
+
     setSidebarPinned((prev) => {
       const nuevoValor = !prev;
       localStorage.setItem('sidebarPinned', String(nuevoValor));
@@ -78,12 +84,22 @@ export function MainLayout({
     <div className="flex min-h-screen bg-slate-100 font-sans antialiased overflow-hidden">
       <Sidebar
         collapsed={sidebarCollapsed}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
         activeMenu={activeMenu}
         permisos={permisos}
         perfilId={user?.perfilId || ''}
         onMouseEnterSidebar={() => setSidebarHover(true)}
         onMouseLeaveSidebar={() => setSidebarHover(false)}
       />
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          aria-label="Cerrar menú"
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] md:hidden"
+        />
+      )}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Header
           user={user}
@@ -96,7 +112,7 @@ export function MainLayout({
           onLogout={onLogout}
         />
 
-        <main className="flex-1 overflow-y-auto p-6 bg-slate-50 transition-all duration-300">
+        <main className="flex-1 overflow-y-auto bg-slate-50 p-3 transition-all duration-300 sm:p-4 md:p-6">
           <Outlet context={contextValue} />
         </main>
       </div>

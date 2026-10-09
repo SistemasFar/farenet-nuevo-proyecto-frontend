@@ -1,6 +1,6 @@
 import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { CampoFormatoDinamicoFaregas } from '../../types/faregas-api';
-import { combustiblesGnvSonEquivalentes, pesosGnvSonIguales } from './gnv-conversion';
+import { combustiblesGnvSonEquivalentes, combustiblesSonEquivalentes, pesosGnvSonIguales } from './gnv-conversion';
 
 type DatosAsistente = {
   tipoCertificado: TipoCertificadoFaregas;
@@ -385,7 +385,9 @@ export const validarDatosEspecificos = ({
   }
 
   if (tipo === 'GLP_ANUAL') {
-    if (vacio(glp.tallerAutorizadoId)) marcar(errores, 'Seleccione el taller autorizado.');
+    if (vacio(glp.tallerAutorizadoId)) {
+      marcar(errores, 'glp.tallerAutorizadoId', 'Seleccione el taller autorizado.');
+    }
     if (vacio(glp.fechaVigencia)) marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
     if (vacio(glp.expedienteTecnico)) marcar(errores, 'glp.expedienteTecnico', 'Complete el número de expediente técnico.');
 
@@ -399,13 +401,13 @@ export const validarDatosEspecificos = ({
       const reglas: ReglaCampo[] = [
         { campo: 'marca', etiqueta: `la marca del ${nombre}` },
         { campo: 'modelo', etiqueta: `el modelo del ${nombre}` },
+        { campo: 'numeroSerie', etiqueta: `la serie del ${nombre}` },
       ];
       if (nombre === 'CILINDRO') {
         reglas.push(
           { campo: 'capacidadLitros', etiqueta: 'la capacidad del cilindro', formato: 'decimal' },
           { campo: 'mesFabricacion', etiqueta: 'el mes de fabricación del cilindro' },
-          { campo: 'anioFabricacion', etiqueta: 'el año de fabricación del cilindro' },
-          { campo: 'numeroSerie', etiqueta: 'la serie del cilindro' }
+          { campo: 'anioFabricacion', etiqueta: 'el año de fabricación del cilindro' }
         );
       }
       // Las claves de la regla coinciden con las del componente, así que se
@@ -646,6 +648,41 @@ const marcarVacias = (errores: ErroresCampo, raiz: Record<string, any>, campos: 
   }
 };
 
+/**
+ * Los componentes GNV sólo se muestran en la modalidad INICIAL. Cada fila
+ * visible debe estar completa; la fecha se presenta como un único control de
+ * mes/año, por eso se reporta con una sola clave de error.
+ */
+const validarComponentesGnvInicial = (gnv: Record<string, any>): ErroresCampo => {
+  const errores: ErroresCampo = {};
+  const componentes = Array.isArray(gnv.componentes) ? gnv.componentes : [];
+
+  for (const nombre of ['REDUCTOR', 'CILINDRO']) {
+    const componente = componentes.find((item: any) => String(item?.componente || '').toUpperCase() === nombre);
+    if (!componente) {
+      marcar(errores, 'gnv.componentes', `Registre el componente ${nombre}.`);
+      continue;
+    }
+
+    for (const campo of ['marca', 'numeroSerie', 'capacidadLitros']) {
+      if (esValorVacioParaAvance(componente[campo])) {
+        const etiqueta = campo === 'marca' ? 'la marca' : campo === 'numeroSerie' ? 'la serie' : 'la capacidad';
+        marcar(errores, `gnv.componentes.${nombre}.${campo}`, `Complete ${etiqueta} del ${nombre}.`);
+      }
+    }
+
+    if (esValorVacioParaAvance(componente.mesFabricacion) || esValorVacioParaAvance(componente.anioFabricacion)) {
+      marcar(
+        errores,
+        `gnv.componentes.${nombre}.fechaFabricacion`,
+        `Complete la fecha de fabricación del ${nombre}.`
+      );
+    }
+  }
+
+  return errores;
+};
+
 type ContextoFormularioVehiculo = {
   tipoCertificado: TipoCertificadoFaregas;
   modalidad?: string;
@@ -734,11 +771,40 @@ export const validarFormularioVehiculoVisible = ({
   }
   if (tipoCertificado === 'GLP_ANUAL') {
     marcarVacias(errores, { glp }, CAMPOS_VISIBLES_GLP);
-    if (esInicial) marcarVacias(errores, { glp }, CAMPOS_VISIBLES_GLP_INICIAL);
+    if (esInicial) {
+      marcarVacias(errores, { glp }, CAMPOS_VISIBLES_GLP_INICIAL);
+      if (combustiblesSonEquivalentes(vehiculo.combustible, 'BI-COMBUSTIBLE GLP')) {
+        marcar(
+          errores,
+          'combustible',
+          'El combustible original debe ser diferente a BI-COMBUSTIBLE GLP, que es el resultado de la conversión.'
+        );
+      }
+    }
   }
   if (tipoCertificado === 'CONFORMIDAD') {
     marcarVacias(errores, { conformidad }, CAMPOS_VISIBLES_CONFORMIDAD);
   }
+
+  // Taller, componentes y verificaciones forman parte de la misma puerta de
+  // avance. Estas reglas ya existían, pero no se incorporaban al validador que
+  // usa el botón Siguiente y por eso un cilindro incompleto podía pasar.
+  Object.assign(
+    errores,
+    validarDatosEspecificos({
+      tipo: tipoCertificado,
+      gnv,
+      glp,
+      conformidad,
+    })
+  );
+
+  if (tipoCertificado === 'GNV_ANUAL' && esInicial) {
+    Object.assign(errores, validarComponentesGnvInicial(gnv));
+  }
+
+  // Además de impedir vacíos, conserva las reglas de documento, RUC y correo.
+  Object.assign(errores, validarTitulares(titulares, tipoCertificado));
 
   // Cada fila de titular debe estar completa; una fila a medias no pasa.
   // La clave es titular.<indice>.<campo>, así que la raíz se anida en dos
@@ -752,6 +818,7 @@ export const validarFormularioVehiculoVisible = ({
   });
 
   marcarVacias(errores, facturacion, CAMPOS_VISIBLES_FACTURACION);
+  Object.assign(errores, validarDatosFacturacionCampos(facturacion));
 
   return errores;
 };

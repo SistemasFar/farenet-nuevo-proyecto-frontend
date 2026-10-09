@@ -43,34 +43,34 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
 
       // 3. Informar éxito al componente padre (App) para que cambie la ruta
       await onSelect(empresa);
-    } catch (err: any) {
-      setError(err.message || 'Ocurrió un error al seleccionar la empresa.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Ocurrió un error al seleccionar la empresa.');
       setLoading(false);
     }
   };
 
   return (
     <div
-      className="flex min-h-screen flex-col items-center justify-center p-4 select-none bg-cover bg-center bg-no-repeat relative"
+      className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-y-auto bg-cover bg-[position:55%_center] bg-no-repeat px-3 py-16 sm:px-4 sm:py-8"
       style={{ backgroundImage: `url(${bgFarenet})` }}
     >
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" />
 
-      <div className="absolute top-5 right-5 z-20">
+      <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-5">
         <button 
           onClick={onLogout}
-          className="text-sm text-white/80 hover:text-white font-semibold capitalize tracking-wider transition"
+          className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
         >
           Cerrar Sesión
         </button>
       </div>
 
-      <div className="w-full max-w-2xl flex flex-col items-center relative z-10">
-        <div className="mb-6 text-center">
+      <div className="relative z-10 flex w-full max-w-3xl flex-col items-center">
+        <div className="mb-5 text-center sm:mb-6">
           <h1 className="text-lg font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
             Selecciona tu Empresa
           </h1>
-          <p className="mt-1 text-lg font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+          <p className="mt-1 text-sm font-semibold leading-5 text-white/90 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] sm:text-lg">
             Tienes acceso a múltiples espacios de trabajo
           </p>
         </div>
@@ -83,7 +83,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+        <div className="grid w-full grid-cols-1 gap-3 sm:gap-5 md:grid-cols-2">
           {empresasDisponibles.map((empresa) => {
             const theme = EMPRESA_THEME[empresa.key] || { colorPrincipal: '#475569', colorHover: '#334155' };
             
@@ -92,10 +92,10 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
                 key={empresa.key}
                 disabled={loading}
                 onClick={() => handleSelectEmpresa(empresa)}
-                className="group flex flex-col items-center justify-center p-8 bg-white/10 backdrop-blur-md rounded-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] hover:bg-white/20 transition-all duration-300 border border-white/20 disabled:opacity-50 relative overflow-hidden"
+                className="group relative flex min-h-44 flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-slate-950/35 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] backdrop-blur-md transition-all duration-300 hover:bg-slate-900/50 disabled:opacity-50 sm:min-h-64 sm:p-8"
               >
                 {empresa.logoUrl ? (
-                  <img src={empresa.logoUrl} alt={empresa.nombre} className="h-16 object-contain mb-4" />
+                  <img src={empresa.logoUrl} alt={empresa.nombre} className="mb-3 h-12 max-w-full object-contain sm:mb-4 sm:h-16" />
                 ) : (
                   <div 
                     className="w-16 h-16 rounded-full flex items-center justify-center text-3xl font-black text-white shadow-lg transition-colors duration-300"
@@ -105,7 +105,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
                   </div>
                 )}
                 
-                <h2 className="text-2xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] capitalize text-center mt-5">
+                <h2 className="mt-3 text-center text-xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] sm:mt-5 sm:text-2xl">
                   {empresa.nombre}
                 </h2>
                 <span className="text-xs text-white/80 font-bold mt-1 tracking-wider">
@@ -113,7 +113,7 @@ export function SeleccionEmpresaView({ onLogout, onSelect }: SeleccionEmpresaVie
                 </span>
 
                 <div 
-                  className="mt-6 w-full flex items-center justify-center gap-2 rounded-xl bg-gold-3d py-3 text-white text-sm font-black capitalize tracking-wider transition disabled:opacity-50"
+                  className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gold-3d px-4 py-3 text-base font-black tracking-wide text-white transition disabled:opacity-50 sm:mt-6"
                 >
                   {loading ? 'Ingresando...' : 'Ingresar'}
                 </div>

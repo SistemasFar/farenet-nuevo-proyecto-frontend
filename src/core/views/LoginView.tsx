@@ -89,19 +89,19 @@ export function LoginView({
 
   return (
     <div
-      className="flex min-h-screen flex-col items-center justify-center p-4 select-none bg-cover bg-center bg-no-repeat relative"
+      className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-y-auto bg-cover bg-[position:55%_center] bg-no-repeat px-3 py-16 sm:px-4 sm:py-8"
       style={{ backgroundImage: `url(${bgFarenet})` }}
     >
       <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" />
 
-      <div className="absolute right-5 top-5 z-20 flex items-center gap-3">
+      <div className="absolute right-3 top-3 z-20 flex items-center gap-2 sm:right-5 sm:top-5 sm:gap-3">
         <NetworkStatus />
         <BackendStatus />
       </div>
 
-      <div className="relative z-10 w-full max-w-sm flex flex-col items-center">
-                <div className="mb-4 text-center w-full">
-          <h1 className="text-4xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)]">
+      <div className="relative z-10 flex w-full max-w-md flex-col items-center">
+        <div className="mb-4 w-full text-center">
+          <h1 className="text-2xl font-black tracking-tight text-gold-3d font-serif drop-shadow-[0_4px_6px_rgba(0,0,0,0.6)] sm:text-4xl">
             SISTEMA EN LÍNEA
           </h1>
         </div>
@@ -116,7 +116,7 @@ export function LoginView({
 
         
 
-        <div className="w-full rounded-xl bg-white/10 backdrop-blur-md border border-white/20 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+        <div className="w-full rounded-2xl border border-white/20 bg-slate-950/35 p-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] backdrop-blur-md sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="rounded bg-red-500/20 backdrop-blur-sm p-3 text-center border-l-4 border-red-500">
@@ -134,7 +134,7 @@ export function LoginView({
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={loading}
                 autoComplete="username"
-                className="w-full rounded border border-white/10 bg-white/15 px-4 py-3 text-sm text-white placeholder-slate-300 outline-none transition focus:border-white/30 focus:bg-white/25 disabled:opacity-50"
+                className="min-h-12 w-full rounded-lg border border-white/20 bg-slate-900/70 px-4 py-3 text-base text-white placeholder-slate-300 outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-300/30 disabled:opacity-50"
               />
             </div>
 
@@ -146,14 +146,14 @@ export function LoginView({
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
                 autoComplete="current-password"
-                className="w-full rounded border border-white/10 bg-white/15 px-4 py-3 text-sm text-white placeholder-slate-300 outline-none transition focus:border-white/30 focus:bg-white/25 disabled:opacity-50"
+                className="min-h-12 w-full rounded-lg border border-white/20 bg-slate-900/70 px-4 py-3 text-base text-white placeholder-slate-300 outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-300/30 disabled:opacity-50"
               />
             </div>
 
             <button
                 type="submit"
                 disabled={loading}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gold-3d py-3 text-sm font-black capitalize tracking-wider transition disabled:opacity-50"
+                className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gold-3d px-4 py-3 text-base font-black tracking-wide transition disabled:opacity-50"
               >
               {loading ? 'Procesando...' : 'Ok'}
             </button>

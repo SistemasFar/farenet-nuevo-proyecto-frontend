@@ -177,23 +177,76 @@ export default function TabDocumentosFacturacion() {
   // El total y el número de páginas los calcula el backend y llegan en el sobre
   // de paginación; no se recalculan aquí para no discrepar del COUNT.
 
+  const accionesDocumento = (documento: DocumentoFacturacionAdmin) => {
+    const anulacionPendiente = ['BORRADOR', 'PENDIENTE'].includes(String(documento.estadoAnulacion || '').toUpperCase());
+    const claseAccion = 'inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold transition disabled:opacity-50';
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => void verDetalle(documento.id)} className={`${claseAccion} border-blue-200 bg-blue-50 text-blue-800`}>Detalle</button>
+        {documento.certificadoId != null && (
+          <button type="button" onClick={() => navigate(`/faregas/certificados/${documento.certificadoId}/continuar`)} className={`${claseAccion} border-blue-200 bg-white text-blue-800`}>Certificado</button>
+        )}
+        {documento.enlacePdf && (
+          <a href={documento.enlacePdf} target="_blank" rel="noreferrer" className={`${claseAccion} border-slate-200 bg-white text-slate-700`}>PDF <ExternalLink className="h-3 w-3" /></a>
+        )}
+        {anulacionPendiente && (
+          <button disabled={procesandoId === documento.id} type="button" onClick={() => void consultarAnulacion(documento)} className={`${claseAccion} border-amber-200 bg-amber-50 text-amber-800`}><RefreshCw className={`h-3 w-3 ${procesandoId === documento.id ? 'animate-spin' : ''}`} /> Consultar anulación</button>
+        )}
+        {documento.certificadoId != null && !documento.anulacionId && ['ERROR', 'PENDIENTE'].includes(documento.estado) && (
+          <button disabled={procesandoId === documento.id} type="button" onClick={() => void reintentar(documento)} className={`${claseAccion} border-amber-200 bg-amber-50 text-amber-800`}><RefreshCw className="h-3 w-3" /> Reintentar</button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs leading-relaxed text-blue-800 sm:p-4 sm:text-sm">
         Consulta administrativa de comprobantes y anulaciones para DEMO y PRODUCCIÓN. En producción la confirmación final corresponde a SUNAT; esta pantalla nunca muestra rutas, tokens ni respuestas completas del proveedor.
       </div>
 
-      <div className="grid gap-3 rounded-xl border bg-slate-50 p-4 md:grid-cols-3 xl:grid-cols-6">
-        <input value={filtros.texto || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, texto: e.target.value }))} placeholder="Comprobante, cliente, DNI/RUC o placa" className="rounded-lg border p-2.5 md:col-span-2" />
-        <select value={filtros.empresaKey || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, empresaKey: e.target.value, plantaKey: '' }))} className="rounded-lg border bg-white p-2.5"><option value="">Todas las empresas</option>{empresas.map((empresa) => <option key={empresa.key} value={empresa.key}>{empresa.nombre}</option>)}</select>
-        <select value={filtros.plantaKey || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, plantaKey: e.target.value }))} className="rounded-lg border bg-white p-2.5"><option value="">Todas las sedes autorizadas</option>{plantasFiltradas.map((planta) => <option key={planta.key} value={planta.key}>{planta.nombre}</option>)}</select>
-        <select value={filtros.estado || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, estado: e.target.value }))} className="rounded-lg border bg-white p-2.5"><option value="">Todos los estados</option><option value="PENDIENTE_ANULACION">Pendiente de anulación</option><option value="ANULADO">Anulado</option><option value="ANULACION_RECHAZADA">Anulación rechazada/error</option>{['BORRADOR', 'PENDIENTE', 'PENDIENTE_SUNAT', 'ACEPTADO', 'RECHAZADO', 'ERROR'].map((estado) => <option key={estado}>{estado}</option>)}</select>
-        <div className="flex gap-2"><button type="button" onClick={buscar} className="flex-1 rounded-lg bg-[#052a79] px-3 py-2 font-bold text-white">BUSCAR</button><button type="button" onClick={limpiar} className="rounded-lg border px-3 py-2 font-bold">LIMPIAR</button></div>
-        <input type="date" value={filtros.fechaDesde || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value }))} className="rounded-lg border p-2.5" />
-        <input type="date" value={filtros.fechaHasta || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value }))} className="rounded-lg border p-2.5" />
+      <div className="grid min-w-0 grid-cols-1 gap-3 rounded-xl bg-slate-50 p-3 sm:border sm:border-slate-200 sm:p-4 md:grid-cols-2 xl:grid-cols-6">
+        <input value={filtros.texto || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, texto: e.target.value }))} placeholder="Comprobante, cliente, DNI/RUC o placa" className="min-w-0 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:col-span-2" />
+        <select value={filtros.empresaKey || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, empresaKey: e.target.value, plantaKey: '' }))} className="min-w-0 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm outline-none focus:border-blue-500"><option value="">Todas las empresas</option>{empresas.map((empresa) => <option key={empresa.key} value={empresa.key}>{empresa.nombre}</option>)}</select>
+        <select value={filtros.plantaKey || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, plantaKey: e.target.value }))} className="min-w-0 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm outline-none focus:border-blue-500"><option value="">Todas las sedes autorizadas</option>{plantasFiltradas.map((planta) => <option key={planta.key} value={planta.key}>{planta.nombre}</option>)}</select>
+        <select value={filtros.estado || ''} onChange={(e) => setFiltros((prev) => ({ ...prev, estado: e.target.value }))} className="min-w-0 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm outline-none focus:border-blue-500"><option value="">Todos los estados</option><option value="PENDIENTE_ANULACION">Pendiente de anulación</option><option value="ANULADO">Anulado</option><option value="ANULACION_RECHAZADA">Anulación rechazada/error</option>{['BORRADOR', 'PENDIENTE', 'PENDIENTE_SUNAT', 'ACEPTADO', 'RECHAZADO', 'ERROR'].map((estado) => <option key={estado}>{estado}</option>)}</select>
+        <label className="min-w-0 text-xs font-bold text-slate-600">Desde
+          <input type="date" value={filtros.fechaDesde || ''} max={filtros.fechaHasta || undefined} onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value }))} className="mt-1 min-w-0 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm font-normal text-slate-700 outline-none focus:border-blue-500" />
+        </label>
+        <label className="min-w-0 text-xs font-bold text-slate-600">Hasta
+          <input type="date" value={filtros.fechaHasta || ''} min={filtros.fechaDesde || undefined} onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value }))} className="mt-1 min-w-0 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm font-normal text-slate-700 outline-none focus:border-blue-500" />
+        </label>
+        <div className="grid grid-cols-2 gap-2 md:col-span-2 xl:col-span-1"><button type="button" onClick={buscar} className="rounded-lg bg-[#052a79] px-3 py-2.5 text-xs font-black text-white">BUSCAR</button><button type="button" onClick={limpiar} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-700">LIMPIAR</button></div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
+      <div className="space-y-3 md:hidden">
+        {loading && <div className="rounded-xl bg-slate-50 p-8 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-[#052a79]" /></div>}
+        {!loading && documentos.length === 0 && <div className="rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500">No se encontraron comprobantes.</div>}
+        {!loading && documentos.map((documento) => {
+          const anulacion = anulacionPresentacion(documento);
+          return (
+            <article key={documento.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-black text-slate-900">{documento.nroComprobante || 'SIN NÚMERO'}</p>
+                  <p className="mt-1 text-xs text-slate-500">{fechaLocal(documento.fechaCreacion)}</p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${estadoClass(documento.estado)}`}>{documento.estado}</span>
+              </div>
+              <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 text-xs">
+                <div className="col-span-2"><dt className="font-bold text-slate-400">CLIENTE</dt><dd className="mt-0.5 break-words font-semibold text-slate-700">{documento.cliente}</dd><dd className="text-slate-500">{documento.nroDocumento} · {documento.placa || 'Sin placa'}</dd></div>
+                <div><dt className="font-bold text-slate-400">EMPRESA / SEDE</dt><dd className="mt-0.5 break-words text-slate-700">{documento.empresaNombre}<br />{documento.plantaNombre}</dd></div>
+                <div><dt className="font-bold text-slate-400">TOTAL</dt><dd className="mt-0.5 text-base font-black text-[#052a79]">S/ {documento.importeTotal.toFixed(2)}</dd></div>
+                <div className="col-span-2"><dt className="font-bold text-slate-400">ANULACIÓN</dt><dd className="mt-1"><span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${anulacion.clase}`}>{anulacion.texto}</span></dd></div>
+              </dl>
+              <div className="mt-4 border-t border-slate-100 pt-3">{accionesDocumento(documento)}</div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100 text-left text-xs capitalize text-slate-600"><tr><th className="p-3">Fecha</th><th className="p-3">Comprobante</th><th className="p-3">Cliente</th><th className="p-3">Empresa / sede</th><th className="p-3">Total</th><th className="p-3">Estado</th><th className="p-3">Anulación</th><th className="p-3">Acciones</th></tr></thead>
           <tbody>
@@ -201,9 +254,8 @@ export default function TabDocumentosFacturacion() {
             {!loading && documentos.length === 0 && <tr><td colSpan={8} className="p-10 text-center text-slate-500">No se encontraron comprobantes.</td></tr>}
             {!loading && documentos.map((documento) => {
               const anulacion = anulacionPresentacion(documento);
-              const anulacionPendiente = ['BORRADOR', 'PENDIENTE'].includes(String(documento.estadoAnulacion || '').toUpperCase());
               return (
-              <tr key={documento.id} className="border-t align-top">
+              <tr key={documento.id} className="border-t border-slate-100 align-top">
                 <td className="p-3">{fechaLocal(documento.fechaCreacion)}</td>
                 <td className="p-3"><div className="font-bold">{documento.nroComprobante || 'SIN NÚMERO'}</div><div className="text-xs text-slate-500">{documento.tipoComprobante} · {documento.origen === 'VENTA_CHIP' ? `Venta de Chip · Op. ${documento.operacionId}` : documento.origen === 'CERTIFICADO' ? `Cert. ${documento.certificadoId}` : 'Operación'}</div></td>
                 <td className="p-3"><div className="font-semibold">{documento.cliente}</div><div className="text-xs text-slate-500">{documento.nroDocumento} · {documento.placa || 'Sin placa'}</div></td>
@@ -211,7 +263,7 @@ export default function TabDocumentosFacturacion() {
                 <td className="p-3 font-bold">S/ {documento.importeTotal.toFixed(2)}</td>
                 <td className="p-3"><span className={`rounded-full px-2 py-1 text-xs font-bold ${estadoClass(documento.estado)}`}>{documento.estado}</span><div className="mt-1 text-xs text-slate-500">{documento.intentos} intento(s)</div></td>
                 <td className="p-3"><span className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-bold ${anulacion.clase}`}>{anulacion.texto}</span>{documento.fechaSolicitudAnulacion && <div className="mt-1 text-xs text-slate-500">{fechaLocal(documento.fechaSolicitudAnulacion)}</div>}</td>
-                <td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void verDetalle(documento.id)} className="text-blue-700 underline">Detalle</button>{documento.certificadoId != null && <button type="button" onClick={() => navigate(`/faregas/certificados/${documento.certificadoId}/continuar`)} className="text-blue-700 underline">Certificado</button>}{documento.enlacePdf && <a href={documento.enlacePdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-blue-700 underline">PDF <ExternalLink className="h-3 w-3" /></a>}{anulacionPendiente && <button disabled={procesandoId === documento.id} type="button" onClick={() => void consultarAnulacion(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className={`h-3 w-3 ${procesandoId === documento.id ? 'animate-spin' : ''}`} /> Consultar anulación</button>}{documento.certificadoId != null && !documento.anulacionId && ['ERROR', 'PENDIENTE'].includes(documento.estado) && <button disabled={procesandoId === documento.id} type="button" onClick={() => void reintentar(documento)} className="inline-flex items-center gap-1 text-amber-700 underline disabled:opacity-50"><RefreshCw className="h-3 w-3" /> Reintentar</button>}</div></td>
+                <td className="p-3">{accionesDocumento(documento)}</td>
               </tr>
               );
             })}

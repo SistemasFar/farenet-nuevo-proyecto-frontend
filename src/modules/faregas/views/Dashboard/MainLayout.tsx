@@ -41,10 +41,16 @@ export function MainLayout({
     return localStorage.getItem('sidebarPinned') === 'true';
   });
   const [sidebarHover, setSidebarHover] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const sidebarCollapsed = !sidebarPinned && !sidebarHover;
 
   const toggleSidebar = () => {
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setMobileMenuOpen((prev) => !prev);
+      return;
+    }
+
     setSidebarPinned((prev) => {
       const nuevoValor = !prev;
       localStorage.setItem('sidebarPinned', String(nuevoValor));
@@ -92,12 +98,22 @@ export function MainLayout({
       <Sidebar
         isFaregas={true}
         collapsed={sidebarCollapsed}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
         activeMenu={activeMenu}
         permisos={permisos}
-        perfilId={user?.perfilId || (user as any)?.perfil_id || ''}
+        perfilId={user?.perfilId || ''}
         onMouseEnterSidebar={() => setSidebarHover(true)}
         onMouseLeaveSidebar={() => setSidebarHover(false)}
       />
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          aria-label="Cerrar menú"
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] md:hidden"
+        />
+      )}
       <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <Header
           user={user}
@@ -111,7 +127,7 @@ export function MainLayout({
           isFaregas={true}
         />
 
-        <main className={`flex-1 min-h-0 overflow-y-auto px-6 pt-6 pb-0 transition-all duration-300 ${
+        <main className={`flex-1 min-h-0 overflow-y-auto px-3 pb-0 pt-3 transition-all duration-300 sm:px-4 sm:pt-4 md:px-6 md:pt-6 ${
           isCertificadoWizard ? 'bg-white' : 'bg-slate-50'
         }`}>
           <Outlet context={contextValue} />
