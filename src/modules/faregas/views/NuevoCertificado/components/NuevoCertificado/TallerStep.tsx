@@ -131,7 +131,6 @@ export const TallerStep: React.FC<TallerStepProps> = ({
                         />
                       )}
                       <div className="flex justify-between">
-                        <span className="font-mono text-[10px] text-slate-400">{`{{${campo.key}}}`}</span>
                         {campo.maxLength && <span className="text-[10px] text-slate-400">{valor.length}/{campo.maxLength}</span>}
                       </div>
                     </div>

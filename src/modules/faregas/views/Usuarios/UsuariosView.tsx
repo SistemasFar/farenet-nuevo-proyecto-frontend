@@ -314,6 +314,12 @@ export function UsuariosView() {
     'MENU_CHIPS_VENTAS'
   ] as const;
   const PERMISO_CHIPS = 'MENU_CHIPS';
+  const NOMBRES_MENU_INVENTARIO: Record<string, string> = {
+    MENU_CHIPS: 'Inventario',
+    MENU_CHIPS_INVENTARIO: 'Inventario',
+    MENU_CHIPS_TIPOS: 'Tipos de producto',
+    MENU_CHIPS_VENTAS: 'Ventas'
+  };
 
   const SUBMODULOS_FACTURACION = [
     'MENU_FACTURACION_PREPARACION',
@@ -1008,7 +1014,7 @@ export function UsuariosView() {
                                         ? 'Facturación'
                                         : clavePadre === PERMISO_CONFIGURACION
                                             ? 'Configuración'
-                                            : 'Chips';
+                                            : 'Inventario';
                                     return (
                                         <label key={p.clave}
                                             className={`flex items-center gap-2 text-sm p-2 rounded border ${hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
@@ -1019,7 +1025,9 @@ export function UsuariosView() {
                                                 onChange={() => !bloqueado && togglePermiso(p.clave)}
                                                 disabled={bloqueado}
                                             />
-                                            <span className={`font-medium ${hijo ? 'text-slate-600 text-xs' : 'text-slate-700'}`}>{p.nombre}</span>
+                                            <span className={`font-medium ${hijo ? 'text-slate-600 text-xs' : 'text-slate-700'}`}>
+                                                {NOMBRES_MENU_INVENTARIO[p.clave] || p.nombre}
+                                            </span>
                                         </label>
                                     );
                                 };
