@@ -32,8 +32,27 @@ export interface DescuentoAdmin {
   activo: boolean;
   total_servicios: number;
   total_codigos: number;
-  nombres_codigos?: string;
   usos_realizados: number;
+}
+
+export interface CodigoDescuentoAdmin {
+  id: number;
+  codigo: string;
+  placa?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  max_usos: number;
+  usos_realizados: number;
+  activo: boolean;
+}
+
+export interface ResultadoCodigosMasivos {
+  solicitados: number;
+  creados: number;
+  validos: number;
+  duplicados: number;
+  rechazados: number;
+  errores: Array<{ fila: number; codigo?: string; motivo: string }>;
 }
 
 export interface DescuentoFormData {
@@ -109,7 +128,17 @@ export const faregasDescuentosAdminApi = {
   actualizar: (id: number, data: DescuentoFormData) => faregasFetch(`/descuentos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cambiarEstado: (id: number, activo: boolean) => faregasFetch(`/descuentos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
   guardarReglas: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/reglas`, { method: 'PUT', body: JSON.stringify(data) }),
+  listarCodigos: (id: number, filtros: { search?: string; estado?: string; limit?: number; offset?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (filtros.search) params.set('search', filtros.search);
+    if (filtros.estado) params.set('estado', filtros.estado);
+    params.set('limit', String(filtros.limit || 20));
+    params.set('offset', String(filtros.offset || 0));
+    return faregasFetch(`/descuentos/${id}/codigos?${params}`) as Promise<{ items: CodigoDescuentoAdmin[]; total: number; limit: number; offset: number }>;
+  },
   crearCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/codigos`, { method: 'POST', body: JSON.stringify(data) }),
+  generarLote: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/codigos/lote`, { method: 'POST', body: JSON.stringify(data) }) as Promise<ResultadoCodigosMasivos>,
+  importarCodigos: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/${id}/codigos/importar`, { method: 'POST', body: JSON.stringify(data) }) as Promise<ResultadoCodigosMasivos>,
   actualizarCodigo: (id: number, data: Record<string, unknown>) => faregasFetch(`/descuentos/codigos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   cambiarEstadoCodigo: (id: number, activo: boolean) => faregasFetch(`/descuentos/codigos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
   obtenerImpacto: async (id: number) => (await faregasFetch(`/descuentos/${id}/impacto`)).impacto as ImpactoDescuento,

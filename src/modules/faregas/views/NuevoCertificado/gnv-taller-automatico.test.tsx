@@ -69,7 +69,7 @@ describe('taller GNV automático por sede', () => {
   });
 
   it('las validaciones de GLP y Conformidad permanecen activas', () => {
-    const erroresGlp = validarDatosEspecificos({ tipo: 'GLP_ANUAL', gnv: {}, glp: {}, conformidad: {} });
+    const erroresGlp = validarDatosEspecificos({ tipo: 'GLP_ANUAL', modalidad: 'INICIAL', gnv: {}, glp: {}, conformidad: {} });
     const erroresConformidad = validarDatosEspecificos({ tipo: 'CONFORMIDAD', gnv: {}, glp: {}, conformidad: {} });
     expect(erroresGlp['glp.fechaVigencia']).toBeDefined();
     expect(erroresGlp['glp.expedienteTecnico']).toBeDefined();

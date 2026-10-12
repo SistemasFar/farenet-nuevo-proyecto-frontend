@@ -20,6 +20,8 @@ import { camposObligatoriosVisibles } from '../../faregas-wizard.validation';
 import { alternarIncumplimientoGnv, marcarTodasVerificacionesGnvComoCumple } from '../../gnv-verificaciones';
 import { alternarIncumplimientoGlp, marcarTodasVerificacionesGlpComoCumple } from '../../glp-verificaciones';
 import { combustiblesGnvSonEquivalentes, combustiblesSonEquivalentes, pesosGnvSonIguales } from '../../gnv-conversion';
+import { obtenerCamposVehiculoCertificado } from '../../faregas-certificado-campos';
+import { CamposVehiculoCertificado } from './CamposVehiculoCertificado';
 
 /** Clase original de los campos del paso; el error sólo sustituye el color. */
 const CLASE_CAMPO = 'w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
@@ -31,6 +33,7 @@ const COMBUSTIBLE_POSTERIOR_GLP = 'BI-COMBUSTIBLE GLP';
 interface VehiculoStepProps {
   tipoCertificado: TipoCertificadoFaregas;
   modalidadCertificado: string;
+  numeroCertificadoOficial?: string | null;
   formVehiculo: any;
   setFormVehiculo: (data: any) => void;
   formPropietario: any;
@@ -61,6 +64,7 @@ interface VehiculoStepProps {
 export function VehiculoStep({
   tipoCertificado,
   modalidadCertificado,
+  numeroCertificadoOficial = null,
   formVehiculo,
   setFormVehiculo,
   formPropietario: _formPropietario,
@@ -93,6 +97,10 @@ export function VehiculoStep({
     () => new Set(camposObligatoriosVisibles(tipoCertificado, modalidadCertificado)),
     [tipoCertificado, modalidadCertificado]
   );
+  const camposVehiculoCertificado = React.useMemo(
+    () => obtenerCamposVehiculoCertificado(tipoCertificado, modalidadCertificado),
+    [tipoCertificado, modalidadCertificado]
+  );
   const required = (campo: string) => (obligatorio.has(campo) ? ' *' : '');
   const esError = (campo: string) => Boolean(erroresCampo[campo]);
   const limpiar = (campo: string) => onCorregirCampo?.(campo);
@@ -115,7 +123,7 @@ export function VehiculoStep({
   
   // Initialize verificaciones based on catalog
   useEffect(() => {
-    if (tipoCertificado === 'GNV_ANUAL' && catalogoVerificaciones?.GNV_ANUAL && (!formGnv.verificaciones || formGnv.verificaciones.length === 0)) {
+    if (tipoCertificado === 'GNV_ANUAL' && modalidadCertificado === 'ANUAL' && catalogoVerificaciones?.GNV_ANUAL && (!formGnv.verificaciones || formGnv.verificaciones.length === 0)) {
       setFormGnv((prev: any) => ({
         ...prev,
         verificaciones: catalogoVerificaciones.GNV_ANUAL.map((v: any) => ({
@@ -332,6 +340,20 @@ export function VehiculoStep({
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <TitularesList
+          titulares={titulares}
+          setTitulares={setTitulares}
+          formFacturacion={formFacturacion}
+          setFormFacturacion={setFormFacturacion}
+          onRemoveTitular={onRemoveTitular}
+          erroresCampo={erroresCampo}
+          onCorregirCampo={onCorregirCampo}
+          mostrarTitulares={tipoCertificado === 'GLP_ANUAL' || tipoCertificado === 'CONFORMIDAD'}
+          mostrarDireccionTitular={tipoCertificado === 'CONFORMIDAD'}
+        />
+      </div>
       
       {/* 1. SECCIÓN GENERAL DEL VEHÍCULO */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
@@ -343,6 +365,17 @@ export function VehiculoStep({
             ORIGEN: {vehiculoOrigen}{['FARENET', 'FAREGAS', 'MIXTO'].includes(vehiculoOrigen) ? ' (EDITABLE)' : ''}
           </span>
         </div>
+        <CamposVehiculoCertificado
+          campos={camposVehiculoCertificado}
+          formVehiculo={formVehiculo}
+          onChange={handleVehiculo}
+          categoriaVehicular={categoriaVehicular}
+          categoriasVehiculares={categoriasVehiculares}
+          onCategoriaVehicularChange={onCategoriaVehicularChange}
+          erroresCampo={erroresCampo}
+          obligatorios={obligatorio}
+        />
+        {camposVehiculoCertificado.length === 0 && <>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">MARCA{required('marca') && <span className="text-red-500">*</span>}</label>
@@ -477,18 +510,7 @@ export function VehiculoStep({
             Farenet no almacena versión, año modelo, cilindrada, potencia ni fórmula rodante en su ficha vehicular. Estos campos deben completarse y validarse con la tarjeta de propiedad.
           </p>
         )}
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <TitularesList
-          titulares={titulares}
-          setTitulares={setTitulares}
-          formFacturacion={formFacturacion}
-          setFormFacturacion={setFormFacturacion}
-          onRemoveTitular={onRemoveTitular}
-          erroresCampo={erroresCampo}
-          onCorregirCampo={onCorregirCampo}
-        />
+        </>}
       </div>
 
       {/* 2. SECCIÓN DINÁMICA SEGÚN CERTIFICADO */}
@@ -520,11 +542,31 @@ export function VehiculoStep({
               </div>
             </div>
 
-            <div>
-               <label className="block text-xs font-bold text-slate-500 mb-1">EXPEDIENTE TÉCNICO <span className="text-red-500">*</span></label>
-               <input name="expedienteTecnico" value={formGlp.expedienteTecnico || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.expedienteTecnico'))} data-campo-error={esError('glp.expedienteTecnico') ? true : undefined} />
-            <MensajeError campo="glp.expedienteTecnico" errores={erroresCampo} />
-            </div>
+            {modalidadCertificado === 'ANUAL' ? (
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-500">EXPEDIENTE TÉCNICO</label>
+                <div className="rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-2">
+                  <p className="font-black text-[#052a79]">
+                    {numeroCertificadoOficial || 'Se asignará automáticamente al emitir'}
+                  </p>
+                  <p className="mt-1 text-[10px] font-bold text-blue-600">
+                    Usará el mismo número oficial del certificado. No consume un correlativo en este paso.
+                  </p>
+                </div>
+                {formGlp.expedienteTecnico
+                  && formGlp.expedienteTecnico !== numeroCertificadoOficial && (
+                    <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                      Este borrador conserva el valor anterior {formGlp.expedienteTecnico}. Al emitir se reemplazará por el número oficial del certificado.
+                    </p>
+                  )}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">EXPEDIENTE TÉCNICO <span className="text-red-500">*</span></label>
+                <input name="expedienteTecnico" value={formGlp.expedienteTecnico || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.expedienteTecnico'))} data-campo-error={esError('glp.expedienteTecnico') ? true : undefined} />
+                <MensajeError campo="glp.expedienteTecnico" errores={erroresCampo} />
+              </div>
+            )}
 
             {modalidadCertificado === 'INICIAL' && (
               <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 sm:p-4">
@@ -762,7 +804,7 @@ export function VehiculoStep({
               </div>
             </div>
 
-            <div className="mt-4">
+            {modalidadCertificado === 'ANUAL' && <div className="mt-4">
               <label className="block text-xs font-bold text-slate-500 mb-1">OBSERVACIONES GNV (Opcional) <span className="font-normal text-slate-400">({formGnv.observaciones?.length || 0}/250)</span></label>
               <input
                 name="observaciones"
@@ -772,7 +814,7 @@ export function VehiculoStep({
                 className={claseConError(CLASE_CAMPO, esError('gnv.observaciones'))} data-campo-error={esError('gnv.observaciones') ? true : undefined}
                 placeholder="EJ: NINGUNA"
               />
-            </div>
+            </div>}
 
             {modalidadCertificado === 'INICIAL' && (
               <>
@@ -958,7 +1000,7 @@ export function VehiculoStep({
               </>
             )}
 
-            <div>
+            {modalidadCertificado === 'ANUAL' && <div>
                 <div className={claseConError("mb-3 mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4", esError('gnv.verificaciones'))} data-campo-error={esError('gnv.verificaciones') ? true : undefined}>
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
@@ -1029,7 +1071,7 @@ export function VehiculoStep({
                   </div>
                 ))}
               </div>
-            </div>
+            </div>}
           </div>
         )}
 

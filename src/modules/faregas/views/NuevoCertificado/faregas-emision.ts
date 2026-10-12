@@ -56,9 +56,9 @@ export const esComprobanteYaEmitido = (facturacion: FacturacionFaregas | null): 
 /** Mantiene aliasados los estados técnicos históricos en el nodo visual final. */
 export const indicePasoVisual = (paso?: PasoBorradorFaregas | string): number => ({
   DATOS_INICIALES: 0,
-  PAGO: 1,
-  VEHICULO: 2,
-  PREVISUALIZACION: 3,
+  VEHICULO: 1,
+  PREVISUALIZACION: 2,
+  PAGO: 3,
   FACTURACION: 4,
   VERIFICACION_EMISION: 4,
 }[paso || ''] ?? 0);

@@ -166,6 +166,7 @@ export function NuevoCertificadoView() {
   const [furthestStepIndex, setFurthestStepIndex] = useState(0);
   const [minimumEditableStepIndex, setMinimumEditableStepIndex] = useState(0);
   const [certificadoEstado, setCertificadoEstado] = useState(id ? 'CARGANDO' : 'BORRADOR');
+  const [numeroCertificadoOficial, setNumeroCertificadoOficial] = useState<string | null>(null);
   const soloLectura = new URLSearchParams(location.search).get('vista') === 'consulta' || certificadoEstado !== 'BORRADOR';
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -373,9 +374,9 @@ export function NuevoCertificadoView() {
   const STEPS = React.useMemo(() => {
     return [
       { id: 'datos_iniciales', label: 'Datos Iniciales', icon: FileText },
-      { id: 'pago', label: 'Pago', icon: CreditCard },
       { id: 'vehiculo', label: formCaja.tipo_flujo === 'TALLER_INSPECCION' ? 'Datos del Taller' : 'Vehículo y Datos Técnicos', icon: Search },
       { id: 'previsualizacion', label: 'Previsualización del Certificado', icon: Eye },
+      { id: 'pago', label: 'Pago', icon: CreditCard },
       { id: 'facturacion', label: 'Facturación y Emisión', icon: CheckCircle2 }
     ];
   }, [formCaja.tipo_flujo]);
@@ -449,6 +450,7 @@ export function NuevoCertificadoView() {
         if (res?.data) {
           // Hidratar estado del borrador
           setCertificadoEstado(res.data.estado || 'BORRADOR');
+          setNumeroCertificadoOficial(res.data.numeroCertificado || res.data.numero_certificado || null);
           setIsEmitido(res.data.estado === 'EMITIDO');
           if (res.data.tipo?.clave) {
             setFormCaja(prev => ({
@@ -585,7 +587,7 @@ export function NuevoCertificadoView() {
           const pasoRecuperado = indicePaso(res.data.pasoActual);
           setCurrentStepIndex(res.data.estado === 'BORRADOR' && new URLSearchParams(location.search).get('vista') !== 'consulta' ? pasoRecuperado : indicePaso('VERIFICACION_EMISION'));
           setFurthestStepIndex(pasoRecuperado);
-          setMinimumEditableStepIndex(pasoRecuperado >= 3 ? 3 : 0);
+          setMinimumEditableStepIndex(pasoRecuperado >= indicePaso('FACTURACION') ? indicePaso('FACTURACION') : 0);
           setIsConsultado(true);
           setLastSavedAt(res.data.fechaActualizacion ? new Date(res.data.fechaActualizacion) : new Date());
           setSaveError('');
@@ -664,17 +666,17 @@ export function NuevoCertificadoView() {
   };
 
   useEffect(() => {
-    if ((currentStepIndex === 0 || (currentStepIndex === 2 && formCaja.tipo_flujo !== 'TALLER_INSPECCION')) && !maestros) {
+    if ((currentStepIndex === indicePaso('DATOS_INICIALES') || (currentStepIndex === indicePaso('VEHICULO') && formCaja.tipo_flujo !== 'TALLER_INSPECCION')) && !maestros) {
       cargarMaestros();
-    } else if (currentStepIndex === 1 && !maestrosPago) {
+    } else if (currentStepIndex === indicePaso('PAGO') && !maestrosPago) {
       cargarMaestrosPago();
-    } else if (currentStepIndex === 2 && formCaja.tipo_flujo !== 'TALLER_INSPECCION' && !maestrosVehiculo) {
+    } else if (currentStepIndex === indicePaso('VEHICULO') && formCaja.tipo_flujo !== 'TALLER_INSPECCION' && !maestrosVehiculo) {
       cargarMaestrosVehiculo();
     }
   }, [currentStepIndex, maestros, maestrosPago, maestrosVehiculo, formCaja.tipo_flujo]);
 
   useEffect(() => {
-    if (currentStepIndex !== 2 || formCaja.tipo_flujo !== 'TALLER_INSPECCION' || !certificadoId || formatoFormulario) return;
+    if (currentStepIndex !== indicePaso('VEHICULO') || formCaja.tipo_flujo !== 'TALLER_INSPECCION' || !certificadoId || formatoFormulario) return;
     void cargarFormularioFormato(certificadoId);
   }, [currentStepIndex, formCaja.tipo_flujo, certificadoId, formatoFormulario]);
 
@@ -862,8 +864,8 @@ export function NuevoCertificadoView() {
       await consultarVehiculoFarenet(idBorrador);
       const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
       aplicarResumenComercial(tarifaResponse.data);
-      setCurrentStepIndex(0);
-      setFurthestStepIndex((actual) => Math.max(actual, 0));
+      setCurrentStepIndex(indicePaso('DATOS_INICIALES'));
+      setFurthestStepIndex((actual) => Math.max(actual, indicePaso('DATOS_INICIALES')));
       setIsConsultado(true);
       setLastSavedAt(new Date());
     } catch (e: any) {
@@ -1117,7 +1119,7 @@ export function NuevoCertificadoView() {
 
   // Autosave por bloques, serializado y con debounce para no guardar por tecla.
   useEffect(() => {
-    if (!certificadoId || loading || soloLectura || currentStepIndex !== 2) return;
+    if (!certificadoId || loading || soloLectura || currentStepIndex !== indicePaso('VEHICULO')) return;
     const timer = window.setTimeout(() => {
       if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
         if (!formatoFormulario) return;
@@ -1132,7 +1134,7 @@ export function NuevoCertificadoView() {
   }, [certificadoId, loading, soloLectura, currentStepIndex, formCaja.categoria, formVehiculo, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores, titulares]);
 
   useEffect(() => {
-    if (!certificadoId || loading || soloLectura || currentStepIndex !== 1 || precioTotal <= 0) return;
+    if (!certificadoId || loading || soloLectura || currentStepIndex !== indicePaso('PAGO') || precioTotal <= 0) return;
     const timer = window.setTimeout(() => {
       void encolarAutosave(() => guardarPasoPagos(certificadoId)).catch(() => undefined);
     }, 1200);
@@ -1205,8 +1207,8 @@ export function NuevoCertificadoView() {
 
     if (regresarAlPasoTecnico) {
       if (tieneErroresCampo) registrarErrores(campos);
-      setMinimumEditableStepIndex((actual) => Math.min(actual, 2));
-      setCurrentStepIndex(2);
+      setMinimumEditableStepIndex((actual) => Math.min(actual, indicePaso('VEHICULO')));
+      setCurrentStepIndex(indicePaso('VEHICULO'));
     }
 
     if (resumen.length > 0) {
@@ -1234,7 +1236,7 @@ export function NuevoCertificadoView() {
 
   const irSiguientePaso = async () => {
     if (isSavingStep) return;
-    if (currentStepIndex === 0) {
+    if (currentStepIndex === indicePaso('DATOS_INICIALES')) {
       if (!isConsultado) {
         Swal.fire('Consulta requerida', 'Primero presione Consultar para validar los datos iniciales.', 'info');
         return;
@@ -1269,9 +1271,10 @@ export function NuevoCertificadoView() {
         const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
         aplicarResumenComercial(tarifaResponse.data);
         setLastSavedAt(new Date());
-        await persistirPaso(idBorrador, 'PAGO');
-        setFurthestStepIndex(prev => Math.max(prev, 1));
-        setCurrentStepIndex(1);
+        await persistirPaso(idBorrador, 'VEHICULO');
+        const pasoVehiculo = indicePaso('VEHICULO');
+        setFurthestStepIndex(prev => Math.max(prev, pasoVehiculo));
+        setCurrentStepIndex(pasoVehiculo);
       } catch (e: any) {
         Swal.fire('Error', e.message || 'No se pudo crear el borrador', 'error');
       } finally {
@@ -1304,13 +1307,6 @@ export function NuevoCertificadoView() {
         try {
           if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
           else await guardarPasoVehiculo(certificadoId, true);
-          if (formFacturacion.condicionPagoFac === 'CONTADO') {
-            const facturacionGuardada = await faregasCertificadosApi.guardarFacturacion(
-              certificadoId,
-              construirPayloadFacturacion()
-            );
-            setFacturacion(facturacionGuardada.data as FacturacionFaregas);
-          }
           await persistirPaso(certificadoId, 'PREVISUALIZACION');
         } catch (e: any) {
           Swal.fire('No se pudo guardar', e.message || 'Revise los datos del expediente técnico.', 'error');
@@ -1319,6 +1315,9 @@ export function NuevoCertificadoView() {
           setIsSavingStep(false);
         }
       } else if (STEPS[currentStepIndex].id === 'pago' && certificadoId) {
+        // Un borrador histórico guardado en PAGO conserva esa pantalla, pero no
+        // puede saltar los datos técnicos que ahora aparecen antes en el flujo.
+        if (exigirDatosTecnicosCompletos(true)) return;
         if (bloquearPaso(validarPasoPago({
           condicionPago: formFacturacion.condicionPagoFac,
           pagos: pagosAgregados,
@@ -1327,8 +1326,18 @@ export function NuevoCertificadoView() {
         setIsSavingStep(true);
         try {
           await guardarPasoPagos(certificadoId);
-          await persistirPaso(certificadoId, 'VEHICULO');
-          setMinimumEditableStepIndex(2);
+          // La facturación a contado depende de la orden que acaba de crear o
+          // actualizar guardarPasoPagos. No debe ejecutarse al guardar los
+          // datos técnicos, porque Vehículo y Previsualización ocurren antes.
+          if (formFacturacion.condicionPagoFac === 'CONTADO') {
+            const facturacionGuardada = await faregasCertificadosApi.guardarFacturacion(
+              certificadoId,
+              construirPayloadFacturacion()
+            );
+            setFacturacion(facturacionGuardada.data as FacturacionFaregas);
+          }
+          await persistirPaso(certificadoId, 'FACTURACION');
+          setMinimumEditableStepIndex(indicePaso('FACTURACION'));
         } catch (e: any) {
           if (e.codigo === 'PRODUCTO_FISCAL_CHIP_INVALIDO') {
             const productoChipId = Number(e.detalles?.productoChipId || resumenComercial?.productoChipId || 0);
@@ -1354,7 +1363,7 @@ export function NuevoCertificadoView() {
         }
       } else if (STEPS[currentStepIndex].id === 'previsualizacion' && certificadoId) {
         if (exigirDatosTecnicosCompletos(true)) return;
-        await persistirPaso(certificadoId, 'FACTURACION');
+        await persistirPaso(certificadoId, 'PAGO');
       }
       const siguiente = currentStepIndex + 1;
       setFurthestStepIndex(prev => Math.max(prev, siguiente));
@@ -1474,7 +1483,7 @@ export function NuevoCertificadoView() {
 
   // Efecto para auto-llenar pagos de Cortesía u otros que dejan el total en 0
   useEffect(() => {
-    if (currentStepIndex !== 1 || !maestrosPago || !formCaja.descuentoObj || montoPendiente !== 0) {
+    if (currentStepIndex !== indicePaso('PAGO') || !maestrosPago || !formCaja.descuentoObj || montoPendiente !== 0) {
       return;
     }
 
@@ -1590,12 +1599,12 @@ export function NuevoCertificadoView() {
     setSaveError('');
     try {
       await autosaveQueueRef.current.catch(() => undefined);
-      if (currentStepIndex === 0) {
+      if (currentStepIndex === indicePaso('DATOS_INICIALES')) {
         await faregasCertificadosApi.actualizarBorrador(certificadoId, { tarifaCodigo: formCaja.tarifaCodigo });
         await faregasCertificadosApi.guardarVehiculoBorrador(certificadoId, { placa: formCaja.placa, categoria: formCaja.categoria });
-      } else if (currentStepIndex === 1 && precioTotal > 0) {
+      } else if (currentStepIndex === indicePaso('PAGO') && precioTotal > 0) {
         await guardarPasoPagos(certificadoId);
-      } else if (currentStepIndex === 2) {
+      } else if (currentStepIndex === indicePaso('VEHICULO')) {
         if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
         else await guardarPasoVehiculo(certificadoId);
       }
@@ -1611,7 +1620,7 @@ export function NuevoCertificadoView() {
 
   const puedeAnularBorrador = Boolean(certificadoId)
     && certificadoEstado === 'BORRADOR'
-    && currentStepIndex <= indicePaso('PREVISUALIZACION');
+    && currentStepIndex < indicePaso('FACTURACION');
 
   const anularBorrador = async () => {
     if (!certificadoId || !puedeAnularBorrador) return;
@@ -1649,7 +1658,7 @@ export function NuevoCertificadoView() {
     return () => window.removeEventListener('beforeunload', advertirSalida);
   }, [isSavingStep, saveError]);
 
-  if (loading && currentStepIndex === 0) {
+  if (loading && currentStepIndex === indicePaso('DATOS_INICIALES')) {
     return <div className="p-8 text-center text-slate-500">Cargando opciones...</div>;
   }
 
@@ -1799,6 +1808,7 @@ export function NuevoCertificadoView() {
             <VehiculoStep
               tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
               modalidadCertificado={formCaja.modalidadCertificado}
+            numeroCertificadoOficial={numeroCertificadoOficial}
               formVehiculo={formVehiculo}
               setFormVehiculo={setFormVehiculo}
               formPropietario={formPropietario}
@@ -1926,7 +1936,7 @@ export function NuevoCertificadoView() {
             facturacion={facturacion}
             onFacturacionChange={setFacturacion}
             medioPago={medioPagoCalculado}
-            onEditarDatosCliente={() => setCurrentStepIndex(2)}
+            onEditarDatosCliente={() => setCurrentStepIndex(indicePaso('VEHICULO'))}
           />
         )}
       </div>
@@ -1983,7 +1993,7 @@ export function NuevoCertificadoView() {
                 )}
               </div>
             ) : null
-          ) : currentStepIndex === 0 && !isConsultado ? (
+          ) : currentStepIndex === indicePaso('DATOS_INICIALES') && !isConsultado ? (
             <span className="text-xs font-semibold text-slate-500">Complete los datos y presione Consultar.</span>
           ) : (
             <button

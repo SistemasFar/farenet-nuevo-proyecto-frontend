@@ -1,4 +1,5 @@
 import type { TipoCertificadoFaregas } from '../../types/faregas';
+import { camposVehiculoEditables } from './faregas-certificado-campos';
 import type { CampoFormatoDinamicoFaregas } from '../../types/faregas-api';
 import { combustiblesGnvSonEquivalentes, combustiblesSonEquivalentes, pesosGnvSonIguales } from './gnv-conversion';
 
@@ -82,6 +83,7 @@ export const validarDatosIniciales = (caja: Record<string, any>) => {
 
 export const validarExpedienteTecnico = ({
   tipoCertificado,
+  modalidad,
   caja,
   vehiculo,
   titulares,
@@ -119,11 +121,14 @@ export const validarExpedienteTecnico = ({
 
   if (tipoCertificado === 'GLP_ANUAL') {
     agregarFaltantes(errores, vehiculo, [['cargaUtil', 'la carga útil']]);
-    agregarFaltantes(errores, glp, [
+    const camposGlp: Array<[string, string]> = [
       ['tallerAutorizadoId', 'el taller autorizado'],
       ['fechaVigencia', 'la vigencia GLP'],
-      ['expedienteTecnico', 'el número de expediente técnico'],
-    ]);
+    ];
+    if (String(modalidad || '').toUpperCase() === 'INICIAL') {
+      camposGlp.push(['expedienteTecnico', 'el número de expediente técnico']);
+    }
+    agregarFaltantes(errores, glp, camposGlp);
     const componentes = glp.componentes || [];
     for (const tipo of ['CILINDRO', 'REGULADOR']) {
       const componente = componentes.find((item: any) => item.componente === tipo);
@@ -346,8 +351,6 @@ export const validarTitulares = (
   titulares.forEach((titular, indice) => {
     const numero = indice + 1;
     const reglas: ReglaCampo[] = [
-      { campo: 'tipoDocumento', etiqueta: `el tipo de documento del titular ${numero}` },
-      { campo: 'nroDocumento', etiqueta: `el documento del titular ${numero}` },
       { campo: 'nombreRazonSocial', etiqueta: `el nombre del titular ${numero}` },
     ];
     if (tipo === 'CONFORMIDAD') {
@@ -365,11 +368,13 @@ export const validarTitulares = (
 /** Reglas de taller, vigencia y expediente, por familia de certificado. */
 export const validarDatosEspecificos = ({
   tipo,
+  modalidad,
   gnv,
   glp,
   conformidad,
 }: {
   tipo: TipoCertificadoFaregas;
+  modalidad?: string;
   gnv: Record<string, any>;
   glp: Record<string, any>;
   conformidad: Record<string, any>;
@@ -378,9 +383,11 @@ export const validarDatosEspecificos = ({
 
   if (tipo === 'GNV_ANUAL') {
     if (vacio(gnv.fechaVigencia)) marcar(errores, 'gnv.fechaVigencia', 'Complete la vigencia del certificado GNV.');
-    const verificaciones = gnv.verificaciones || [];
-    if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
-      marcar(errores, 'gnv.verificaciones', 'Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
+    if (String(modalidad || '').toUpperCase() === 'ANUAL') {
+      const verificaciones = gnv.verificaciones || [];
+      if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
+        marcar(errores, 'gnv.verificaciones', 'Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
+      }
     }
   }
 
@@ -389,7 +396,9 @@ export const validarDatosEspecificos = ({
       marcar(errores, 'glp.tallerAutorizadoId', 'Seleccione el taller autorizado.');
     }
     if (vacio(glp.fechaVigencia)) marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
-    if (vacio(glp.expedienteTecnico)) marcar(errores, 'glp.expedienteTecnico', 'Complete el número de expediente técnico.');
+    if (String(modalidad || '').toUpperCase() === 'INICIAL' && vacio(glp.expedienteTecnico)) {
+      marcar(errores, 'glp.expedienteTecnico', 'Complete el número de expediente técnico.');
+    }
 
     const componentes = glp.componentes || [];
     for (const nombre of ['CILINDRO', 'REGULADOR']) {
@@ -431,10 +440,7 @@ export const validarDatosEspecificos = ({
       marcar(errores, 'conformidad.tipoConformidad', 'Seleccione el tipo de conformidad.');
     }
     const reglas: ReglaCampo[] = [
-      { campo: 'tipoTramite', etiqueta: 'el tipo de trámite' },
       { campo: 'caracteristicaRegistrable', etiqueta: 'la característica registrable' },
-      { campo: 'motivo', etiqueta: 'el motivo' },
-      { campo: 'descripcion', etiqueta: 'la descripción' },
       { campo: 'usoOriginalVehiculo', etiqueta: 'el uso original del vehículo' },
     ];
     for (const regla of reglas) {
@@ -452,6 +458,7 @@ export const validarDatosEspecificos = ({
  */
 export const validarPasoExpedienteTecnico = ({
   tipoCertificado,
+  modalidad,
   caja,
   vehiculo,
   titulares,
@@ -474,7 +481,7 @@ export const validarPasoExpedienteTecnico = ({
     ...validarIdentificacionVehiculo(vehiculo),
     ...validarAniosVehiculo(vehiculo),
     ...validarTitulares(titulares, tipo),
-    ...validarDatosEspecificos({ tipo, gnv, glp, conformidad }),
+    ...validarDatosEspecificos({ tipo, modalidad, gnv, glp, conformidad }),
   };
 };
 
@@ -577,15 +584,6 @@ export const validarDatosFacturacionBasica = (facturacion: Record<string, any>) 
 
 export const MENSAJE_CAMPO_OBLIGATORIO = 'Este campo es obligatorio.';
 
-/** Bloque A. Se renderiza siempre, para cualquier tipo de certificado. */
-export const CAMPOS_VISIBLES_COMUNES = [
-  'marca', 'modelo', 'version', 'anioFabricacion', 'anioModelo', 'vin', 'serieChasis',
-  'numeroMotor', 'combustible', 'color', 'clase', 'categoria', 'carroceria',
-  'numeroCilindros', 'cilindrada', 'numeroEjes', 'numeroRuedas', 'numeroAsientos',
-  'numeroPasajeros', 'pesoNeto', 'pesoBruto', 'cargaUtil', 'potencia',
-  'longitud', 'ancho', 'alto', 'formulaRodante',
-] as const;
-
 /**
  * Bloque B, sección GNV (más los campos "después" cuando la modalidad es INICIAL).
  *
@@ -600,16 +598,16 @@ export const CAMPOS_VISIBLES_GNV_INICIAL = [
 
 /** Bloque B, sección GLP (idem para INICIAL). */
 export const CAMPOS_VISIBLES_GLP = [
-  'glp.fechaVigencia', 'glp.expedienteTecnico',
+  'glp.fechaVigencia',
 ] as const;
 export const CAMPOS_VISIBLES_GLP_INICIAL = [
-  'glp.pesoNetoPosterior', 'glp.cargaUtilPosterior',
+  'glp.expedienteTecnico', 'glp.pesoNetoPosterior', 'glp.cargaUtilPosterior',
 ] as const;
 
 /** Bloque B, sección CONFORMIDAD. */
 export const CAMPOS_VISIBLES_CONFORMIDAD = [
-  'conformidad.tipoConformidad', 'conformidad.tipoTramite', 'conformidad.caracteristicaRegistrable',
-  'conformidad.motivo', 'conformidad.usoOriginalVehiculo', 'conformidad.descripcion',
+  'conformidad.tipoConformidad', 'conformidad.caracteristicaRegistrable',
+  'conformidad.usoOriginalVehiculo',
 ] as const;
 
 /** Campos de cada fila de titular. */
@@ -704,7 +702,7 @@ export const camposObligatoriosVisibles = (
   tipoCertificado: TipoCertificadoFaregas,
   modalidad?: string
 ): string[] => {
-  const campos: string[] = [...CAMPOS_VISIBLES_COMUNES];
+  const campos: string[] = camposVehiculoEditables(tipoCertificado, modalidad);
   const esInicial = String(modalidad || '').toUpperCase() === 'INICIAL';
 
   if (tipoCertificado === 'GNV_ANUAL') {
@@ -742,7 +740,20 @@ export const validarFormularioVehiculoVisible = ({
 
   // La categoría se edita en el paso 1 y vive en `caja`.
   const vehiculoConCategoria = { ...vehiculo, categoria: caja.categoria };
-  marcarVacias(errores, vehiculoConCategoria, CAMPOS_VISIBLES_COMUNES);
+  const camposVehiculo = camposVehiculoEditables(tipoCertificado, modalidad);
+  for (const campo of camposVehiculo) {
+    // GLP/GNV imprimen un único dato "VIN / N° de Serie": cualquiera de los
+    // dos valores históricos satisface el control único del formulario.
+    if (campo === 'vin' && tipoCertificado !== 'CONFORMIDAD') {
+      if (esValorVacioParaAvance(vehiculo.vin) && esValorVacioParaAvance(vehiculo.serieChasis)) {
+        marcar(errores, 'vin', MENSAJE_CAMPO_OBLIGATORIO);
+      }
+      continue;
+    }
+    if (esValorVacioParaAvance(leerPorRuta(vehiculoConCategoria, campo))) {
+      marcar(errores, campo, MENSAJE_CAMPO_OBLIGATORIO);
+    }
+  }
 
   const esInicial = String(modalidad || '').toUpperCase() === 'INICIAL';
 
@@ -793,6 +804,7 @@ export const validarFormularioVehiculoVisible = ({
     errores,
     validarDatosEspecificos({
       tipo: tipoCertificado,
+      modalidad,
       gnv,
       glp,
       conformidad,
@@ -810,10 +822,14 @@ export const validarFormularioVehiculoVisible = ({
   // La clave es titular.<indice>.<campo>, así que la raíz se anida en dos
   // niveles para que la ruta se pueda recorrer segmento a segmento.
   titulares.forEach((titular, indice) => {
+    if (tipoCertificado !== 'GLP_ANUAL' && tipoCertificado !== 'CONFORMIDAD') return;
+    const camposTitular = tipoCertificado === 'CONFORMIDAD'
+      ? ['nombreRazonSocial', 'direccion']
+      : ['nombreRazonSocial'];
     marcarVacias(
       errores,
       { titular: { [indice]: titular } },
-      CAMPOS_VISIBLES_TITULAR.map((campo) => `titular.${indice}.${campo}`)
+      camposTitular.map((campo) => `titular.${indice}.${campo}`)
     );
   });
 
