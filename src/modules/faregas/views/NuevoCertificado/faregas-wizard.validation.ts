@@ -113,9 +113,11 @@ export const validarExpedienteTecnico = ({
   if (tipoCertificado === 'GNV_ANUAL') {
     agregarFaltantes(errores, vehiculo, [['color', 'el color']]);
     agregarFaltantes(errores, gnv, [['fechaVigencia', 'la vigencia GNV']]);
-    const verificaciones = gnv.verificaciones || [];
-    if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
-      errores.push('Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
+    if (String(modalidad || '').toUpperCase() === 'ANUAL') {
+      const verificaciones = gnv.verificaciones || [];
+      if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
+        errores.push('Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
+      }
     }
   }
 
@@ -172,9 +174,8 @@ export const validarExpedienteTecnico = ({
     ]);
     if (vacio(conformidad.tipoConformidad)) { errores.push('Seleccione el tipo de conformidad.'); }
     agregarFaltantes(errores, conformidad, [
-      ['tipoTramite', 'el tipo de trámite'],
-      ['caracteristicaRegistrable', 'la característica registrable'], ['motivo', 'el motivo'],
-      ['descripcion', 'la descripción'], ['usoOriginalVehiculo', 'el uso original del vehículo'],
+      ['caracteristicaRegistrable', 'la característica registrable'],
+      ['usoOriginalVehiculo', 'el uso original del vehículo'],
     ]);
   }
 

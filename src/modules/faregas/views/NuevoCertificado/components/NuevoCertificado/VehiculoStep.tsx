@@ -120,7 +120,7 @@ export function VehiculoStep({
     && pesosGnvSonIguales(formVehiculo.pesoNeto, formGnv.pesoNetoPosterior);
   const combustibleGlpSinCambio = modalidadCertificado === 'INICIAL'
     && combustiblesSonEquivalentes(formVehiculo.combustible, COMBUSTIBLE_POSTERIOR_GLP);
-  
+
   // Initialize verificaciones based on catalog
   useEffect(() => {
     if (tipoCertificado === 'GNV_ANUAL' && modalidadCertificado === 'ANUAL' && catalogoVerificaciones?.GNV_ANUAL && (!formGnv.verificaciones || formGnv.verificaciones.length === 0)) {
@@ -182,7 +182,7 @@ export function VehiculoStep({
     limpiar(name);
     if (name === 'combustible') limpiar('gnv.combustiblePosterior');
     if (name === 'pesoNeto') limpiar('gnv.pesoNetoPosterior');
-    
+
     switch (name) {
       case 'vin': finalValue = formatVIN(finalValue); break;
       case 'serieChasis':
@@ -341,24 +341,28 @@ export function VehiculoStep({
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <TitularesList
-          titulares={titulares}
-          setTitulares={setTitulares}
-          formFacturacion={formFacturacion}
-          setFormFacturacion={setFormFacturacion}
-          onRemoveTitular={onRemoveTitular}
-          erroresCampo={erroresCampo}
-          onCorregirCampo={onCorregirCampo}
-          mostrarTitulares={tipoCertificado === 'GLP_ANUAL' || tipoCertificado === 'CONFORMIDAD'}
-          mostrarDireccionTitular={tipoCertificado === 'CONFORMIDAD'}
-        />
-      </div>
-      
+      {/* 1. PROPIETARIO (SI EL CERTIFICADO LO MUESTRA) */}
+      {(tipoCertificado === 'GLP_ANUAL' || tipoCertificado === 'CONFORMIDAD') && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <TitularesList
+            titulares={titulares}
+            setTitulares={setTitulares}
+            formFacturacion={formFacturacion}
+            setFormFacturacion={setFormFacturacion}
+            onRemoveTitular={onRemoveTitular}
+            erroresCampo={erroresCampo}
+            onCorregirCampo={onCorregirCampo}
+            mostrarTitulares={true}
+            mostrarFacturacion={false}
+            mostrarDireccionTitular={tipoCertificado === 'CONFORMIDAD'}
+          />
+        </div>
+      )}
+
       {/* 1. SECCIÓN GENERAL DEL VEHÍCULO */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <h4 className="text-lg font-bold text-slate-800 capitalize tracking-wider mb-6 border-b pb-2">
-          A. DATOS GENERALES DEL VEHÍCULO
+          A. DATOS DEL VEHÍCULO
         </h4>
         <div className="mb-4 flex justify-end">
           <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black text-[#052a79]">
@@ -526,7 +530,7 @@ export function VehiculoStep({
         {/* --- DATOS GLP --- */}
         {tipoCertificado === 'GLP_ANUAL' && (
           <div className="space-y-6">
-            
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD</label>
@@ -653,63 +657,143 @@ export function VehiculoStep({
               </section>
             )}
 
-            <div className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
-              <h5 className="mb-3 font-bold text-slate-700">COMPONENTES INSTALADOS GLP</h5>
-              <MensajeError campo="glp.componentes" errores={erroresCampo} />
-              <div className="mb-2 hidden grid-cols-7 gap-2 text-xs font-bold capitalize text-slate-500 md:grid">
-                <div>Componente</div>
-                <div>Marca *</div>
-                <div>Modelo *</div>
-                <div>Cap. (L) *</div>
-                <div>Mes *</div>
-                <div>Año *</div>
-                <div>N° Serie *</div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+              <div className="mb-3 flex items-center justify-between border-b pb-2">
+                <h5 className="font-bold text-slate-800">COMPONENTES INSTALADOS GLP</h5>
+                <span className="text-[11px] font-bold text-slate-500">TABLA DEL CERTIFICADO</span>
               </div>
-              {formGlp.componentes?.map((comp: any, idx: number) => (
-                <div key={idx} className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 last:mb-0 md:grid md:grid-cols-7 md:gap-2 md:border-0 md:bg-transparent md:p-0">
-                  <div className="mb-3 font-bold text-[#052a79] md:mb-0 md:pt-2 md:text-slate-800">
-                    <span className="mr-1 text-[10px] text-slate-500 md:hidden">COMPONENTE:</span>{comp.componente}
-                  </div>
-                  <label className="mb-3 block md:mb-0">
-                    <span className="mb-1 block text-[10px] font-bold text-slate-500 md:hidden">MARCA *</span>
-                    <input value={comp.marca || ''} onChange={e => handleComponenteGlp(idx, 'marca', e.target.value)} className={claseConError("min-h-10 w-full min-w-0 rounded-md border-2 border-slate-200 p-1.5 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'marca')))} data-campo-error={esError(claveComponente('glp', comp.componente, 'marca')) ? true : undefined} placeholder="Marca" />
-                    <MensajeError campo={claveComponente('glp', comp.componente, 'marca')} errores={erroresCampo} />
-                  </label>
-                  <label className="mb-3 block md:mb-0">
-                    <span className="mb-1 block text-[10px] font-bold text-slate-500 md:hidden">MODELO *</span>
-                    <input value={comp.modelo || ''} onChange={e => handleComponenteGlp(idx, 'modelo', e.target.value)} className={claseConError("min-h-10 w-full min-w-0 rounded-md border-2 border-slate-200 p-1.5 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'modelo')))} data-campo-error={esError(claveComponente('glp', comp.componente, 'modelo')) ? true : undefined} placeholder="Modelo" />
-                    <MensajeError campo={claveComponente('glp', comp.componente, 'modelo')} errores={erroresCampo} />
-                  </label>
-                  {comp.componente === 'REGULADOR' ? (
-                    <div className="mb-3 rounded-md bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500 md:col-span-3 md:mb-0 md:bg-transparent md:text-center">
-                      <span className="md:hidden">Capacidad y fecha de fabricación: </span>NO APLICA
-                    </div>
-                  ) : (
-                    <>
-                      <label className="mb-3 block md:mb-0">
-                        <span className="mb-1 block text-[10px] font-bold text-slate-500 md:hidden">CAPACIDAD (L) *</span>
-                        <input value={comp.capacidadLitros || ''} onChange={e => handleComponenteGlp(idx, 'capacidadLitros', e.target.value)} className={claseConError("min-h-10 w-full min-w-0 rounded-md border-2 border-slate-200 p-1.5 font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'capacidadLitros')))} data-campo-error={esError(claveComponente('glp', comp.componente, 'capacidadLitros')) ? true : undefined} placeholder="Litros" />
-                        <MensajeError campo={claveComponente('glp', comp.componente, 'capacidadLitros')} errores={erroresCampo} />
-                      </label>
-                      <label className="mb-3 block md:mb-0">
-                        <span className="mb-1 block text-[10px] font-bold text-slate-500 md:hidden">MES *</span>
-                        <input value={comp.mesFabricacion || ''} onChange={e => handleComponenteGlp(idx, 'mesFabricacion', e.target.value)} className={claseConError("min-h-10 w-full min-w-0 rounded-md border-2 border-slate-200 p-1.5 font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'mesFabricacion')))} data-campo-error={esError(claveComponente('glp', comp.componente, 'mesFabricacion')) ? true : undefined} placeholder="Mes" />
-                        <MensajeError campo={claveComponente('glp', comp.componente, 'mesFabricacion')} errores={erroresCampo} />
-                      </label>
-                      <label className="mb-3 block md:mb-0">
-                        <span className="mb-1 block text-[10px] font-bold text-slate-500 md:hidden">AÑO *</span>
-                        <input value={comp.anioFabricacion || ''} onChange={e => handleComponenteGlp(idx, 'anioFabricacion', e.target.value)} className={claseConError("min-h-10 w-full min-w-0 rounded-md border-2 border-slate-200 p-1.5 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'anioFabricacion')))} data-campo-error={esError(claveComponente('glp', comp.componente, 'anioFabricacion')) ? true : undefined} placeholder="Año" />
-                        <MensajeError campo={claveComponente('glp', comp.componente, 'anioFabricacion')} errores={erroresCampo} />
-                      </label>
-                    </>
-                  )}
-                  <label className="block">
-                    <span className="mb-1 block text-[10px] font-bold text-slate-500 md:hidden">N° SERIE *</span>
-                    <input value={comp.numeroSerie || ''} onChange={e => handleComponenteGlp(idx, 'numeroSerie', e.target.value)} className={claseConError("min-h-10 w-full min-w-0 rounded-md border-2 border-slate-200 p-1.5 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'numeroSerie')))} data-campo-error={esError(claveComponente('glp', comp.componente, 'numeroSerie')) ? true : undefined} placeholder="N° Serie" />
-                    <MensajeError campo={claveComponente('glp', comp.componente, 'numeroSerie')} errores={erroresCampo} />
-                  </label>
-                </div>
-              ))}
+              <MensajeError campo="glp.componentes" errores={erroresCampo} />
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold">
+                      <th className="p-2.5 text-center w-12">ÍTEM</th>
+                      <th className="p-2.5 w-32">COMPONENTE</th>
+                      <th className="p-2.5 w-44">MARCA *</th>
+                      <th className="p-2.5 min-w-[280px]">MODELO (*) *</th>
+                      <th className="p-2.5 w-44">N° DE SERIE *</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {formGlp.componentes?.map((comp: any, idx: number) => {
+                      const esCilindro = comp.componente === 'CILINDRO';
+                      const previewCilindro = esCilindro
+                        ? [
+                            comp.capacidadLitros ? `${Number(comp.capacidadLitros).toFixed(2)} LTS` : '',
+                            comp.anioFabricacion ? `${comp.mesFabricacion ? String(comp.mesFabricacion).padStart(2, '0') + '-' : ''}${comp.anioFabricacion}` : ''
+                          ].filter(Boolean).join(' / ')
+                        : '';
+
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="p-2.5 text-center font-bold text-slate-400 align-top pt-4">
+                            {idx + 1}
+                          </td>
+                          <td className="p-2.5 font-black text-[#052a79] align-top pt-4">
+                            {comp.componente}
+                          </td>
+                          <td className="p-2.5 align-top">
+                            <input
+                              value={comp.marca || ''}
+                              onChange={e => handleComponenteGlp(idx, 'marca', e.target.value)}
+                              className={claseConError("min-h-10 w-full rounded-md border-2 border-slate-200 p-2 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'marca')))}
+                              data-campo-error={esError(claveComponente('glp', comp.componente, 'marca')) ? true : undefined}
+                              placeholder="Marca"
+                            />
+                            <MensajeError campo={claveComponente('glp', comp.componente, 'marca')} errores={erroresCampo} />
+                          </td>
+                          <td className="p-2.5 align-top">
+                            {esCilindro ? (
+                              <div className="space-y-2">
+                                <input
+                                  value={comp.modelo || ''}
+                                  onChange={e => handleComponenteGlp(idx, 'modelo', e.target.value)}
+                                  className={claseConError("min-h-10 w-full rounded-md border-2 border-slate-200 p-2 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'modelo')))}
+                                  data-campo-error={esError(claveComponente('glp', comp.componente, 'modelo')) ? true : undefined}
+                                  placeholder="Modelo (ej: Cilíndrico / Toroidal)"
+                                />
+                                <MensajeError campo={claveComponente('glp', comp.componente, 'modelo')} errores={erroresCampo} />
+
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                                    <div className="flex-1 min-w-[90px]">
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">CAPACIDAD (L) *</label>
+                                      <input
+                                        value={comp.capacidadLitros || ''}
+                                        onChange={e => handleComponenteGlp(idx, 'capacidadLitros', e.target.value)}
+                                        className={claseConError("h-9 w-full rounded-md border-2 border-slate-200 px-2 text-xs font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'capacidadLitros')))}
+                                        data-campo-error={esError(claveComponente('glp', comp.componente, 'capacidadLitros')) ? true : undefined}
+                                        placeholder="Litros (ej: 48.00)"
+                                      />
+                                      <MensajeError campo={claveComponente('glp', comp.componente, 'capacidadLitros')} errores={erroresCampo} />
+                                    </div>
+                                    <span className="text-base font-black text-slate-400 select-none pt-4">/</span>
+                                    <div className="w-20">
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">MES *</label>
+                                      <input
+                                        value={comp.mesFabricacion || ''}
+                                        onChange={e => handleComponenteGlp(idx, 'mesFabricacion', e.target.value)}
+                                        maxLength={2}
+                                        className={claseConError("h-9 w-full rounded-md border-2 border-slate-200 px-2 text-center text-xs font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'mesFabricacion')))}
+                                        data-campo-error={esError(claveComponente('glp', comp.componente, 'mesFabricacion')) ? true : undefined}
+                                        placeholder="MM"
+                                      />
+                                      <MensajeError campo={claveComponente('glp', comp.componente, 'mesFabricacion')} errores={erroresCampo} />
+                                    </div>
+                                    <span className="text-base font-black text-slate-400 select-none pt-4">-</span>
+                                    <div className="w-24">
+                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">AÑO *</label>
+                                      <input
+                                        value={comp.anioFabricacion || ''}
+                                        onChange={e => handleComponenteGlp(idx, 'anioFabricacion', e.target.value)}
+                                        maxLength={4}
+                                        className={claseConError("h-9 w-full rounded-md border-2 border-slate-200 px-2 text-center text-xs font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'anioFabricacion')))}
+                                        data-campo-error={esError(claveComponente('glp', comp.componente, 'anioFabricacion')) ? true : undefined}
+                                        placeholder="AAAA"
+                                      />
+                                      <MensajeError campo={claveComponente('glp', comp.componente, 'anioFabricacion')} errores={erroresCampo} />
+                                    </div>
+                                  </div>
+                                  {previewCilindro && (
+                                    <p className="mt-1.5 text-[10px] font-medium text-slate-600">
+                                      Impresión en certificado: <strong className="text-[#052a79]">{previewCilindro}</strong>
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <input
+                                  value={comp.modelo || ''}
+                                  onChange={e => handleComponenteGlp(idx, 'modelo', e.target.value)}
+                                  className={claseConError("min-h-10 w-full rounded-md border-2 border-slate-200 p-2 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'modelo')))}
+                                  data-campo-error={esError(claveComponente('glp', comp.componente, 'modelo')) ? true : undefined}
+                                  placeholder="Modelo del regulador"
+                                />
+                                <MensajeError campo={claveComponente('glp', comp.componente, 'modelo')} errores={erroresCampo} />
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-2.5 align-top">
+                            <input
+                              value={comp.numeroSerie || ''}
+                              onChange={e => handleComponenteGlp(idx, 'numeroSerie', e.target.value)}
+                              className={claseConError("min-h-10 w-full rounded-md border-2 border-slate-200 p-2 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'numeroSerie')))}
+                              data-campo-error={esError(claveComponente('glp', comp.componente, 'numeroSerie')) ? true : undefined}
+                              placeholder="N° de Serie"
+                            />
+                            <MensajeError campo={claveComponente('glp', comp.componente, 'numeroSerie')} errores={erroresCampo} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-[11px] italic text-slate-500 border-t pt-2">
+                (*): En caso del cilindro de almacenamiento de GLP, indicar su capacidad en litros y año de fabricación.
+              </p>
             </div>
 
             <div>
@@ -956,7 +1040,7 @@ export function VehiculoStep({
                                   value={comp.capacidadLitros || ''}
                                   onChange={e => {
                                     if (e.target.value === 'ESPECIFICAR') {
-                                      handleComponenteGnv(idx, 'capacidadLitros', ' '); 
+                                      handleComponenteGnv(idx, 'capacidadLitros', ' ');
                                     } else {
                                       handleComponenteGnv(idx, 'capacidadLitros', e.target.value);
                                     }
@@ -1079,30 +1163,22 @@ export function VehiculoStep({
         {tipoCertificado === 'CONFORMIDAD' && (
           <div className="space-y-4">
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-              <p className="font-bold">Completa los 6 datos que aparecerán en el certificado.</p>
-              <p className="mt-1 text-xs leading-5 text-blue-800">Primero indica el trabajo realizado; después explica qué característica se certifica y por qué.</p>
+              <p className="font-bold">Completa los 3 datos que aparecerán en el certificado.</p>
+              <p className="mt-1 text-xs leading-5 text-blue-800">Indica el tipo de trabajo realizado, la característica que se certifica y el uso original del vehículo.</p>
             </div>
 
             <section className="rounded-lg border border-slate-200 bg-white p-4">
               <h5 className="mb-4 font-bold text-[#052a79]">1. Tipo de trabajo realizado</h5>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-600">¿QUÉ TRABAJO SE CERTIFICA?{required('conformidad.tipoConformidad')}</label>
-                  <select name="tipoConformidad" value={formConformidad.tipoConformidad || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoConformidad'))} data-campo-error={esError('conformidad.tipoConformidad') ? true : undefined}>
-                    <option value="">SELECCIONAR TIPO</option>
-                    <option value="MODIFICACION">MODIFICACIÓN</option>
-                    <option value="MONTAJE">MONTAJE</option>
-                    <option value="FABRICACION">FABRICACIÓN</option>
-                  </select>
-                  <MensajeError campo="conformidad.tipoConformidad" errores={erroresCampo} />
-                  <p className="mt-1 text-xs text-slate-500">Selecciona una sola opción.</p>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-600">TRÁMITE SOLICITADO{required('conformidad.tipoTramite')}</label>
-                  <input name="tipoTramite" value={formConformidad.tipoTramite || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoTramite'))} data-campo-error={esError('conformidad.tipoTramite') ? true : undefined} placeholder="EJ.: RECTIFICACIÓN DE CARACTERÍSTICAS" />
-                  <MensajeError campo="conformidad.tipoTramite" errores={erroresCampo} />
-                  <p className="mt-1 text-xs text-slate-500">Escribe el nombre del trámite presentado.</p>
-                </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-slate-600">¿QUÉ TRABAJO SE CERTIFICA?{required('conformidad.tipoConformidad')}</label>
+                <select name="tipoConformidad" value={formConformidad.tipoConformidad || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.tipoConformidad'))} data-campo-error={esError('conformidad.tipoConformidad') ? true : undefined}>
+                  <option value="">SELECCIONAR TIPO</option>
+                  <option value="MODIFICACION">MODIFICACIÓN</option>
+                  <option value="MONTAJE">MONTAJE</option>
+                  <option value="FABRICACION">FABRICACIÓN</option>
+                </select>
+                <MensajeError campo="conformidad.tipoConformidad" errores={erroresCampo} />
+                <p className="mt-1 text-xs text-slate-500">Selecciona una sola opción.</p>
               </div>
             </section>
 
@@ -1116,29 +1192,29 @@ export function VehiculoStep({
                   <p className="mt-1 text-xs text-slate-500">Indica el dato registrable que se está verificando o corrigiendo.</p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-bold text-slate-600">MOTIVO DE LA SOLICITUD{required('conformidad.motivo')}</label>
-                    <input name="motivo" value={formConformidad.motivo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.motivo'))} data-campo-error={esError('conformidad.motivo') ? true : undefined} placeholder="EJ.: DATO INCORRECTO EN LA TARJETA" />
-                    <MensajeError campo="conformidad.motivo" errores={erroresCampo} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-bold text-slate-600">USO ORIGINAL DEL VEHÍCULO{required('conformidad.usoOriginalVehiculo')}</label>
-                    <input name="usoOriginalVehiculo" value={formConformidad.usoOriginalVehiculo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.usoOriginalVehiculo'))} data-campo-error={esError('conformidad.usoOriginalVehiculo') ? true : undefined} placeholder="EJ.: TRANSPORTE DE PERSONAS" />
-                    <MensajeError campo="conformidad.usoOriginalVehiculo" errores={erroresCampo} />
-                  </div>
-                </div>
-
                 <div>
-                  <label className="mb-1 block text-xs font-bold text-slate-600">DESCRIPCIÓN COMPLEMENTARIA{required('conformidad.descripcion')}</label>
-                  <textarea name="descripcion" value={formConformidad.descripcion || ''} onChange={handleConformidad} maxLength={500} rows={3} className={claseConError(`${CLASE_CAMPO} resize-y normal-case`, esError('conformidad.descripcion'))} data-campo-error={esError('conformidad.descripcion') ? true : undefined} placeholder="DESCRIBE BREVEMENTE LA MODIFICACIÓN, MONTAJE O FABRICACIÓN REALIZADA." />
-                  <MensajeError campo="conformidad.descripcion" errores={erroresCampo} />
-                  <p className="mt-1 text-right text-xs text-slate-400">{String(formConformidad.descripcion || '').length}/500</p>
+                  <label className="mb-1 block text-xs font-bold text-slate-600">USO ORIGINAL DEL VEHÍCULO{required('conformidad.usoOriginalVehiculo')}</label>
+                  <input name="usoOriginalVehiculo" value={formConformidad.usoOriginalVehiculo || ''} onChange={handleConformidad} className={claseConError(CLASE_CAMPO, esError('conformidad.usoOriginalVehiculo'))} data-campo-error={esError('conformidad.usoOriginalVehiculo') ? true : undefined} placeholder="EJ.: TRANSPORTE DE PERSONAS" />
+                  <MensajeError campo="conformidad.usoOriginalVehiculo" errores={erroresCampo} />
                 </div>
               </div>
             </section>
           </div>
         )}
+      </div>
+      {/* 4. DATOS PARA FACTURACIÓN (SIEMPRE VISIBLES AL FINAL DEL FORMULARIO) */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <TitularesList
+          titulares={titulares}
+          setTitulares={setTitulares}
+          formFacturacion={formFacturacion}
+          setFormFacturacion={setFormFacturacion}
+          onRemoveTitular={onRemoveTitular}
+          erroresCampo={erroresCampo}
+          onCorregirCampo={onCorregirCampo}
+          mostrarTitulares={false}
+          mostrarFacturacion={true}
+        />
       </div>
     </div>
   );

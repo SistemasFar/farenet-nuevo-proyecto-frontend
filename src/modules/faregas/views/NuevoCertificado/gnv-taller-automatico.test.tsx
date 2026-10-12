@@ -50,7 +50,11 @@ describe('taller GNV automático por sede', () => {
     expect(html).not.toContain('TALLER AUTORIZADO');
     expect(html).not.toContain('tallerAutorizadoId');
     expect(html).toContain('VIGENCIA HASTA');
-    expect(html.match(/MARCAR LOS 8 COMO CUMPLE/g)).toHaveLength(1);
+    if (modalidad === 'ANUAL') {
+      expect(html.match(/MARCAR LOS 8 COMO CUMPLE/g)).toHaveLength(1);
+    } else {
+      expect(html).not.toContain('MARCAR LOS 8 COMO CUMPLE');
+    }
     expect(html).not.toContain('gnv-verif-');
   });
 

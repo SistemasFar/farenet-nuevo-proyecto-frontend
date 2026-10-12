@@ -27,7 +27,7 @@ export function CamposVehiculoCertificado({
   obligatorios,
 }: Props) {
   const valor = (campo: CampoVehiculoCertificado) => {
-    if (campo.campo === 'combustibleGlpAnual') return 'BI COMBUSTIBLE GLP';
+    if (campo.campo === 'combustibleGlpAnual') return formVehiculo.combustible || 'BI COMBUSTIBLE GLP';
     if (campo.grupo === 'vin-serie') return formVehiculo.vin || formVehiculo.serieChasis || '';
     return formVehiculo[campo.campo] || '';
   };
@@ -35,11 +35,60 @@ export function CamposVehiculoCertificado({
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
       {campos.map((campo, indice) => {
+        const prefijoNumero = campo.numero != null ? `${campo.numero}. ` : '';
+        const textoEtiqueta = `${prefijoNumero}${campo.etiqueta}`;
+
+        if (campo.tipo === 'grupo' && campo.campos) {
+          const requeridaGrupo = campo.campos.some((sub) => obligatorios.has(sub.campo));
+          const colSpanClase = campo.colSpan === 3
+            ? 'col-span-1 md:col-span-3'
+            : campo.colSpan === 4
+              ? 'col-span-1 md:col-span-4'
+              : 'col-span-1 md:col-span-2';
+
+          return (
+            <div
+              key={campo.campo}
+              className={colSpanClase}
+              data-campo-certificado={campo.campo}
+              data-grupo-certificado="true"
+            >
+              <label className="mb-1 block text-xs font-bold text-slate-500">
+                {textoEtiqueta}{requeridaGrupo && <span className="text-red-500">*</span>}
+              </label>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                {campo.campos.map((sub, subIdx) => {
+                  const valorSub = String(formVehiculo[sub.campo] ?? '');
+                  return (
+                    <React.Fragment key={sub.campo}>
+                      {subIdx > 0 && (
+                        <span className="text-base font-black text-slate-400 select-none px-1">
+                          {campo.separador || '/'}
+                        </span>
+                      )}
+                      <div className="flex-1 min-w-[70px]">
+                        <input
+                          name={sub.campo}
+                          value={valorSub}
+                          onChange={onChange}
+                          placeholder={sub.placeholder || sub.campo}
+                          {...propsCampo(sub.campo, erroresCampo, CLASE_CAMPO)}
+                        />
+                        <MensajeError campo={sub.campo} errores={erroresCampo} />
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
         const esError = Boolean(erroresCampo[campo.campo]);
         const requerida = obligatorios.has(campo.campo);
         const etiqueta = (
           <label className="mb-1 block text-xs font-bold text-slate-500">
-            {indice + 1}. {campo.etiqueta}{requerida && <span className="text-red-500">*</span>}
+            {textoEtiqueta}{requerida && <span className="text-red-500">*</span>}
           </label>
         );
 
@@ -91,4 +140,3 @@ export function CamposVehiculoCertificado({
     </div>
   );
 }
-

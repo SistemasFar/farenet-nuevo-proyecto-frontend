@@ -28,6 +28,7 @@ interface TitularesListProps {
   erroresCampo?: ErroresCampo;
   onCorregirCampo?: (campo: string) => void;
   mostrarTitulares?: boolean;
+  mostrarFacturacion?: boolean;
   mostrarDireccionTitular?: boolean;
 }
 
@@ -40,9 +41,10 @@ export function TitularesList({
   erroresCampo = {},
   onCorregirCampo,
   mostrarTitulares = true,
+  mostrarFacturacion = true,
   mostrarDireccionTitular = false,
 }: TitularesListProps) {
-  const facturarAlTitular = mostrarTitulares && formFacturacion.usarTitularPrincipalFac;
+  const facturarAlTitular = Boolean(titulares.length > 0 && formFacturacion.usarTitularPrincipalFac);
 
   React.useEffect(() => {
     if (!mostrarTitulares && formFacturacion.usarTitularPrincipalFac) {
@@ -206,7 +208,7 @@ export function TitularesList({
     <div className="space-y-4">
       {mostrarTitulares && (<>
       <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-        <h4 className="text-sm font-bold text-[#052a79] capitalize tracking-wider">C. Dueño del Vehículo y Pago</h4>
+        <h4 className="text-sm font-bold text-[#052a79] capitalize tracking-wider">1. Propietario / Dueño del Vehículo</h4>
         <button type="button" onClick={handleAdd} className="flex items-center gap-1 text-xs font-bold text-white bg-[#052a79] hover:bg-[#041d54] px-3 py-1.5 rounded-lg transition-colors">
           <Plus className="w-4 h-4" /> Agregar Dueño
         </button>
@@ -258,7 +260,7 @@ export function TitularesList({
               <p className="text-xs font-medium text-slate-600">Se utilizarán posteriormente para emitir la boleta o factura.</p>
             </div>
           </div>
-          {mostrarTitulares && <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+          {titulares.length > 0 && <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
             <input
               type="checkbox"
               checked={formFacturacion.usarTitularPrincipalFac}

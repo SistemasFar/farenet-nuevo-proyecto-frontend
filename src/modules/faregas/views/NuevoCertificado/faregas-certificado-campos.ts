@@ -1,60 +1,214 @@
 import type { TipoCertificadoFaregas } from '../../types/faregas';
 
-export type CampoVehiculoCertificado = {
+export type SubcampoVehiculo = {
   campo: string;
-  etiqueta: string;
-  grupo?: 'simple' | 'vin-serie';
+  placeholder?: string;
+  etiqueta?: string;
   automatico?: boolean;
 };
 
-const identificacionComun: CampoVehiculoCertificado[] = [
-  { campo: 'placaNueva', etiqueta: 'PLACA DE RODAJE', automatico: true },
-  { campo: 'categoria', etiqueta: 'CATEGORÍA' },
-  { campo: 'marca', etiqueta: 'MARCA' },
-  { campo: 'modelo', etiqueta: 'MODELO' },
-  { campo: 'version', etiqueta: 'VERSIÓN' },
-  { campo: 'anioFabricacion', etiqueta: 'AÑO DE FABRICACIÓN' },
-  { campo: 'vin', etiqueta: 'VIN / N° DE SERIE', grupo: 'vin-serie' },
-  { campo: 'numeroMotor', etiqueta: 'N° DE MOTOR' },
-  { campo: 'numeroCilindros', etiqueta: 'N° DE CILINDROS' },
-  { campo: 'cilindrada', etiqueta: 'CILINDRADA (CM³)' },
-];
-
-const rodajeDimensiones: CampoVehiculoCertificado[] = [
-  { campo: 'numeroEjes', etiqueta: 'N° DE EJES' },
-  { campo: 'numeroRuedas', etiqueta: 'N° DE RUEDAS' },
-  { campo: 'numeroAsientos', etiqueta: 'N° DE ASIENTOS' },
-  { campo: 'numeroPasajeros', etiqueta: 'N° DE PASAJEROS' },
-  { campo: 'longitud', etiqueta: 'LARGO (M)' },
-  { campo: 'ancho', etiqueta: 'ANCHO (M)' },
-  { campo: 'alto', etiqueta: 'ALTO (M)' },
-];
+export type CampoVehiculoCertificado = {
+  tipo?: 'simple' | 'grupo';
+  campo: string;
+  etiqueta: string;
+  numero?: number;
+  grupo?: 'simple' | 'vin-serie';
+  automatico?: boolean;
+  campos?: SubcampoVehiculo[];
+  separador?: string;
+  colSpan?: number;
+};
 
 const CAMPOS_GLP_INICIAL: CampoVehiculoCertificado[] = [
-  ...identificacionComun,
-  { campo: 'combustible', etiqueta: 'COMBUSTIBLE ORIGINAL' },
-  ...rodajeDimensiones,
-  { campo: 'pesoNeto', etiqueta: 'PESO NETO (KG)' },
-  { campo: 'pesoBruto', etiqueta: 'PESO BRUTO VEHICULAR (KG)' },
-  { campo: 'cargaUtil', etiqueta: 'CARGA ÚTIL (KG)' },
+  { campo: 'placaNueva', etiqueta: 'PLACA DE RODAJE', numero: 2, automatico: true },
+  { campo: 'categoria', etiqueta: 'CATEGORÍA', numero: 3 },
+  { campo: 'marca', etiqueta: 'MARCA', numero: 4 },
+  { campo: 'modelo', etiqueta: 'MODELO', numero: 5 },
+  { campo: 'version', etiqueta: 'VERSIÓN', numero: 6 },
+  { campo: 'anioFabricacion', etiqueta: 'AÑO DE FABRICACIÓN', numero: 7 },
+  { campo: 'vin', etiqueta: 'VIN / N° DE SERIE', numero: 8, grupo: 'vin-serie' },
+  { campo: 'numeroMotor', etiqueta: 'N° DE MOTOR', numero: 9 },
+  {
+    tipo: 'grupo',
+    campo: 'numeroCilindros',
+    etiqueta: 'N° CILINDROS / CILINDRADA (CM³)',
+    numero: 10,
+    campos: [
+      { campo: 'numeroCilindros', placeholder: 'N° Cilindros' },
+      { campo: 'cilindrada', placeholder: 'Cilindrada' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  { campo: 'combustible', etiqueta: 'COMBUSTIBLE ORIGINAL', numero: 11 },
+  {
+    tipo: 'grupo',
+    campo: 'numeroEjes',
+    etiqueta: 'N° EJES / N° RUEDAS',
+    numero: 12,
+    campos: [
+      { campo: 'numeroEjes', placeholder: 'N° Ejes' },
+      { campo: 'numeroRuedas', placeholder: 'N° Ruedas' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  {
+    tipo: 'grupo',
+    campo: 'numeroAsientos',
+    etiqueta: 'N° ASIENTOS / PASAJEROS',
+    numero: 13,
+    campos: [
+      { campo: 'numeroAsientos', placeholder: 'N° Asientos' },
+      { campo: 'numeroPasajeros', placeholder: 'Pasajeros' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  {
+    tipo: 'grupo',
+    campo: 'longitud',
+    etiqueta: 'LARGO / ANCHO / ALTO (M)',
+    numero: 14,
+    campos: [
+      { campo: 'longitud', placeholder: 'Largo' },
+      { campo: 'ancho', placeholder: 'Ancho' },
+      { campo: 'alto', placeholder: 'Alto' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  { campo: 'pesoNeto', etiqueta: 'PESO NETO (KG)', numero: 15 },
+  { campo: 'pesoBruto', etiqueta: 'PESO BRUTO VEHICULAR (KG)', numero: 16 },
+  { campo: 'cargaUtil', etiqueta: 'CARGA ÚTIL (KG)', numero: 17 },
 ];
 
 const CAMPOS_GLP_ANUAL: CampoVehiculoCertificado[] = [
-  ...identificacionComun,
-  { campo: 'combustibleGlpAnual', etiqueta: 'COMBUSTIBLE', automatico: true },
-  ...rodajeDimensiones,
-  { campo: 'pesoNeto', etiqueta: 'PESO NETO (KG)' },
-  { campo: 'pesoBruto', etiqueta: 'PESO BRUTO VEHICULAR (KG)' },
-  { campo: 'cargaUtil', etiqueta: 'CARGA ÚTIL (KG)' },
+  { campo: 'placaNueva', etiqueta: 'PLACA DE RODAJE', numero: 2, automatico: true },
+  { campo: 'categoria', etiqueta: 'CATEGORÍA', numero: 3 },
+  { campo: 'marca', etiqueta: 'MARCA', numero: 4 },
+  { campo: 'modelo', etiqueta: 'MODELO', numero: 5 },
+  { campo: 'version', etiqueta: 'VERSIÓN', numero: 6 },
+  { campo: 'anioFabricacion', etiqueta: 'AÑO DE FABRICACIÓN', numero: 7 },
+  { campo: 'vin', etiqueta: 'VIN / N° DE SERIE', numero: 8, grupo: 'vin-serie' },
+  { campo: 'numeroMotor', etiqueta: 'N° DE MOTOR', numero: 9 },
+  {
+    tipo: 'grupo',
+    campo: 'numeroCilindros',
+    etiqueta: 'N° CILINDROS / CILINDRADA (CM³)',
+    numero: 10,
+    campos: [
+      { campo: 'numeroCilindros', placeholder: 'N° Cilindros' },
+      { campo: 'cilindrada', placeholder: 'Cilindrada' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  { campo: 'combustibleGlpAnual', etiqueta: 'COMBUSTIBLE', numero: 11, automatico: true },
+  {
+    tipo: 'grupo',
+    campo: 'numeroEjes',
+    etiqueta: 'N° EJES / N° RUEDAS',
+    numero: 12,
+    campos: [
+      { campo: 'numeroEjes', placeholder: 'N° Ejes' },
+      { campo: 'numeroRuedas', placeholder: 'N° Ruedas' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  {
+    tipo: 'grupo',
+    campo: 'numeroAsientos',
+    etiqueta: 'N° ASIENTOS / PASAJEROS',
+    numero: 13,
+    campos: [
+      { campo: 'numeroAsientos', placeholder: 'N° Asientos' },
+      { campo: 'numeroPasajeros', placeholder: 'Pasajeros' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  {
+    tipo: 'grupo',
+    campo: 'longitud',
+    etiqueta: 'LARGO / ANCHO / ALTO (M)',
+    numero: 14,
+    campos: [
+      { campo: 'longitud', placeholder: 'Largo' },
+      { campo: 'ancho', placeholder: 'Ancho' },
+      { campo: 'alto', placeholder: 'Alto' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  { campo: 'pesoNeto', etiqueta: 'PESO NETO (KG)', numero: 15 },
+  { campo: 'pesoBruto', etiqueta: 'PESO BRUTO VEHICULAR (KG)', numero: 16 },
+  { campo: 'cargaUtil', etiqueta: 'CARGA ÚTIL (KG)', numero: 17 },
 ];
 
 const CAMPOS_GNV: CampoVehiculoCertificado[] = [
-  ...identificacionComun,
-  { campo: 'combustible', etiqueta: 'COMBUSTIBLE' },
-  ...rodajeDimensiones,
-  { campo: 'color', etiqueta: 'COLOR(ES)' },
-  { campo: 'pesoNeto', etiqueta: 'PESO NETO VEHICULAR (KG)' },
-  { campo: 'pesoBruto', etiqueta: 'PESO BRUTO VEHICULAR (KG)' },
+  { campo: 'placaNueva', etiqueta: 'PLACA DE RODAJE', numero: 1, automatico: true },
+  { campo: 'categoria', etiqueta: 'CATEGORÍA', numero: 2 },
+  { campo: 'marca', etiqueta: 'MARCA', numero: 3 },
+  { campo: 'modelo', etiqueta: 'MODELO', numero: 4 },
+  { campo: 'version', etiqueta: 'VERSIÓN', numero: 5 },
+  { campo: 'anioFabricacion', etiqueta: 'AÑO DE FABRICACIÓN', numero: 6 },
+  { campo: 'vin', etiqueta: 'VIN / N° DE SERIE', numero: 7, grupo: 'vin-serie' },
+  { campo: 'numeroMotor', etiqueta: 'N° DE MOTOR', numero: 8 },
+  {
+    tipo: 'grupo',
+    campo: 'numeroCilindros',
+    etiqueta: 'N° CILINDROS / CILINDRADA (CM³)',
+    numero: 9,
+    campos: [
+      { campo: 'numeroCilindros', placeholder: 'N° Cilindros' },
+      { campo: 'cilindrada', placeholder: 'Cilindrada' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  { campo: 'combustible', etiqueta: 'COMBUSTIBLE', numero: 10 },
+  {
+    tipo: 'grupo',
+    campo: 'numeroEjes',
+    etiqueta: 'N° EJES / N° RUEDAS',
+    numero: 11,
+    campos: [
+      { campo: 'numeroEjes', placeholder: 'N° Ejes' },
+      { campo: 'numeroRuedas', placeholder: 'N° Ruedas' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  {
+    tipo: 'grupo',
+    campo: 'numeroAsientos',
+    etiqueta: 'N° ASIENTOS / PASAJEROS',
+    numero: 12,
+    campos: [
+      { campo: 'numeroAsientos', placeholder: 'N° Asientos' },
+      { campo: 'numeroPasajeros', placeholder: 'Pasajeros' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  {
+    tipo: 'grupo',
+    campo: 'longitud',
+    etiqueta: 'LARGO / ANCHO / ALTO (M)',
+    numero: 13,
+    campos: [
+      { campo: 'longitud', placeholder: 'Largo' },
+      { campo: 'ancho', placeholder: 'Ancho' },
+      { campo: 'alto', placeholder: 'Alto' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
+  { campo: 'color', etiqueta: 'COLOR(ES)', numero: 14 },
+  { campo: 'pesoNeto', etiqueta: 'PESO NETO VEHICULAR (KG)', numero: 15 },
+  { campo: 'pesoBruto', etiqueta: 'PESO BRUTO VEHICULAR (KG)', numero: 16 },
 ];
 
 // Orden fila por fila de la versión 2 vigente del formato dinámico CONFORMIDAD.
@@ -79,11 +233,29 @@ const CAMPOS_CONFORMIDAD: CampoVehiculoCertificado[] = [
   { campo: 'formulaRodante', etiqueta: 'FÓRMULA RODANTE' },
   { campo: 'potencia', etiqueta: 'POTENCIA (KW / RPM)' },
   { campo: 'numeroEjes', etiqueta: 'N° DE EJES' },
-  { campo: 'numeroAsientos', etiqueta: 'N° DE ASIENTOS' },
-  { campo: 'numeroPasajeros', etiqueta: 'N° DE PASAJEROS' },
+  {
+    tipo: 'grupo',
+    campo: 'numeroAsientos',
+    etiqueta: 'ASIENTOS / PASAJEROS',
+    campos: [
+      { campo: 'numeroAsientos', placeholder: 'Asientos' },
+      { campo: 'numeroPasajeros', placeholder: 'Pasajeros' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
   { campo: 'numeroRuedas', etiqueta: 'N° DE RUEDAS' },
-  { campo: 'cilindrada', etiqueta: 'CILINDRADA (CC)' },
-  { campo: 'numeroCilindros', etiqueta: 'N° DE CILINDROS' },
+  {
+    tipo: 'grupo',
+    campo: 'cilindrada',
+    etiqueta: 'CILINDRADA (CC) / CILINDROS',
+    campos: [
+      { campo: 'cilindrada', placeholder: 'Cilindrada' },
+      { campo: 'numeroCilindros', placeholder: 'N° Cilindros' },
+    ],
+    separador: '/',
+    colSpan: 2,
+  },
   { campo: 'version', etiqueta: 'VERSIÓN' },
   { campo: 'longitud', etiqueta: 'LONGITUD (M)' },
   { campo: 'vin', etiqueta: 'VIN' },
@@ -94,8 +266,9 @@ export const obtenerCamposVehiculoCertificado = (
   modalidad?: string,
 ): CampoVehiculoCertificado[] => {
   if (tipo === 'CONFORMIDAD') return CAMPOS_CONFORMIDAD;
-  if (tipo === 'GNV_ANUAL') return CAMPOS_GNV;
-  if (tipo === 'GLP_ANUAL' && String(modalidad || '').toUpperCase() === 'INICIAL') {
+  if (tipo === 'GNV_ANUAL' || (tipo as string) === 'GNV_INICIAL') return CAMPOS_GNV;
+  const mod = String(modalidad || '').toUpperCase();
+  if ((tipo === 'GLP_ANUAL' && mod === 'INICIAL') || (tipo as string) === 'GLP_INICIAL') {
     return CAMPOS_GLP_INICIAL;
   }
   if (tipo === 'GLP_ANUAL') return CAMPOS_GLP_ANUAL;
@@ -105,7 +278,19 @@ export const obtenerCamposVehiculoCertificado = (
 export const camposVehiculoEditables = (
   tipo: TipoCertificadoFaregas,
   modalidad?: string,
-): string[] => obtenerCamposVehiculoCertificado(tipo, modalidad)
-  .filter((campo) => !campo.automatico)
-  .map((campo) => campo.campo);
-
+): string[] => {
+  const elementos = obtenerCamposVehiculoCertificado(tipo, modalidad);
+  const resultado: string[] = [];
+  for (const item of elementos) {
+    if (item.tipo === 'grupo' && item.campos) {
+      for (const sub of item.campos) {
+        if (!sub.automatico) {
+          resultado.push(sub.campo);
+        }
+      }
+    } else if (!item.automatico) {
+      resultado.push(item.campo);
+    }
+  }
+  return resultado;
+};
