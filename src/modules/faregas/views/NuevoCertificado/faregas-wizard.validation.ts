@@ -122,6 +122,7 @@ export const validarExpedienteTecnico = ({
   }
 
   if (tipoCertificado === 'GLP_ANUAL') {
+    const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
     agregarFaltantes(errores, vehiculo, [['cargaUtil', 'la carga útil']]);
     const camposGlp: Array<[string, string]> = [
       ['tallerAutorizadoId', 'el taller autorizado'],
@@ -138,12 +139,23 @@ export const validarExpedienteTecnico = ({
         errores.push(`Registre el componente ${tipo}.`);
         continue;
       }
-      agregarFaltantes(errores, componente, [['marca', `la marca del ${tipo}`], ['modelo', `el modelo del ${tipo}`]]);
+      const camposComponente: Array<[string, string]> = [
+        ['marca', `la marca del ${tipo}`],
+        ['numeroSerie', `la serie del ${tipo}`],
+      ];
+      if (!(esGlpAnual && tipo === 'CILINDRO')) {
+        camposComponente.push(['modelo', `el modelo del ${tipo}`]);
+      }
+      agregarFaltantes(errores, componente, camposComponente);
       if (tipo === 'CILINDRO') {
-        agregarFaltantes(errores, componente, [
-          ['capacidadLitros', 'la capacidad del cilindro'], ['mesFabricacion', 'el mes de fabricación del cilindro'],
-          ['anioFabricacion', 'el año de fabricación del cilindro'], ['numeroSerie', 'la serie del cilindro'],
-        ]);
+        const camposCilindro: Array<[string, string]> = [
+          ['capacidadLitros', 'la capacidad del cilindro'],
+          ['anioFabricacion', 'el año de fabricación del cilindro'],
+        ];
+        if (!esGlpAnual) {
+          camposCilindro.push(['mesFabricacion', 'el mes de fabricación del cilindro']);
+        }
+        agregarFaltantes(errores, componente, camposCilindro);
       }
     }
     const verificaciones = glp.verificaciones || [];
@@ -393,6 +405,7 @@ export const validarDatosEspecificos = ({
   }
 
   if (tipo === 'GLP_ANUAL') {
+    const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
     if (vacio(glp.tallerAutorizadoId)) {
       marcar(errores, 'glp.tallerAutorizadoId', 'Seleccione el taller autorizado.');
     }
@@ -410,15 +423,19 @@ export const validarDatosEspecificos = ({
       }
       const reglas: ReglaCampo[] = [
         { campo: 'marca', etiqueta: `la marca del ${nombre}` },
-        { campo: 'modelo', etiqueta: `el modelo del ${nombre}` },
         { campo: 'numeroSerie', etiqueta: `la serie del ${nombre}` },
       ];
+      if (!(esGlpAnual && nombre === 'CILINDRO')) {
+        reglas.push({ campo: 'modelo', etiqueta: `el modelo del ${nombre}` });
+      }
       if (nombre === 'CILINDRO') {
         reglas.push(
-          { campo: 'capacidadLitros', etiqueta: 'la capacidad del cilindro', formato: 'decimal' },
-          { campo: 'mesFabricacion', etiqueta: 'el mes de fabricación del cilindro' },
+          { campo: 'capacidadLitros', etiqueta: 'la capacidad del cilindro', formato: 'entero' },
           { campo: 'anioFabricacion', etiqueta: 'el año de fabricación del cilindro' }
         );
+        if (!esGlpAnual) {
+          reglas.push({ campo: 'mesFabricacion', etiqueta: 'el mes de fabricación del cilindro' });
+        }
       }
       // Las claves de la regla coinciden con las del componente, así que se
       // lee el mismo nombre en ambos lados.

@@ -17,6 +17,7 @@ export type CampoVehiculoCertificado = {
   campos?: SubcampoVehiculo[];
   separador?: string;
   colSpan?: number;
+  columnaCertificado?: 'izquierda' | 'derecha';
 };
 
 const CAMPOS_GLP_INICIAL: CampoVehiculoCertificado[] = [
@@ -84,14 +85,14 @@ const CAMPOS_GLP_INICIAL: CampoVehiculoCertificado[] = [
 ];
 
 const CAMPOS_GLP_ANUAL: CampoVehiculoCertificado[] = [
-  { campo: 'placaNueva', etiqueta: 'PLACA DE RODAJE', numero: 2, automatico: true },
-  { campo: 'categoria', etiqueta: 'CATEGORÍA', numero: 3 },
-  { campo: 'marca', etiqueta: 'MARCA', numero: 4 },
-  { campo: 'modelo', etiqueta: 'MODELO', numero: 5 },
-  { campo: 'version', etiqueta: 'VERSIÓN', numero: 6 },
-  { campo: 'anioFabricacion', etiqueta: 'AÑO DE FABRICACIÓN', numero: 7 },
-  { campo: 'vin', etiqueta: 'VIN / N° DE SERIE', numero: 8, grupo: 'vin-serie' },
-  { campo: 'numeroMotor', etiqueta: 'N° DE MOTOR', numero: 9 },
+  { campo: 'placaNueva', etiqueta: 'PLACA DE RODAJE', numero: 2, automatico: true, columnaCertificado: 'izquierda' },
+  { campo: 'categoria', etiqueta: 'CATEGORÍA', numero: 3, columnaCertificado: 'izquierda' },
+  { campo: 'marca', etiqueta: 'MARCA', numero: 4, columnaCertificado: 'izquierda' },
+  { campo: 'modelo', etiqueta: 'MODELO', numero: 5, columnaCertificado: 'izquierda' },
+  { campo: 'version', etiqueta: 'VERSIÓN', numero: 6, columnaCertificado: 'izquierda' },
+  { campo: 'anioFabricacion', etiqueta: 'AÑO DE FABRICACIÓN', numero: 7, columnaCertificado: 'izquierda' },
+  { campo: 'vin', etiqueta: 'VIN / N° DE SERIE', numero: 8, grupo: 'vin-serie', columnaCertificado: 'izquierda' },
+  { campo: 'numeroMotor', etiqueta: 'N° DE MOTOR', numero: 9, columnaCertificado: 'izquierda' },
   {
     tipo: 'grupo',
     campo: 'numeroCilindros',
@@ -103,8 +104,9 @@ const CAMPOS_GLP_ANUAL: CampoVehiculoCertificado[] = [
     ],
     separador: '/',
     colSpan: 2,
+    columnaCertificado: 'derecha',
   },
-  { campo: 'combustibleGlpAnual', etiqueta: 'COMBUSTIBLE', numero: 11, automatico: true },
+  { campo: 'combustibleGlpAnual', etiqueta: 'COMBUSTIBLE', numero: 11, automatico: true, columnaCertificado: 'derecha' },
   {
     tipo: 'grupo',
     campo: 'numeroEjes',
@@ -116,6 +118,7 @@ const CAMPOS_GLP_ANUAL: CampoVehiculoCertificado[] = [
     ],
     separador: '/',
     colSpan: 2,
+    columnaCertificado: 'derecha',
   },
   {
     tipo: 'grupo',
@@ -128,6 +131,7 @@ const CAMPOS_GLP_ANUAL: CampoVehiculoCertificado[] = [
     ],
     separador: '/',
     colSpan: 2,
+    columnaCertificado: 'derecha',
   },
   {
     tipo: 'grupo',
@@ -141,10 +145,11 @@ const CAMPOS_GLP_ANUAL: CampoVehiculoCertificado[] = [
     ],
     separador: '/',
     colSpan: 2,
+    columnaCertificado: 'derecha',
   },
-  { campo: 'pesoNeto', etiqueta: 'PESO NETO (KG)', numero: 15 },
-  { campo: 'pesoBruto', etiqueta: 'PESO BRUTO VEHICULAR (KG)', numero: 16 },
-  { campo: 'cargaUtil', etiqueta: 'CARGA ÚTIL (KG)', numero: 17 },
+  { campo: 'pesoNeto', etiqueta: 'PESO NETO (KG)', numero: 15, columnaCertificado: 'derecha' },
+  { campo: 'pesoBruto', etiqueta: 'PESO BRUTO VEHICULAR (KG)', numero: 16, columnaCertificado: 'derecha' },
+  { campo: 'cargaUtil', etiqueta: 'CARGA ÚTIL (KG)', numero: 17, columnaCertificado: 'derecha' },
 ];
 
 const CAMPOS_GNV: CampoVehiculoCertificado[] = [

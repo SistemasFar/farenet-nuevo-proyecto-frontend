@@ -61,6 +61,20 @@ body {
   box-shadow: 0 0 0 3px rgba(23, 79, 145, 0.1);
 }
 
+/* Ficha operativa de certificados: controles compactos sin perder área útil. */
+.faregas-formulario-operativo
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+.faregas-formulario-operativo select {
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.faregas-formulario-operativo label {
+  line-height: 1.15;
+}
+
 /* Administración de usuarios: misma apariencia blanca y estados neutros. */
 .faregas-user-form input:not([type="checkbox"]):not([type="radio"]):not(:disabled),
 .faregas-user-form select:not(:disabled),

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, XCircle } from 'lucide-react';
 import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
+import { normalizarEnteroCertificado } from '../../faregas-formulario-operativo';
 
 export const customSelectStyles = {
   control: (base: any, state: any) => ({
@@ -220,6 +221,7 @@ export const InputField = ({ label, name, formData, setFormData, type = "text", 
           <input
             type={type === 'number' ? 'text' : type}
             inputMode={type === 'number' ? 'numeric' : undefined}
+            data-tipo-dato={type === 'number' ? 'entero' : 'texto'}
             value={filter === 'telefono' ? displayValue : (overrideValue !== undefined ? overrideValue : formData[name]) || ''}
             onKeyDown={onKeyDown}
             onChange={(e) => {
@@ -229,7 +231,7 @@ export const InputField = ({ label, name, formData, setFormData, type = "text", 
               }
               let val = type === 'email' ? e.target.value : e.target.value.toUpperCase();
               if (type === 'number') {
-                val = val.replace(/\D/g, '');
+                val = normalizarEnteroCertificado(val, maxLength);
               }
               if (filter === 'letras') {
                 val = val.replace(/[^A-Z\sÑÁÉÍÓÚ]/g, '');
@@ -276,7 +278,7 @@ export const InputField = ({ label, name, formData, setFormData, type = "text", 
             }}
             placeholder={placeholder}
             disabled={disabled}
-            className={`w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-[#052a79] ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''} ${onSearch ? 'pr-10' : ''}`}
+            className={`h-9 w-full rounded-lg border border-slate-200 px-3 py-1 text-sm font-semibold outline-none focus:border-[#052a79] ${disabled ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''} ${onSearch ? 'pr-10' : ''}`}
           />
           {onSearch && (
             <button

@@ -174,7 +174,7 @@ describe('taller GNV automático por sede', () => {
     expect(errores.combustible).toBeUndefined();
   });
 
-  it('bloquea GLP si cualquier dato visible del cilindro o regulador está incompleto', () => {
+  it('GLP anual no exige modelo/mes del cilindro, pero bloquea la serie del regulador', () => {
     const errores = validarFormularioVehiculoVisible({
       tipoCertificado: 'GLP_ANUAL',
       modalidad: 'ANUAL',
@@ -196,7 +196,8 @@ describe('taller GNV automático por sede', () => {
       facturacion: {},
     });
 
-    expect(errores['glp.componentes.CILINDRO.modelo']).toBeDefined();
+    expect(errores['glp.componentes.CILINDRO.modelo']).toBeUndefined();
+    expect(errores['glp.componentes.CILINDRO.mesFabricacion']).toBeUndefined();
     expect(errores['glp.componentes.REGULADOR.numeroSerie']).toBeDefined();
   });
 

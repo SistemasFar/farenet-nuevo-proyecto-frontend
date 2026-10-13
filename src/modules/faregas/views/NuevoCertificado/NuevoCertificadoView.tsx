@@ -25,6 +25,7 @@ import { validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculo
 import { useErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual as indicePaso } from './faregas-emision';
+import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './faregas-formulario-operativo';
 
 
 
@@ -93,6 +94,8 @@ export interface FormVerificacionState {
 }
 
 const textValue = (value: unknown) => value === null || value === undefined ? '' : String(value);
+const enteroValue = (value: unknown, maximoDigitos: number) =>
+  normalizarEnteroCertificado(textValue(value), maximoDigitos);
 
 const mapVehiculoBorrador = (vehiculo: any): Partial<FormVehiculoState> => ({
   placaNueva: textValue(vehiculo.placa),
@@ -100,8 +103,8 @@ const mapVehiculoBorrador = (vehiculo: any): Partial<FormVehiculoState> => ({
   marca: textValue(vehiculo.marca),
   modelo: textValue(vehiculo.modelo),
   version: textValue(vehiculo.version),
-  anioFabricacion: textValue(vehiculo.anio_fabricacion ?? vehiculo.anioFabricacion),
-  anioModelo: textValue(vehiculo.anio_modelo ?? vehiculo.anioModelo),
+  anioFabricacion: enteroValue(vehiculo.anio_fabricacion ?? vehiculo.anioFabricacion, 4),
+  anioModelo: enteroValue(vehiculo.anio_modelo ?? vehiculo.anioModelo, 4),
   vin: textValue(vehiculo.vin),
   serieChasis: textValue(vehiculo.serie_chasis ?? vehiculo.serieChasis),
   numeroMotor: textValue(vehiculo.numero_motor ?? vehiculo.numeroMotor),
@@ -109,18 +112,18 @@ const mapVehiculoBorrador = (vehiculo: any): Partial<FormVehiculoState> => ({
   color: textValue(vehiculo.color),
   carroceria: textValue(vehiculo.carroceria),
   marcaCarroceria: textValue(vehiculo.marca_carroceria ?? vehiculo.marcaCarroceria),
-  numeroCilindros: textValue(vehiculo.numero_cilindros ?? vehiculo.numeroCilindros),
-  cilindrada: textValue(vehiculo.cilindrada),
-  numeroEjes: textValue(vehiculo.numero_ejes ?? vehiculo.numeroEjes),
-  numeroRuedas: textValue(vehiculo.numero_ruedas ?? vehiculo.numeroRuedas),
-  numeroAsientos: textValue(vehiculo.numero_asientos ?? vehiculo.numeroAsientos),
-  numeroPasajeros: textValue(vehiculo.numero_pasajeros ?? vehiculo.numeroPasajeros),
+  numeroCilindros: enteroValue(vehiculo.numero_cilindros ?? vehiculo.numeroCilindros, 4),
+  cilindrada: enteroValue(vehiculo.cilindrada, 5),
+  numeroEjes: enteroValue(vehiculo.numero_ejes ?? vehiculo.numeroEjes, 4),
+  numeroRuedas: enteroValue(vehiculo.numero_ruedas ?? vehiculo.numeroRuedas, 4),
+  numeroAsientos: enteroValue(vehiculo.numero_asientos ?? vehiculo.numeroAsientos, 4),
+  numeroPasajeros: enteroValue(vehiculo.numero_pasajeros ?? vehiculo.numeroPasajeros, 4),
   longitud: textValue(vehiculo.longitud),
   ancho: textValue(vehiculo.ancho),
   alto: textValue(vehiculo.alto),
-  pesoNeto: textValue(vehiculo.peso_neto ?? vehiculo.pesoNeto),
-  pesoBruto: textValue(vehiculo.peso_bruto ?? vehiculo.pesoBruto),
-  cargaUtil: textValue(vehiculo.carga_util ?? vehiculo.cargaUtil),
+  pesoNeto: enteroValue(vehiculo.peso_neto ?? vehiculo.pesoNeto, 6),
+  pesoBruto: enteroValue(vehiculo.peso_bruto ?? vehiculo.pesoBruto, 6),
+  cargaUtil: enteroValue(vehiculo.carga_util ?? vehiculo.cargaUtil, 6),
   potencia: textValue(vehiculo.potencia),
   formulaRodante: textValue(vehiculo.formula_rodante ?? vehiculo.formulaRodante),
   kilometraje: textValue(vehiculo.kilometraje),
@@ -296,47 +299,52 @@ export function NuevoCertificadoView() {
     if (!formFacturacion.usarTitularPrincipalFac || !titularPrincipal) return;
 
     const tipoComprobante = titularPrincipal.tipoDocumento === 'RUC' ? 'FACTURA' : 'BOLETA';
-    
-    let emailFac = '';
-    let telefonoFac = '';
-    
-    const sincronizarContacto = async () => {
-      if (titularPrincipal.nroDocumento) {
-        try {
-          const response = await faregasClientesApi.autocompletarPersona(titularPrincipal.tipoDocumento, titularPrincipal.nroDocumento);
-          const persona = response?.data;
-          if (persona) {
-            emailFac = persona.correo || persona.email || '';
-            telefonoFac = persona.telefono || '';
-          }
-        } catch (e) {
-          // Fallback silencioso
-        }
-      }
-      
-      setFormFacturacion((prev) => {
-        const sincronizada = {
-          ...prev,
-          tipoDocFac: tipoComprobante,
-          nroDocFac: titularPrincipal.nroDocumento,
-          razonSocialFac: titularPrincipal.nombreRazonSocial,
-          direccionFac: titularPrincipal.direccion,
-        };
-        
-        if (emailFac) sincronizada.emailFac = emailFac;
-        if (telefonoFac) sincronizada.telefonoFac = telefonoFac;
 
-        const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
-          && prev.nroDocFac === sincronizada.nroDocFac
-          && prev.razonSocialFac === sincronizada.razonSocialFac
-          && prev.direccionFac === sincronizada.direccionFac
-          && prev.emailFac === sincronizada.emailFac
-          && prev.telefonoFac === sincronizada.telefonoFac;
-        return sinCambios ? prev : sincronizada;
-      });
+    // El documento, nombre y dirección deben reflejarse en el mismo clic. La
+    // consulta remota sólo completa contacto y nunca bloquea el checkbox.
+    setFormFacturacion((prev) => {
+      const sincronizada = {
+        ...prev,
+        tipoDocFac: tipoComprobante,
+        nroDocFac: titularPrincipal.nroDocumento,
+        razonSocialFac: titularPrincipal.nombreRazonSocial,
+        direccionFac: titularPrincipal.direccion,
+      };
+      const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
+        && prev.nroDocFac === sincronizada.nroDocFac
+        && prev.razonSocialFac === sincronizada.razonSocialFac
+        && prev.direccionFac === sincronizada.direccionFac;
+      return sinCambios ? prev : sincronizada;
+    });
+
+    let activo = true;
+    const sincronizarContacto = async () => {
+      if (!titularPrincipal.nroDocumento) return;
+      try {
+        const response = await faregasClientesApi.autocompletarPersona(
+          titularPrincipal.tipoDocumento,
+          titularPrincipal.nroDocumento
+        );
+        const persona = response?.data;
+        if (!activo || !persona) return;
+        const emailFac = persona.correo || persona.email || '';
+        const telefonoFac = persona.telefono || '';
+        if (!emailFac && !telefonoFac) return;
+        setFormFacturacion((prev) => ({
+          ...prev,
+          emailFac: emailFac || prev.emailFac,
+          telefonoFac: telefonoFac || prev.telefonoFac,
+        }));
+      } catch {
+        // Los datos básicos ya quedaron sincronizados; el contacto puede
+        // completarse manualmente cuando la consulta no responde.
+      }
     };
-    
-    sincronizarContacto();
+
+    void sincronizarContacto();
+    return () => {
+      activo = false;
+    };
   }, [formFacturacion.usarTitularPrincipalFac, titularPrincipal]);
 
   const construirPayloadFacturacion = () => ({
@@ -539,7 +547,7 @@ export function NuevoCertificadoView() {
                 observaciones: gnv.observaciones || '',
                 // Características después de la conversión (sólo INICIAL).
                 combustiblePosterior: gnv.combustible_posterior || '',
-                pesoNetoPosterior: gnv.peso_neto_posterior ?? '',
+                pesoNetoPosterior: enteroValue(gnv.peso_neto_posterior, 6),
                 verificaciones: (detalle.data?.verificaciones || []).map(mapVerificacionBorrador),
               });
             }
@@ -554,16 +562,16 @@ export function NuevoCertificadoView() {
                 expedienteTecnico: glp.expediente_tecnico || '',
                 modalidad: glp.modalidad || '',
                 combustiblePosterior: glp.combustible_posterior || '',
-                pesoNetoPosterior: glp.peso_neto_posterior || '',
-                cargaUtilPosterior: glp.carga_util_posterior || '',
+                pesoNetoPosterior: enteroValue(glp.peso_neto_posterior, 6),
+                cargaUtilPosterior: enteroValue(glp.carga_util_posterior, 6),
                 componentes: (detalle.data?.componentes || []).map((componente: any) => ({
                   orden: Number(componente.orden),
                   componente: componente.componente,
                   marca: componente.marca || '',
                   modelo: componente.modelo || '',
-                  capacidadLitros: textValue(componente.capacidad_litros),
+                  capacidadLitros: enteroValue(componente.capacidad_litros, 5),
                   mesFabricacion: textValue(componente.mes_fabricacion),
-                  anioFabricacion: textValue(componente.anio_fabricacion),
+                  anioFabricacion: enteroValue(componente.anio_fabricacion, 4),
                   numeroSerie: componente.numero_serie || '',
                 })),
                 verificaciones: (detalle.data?.verificaciones || []).map(mapVerificacionBorrador),
@@ -734,9 +742,9 @@ export function NuevoCertificadoView() {
               componente: componente.componente,
               marca: componente.marca || '',
               modelo: componente.modelo || '',
-              capacidadLitros: componente.capacidad_litros || '',
+              capacidadLitros: enteroValue(componente.capacidad_litros, 5),
               mesFabricacion: componente.mes_fabricacion || '',
-              anioFabricacion: componente.anio_fabricacion || '',
+              anioFabricacion: enteroValue(componente.anio_fabricacion, 4),
               numeroSerie: componente.numero_serie || '',
             })),
             verificaciones: (glp.verificaciones || []).map((v: any) => ({
@@ -761,24 +769,27 @@ export function NuevoCertificadoView() {
             // Igual que observaciones: un NULL del servidor no borra la
             // pantalla. El peso es numérico en BD, de ahí el ?? ''.
             combustiblePosterior: gnv.combustible_posterior || prev.combustiblePosterior || '',
-            pesoNetoPosterior: gnv.peso_neto_posterior ?? prev.pesoNetoPosterior ?? '',
+            pesoNetoPosterior: gnv.peso_neto_posterior == null
+              ? prev.pesoNetoPosterior ?? ''
+              : enteroValue(gnv.peso_neto_posterior, 6),
             expedienteTecnico: gnv.expediente_tecnico || prev.expedienteTecnico,
             componentes: (gnv.componentes || []).map((componente: any) => ({
               orden: Number(componente.orden),
               componente: componente.componente,
               marca: componente.marca || '',
               modelo: componente.modelo || '',
+              capacidadLitros: enteroValue(componente.capacidad_litros, 5),
               mesFabricacion: componente.mes_fabricacion || '',
-              anioFabricacion: componente.anio_fabricacion || '',
+              anioFabricacion: enteroValue(componente.anio_fabricacion, 4),
               numeroSerie: componente.numero_serie || '',
             })),
             cilindros: (gnv.cilindros || []).map((cilindro: any) => ({
               orden: Number(cilindro.orden),
               marca: cilindro.marca || '',
               mesFabricacion: cilindro.mes_fabricacion || '',
-              anioFabricacion: cilindro.anio_fabricacion || '',
+              anioFabricacion: enteroValue(cilindro.anio_fabricacion, 4),
               numeroSerie: cilindro.numero_serie || '',
-              capacidadLitros: cilindro.capacidad_litros || '',
+              capacidadLitros: enteroValue(cilindro.capacidad_litros, 5),
               pesoVacio: cilindro.peso_vacio || '',
             })),
             verificaciones: (gnv.verificaciones || []).map((v: any) => ({
@@ -976,26 +987,26 @@ export function NuevoCertificadoView() {
       marca: formVehiculo.marca || null,
       modelo: formVehiculo.modelo || null,
       version: formVehiculo.version || null,
-      anioFabricacion: formVehiculo.anioFabricacion || null,
-      anioModelo: formVehiculo.anioModelo || null,
+      anioFabricacion: normalizarEnteroCertificado(formVehiculo.anioFabricacion, 4) || null,
+      anioModelo: normalizarEnteroCertificado(formVehiculo.anioModelo, 4) || null,
       vin: formVehiculo.vin || formVehiculo.serieChasis || null,
       serieChasis: formVehiculo.serieChasis || (formCaja.tipoCertificado !== 'CONFORMIDAD' ? formVehiculo.vin : null) || null,
       numeroMotor: formVehiculo.numeroMotor || null,
       combustible: formVehiculo.combustible || (formCaja.tipoCertificado === 'GLP_ANUAL' && String(formCaja.modalidadCertificado || '').toUpperCase() === 'ANUAL' ? 'BI COMBUSTIBLE GLP' : null),
       color: formVehiculo.color || null,
       carroceria: formVehiculo.carroceria || null,
-      numeroCilindros: formVehiculo.numeroCilindros || null,
-      cilindrada: formVehiculo.cilindrada || null,
-      numeroEjes: formVehiculo.numeroEjes || null,
-      numeroRuedas: formVehiculo.numeroRuedas || null,
-      numeroAsientos: formVehiculo.numeroAsientos || null,
-      numeroPasajeros: formVehiculo.numeroPasajeros || null,
+      numeroCilindros: normalizarEnteroCertificado(formVehiculo.numeroCilindros, 4) || null,
+      cilindrada: normalizarEnteroCertificado(formVehiculo.cilindrada, 5) || null,
+      numeroEjes: normalizarEnteroCertificado(formVehiculo.numeroEjes, 4) || null,
+      numeroRuedas: normalizarEnteroCertificado(formVehiculo.numeroRuedas, 4) || null,
+      numeroAsientos: normalizarEnteroCertificado(formVehiculo.numeroAsientos, 4) || null,
+      numeroPasajeros: normalizarEnteroCertificado(formVehiculo.numeroPasajeros, 4) || null,
       longitud: formVehiculo.longitud || null,
       ancho: formVehiculo.ancho || null,
       alto: formVehiculo.alto || null,
-      pesoNeto: formVehiculo.pesoNeto || null,
-      pesoBruto: formVehiculo.pesoBruto || null,
-      cargaUtil: formVehiculo.cargaUtil || null,
+      pesoNeto: normalizarEnteroCertificado(formVehiculo.pesoNeto, 6) || null,
+      pesoBruto: normalizarEnteroCertificado(formVehiculo.pesoBruto, 6) || null,
+      cargaUtil: normalizarEnteroCertificado(formVehiculo.cargaUtil, 6) || null,
       potencia: formVehiculo.potencia || null,
       formulaRodante: formVehiculo.formulaRodante || null,
     });
@@ -1025,7 +1036,7 @@ export function NuevoCertificadoView() {
         // valores que el inspector ya haya escrito.
         ...(formCaja.modalidadCertificado === 'INICIAL' ? {
           combustiblePosterior: formGnv.combustiblePosterior || null,
-          pesoNetoPosterior: formGnv.pesoNetoPosterior || null,
+          pesoNetoPosterior: normalizarEnteroCertificado(String(formGnv.pesoNetoPosterior || ''), 6) || null,
         } : {}),
       });
       if (formGnv.componentes?.length > 0) {
@@ -1047,8 +1058,12 @@ export function NuevoCertificadoView() {
         expedienteTecnico: formGlp.expedienteTecnico || null,
         modalidad: formCaja.modalidadCertificado || null,
         combustiblePosterior: formCaja.modalidadCertificado === 'INICIAL' ? 'BI-COMBUSTIBLE GLP' : null,
-        pesoNetoPosterior: formCaja.modalidadCertificado === 'INICIAL' ? (formGlp.pesoNetoPosterior || null) : null,
-        cargaUtilPosterior: formCaja.modalidadCertificado === 'INICIAL' ? (formGlp.cargaUtilPosterior || null) : null,
+        pesoNetoPosterior: formCaja.modalidadCertificado === 'INICIAL'
+          ? (normalizarEnteroCertificado(String(formGlp.pesoNetoPosterior || ''), 6) || null)
+          : null,
+        cargaUtilPosterior: formCaja.modalidadCertificado === 'INICIAL'
+          ? (normalizarEnteroCertificado(String(formGlp.cargaUtilPosterior || ''), 6) || null)
+          : null,
       });
       await faregasCertificadosApi.guardarComponentesGlp(idBorrador, {
         componentes: (formGlp.componentes || []).map((componente: any, index: number) => ({
@@ -1056,9 +1071,9 @@ export function NuevoCertificadoView() {
           componente: componente.componente,
           marca: componente.marca || null,
           modelo: componente.modelo || null,
-          capacidadLitros: componente.capacidadLitros || null,
+          capacidadLitros: normalizarEnteroCertificado(String(componente.capacidadLitros || ''), 5) || null,
           mesFabricacion: componente.mesFabricacion || null,
-          anioFabricacion: componente.anioFabricacion || null,
+          anioFabricacion: normalizarEnteroCertificado(String(componente.anioFabricacion || ''), 4) || null,
           numeroSerie: componente.numeroSerie || null,
         })),
       });
@@ -1747,7 +1762,8 @@ export function NuevoCertificadoView() {
       {/* Content Area */}
       <div className="p-5 sm:p-6 lg:p-8">
         {soloLectura && <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800">Consulta de solo lectura. Puede recorrer todos los pasos sin modificar el registro.</p>}
-        <fieldset disabled={soloLectura} className="m-0 min-w-0 w-full border-0 p-0"
+        <fieldset disabled={soloLectura} className="faregas-formulario-operativo m-0 min-w-0 w-full border-0 p-0"
+          onKeyDownCapture={manejarNavegacionFormulario}
           onClickCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}
           onSubmitCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}>
         {STEPS[currentStepIndex].id === 'datos_iniciales' && (

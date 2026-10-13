@@ -30,6 +30,7 @@ interface TitularesListProps {
   mostrarTitulares?: boolean;
   mostrarFacturacion?: boolean;
   mostrarDireccionTitular?: boolean;
+  integrarPropietarioGlpAnual?: boolean;
 }
 
 export function TitularesList({
@@ -43,14 +44,9 @@ export function TitularesList({
   mostrarTitulares = true,
   mostrarFacturacion = true,
   mostrarDireccionTitular = false,
+  integrarPropietarioGlpAnual = false,
 }: TitularesListProps) {
   const facturarAlTitular = Boolean(titulares.length > 0 && formFacturacion.usarTitularPrincipalFac);
-
-  React.useEffect(() => {
-    if (!mostrarTitulares && formFacturacion.usarTitularPrincipalFac) {
-      setFormFacturacion((prev) => ({ ...prev, usarTitularPrincipalFac: false }));
-    }
-  }, [formFacturacion.usarTitularPrincipalFac, mostrarTitulares, setFormFacturacion]);
   const errorTitular = (indice: number, campo: string) => erroresCampo[`titular.${indice}.${campo}`];
   const limpiarTitular = (indice: number, campo: string) => onCorregirCampo?.(`titular.${indice}.${campo}`);
   
@@ -207,8 +203,10 @@ export function TitularesList({
   return (
     <div className="space-y-4">
       {mostrarTitulares && (<>
-      <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-        <h4 className="text-sm font-bold text-[#052a79] capitalize tracking-wider">1. Propietario / Dueño del Vehículo</h4>
+      <div className="flex justify-between items-center border-b border-slate-200 pb-2" data-propietario-certificado={integrarPropietarioGlpAnual || undefined}>
+        <h4 className="text-sm font-bold text-[#052a79] capitalize tracking-wider">
+          {integrarPropietarioGlpAnual ? '1. PROPIETARIO' : '1. Propietario / Dueño del Vehículo'}
+        </h4>
         <button type="button" onClick={handleAdd} className="flex items-center gap-1 text-xs font-bold text-white bg-[#052a79] hover:bg-[#041d54] px-3 py-1.5 rounded-lg transition-colors">
           <Plus className="w-4 h-4" /> Agregar Dueño
         </button>
@@ -249,7 +247,7 @@ export function TitularesList({
       )}
       </>)}
 
-      <div className="overflow-hidden rounded-xl border-2 border-blue-200 bg-white">
+      {(!integrarPropietarioGlpAnual || mostrarFacturacion) && <div className="overflow-hidden rounded-xl border-2 border-blue-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-blue-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-[#052a79] p-2 text-white">
@@ -368,7 +366,7 @@ export function TitularesList({
               : 'La boleta o factura se emitirá a una persona o empresa diferente del dueño del vehículo.'}
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

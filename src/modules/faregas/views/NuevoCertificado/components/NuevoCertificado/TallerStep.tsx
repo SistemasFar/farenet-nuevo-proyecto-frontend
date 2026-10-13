@@ -3,6 +3,7 @@ import type { FormularioFormatoDinamicoFaregas } from '../../../../types/faregas
 import { TitularesList } from './TitularesList';
 import type { TitularState } from './TitularesList';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
+import { normalizarEnteroCertificado } from '../../faregas-formulario-operativo';
 
 interface TallerStepProps {
   formulario: FormularioFormatoDinamicoFaregas | null;
@@ -39,8 +40,8 @@ export const TallerStep: React.FC<TallerStepProps> = ({
   }, {});
 
   return (
-    <div className="w-full flex flex-col gap-5 animate-fade-in pb-12">
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4">
+    <div className="w-full flex flex-col gap-4 animate-fade-in pb-12">
+      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
         <h3 className="font-bold text-[#052a79]">Datos del formato: {formulario.formatoNombre}</h3>
         <p className="mt-1 text-xs text-slate-600">
           Este formulario se generó automáticamente con las variables usadas por la versión {formulario.version}.
@@ -62,7 +63,7 @@ export const TallerStep: React.FC<TallerStepProps> = ({
 
         return (
           <section key={grupo} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 bg-[#f4f9ff] px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="border-b border-slate-200 bg-[#f4f9ff] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold capitalize text-slate-800">{grupo}</h3>
                 <p className="mt-1 text-xs text-slate-500">Complete los valores que aparecerán en el certificado.</p>
@@ -80,7 +81,7 @@ export const TallerStep: React.FC<TallerStepProps> = ({
               )}
             </div>
             {(!isEmpresa || isEmpresaActiva) && (
-              <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
+              <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
                 {campos.map((campo) => {
                   const esObservacion = campo.key.includes('observacion');
                   
@@ -97,7 +98,7 @@ export const TallerStep: React.FC<TallerStepProps> = ({
 
                   const handleChange = (event) => {
                     let val = event.target.value;
-                    if (campo.soloDigitos) val = val.replace(/\D/g, '');
+                    if (campo.soloDigitos) val = normalizarEnteroCertificado(val, campo.maxLength);
                     if (campo.maxLength) val = val.slice(0, campo.maxLength);
                     setValores((actual) => ({ ...actual, [campo.key]: val }));
                   };
@@ -115,9 +116,10 @@ export const TallerStep: React.FC<TallerStepProps> = ({
                           id={`formato-${campo.key}`}
                           value={valor}
                           onChange={handleChange}
+                          data-tipo-dato="texto"
                           maxLength={campo.maxLength}
                           rows={3}
-                          className={`w-full resize-none rounded-xl border-2 bg-white px-4 py-3 text-sm font-semibold transition-all focus:ring-4 focus:ring-blue-50 ${errorStr ? 'border-red-300 text-red-900 focus:border-red-500' : 'border-slate-200 text-slate-700 focus:border-[#052a79]'}`}
+                          className={`w-full resize-none rounded-lg border-2 bg-white px-3 py-2 text-sm font-semibold transition-all focus:ring-4 focus:ring-blue-50 ${errorStr ? 'border-red-300 text-red-900 focus:border-red-500' : 'border-slate-200 text-slate-700 focus:border-[#052a79]'}`}
                         />
                       ) : (
                         <input
@@ -126,8 +128,9 @@ export const TallerStep: React.FC<TallerStepProps> = ({
                           value={valor}
                           onChange={handleChange}
                           inputMode={campo.inputMode}
+                          data-tipo-dato={campo.soloDigitos ? 'entero' : 'texto'}
                           maxLength={campo.maxLength}
-                          className={`h-11 w-full rounded-xl border-2 bg-white px-4 text-sm font-semibold transition-all focus:ring-4 focus:ring-blue-50 ${errorStr ? 'border-red-300 text-red-900 focus:border-red-500' : 'border-slate-200 text-slate-700 focus:border-[#052a79]'}`}
+                          className={`h-9 w-full rounded-lg border-2 bg-white px-3 text-sm font-semibold transition-all focus:ring-4 focus:ring-blue-50 ${errorStr ? 'border-red-300 text-red-900 focus:border-red-500' : 'border-slate-200 text-slate-700 focus:border-[#052a79]'}`}
                         />
                       )}
                       <div className="flex justify-between">
