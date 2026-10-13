@@ -74,6 +74,7 @@ export interface GuardarPagosFaregasRequest {
 
 export interface GuardarFacturacionFaregasRequest {
   tipoComprobante: 'BOLETA' | 'FACTURA' | string;
+  tipoDocumentoCliente?: 'DNI' | 'RUC' | 'CARNETEXTRANJERIA' | string;
   nroDocumento: string;
   nombreRazonSocial: string;
   direccion: string;
@@ -101,7 +102,7 @@ export interface FacturacionFaregas {
   id: number;
   certificadoId: number;
   tipoComprobante: 'BOLETA' | 'FACTURA';
-  tipoDocumentoCliente: 'DNI' | 'RUC';
+  tipoDocumentoCliente: 'DNI' | 'RUC' | 'CARNETEXTRANJERIA';
   nroDocumento: string;
   nombreRazonSocial: string;
   direccion: string;

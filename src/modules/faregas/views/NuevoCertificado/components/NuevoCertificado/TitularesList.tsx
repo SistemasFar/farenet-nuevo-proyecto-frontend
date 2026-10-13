@@ -1,5 +1,6 @@
+import { DatosFacturacion } from './DatosFacturacion';
 import React from 'react';
-import { Search, Plus, Trash2, ReceiptText } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
 import Swal from 'sweetalert2';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
@@ -90,51 +91,6 @@ export function TitularesList({
     }));
   };
 
-  const handleSearch = async (uuid: string, tipoDocumento: string, nroDocumento: string) => {
-    if (!nroDocumento) return;
-    
-    try {
-      const res = await faregasClientesApi.autocompletarPersona(tipoDocumento, nroDocumento);
-      if (res.ok && res.data) {
-        setTitulares(prev => prev.map(t => {
-          if (t._uuid === uuid) {
-            return {
-              ...t,
-              clienteId: res.data.clienteExistente ? res.data.id : null,
-              nombreRazonSocial: res.data.nombreRazonSocial || '',
-              direccion: res.data.direccion || ''
-            };
-          }
-          return t;
-        }));
-        Swal.fire({
-          icon: 'success',
-          title: 'Encontrado',
-          text: res.data.origen === 'FAREGAS' ? 'Cliente FAREGAS recuperado' : 'Datos autocompletados desde FARENET',
-          timer: 2000,
-          showConfirmButton: false
-        });
-      }
-    } catch (e: unknown) {
-      const status = e instanceof Error && 'status' in e ? (e as Error & { status?: number }).status : undefined;
-      if (status === 404) {
-        Swal.fire({
-          icon: 'info',
-          title: 'No encontrado',
-          text: 'Puede ingresar los datos manualmente.',
-          timer: 2000,
-          showConfirmButton: false
-        });
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Ocurrió un error al consultar el documento.'
-        });
-      }
-    }
-  };
-
   const handleRemove = (titular: TitularState) => {
     const { _uuid: uuid, titularId } = titular;
     if (titularId) {
@@ -152,51 +108,6 @@ export function TitularesList({
       });
     } else {
       setTitulares(prev => prev.filter(t => t._uuid !== uuid));
-    }
-  };
-
-  const handleFacturacionChange = (field: keyof FormFacturacionState, value: string | boolean) => {
-    // Corregir un campo de facturación esconde únicamente su propio error.
-    onCorregirCampo?.(String(field));
-    setFormFacturacion(prev => {
-      if (typeof value === 'boolean') return { ...prev, [field]: value };
-
-      let normalizado = value.toUpperCase();
-      if (field === 'emailFac') normalizado = value.trim().toLowerCase();
-      if (field === 'nroDocFac') normalizado = value.replace(/\D/g, '').slice(0, 11);
-      if (field === 'telefonoFac') normalizado = value.replace(/\D/g, '').slice(0, 9);
-      return { ...prev, [field]: normalizado };
-    });
-  };
-
-  const buscarClienteFacturacion = async () => {
-    const documento = formFacturacion.nroDocFac.replace(/\D/g, '');
-    const tipoDocumento = documento.length === 11 ? 'RUC' : documento.length === 8 ? 'DNI' : '';
-    if (!tipoDocumento) {
-      await Swal.fire('Documento inválido', 'Ingrese un DNI de 8 dígitos o un RUC de 11 dígitos.', 'warning');
-      return;
-    }
-
-    try {
-      const response = await faregasClientesApi.autocompletarPersona(tipoDocumento, documento);
-      const persona = response.data;
-      setFormFacturacion(prev => ({
-        ...prev,
-        tipoDocFac: tipoDocumento === 'RUC' ? 'FACTURA' : 'BOLETA',
-        razonSocialFac: persona.nombreRazonSocial || persona.nombrerazonsocial || '',
-        direccionFac: persona.direccion || '',
-        emailFac: persona.correo || persona.email || prev.emailFac,
-        telefonoFac: persona.telefono || prev.telefonoFac,
-      }));
-      await Swal.fire({
-        icon: 'success',
-        title: 'Cliente encontrado',
-        text: persona.origen === 'FAREGAS' ? 'Datos recuperados de Faregas.' : 'Datos recuperados de Farenet.',
-        timer: 1800,
-        showConfirmButton: false,
-      });
-    } catch {
-      await Swal.fire('Sin coincidencias', 'Puede completar los datos de facturación manualmente.', 'info');
     }
   };
 
@@ -247,126 +158,15 @@ export function TitularesList({
       )}
       </>)}
 
-      {mostrarFacturacion && <div className="overflow-hidden rounded-xl border-2 border-blue-200 bg-white">
-        <div className="flex flex-col gap-3 border-b border-blue-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-[#052a79] p-2 text-white">
-              <ReceiptText className="h-5 w-5" />
-            </div>
-            <div>
-              <h5 className="text-sm font-black capitalize text-[#052a79]">Datos para facturación</h5>
-              <p className="text-xs font-medium text-slate-600">Se utilizarán posteriormente para emitir la boleta o factura.</p>
-            </div>
-          </div>
-          {titulares.length > 0 && <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
-            <input
-              type="checkbox"
-              checked={formFacturacion.usarTitularPrincipalFac}
-              onChange={(event) => handleFacturacionChange('usarTitularPrincipalFac', event.target.checked)}
-              className="h-4 w-4 accent-[#052a79]"
-            />
-            FACTURAR AL DUEÑO PRINCIPAL
-          </label>}
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-4">
-          {facturarAlTitular && !titulares.length && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800 md:col-span-4">
-              Agregue el dueño principal para completar automáticamente los datos de facturación.
-            </div>
-          )}
-
-          <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500">TIPO DE COMPROBANTE</label>
-            <select
-              value={formFacturacion.tipoDocFac}
-              disabled={facturarAlTitular}
-              onChange={(event) => handleFacturacionChange('tipoDocFac', event.target.value)}
-              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] disabled:bg-slate-100 disabled:text-slate-500', Boolean(erroresCampo['tipoDocFac']))} data-campo-error={erroresCampo['tipoDocFac'] ? true : undefined} aria-invalid={erroresCampo['tipoDocFac'] ? true : undefined} aria-describedby={erroresCampo['tipoDocFac'] ? 'error-tipoDocFac' : undefined}
-            >
-              <option value="">-- SELECCIONAR --</option>
-              <option value="BOLETA">BOLETA</option>
-              <option value="FACTURA">FACTURA</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500">DNI / RUC</label>
-            <div className="flex gap-2">
-              <input
-                value={formFacturacion.nroDocFac}
-                readOnly={facturarAlTitular}
-                onChange={(event) => handleFacturacionChange('nroDocFac', event.target.value)}
-                inputMode="numeric"
-                maxLength={11}
-                className={claseConError('h-[42px] min-w-0 flex-1 rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500', Boolean(erroresCampo['nroDocFac']))} data-campo-error={erroresCampo['nroDocFac'] ? true : undefined} aria-invalid={erroresCampo['nroDocFac'] ? true : undefined} aria-describedby={erroresCampo['nroDocFac'] ? 'error-nroDocFac' : undefined}
-              />
-              {!facturarAlTitular && (
-                <button type="button" onClick={buscarClienteFacturacion} className="flex h-[42px] items-center justify-center rounded-lg bg-slate-200 px-3 transition-colors hover:bg-slate-300" title="Buscar cliente">
-                  <Search className="h-5 w-5 text-slate-600" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-bold text-slate-500">NOMBRE / RAZÓN SOCIAL</label>
-            <input
-              value={formFacturacion.razonSocialFac}
-              readOnly={facturarAlTitular}
-              onChange={(event) => handleFacturacionChange('razonSocialFac', event.target.value)}
-              maxLength={100}
-              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold capitalize text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500', Boolean(erroresCampo['razonSocialFac']))} data-campo-error={erroresCampo['razonSocialFac'] ? true : undefined} aria-invalid={erroresCampo['razonSocialFac'] ? true : undefined} aria-describedby={erroresCampo['razonSocialFac'] ? 'error-razonSocialFac' : undefined}
-            />
-          </div>
-
-          <div className="md:col-span-4">
-            <label className="mb-1 block text-xs font-bold text-slate-500">DIRECCIÓN FISCAL</label>
-            <input
-              value={formFacturacion.direccionFac}
-              readOnly={facturarAlTitular}
-              onChange={(event) => handleFacturacionChange('direccionFac', event.target.value)}
-              maxLength={100}
-              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold capitalize text-slate-800 focus:border-[#f59e0b] read-only:bg-slate-100 read-only:text-slate-500', Boolean(erroresCampo['direccionFac']))} data-campo-error={erroresCampo['direccionFac'] ? true : undefined} aria-invalid={erroresCampo['direccionFac'] ? true : undefined} aria-describedby={erroresCampo['direccionFac'] ? 'error-direccionFac' : undefined}
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-bold text-slate-500">
-              CORREO ELECTRÓNICO <span className="text-red-500" aria-hidden="true">*</span>
-            </label>
-            <input
-              type="email"
-              required
-              aria-required="true"
-              value={formFacturacion.emailFac}
-              onChange={(event) => handleFacturacionChange('emailFac', event.target.value)}
-              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]', Boolean(erroresCampo['emailFac']))} data-campo-error={erroresCampo['emailFac'] ? true : undefined} aria-invalid={erroresCampo['emailFac'] ? true : undefined} aria-describedby={erroresCampo['emailFac'] ? 'error-emailFac' : undefined}
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-bold text-slate-500">
-              TELÉFONO <span className="text-red-500" aria-hidden="true">*</span>
-            </label>
-            <input
-              type="tel"
-              required
-              aria-required="true"
-              value={formFacturacion.telefonoFac}
-              onChange={(event) => handleFacturacionChange('telefonoFac', event.target.value)}
-              maxLength={9}
-              className={claseConError('h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]', Boolean(erroresCampo['telefonoFac']))} data-campo-error={erroresCampo['telefonoFac'] ? true : undefined} aria-invalid={erroresCampo['telefonoFac'] ? true : undefined} aria-describedby={erroresCampo['telefonoFac'] ? 'error-telefonoFac' : undefined}
-            />
-          </div>
-
-          <div className="rounded-lg border border-blue-100 bg-white px-4 py-3 text-xs font-medium text-slate-600 md:col-span-4">
-            {facturarAlTitular
-              ? 'El documento, nombre y dirección se mantienen sincronizados con el dueño principal.'
-              : 'La boleta o factura se emitirá a una persona o empresa diferente del dueño del vehículo.'}
-          </div>
-        </div>
-      </div>}
+      {mostrarFacturacion && (
+        <DatosFacturacion
+          titulares={titulares}
+          formFacturacion={formFacturacion}
+          setFormFacturacion={setFormFacturacion}
+          erroresCampo={erroresCampo}
+          onCorregirCampo={onCorregirCampo}
+        />
+      )}
     </div>
   );
 }

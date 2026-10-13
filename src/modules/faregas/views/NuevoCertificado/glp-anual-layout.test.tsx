@@ -108,11 +108,9 @@ describe('formulario GLP ANUAL alineado al certificado oficial', () => {
       .toEqual(['numeroCilindros', 'numeroEjes', 'numeroAsientos', 'longitud']);
   });
 
-  it('no activa esta distribución en GNV ni Conformidad', () => {
-    expect(obtenerCamposVehiculoCertificado('GNV_ANUAL', 'ANUAL')
-      .every((campo) => campo.columnaCertificado === undefined)).toBe(true);
+  it('no activa la numeración de GLP Anual en Conformidad', () => {
     expect(obtenerCamposVehiculoCertificado('CONFORMIDAD')
-      .every((campo) => campo.columnaCertificado === undefined)).toBe(true);
+      .every((campo) => campo.numero === undefined)).toBe(true);
   });
 
   it('muestra propietario primero y usa la distribución real de dos columnas', () => {
@@ -127,17 +125,21 @@ describe('formulario GLP ANUAL alineado al certificado oficial', () => {
     expect(html).toContain('BI-COMBUSTIBLE GLP');
   });
 
-  it('respeta B componentes, C verificaciones, D vigencia/expediente y E facturación', () => {
+  it('respeta el orden: Propietario -> Facturación -> Vehículo -> Componentes -> Verificaciones -> Vigencia', () => {
     const html = renderGlpAnual();
+    const propietarioIndex = html.indexOf('data-propietario-certificado="true"');
+    const facturacionIndex = html.indexOf('data-seccion-glp-anual="facturacion"');
+    const vehiculoIndex = html.indexOf('data-layout-certificado="dos-columnas"');
     const componentesIndex = html.indexOf('B. COMPONENTES INSTALADOS GLP');
     const verificacionesIndex = html.indexOf('C. VERIFICACIONES DE SEGURIDAD GLP');
     const vigenciaIndex = html.indexOf('D. VIGENCIA / EXPEDIENTE');
-    const facturacionIndex = html.indexOf('E. DATOS PARA FACTURACIÓN');
 
-    expect(componentesIndex).toBeGreaterThan(-1);
+    expect(propietarioIndex).toBeGreaterThan(-1);
+    expect(facturacionIndex).toBeGreaterThan(propietarioIndex);
+    expect(vehiculoIndex).toBeGreaterThan(facturacionIndex);
+    expect(componentesIndex).toBeGreaterThan(vehiculoIndex);
     expect(verificacionesIndex).toBeGreaterThan(componentesIndex);
     expect(vigenciaIndex).toBeGreaterThan(verificacionesIndex);
-    expect(facturacionIndex).toBeGreaterThan(vigenciaIndex);
     expect(html).toContain('>1</td>');
     expect(html).toContain('>Q</td>');
     expect(html).toContain('CAPACIDAD (L)');
@@ -150,7 +152,7 @@ describe('formulario GLP ANUAL alineado al certificado oficial', () => {
     expect(html).toContain('Se asignará automáticamente al emitir');
     expect(html).not.toContain('name="expedienteTecnico"');
     expect(html).toContain('TIPO DE COMPROBANTE');
-    expect(html).toContain('DNI / RUC');
+    expect(html).toContain('TIPO DE DOCUMENTO');
     expect(html).toContain('CORREO ELECTRÓNICO');
   });
 

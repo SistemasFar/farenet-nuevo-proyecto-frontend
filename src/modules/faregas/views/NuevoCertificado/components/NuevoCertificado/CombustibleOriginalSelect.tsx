@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
 import type { MaestroOption } from '@/types/maestros';
 import { maestrosApi } from '@/services/api';
-import { combustiblesSonEquivalentes } from '../../gnv-conversion';
+import { combustiblesSonEquivalentes, combustiblesGnvSonEquivalentes } from '../../gnv-conversion';
 
 export interface CombustibleOriginalSelectProps {
   value: string;
@@ -71,7 +71,9 @@ export function CombustibleOriginalSelect({
       if (!nombre) continue;
       if (
         combustiblesSonEquivalentes(nombre, 'BI-COMBUSTIBLE GLP') ||
-        combustiblesSonEquivalentes(clave, 'BI-COMBUSTIBLE GLP')
+        combustiblesSonEquivalentes(clave, 'BI-COMBUSTIBLE GLP') ||
+        combustiblesGnvSonEquivalentes(nombre, 'BI - COMBUSTIBLE GNV') ||
+        combustiblesGnvSonEquivalentes(clave, 'BI - COMBUSTIBLE GNV')
       ) {
         continue;
       }
@@ -104,7 +106,8 @@ export function CombustibleOriginalSelect({
   const esValorHistoricoFueraDeCatalogo = Boolean(
     valorLimpio &&
     !opcionSeleccionada &&
-    !combustiblesSonEquivalentes(valorLimpio, 'BI-COMBUSTIBLE GLP')
+    !combustiblesSonEquivalentes(valorLimpio, 'BI-COMBUSTIBLE GLP') &&
+    !combustiblesGnvSonEquivalentes(valorLimpio, 'BI - COMBUSTIBLE GNV')
   );
 
   const opcionesTotales = useMemo(() => {

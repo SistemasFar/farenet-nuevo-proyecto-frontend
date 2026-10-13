@@ -78,7 +78,7 @@ export interface FormVehiculoState {
 }
 
 export interface FormFacturacionState {
-  tipoDocFac: string; nroDocFac: string; razonSocialFac: string; nombresFac: string; apellidosFac: string;
+  tipoDocFac: string; tipoDocumentoFac?: string; nroDocFac: string; razonSocialFac: string; nombresFac: string; apellidosFac: string;
   paisFac: string; departamentoFac: string; provinciaFac: string; distritoFac: string; direccionFac: string;
   emailFac: string; telefonoFac: string;
   usarTitularPrincipalFac: boolean;
@@ -278,7 +278,7 @@ export function NuevoCertificadoView() {
 
   // Form State (Facturación)
   const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
-    tipoDocFac: '', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
+    tipoDocFac: '', tipoDocumentoFac: 'DNI', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
     emailFac: '', telefonoFac: '', usarTitularPrincipalFac: true,
     condicionPagoFac: 'CONTADO', fechaVencimientoFac: '',
@@ -299,6 +299,7 @@ export function NuevoCertificadoView() {
     if (!formFacturacion.usarTitularPrincipalFac || !titularPrincipal) return;
 
     const tipoComprobante = titularPrincipal.tipoDocumento === 'RUC' ? 'FACTURA' : 'BOLETA';
+    const tipoDocumentoFac = String(titularPrincipal.tipoDocumento || 'DNI').trim().toUpperCase();
 
     // El documento, nombre y dirección deben reflejarse en el mismo clic. La
     // consulta remota sólo completa contacto y nunca bloquea el checkbox.
@@ -306,11 +307,13 @@ export function NuevoCertificadoView() {
       const sincronizada = {
         ...prev,
         tipoDocFac: tipoComprobante,
+        tipoDocumentoFac,
         nroDocFac: titularPrincipal.nroDocumento,
         razonSocialFac: titularPrincipal.nombreRazonSocial,
         direccionFac: titularPrincipal.direccion,
       };
       const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
+        && prev.tipoDocumentoFac === sincronizada.tipoDocumentoFac
         && prev.nroDocFac === sincronizada.nroDocFac
         && prev.razonSocialFac === sincronizada.razonSocialFac
         && prev.direccionFac === sincronizada.direccionFac;
@@ -349,6 +352,7 @@ export function NuevoCertificadoView() {
 
   const construirPayloadFacturacion = () => ({
     tipoComprobante: formFacturacion.tipoDocFac || 'BOLETA',
+    tipoDocumentoCliente: formFacturacion.tipoDocumentoFac || (formFacturacion.nroDocFac.length === 11 ? 'RUC' : 'DNI'),
     nroDocumento: formFacturacion.nroDocFac,
     nombreRazonSocial: formFacturacion.razonSocialFac,
     direccion: formFacturacion.direccionFac,
@@ -466,6 +470,7 @@ export function NuevoCertificadoView() {
               tipoCertificado: res.data.tipo.clave,
               tarifaCodigo: res.data.tarifaCodigo || prev.tarifaCodigo,
               servicioCodigo: res.data.servicio?.codigo || prev.servicioCodigo,
+              concepto: res.data.servicio?.nombre || prev.concepto,
               modalidadCertificado: res.data.servicio?.modalidad || prev.modalidadCertificado,
               tipo_flujo: res.data.servicio?.tipoFlujo || prev.tipo_flujo,
               placa: res.data.vehiculo?.placa || prev.placa,
@@ -513,6 +518,7 @@ export function NuevoCertificadoView() {
               setFormFacturacion(prev => ({
                 ...prev,
                 tipoDocFac: fac.tipoComprobante || 'BOLETA',
+                tipoDocumentoFac: fac.tipoDocumentoCliente || (String(fac.nroDocumento || '').length === 11 ? 'RUC' : 'DNI'),
                 nroDocFac: fac.nroDocumento || '',
                 razonSocialFac: fac.nombreRazonSocial || '',
                 direccionFac: fac.direccion || '',
@@ -548,6 +554,21 @@ export function NuevoCertificadoView() {
                 // Características después de la conversión (sólo INICIAL).
                 combustiblePosterior: gnv.combustible_posterior || '',
                 pesoNetoPosterior: enteroValue(gnv.peso_neto_posterior, 6),
+                componentes: (detalle.data?.componentes || []).map((componente: any) => {
+                  const capRaw = String(componente.capacidad_litros ?? '').trim();
+                  const esNoAplica = capRaw.toUpperCase() === 'NO APLICA';
+                  return {
+                    orden: Number(componente.orden),
+                    componente: componente.componente,
+                    marca: componente.marca || '',
+                    modelo: componente.modelo || '',
+                    capacidadLitros: esNoAplica ? 'NO APLICA' : (enteroValue(componente.capacidad_litros, 5) || ''),
+                    modoCapacidad: esNoAplica ? 'NO_APLICA' : 'VALOR',
+                    mesFabricacion: textValue(componente.mes_fabricacion),
+                    anioFabricacion: enteroValue(componente.anio_fabricacion, 4),
+                    numeroSerie: componente.numero_serie || '',
+                  };
+                }),
                 verificaciones: (detalle.data?.verificaciones || []).map(mapVerificacionBorrador),
               });
             }
@@ -1035,15 +1056,20 @@ export function NuevoCertificadoView() {
         // tabla "antes / después". En ANUAL no se envían, para no poner en NULL
         // valores que el inspector ya haya escrito.
         ...(formCaja.modalidadCertificado === 'INICIAL' ? {
-          combustiblePosterior: formGnv.combustiblePosterior || null,
+          combustiblePosterior: formGnv.combustiblePosterior || 'BI - COMBUSTIBLE GNV',
           pesoNetoPosterior: normalizarEnteroCertificado(String(formGnv.pesoNetoPosterior || ''), 6) || null,
         } : {}),
       });
       if (formGnv.componentes?.length > 0) {
         await faregasCertificadosApi.guardarComponentesGnv(idBorrador, {
-          componentes: formGnv.componentes.map((c: any, i: number) => ({
-            ...c, orden: i + 1
-          }))
+          componentes: formGnv.componentes.map((c: any, i: number) => {
+            const modo = c.modoCapacidad || (c.capacidadLitros === 'NO APLICA' ? 'NO_APLICA' : 'VALOR');
+            return {
+              ...c,
+              orden: i + 1,
+              capacidadLitros: modo === 'NO_APLICA' ? 'NO APLICA' : (c.capacidadLitros || null)
+            };
+          })
         });
       }
       if (formGnv.verificaciones?.length > 0) {
@@ -1824,7 +1850,9 @@ export function NuevoCertificadoView() {
             <VehiculoStep
               tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
               modalidadCertificado={formCaja.modalidadCertificado}
-            numeroCertificadoOficial={numeroCertificadoOficial}
+              servicioCodigo={formCaja.servicioCodigo}
+              servicioNombre={formCaja.concepto}
+              numeroCertificadoOficial={numeroCertificadoOficial}
               formVehiculo={formVehiculo}
               setFormVehiculo={setFormVehiculo}
               formPropietario={formPropietario}

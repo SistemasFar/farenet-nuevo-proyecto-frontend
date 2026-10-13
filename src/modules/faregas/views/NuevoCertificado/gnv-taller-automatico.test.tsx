@@ -49,10 +49,11 @@ describe('taller GNV automático por sede', () => {
     const html = renderGnv(modalidad);
     expect(html).not.toContain('TALLER AUTORIZADO');
     expect(html).not.toContain('tallerAutorizadoId');
-    expect(html).toContain('VIGENCIA HASTA');
     if (modalidad === 'ANUAL') {
+      expect(html).toContain('VIGENCIA HASTA');
       expect(html.match(/MARCAR LOS 8 COMO CUMPLE/g)).toHaveLength(1);
     } else {
+      expect(html).not.toContain('VIGENCIA HASTA');
       expect(html).not.toContain('MARCAR LOS 8 COMO CUMPLE');
     }
     expect(html).not.toContain('gnv-verif-');
@@ -110,16 +111,17 @@ describe('taller GNV automático por sede', () => {
     expect(pesosGnvSonIguales('1301', '1450')).toBe(false);
   });
 
-  it('muestra la conversión como Antes y Después con una alerta inmediata', () => {
+  it('muestra la conversión compacta del certificado con alerta inmediata si los valores no cambian', () => {
     const html = renderGnv(
       'INICIAL',
       { combustible: 'BI COMBUSTIBLE/GNV', pesoNeto: '1301.000' },
       { combustiblePosterior: 'BI - COMBUSTIBLE GNV', pesoNetoPosterior: '1301' }
     );
-    expect(html).toContain('1. ANTES DE LA CONVERSIÓN');
-    expect(html).toContain('2. DESPUÉS DE LA CONVERSIÓN');
-    expect(html).toContain('El resultado no puede ser el mismo combustible original.');
-    expect(html).toContain('El nuevo peso no puede ser igual al peso original.');
+    expect(html).not.toContain('1. ANTES DE LA CONVERSIÓN');
+    expect(html).not.toContain('2. DESPUÉS DE LA CONVERSIÓN');
+    expect(html).toContain('C. CAMBIO REALIZADO EN LA CONVERSIÓN GNV');
+    expect(html).toContain('BI - COMBUSTIBLE GNV');
+    expect(html).toContain('El nuevo peso neto debe ser diferente al peso original.');
   });
 
   it('bloquea el avance cuando la conversión GNV no cambia combustible o peso', () => {

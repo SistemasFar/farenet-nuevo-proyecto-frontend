@@ -35,6 +35,7 @@ export function CamposVehiculoCertificado({
   combustibles,
 }: Props) {
   const valor = (campo: CampoVehiculoCertificado) => {
+    if (campo.valorAutomatico) return campo.valorAutomatico;
     if (campo.campo === 'combustibleGlpAnual') return 'BI-COMBUSTIBLE GLP';
     if (campo.grupo === 'vin-serie') return formVehiculo.vin || formVehiculo.serieChasis || '';
     return formVehiculo[campo.campo] || '';

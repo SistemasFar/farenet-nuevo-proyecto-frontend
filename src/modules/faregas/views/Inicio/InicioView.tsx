@@ -6,6 +6,7 @@ import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import type { FacturacionFaregas } from '../../types/faregas-api';
 import Swal from 'sweetalert2';
 import { FileText, FileEdit, Eye, Ban, RefreshCw } from 'lucide-react';
+import { nombreTipoCertificadoPanel } from './tipo-certificado-panel';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
@@ -18,6 +19,8 @@ interface BorradorPanel {
   placa?: string;
   clienteDocumento?: string;
   clienteNombre?: string;
+  tipoCertificadoClave?: string;
+  modalidad?: string | null;
   conceptoVehicular?: string;
   pasoActual?: string;
   estado?: string;
@@ -722,7 +725,7 @@ export function InicioView() {
                         {normalizarTexto(ins.clienteNombre)?.toLowerCase()}
                       </td>
                       <td className="px-4 py-3 min-w-[180px]">
-                        {normalizarTexto(ins.conceptoVehicular)}
+                        {nombreTipoCertificadoPanel(ins)}
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap">

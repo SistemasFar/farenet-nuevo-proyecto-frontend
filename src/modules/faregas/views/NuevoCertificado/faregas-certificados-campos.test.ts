@@ -232,7 +232,7 @@ describe('Campos vehiculares por template real y agrupaciones visuales', () => {
 
 describe('Validacion frontend de campos visibles y obligatorios', () => {
   const facturacionValida = {
-    tipoDocFac: 'BOLETA', nroDocFac: '12345678', razonSocialFac: 'CLIENTE PRUEBA',
+    tipoDocFac: 'BOLETA', tipoDocumentoFac: 'DNI', nroDocFac: '12345678', razonSocialFac: 'CLIENTE PRUEBA',
     direccionFac: 'CALLE 123', telefonoFac: '999888777', emailFac: 'test@example.com'
   };
 
@@ -281,7 +281,7 @@ describe('Validacion frontend de campos visibles y obligatorios', () => {
 
   it('GNV Inicial: no exige verificaciones anuales, exige componentes y conversion', () => {
     const obligatorios = camposObligatoriosVisibles('GNV_ANUAL', 'INICIAL');
-    expect(obligatorios).toContain('gnv.fechaVigencia');
+    expect(obligatorios).not.toContain('gnv.fechaVigencia');
     expect(obligatorios).toContain('gnv.combustiblePosterior');
     expect(obligatorios).toContain('gnv.pesoNetoPosterior');
     expect(obligatorios).not.toContain('gnv.verificaciones');
@@ -351,7 +351,7 @@ describe('Validacion frontend de campos visibles y obligatorios', () => {
 
   it('Facturación permanece en todos los certificados', () => {
     expect(CAMPOS_VISIBLES_FACTURACION).toEqual([
-      'tipoDocFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac', 'emailFac'
+      'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac', 'emailFac'
     ]);
   });
 

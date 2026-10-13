@@ -116,24 +116,24 @@ describe('formulario GLP INICIAL alineado al certificado real', () => {
     expect(derecha[1].etiqueta).toBe('COMBUSTIBLE ORIGINAL');
   });
 
-  it('respeta el orden físico estricto de las secciones: Propietario -> Vehículo -> Componentes -> Conversión -> Verificaciones -> Vigencia/Expediente -> Facturación', () => {
+  it('respeta el orden físico estricto de las secciones: Propietario -> Facturación -> Vehículo -> Componentes -> Conversión -> Verificaciones -> Vigencia', () => {
     const html = renderGlpInicial();
 
     const propietarioIndex = html.indexOf('data-seccion-glp-inicial="propietario"');
+    const facturacionIndex = html.indexOf('data-seccion-glp-inicial="facturacion"');
     const vehiculoIndex = html.indexOf('data-layout-certificado="dos-columnas"');
     const componentesIndex = html.indexOf('data-seccion-glp-inicial="componentes"');
     const conversionIndex = html.indexOf('data-seccion-glp-inicial="conversion"');
     const verificacionesIndex = html.indexOf('data-seccion-glp-inicial="verificaciones"');
     const vigenciaExpedienteIndex = html.indexOf('data-seccion-glp-inicial="vigencia-expediente"');
-    const facturacionIndex = html.indexOf('data-seccion-glp-inicial="facturacion"');
 
     expect(propietarioIndex).toBeGreaterThan(-1);
-    expect(vehiculoIndex).toBeGreaterThan(propietarioIndex);
+    expect(facturacionIndex).toBeGreaterThan(propietarioIndex);
+    expect(vehiculoIndex).toBeGreaterThan(facturacionIndex);
     expect(componentesIndex).toBeGreaterThan(vehiculoIndex);
     expect(conversionIndex).toBeGreaterThan(componentesIndex);
     expect(verificacionesIndex).toBeGreaterThan(conversionIndex);
     expect(vigenciaExpedienteIndex).toBeGreaterThan(verificacionesIndex);
-    expect(facturacionIndex).toBeGreaterThan(vigenciaExpedienteIndex);
 
     // Los encabezados coinciden
     expect(html).toContain('A. DATOS DEL CERTIFICADO / VEHÍCULO');
@@ -141,7 +141,7 @@ describe('formulario GLP INICIAL alineado al certificado real', () => {
     expect(html).toContain('C. CAMBIO REALIZADO EN LA CONVERSIÓN GLP');
     expect(html).toContain('D. VERIFICACIONES DE SEGURIDAD GLP');
     expect(html).toContain('E. VIGENCIA / EXPEDIENTE');
-    expect(html).toContain('F. DATOS PARA FACTURACIÓN');
+    expect(html).toContain('DATOS PARA FACTURACIÓN');
   });
 
   it('componentes están antes de conversión y la fila del cilindro es compacta (sin Mes ni Modelo redundante)', () => {
@@ -196,7 +196,7 @@ describe('formulario GLP INICIAL alineado al certificado real', () => {
     expect(html).toContain('1280');
   });
 
-  it('facturación aparece UNA SOLA VEZ al final del formulario', () => {
+  it('facturación aparece UNA SOLA VEZ en el formulario', () => {
     const html = renderGlpInicial();
 
     const matchesHeader = (html.match(/DATOS PARA FACTURACIÓN/g) || []).length;

@@ -246,7 +246,12 @@ function ClienteComprobanteCompacto({
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
         <div><div className="text-[9px] font-bold text-slate-500">COMPROBANTE</div><div className="mt-0.5 font-black text-slate-800">{formFacturacion.tipoDocFac || '-'}</div></div>
-        <div><div className="text-[9px] font-bold text-slate-500">DNI / RUC</div><div className="mt-0.5 font-black text-slate-800">{formFacturacion.nroDocFac || '-'}</div></div>
+        <div>
+          <div className="text-[9px] font-bold text-slate-500">TIPO / DOCUMENTO</div>
+          <div className="mt-0.5 font-black text-slate-800">
+            {[formFacturacion.tipoDocumentoFac, formFacturacion.nroDocFac].filter(Boolean).join(' · ') || '-'}
+          </div>
+        </div>
         <div className="col-span-2"><div className="text-[9px] font-bold text-slate-500">NOMBRE / RAZÓN SOCIAL</div><div className="mt-0.5 truncate font-black capitalize text-slate-800">{formFacturacion.razonSocialFac || '-'}</div></div>
         <div className="col-span-2"><div className="text-[9px] font-bold text-slate-500">DIRECCIÓN FISCAL</div><div className="mt-0.5 truncate font-semibold capitalize text-slate-700">{formFacturacion.direccionFac || '-'}</div></div>
         <div><div className="text-[9px] font-bold text-slate-500">CORREO</div><div className="mt-0.5 truncate font-semibold text-slate-700">{formFacturacion.emailFac || 'NO REGISTRADO'}</div></div>
@@ -369,6 +374,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
           setFormFacturacion(prev => ({
             ...prev,
             tipoDocFac: guardada.tipoComprobante,
+            tipoDocumentoFac: guardada.tipoDocumentoCliente || (guardada.nroDocumento.length === 11 ? 'RUC' : 'DNI'),
             nroDocFac: guardada.nroDocumento,
             razonSocialFac: guardada.nombreRazonSocial,
             direccionFac: guardada.direccion,
@@ -398,6 +404,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
   const datosRequest = () => {
     return {
       tipoComprobante: formFacturacion.tipoDocFac,
+      tipoDocumentoCliente: formFacturacion.tipoDocumentoFac || (formFacturacion.nroDocFac.length === 11 ? 'RUC' : 'DNI'),
       nroDocumento: formFacturacion.nroDocFac,
       nombreRazonSocial: formFacturacion.razonSocialFac,
       direccion: formFacturacion.direccionFac,
@@ -637,8 +644,10 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
                 <div className="mt-1 font-black text-slate-800">{formFacturacion.tipoDocFac || '-'}</div>
               </div>
               <div>
-                <div className="text-[11px] font-bold text-slate-500">DNI / RUC</div>
-                <div className="mt-1 font-black text-slate-800">{formFacturacion.nroDocFac || '-'}</div>
+                <div className="text-[11px] font-bold text-slate-500">TIPO / DOCUMENTO</div>
+                <div className="mt-1 font-black text-slate-800">
+                  {[formFacturacion.tipoDocumentoFac, formFacturacion.nroDocFac].filter(Boolean).join(' · ') || '-'}
+                </div>
               </div>
               <div className="md:col-span-2">
                 <div className="text-[11px] font-bold text-slate-500">NOMBRE / RAZÓN SOCIAL</div>

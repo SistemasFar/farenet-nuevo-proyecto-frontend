@@ -2,6 +2,7 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import { camposVehiculoEditables } from './faregas-certificado-campos';
 import type { CampoFormatoDinamicoFaregas } from '../../types/faregas-api';
 import { combustiblesGnvSonEquivalentes, combustiblesSonEquivalentes, pesosGnvSonIguales } from './gnv-conversion';
+import { validarDocumento } from '../Usuarios/usuariosValidacion';
 
 type DatosAsistente = {
   tipoCertificado: TipoCertificadoFaregas;
@@ -112,8 +113,8 @@ export const validarExpedienteTecnico = ({
 
   if (tipoCertificado === 'GNV_ANUAL') {
     agregarFaltantes(errores, vehiculo, [['color', 'el color']]);
-    agregarFaltantes(errores, gnv, [['fechaVigencia', 'la vigencia GNV']]);
     if (String(modalidad || '').toUpperCase() === 'ANUAL') {
+      agregarFaltantes(errores, gnv, [['fechaVigencia', 'la vigencia GNV']]);
       const verificaciones = gnv.verificaciones || [];
       if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
         errores.push('Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
@@ -390,8 +391,8 @@ export const validarDatosEspecificos = ({
   const errores: ErroresCampo = {};
 
   if (tipo === 'GNV_ANUAL') {
-    if (vacio(gnv.fechaVigencia)) marcar(errores, 'gnv.fechaVigencia', 'Complete la vigencia del certificado GNV.');
     if (String(modalidad || '').toUpperCase() === 'ANUAL') {
+      if (vacio(gnv.fechaVigencia)) marcar(errores, 'gnv.fechaVigencia', 'Complete la vigencia del certificado GNV.');
       const verificaciones = gnv.verificaciones || [];
       if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
         marcar(errores, 'gnv.verificaciones', 'Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
@@ -540,17 +541,22 @@ export const validarDatosFacturacionCampos = (
 ): ErroresCampo => {
   const errores: ErroresCampo = {};
   const tipoComprobante = String(facturacion.tipoDocFac || '').trim().toUpperCase();
-  const documento = String(facturacion.nroDocFac || '').replace(/\D/g, '');
+  const tipoDocumento = String(facturacion.tipoDocumentoFac || '').trim().toUpperCase();
+  const documento = String(facturacion.nroDocFac || '').trim().toUpperCase();
   const email = String(facturacion.emailFac || '').trim();
 
   if (!['BOLETA', 'FACTURA'].includes(tipoComprobante)) {
     errores.tipoDocFac = 'Seleccione el tipo de comprobante en Titulares y Datos de Facturación.';
   }
-  if (![8, 11].includes(documento.length)) {
-    errores.nroDocFac = 'Complete un DNI de 8 dígitos o un RUC de 11 dígitos para facturación.';
-  } else if (tipoComprobante === 'FACTURA' && documento.length !== 11) {
-    errores.nroDocFac = 'La factura requiere un RUC de 11 dígitos.';
-  } else if (tipoComprobante === 'FACTURA' && documento.length === 11 && !esRucValido(documento)) {
+  if (!['DNI', 'RUC', 'CARNETEXTRANJERIA'].includes(tipoDocumento)) {
+    errores.tipoDocumentoFac = 'Seleccione el tipo de documento de identidad.';
+  } else {
+    const errorDocumento = validarDocumento(tipoDocumento.toLowerCase(), documento);
+    if (errorDocumento) errores.nroDocFac = errorDocumento;
+  }
+  if (tipoComprobante === 'FACTURA' && tipoDocumento !== 'RUC') {
+    errores.tipoDocumentoFac = 'La factura requiere un documento de tipo RUC.';
+  } else if (tipoComprobante === 'FACTURA' && tipoDocumento === 'RUC' && !errores.nroDocFac && !esRucValido(documento)) {
     errores.nroDocFac = 'El RUC ingresado no tiene un dígito verificador válido. Revise el número antes de facturar.';
   }
   if (vacio(facturacion.razonSocialFac)) {
@@ -625,7 +631,7 @@ export const CAMPOS_VISIBLES_TITULAR = [
 
 /** Datos de facturación, que se capturan en el mismo paso. */
 export const CAMPOS_VISIBLES_FACTURACION = [
-  'tipoDocFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac', 'emailFac',
+  'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac', 'emailFac',
 ] as const;
 
 /**
@@ -670,10 +676,22 @@ const validarComponentesGnvInicial = (gnv: Record<string, any>): ErroresCampo =>
       continue;
     }
 
-    for (const campo of ['marca', 'numeroSerie', 'capacidadLitros']) {
+    for (const campo of ['marca', 'numeroSerie']) {
       if (esValorVacioParaAvance(componente[campo])) {
-        const etiqueta = campo === 'marca' ? 'la marca' : campo === 'numeroSerie' ? 'la serie' : 'la capacidad';
+        const etiqueta = campo === 'marca' ? 'la marca' : 'la serie';
         marcar(errores, `gnv.componentes.${nombre}.${campo}`, `Complete ${etiqueta} del ${nombre}.`);
+      }
+    }
+
+    const modo = componente.modoCapacidad || (componente.capacidadLitros === 'NO APLICA' ? 'NO_APLICA' : 'VALOR');
+    if (modo === 'NO_APLICA') {
+      // Válido tanto para Reductor como para Cilindro
+    } else {
+      const cap = String(componente.capacidadLitros ?? '').trim();
+      if (esValorVacioParaAvance(cap)) {
+        marcar(errores, `gnv.componentes.${nombre}.capacidadLitros`, `Complete la capacidad del ${nombre}.`);
+      } else if (!/^\d+$/.test(cap)) {
+        marcar(errores, `gnv.componentes.${nombre}.capacidadLitros`, `La capacidad del ${nombre} debe ser un número entero sin decimales.`);
       }
     }
 
@@ -714,7 +732,7 @@ export const camposObligatoriosVisibles = (
   const esInicial = String(modalidad || '').toUpperCase() === 'INICIAL';
 
   if (tipoCertificado === 'GNV_ANUAL') {
-    campos.push(...CAMPOS_VISIBLES_GNV);
+    if (!esInicial) campos.push(...CAMPOS_VISIBLES_GNV);
     if (esInicial) campos.push(...CAMPOS_VISIBLES_GNV_INICIAL);
   }
   if (tipoCertificado === 'GLP_ANUAL') {
@@ -769,10 +787,18 @@ export const validarFormularioVehiculoVisible = ({
   // gnv.fechaVigencia), así que la raíz debe exponer el grupo en su primer
   // segmento para validar el campo correcto.
   if (tipoCertificado === 'GNV_ANUAL') {
-    marcarVacias(errores, { gnv }, CAMPOS_VISIBLES_GNV);
+    if (!esInicial) {
+      marcarVacias(errores, { gnv }, CAMPOS_VISIBLES_GNV);
+    }
     if (esInicial) {
       marcarVacias(errores, { gnv }, CAMPOS_VISIBLES_GNV_INICIAL);
-      if (combustiblesGnvSonEquivalentes(vehiculo.combustible, gnv.combustiblePosterior)) {
+      const combustiblePost = gnv.combustiblePosterior || 'BI - COMBUSTIBLE GNV';
+      if (combustiblesGnvSonEquivalentes(vehiculo.combustible, combustiblePost)) {
+        marcar(
+          errores,
+          'combustible',
+          'El combustible original debe ser diferente a BI - COMBUSTIBLE GNV, que es el resultado de la conversión.'
+        );
         marcar(
           errores,
           'gnv.combustiblePosterior',
