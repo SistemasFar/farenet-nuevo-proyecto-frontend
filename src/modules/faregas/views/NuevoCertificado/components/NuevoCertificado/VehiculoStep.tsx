@@ -345,7 +345,7 @@ export function VehiculoStep({
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* 1. PROPIETARIO (SI EL CERTIFICADO LO MUESTRA) */}
-      {((tipoCertificado === 'GLP_ANUAL' && !esGlpAnual) || tipoCertificado === 'CONFORMIDAD') && (
+      {tipoCertificado === 'CONFORMIDAD' && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <TitularesList
             titulares={titulares}
@@ -357,7 +357,7 @@ export function VehiculoStep({
             onCorregirCampo={onCorregirCampo}
             mostrarTitulares={true}
             mostrarFacturacion={false}
-            mostrarDireccionTitular={tipoCertificado === 'CONFORMIDAD'}
+            mostrarDireccionTitular={true}
           />
         </div>
       )}
@@ -365,10 +365,14 @@ export function VehiculoStep({
       {/* 1. SECCIÓN GENERAL DEL VEHÍCULO */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h4 className="text-lg font-bold text-slate-800 capitalize tracking-wider mb-6 border-b pb-2">
-          {esGlpAnual ? 'A. DATOS DEL CERTIFICADO / VEHÍCULO' : 'A. DATOS DEL VEHÍCULO'}
+          {tipoCertificado === 'GLP_ANUAL' ? 'A. DATOS DEL CERTIFICADO / VEHÍCULO' : 'A. DATOS DEL VEHÍCULO'}
         </h4>
-        {esGlpAnual && (
-          <div className="mb-6" data-seccion-glp-anual="propietario">
+        {tipoCertificado === 'GLP_ANUAL' && (
+          <div
+            className="mb-6"
+            data-seccion-glp-anual={esGlpAnual ? 'propietario' : undefined}
+            data-seccion-glp-inicial={!esGlpAnual ? 'propietario' : undefined}
+          >
             <TitularesList
               titulares={titulares}
               setTitulares={setTitulares}
@@ -397,6 +401,8 @@ export function VehiculoStep({
           onCategoriaVehicularChange={onCategoriaVehicularChange}
           erroresCampo={erroresCampo}
           obligatorios={obligatorio}
+          esGlpInicial={tipoCertificado === 'GLP_ANUAL' && String(modalidadCertificado || '').toUpperCase() === 'INICIAL'}
+          maestrosVehiculo={maestrosVehiculo}
         />
         {camposVehiculoCertificado.length === 0 && <>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -539,7 +545,7 @@ export function VehiculoStep({
       {/* 2. SECCIÓN DINÁMICA SEGÚN CERTIFICADO */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h4 className="text-lg font-bold text-[#052a79] capitalize tracking-wider mb-6 border-b pb-2">
-          {esGlpAnual
+          {tipoCertificado === 'GLP_ANUAL'
             ? 'B. COMPONENTES INSTALADOS GLP'
             : <>B. INFORMACIÓN ESPECÍFICA:{' '}
               {tipoCertificado === 'GNV_ANUAL' ? 'GNV'
@@ -553,133 +559,12 @@ export function VehiculoStep({
         {tipoCertificado === 'GLP_ANUAL' && (
           <div className="space-y-6">
 
-            {!esGlpAnual && <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD</label>
-                <div className="flex min-h-[42px] items-center justify-between rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-2">
-                  <span className="font-black text-[#052a79]">{modalidadCertificado || 'NO DEFINIDA'}</span>
-                  <span className="text-[10px] font-bold capitalize text-blue-500">Seleccionada en datos iniciales</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">VIGENCIA HASTA <span className="text-red-500">*</span></label>
-                <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.fechaVigencia'))} data-campo-error={esError('glp.fechaVigencia') ? true : undefined} />
-            <MensajeError campo="glp.fechaVigencia" errores={erroresCampo} />
-              </div>
-            </div>}
-
-            {!esGlpAnual && (modalidadCertificado === 'ANUAL' ? (
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-500">EXPEDIENTE TÉCNICO</label>
-                <div className="rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-2">
-                  <p className="font-black text-[#052a79]">
-                    {numeroCertificadoOficial || 'Se asignará automáticamente al emitir'}
-                  </p>
-                  <p className="mt-1 text-[10px] font-bold text-blue-600">
-                    Usará el mismo número oficial del certificado. No consume un correlativo en este paso.
-                  </p>
-                </div>
-                {formGlp.expedienteTecnico
-                  && formGlp.expedienteTecnico !== numeroCertificadoOficial && (
-                    <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
-                      Este borrador conserva el valor anterior {formGlp.expedienteTecnico}. Al emitir se reemplazará por el número oficial del certificado.
-                    </p>
-                  )}
-              </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">EXPEDIENTE TÉCNICO <span className="text-red-500">*</span></label>
-                <input name="expedienteTecnico" value={formGlp.expedienteTecnico || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.expedienteTecnico'))} data-campo-error={esError('glp.expedienteTecnico') ? true : undefined} />
-                <MensajeError campo="glp.expedienteTecnico" errores={erroresCampo} />
-              </div>
-            ))}
-
-            {modalidadCertificado === 'INICIAL' && (
-              <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 sm:p-4">
-                <h5 className="font-bold text-[#052a79]">CAMBIO REALIZADO EN LA CONVERSIÓN GLP</h5>
-                <p className="mt-1 text-xs leading-5 text-slate-600">
-                  Primero confirma cómo ingresó el vehículo. El resultado de la conversión es fijo y no puede ser igual al combustible original.
-                </p>
-
-                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <div className={`rounded-xl border bg-white p-4 ${combustibleGlpSinCambio ? 'border-red-400' : 'border-slate-200'}`} data-campo-error={combustibleGlpSinCambio ? true : undefined}>
-                    <div className="mb-4 flex items-center gap-2">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-xs font-black text-white">1</span>
-                      <div>
-                        <p className="text-xs font-black text-slate-800">ANTES DE LA CONVERSIÓN</p>
-                        <p className="text-[11px] text-slate-500">Datos originales del vehículo</p>
-                      </div>
-                    </div>
-
-                    <label className="mb-1 block text-xs font-bold text-slate-600">COMBUSTIBLE ORIGINAL <span className="text-red-500">*</span></label>
-                    <select
-                      name="combustible"
-                      value={formVehiculo.combustible || ''}
-                      onChange={handleVehiculo}
-                      className={claseConError(CLASE_CAMPO, esError('combustible') || combustibleGlpSinCambio)}
-                      data-campo-error={(esError('combustible') || combustibleGlpSinCambio) ? true : undefined}
-                    >
-                      <option value="">-- SELECCIONAR COMBUSTIBLE ORIGINAL --</option>
-                      {maestrosVehiculo?.combustibles?.map((c: any) => {
-                        const coincideConResultado = combustiblesSonEquivalentes(c.nombre, COMBUSTIBLE_POSTERIOR_GLP);
-                        return (
-                          <option key={c.key} value={c.nombre} disabled={coincideConResultado}>
-                            {c.nombre}{coincideConResultado ? ' — NO VÁLIDO COMO ORIGINAL' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    <MensajeError campo="combustible" errores={erroresCampo} />
-                    {combustibleGlpSinCambio && !esError('combustible') && (
-                      <p role="alert" className="mt-2 text-xs font-bold leading-5 text-red-600">
-                        El combustible original no puede ser BI-COMBUSTIBLE GLP porque ese es el resultado de la conversión.
-                      </p>
-                    )}
-
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[10px] font-bold text-slate-500">PESO NETO ORIGINAL</p>
-                        <p className="mt-1 text-sm font-black text-slate-800">{formVehiculo.pesoNeto || '-'} kg</p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-3">
-                        <p className="text-[10px] font-bold text-slate-500">CARGA ÚTIL ORIGINAL</p>
-                        <p className="mt-1 text-sm font-black text-slate-800">{formVehiculo.cargaUtil || '-'} kg</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-amber-300 bg-amber-50/60 p-4">
-                    <div className="mb-4 flex items-center gap-2">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white">2</span>
-                      <div>
-                        <p className="text-xs font-black text-amber-900">DESPUÉS DE LA CONVERSIÓN</p>
-                        <p className="text-[11px] text-amber-700">Resultado que se certificará</p>
-                      </div>
-                    </div>
-
-                    <div className="mb-4 rounded-lg border border-amber-200 bg-white px-3 py-3">
-                      <p className="text-[10px] font-bold text-slate-500">NUEVO COMBUSTIBLE</p>
-                      <p className="mt-1 text-sm font-black text-[#052a79]">{COMBUSTIBLE_POSTERIOR_GLP}</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-xs font-bold text-slate-600">NUEVO PESO NETO (kg) <span className="text-red-500">*</span></label>
-                        <input type="text" inputMode="numeric" data-tipo-dato="entero" name="pesoNetoPosterior" value={formGlp.pesoNetoPosterior || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.pesoNetoPosterior'))} data-campo-error={esError('glp.pesoNetoPosterior') ? true : undefined} placeholder="Ej.: 1450" />
-                        <MensajeError campo="glp.pesoNetoPosterior" errores={erroresCampo} />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-bold text-slate-600">NUEVA CARGA ÚTIL (kg) <span className="text-red-500">*</span></label>
-                        <input type="text" inputMode="numeric" data-tipo-dato="entero" name="cargaUtilPosterior" value={formGlp.cargaUtilPosterior || ''} onChange={handleGlp} className={claseConError(CLASE_CAMPO, esError('glp.cargaUtilPosterior'))} data-campo-error={esError('glp.cargaUtilPosterior') ? true : undefined} placeholder="Ej.: 149" />
-                        <MensajeError campo="glp.cargaUtilPosterior" errores={erroresCampo} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4" data-seccion-glp-anual={esGlpAnual ? 'componentes' : undefined}>
+            {/* B. TABLA COMPONENTES GLP */}
+            <div
+              className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4"
+              data-seccion-glp-anual={esGlpAnual ? 'componentes' : undefined}
+              data-seccion-glp-inicial={!esGlpAnual ? 'componentes' : undefined}
+            >
               <div className="mb-3 flex items-center justify-between border-b pb-2">
                 <h5 className="font-bold text-slate-800">COMPONENTES INSTALADOS GLP</h5>
                 <span className="text-[11px] font-bold text-slate-500">TABLA DEL CERTIFICADO</span>
@@ -700,14 +585,6 @@ export function VehiculoStep({
                   <tbody className="divide-y divide-slate-100">
                     {formGlp.componentes?.map((comp: any, idx: number) => {
                       const esCilindro = comp.componente === 'CILINDRO';
-                      const previewCilindro = esCilindro && !esGlpAnual
-                        ? [
-                            comp.capacidadLitros
-                              ? `${String(comp.capacidadLitros)} LTS`
-                              : '',
-                            comp.anioFabricacion ? `${comp.mesFabricacion ? String(comp.mesFabricacion).padStart(2, '0') + '-' : ''}${comp.anioFabricacion}` : ''
-                          ].filter(Boolean).join(' / ')
-                        : '';
 
                       return (
                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
@@ -728,7 +605,7 @@ export function VehiculoStep({
                             <MensajeError campo={claveComponente('glp', comp.componente, 'marca')} errores={erroresCampo} />
                           </td>
                            <td className="p-2 align-top">
-                            {esCilindro && esGlpAnual ? (
+                            {esCilindro ? (
                               <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
                                 <div className="min-w-0">
                                   <label className="mb-0.5 block text-[10px] font-bold text-slate-500">CAPACIDAD (L) *</label>
@@ -758,70 +635,6 @@ export function VehiculoStep({
                                     placeholder="AAAA"
                                   />
                                   <MensajeError campo={claveComponente('glp', comp.componente, 'anioFabricacion')} errores={erroresCampo} />
-                                </div>
-                              </div>
-                            ) : esCilindro ? (
-                              <div className="space-y-2">
-                                <input
-                                  value={comp.modelo || ''}
-                                  onChange={e => handleComponenteGlp(idx, 'modelo', e.target.value)}
-                                  className={claseConError("min-h-10 w-full rounded-md border-2 border-slate-200 p-2 font-semibold capitalize text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'modelo')))}
-                                  data-campo-error={esError(claveComponente('glp', comp.componente, 'modelo')) ? true : undefined}
-                                  placeholder="Modelo (ej: Cilíndrico / Toroidal)"
-                                />
-                                <MensajeError campo={claveComponente('glp', comp.componente, 'modelo')} errores={erroresCampo} />
-
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
-                                    <div className="flex-1 min-w-[90px]">
-                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">CAPACIDAD (L) *</label>
-                                      <input
-                                        value={comp.capacidadLitros || ''}
-                                        onChange={e => handleComponenteGlp(idx, 'capacidadLitros', e.target.value)}
-                                         inputMode="numeric"
-                                         data-tipo-dato="entero"
-                                        className={claseConError("h-9 w-full rounded-md border-2 border-slate-200 px-2 text-xs font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'capacidadLitros')))}
-                                        data-campo-error={esError(claveComponente('glp', comp.componente, 'capacidadLitros')) ? true : undefined}
-                                         placeholder="Litros"
-                                      />
-                                      <MensajeError campo={claveComponente('glp', comp.componente, 'capacidadLitros')} errores={erroresCampo} />
-                                    </div>
-                                    <span className="text-base font-black text-slate-400 select-none pt-4">/</span>
-                                    <div className="w-20">
-                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">MES *</label>
-                                      <input
-                                        value={comp.mesFabricacion || ''}
-                                        onChange={e => handleComponenteGlp(idx, 'mesFabricacion', e.target.value)}
-                                         inputMode="numeric"
-                                         data-tipo-dato="entero"
-                                        maxLength={2}
-                                        className={claseConError("h-9 w-full rounded-md border-2 border-slate-200 px-2 text-center text-xs font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'mesFabricacion')))}
-                                        data-campo-error={esError(claveComponente('glp', comp.componente, 'mesFabricacion')) ? true : undefined}
-                                        placeholder="MM"
-                                      />
-                                      <MensajeError campo={claveComponente('glp', comp.componente, 'mesFabricacion')} errores={erroresCampo} />
-                                    </div>
-                                    <span className="text-base font-black text-slate-400 select-none pt-4">-</span>
-                                    <div className="w-24">
-                                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">AÑO *</label>
-                                      <input
-                                        value={comp.anioFabricacion || ''}
-                                        onChange={e => handleComponenteGlp(idx, 'anioFabricacion', e.target.value)}
-                                         inputMode="numeric"
-                                         data-tipo-dato="entero"
-                                        maxLength={4}
-                                        className={claseConError("h-9 w-full rounded-md border-2 border-slate-200 px-2 text-center text-xs font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'anioFabricacion')))}
-                                        data-campo-error={esError(claveComponente('glp', comp.componente, 'anioFabricacion')) ? true : undefined}
-                                        placeholder="AAAA"
-                                      />
-                                      <MensajeError campo={claveComponente('glp', comp.componente, 'anioFabricacion')} errores={erroresCampo} />
-                                    </div>
-                                  </div>
-                                  {previewCilindro && (
-                                    <p className="mt-1.5 text-[10px] font-medium text-slate-600">
-                                      Impresión en certificado: <strong className="text-[#052a79]">{previewCilindro}</strong>
-                                    </p>
-                                  )}
                                 </div>
                               </div>
                             ) : (
@@ -858,12 +671,93 @@ export function VehiculoStep({
               </p>
             </div>
 
-            <div data-seccion-glp-anual={esGlpAnual ? 'verificaciones' : undefined}>
+            {/* C. CAMBIO REALIZADO EN LA CONVERSIÓN GLP (SOLO INICIAL) */}
+            {modalidadCertificado === 'INICIAL' && (
+              <section
+                className="rounded-xl border border-blue-200 bg-blue-50/40 p-3 sm:p-4"
+                data-seccion-glp-inicial="conversion"
+              >
+                <div className="mb-3 flex items-center justify-between border-b pb-2">
+                  <h5 className="font-bold text-[#052a79]">C. CAMBIO REALIZADO EN LA CONVERSIÓN GLP</h5>
+                  <span className="text-[11px] font-bold text-slate-500">VALORES DEL CERTIFICADO</span>
+                </div>
+
+                <div className={`overflow-x-auto rounded-lg border bg-white ${combustibleGlpSinCambio ? 'border-red-400' : 'border-slate-200'}`} data-campo-error={combustibleGlpSinCambio ? true : undefined}>
+                  <table className="w-full border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold">
+                        <th className="p-2 text-center w-12">N°</th>
+                        <th className="p-2 w-52 sm:w-64">CARACTERÍSTICA</th>
+                        <th className="p-2">VALOR</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-2 text-center font-bold text-slate-400 align-middle">11</td>
+                        <td className="p-2 font-bold text-slate-700 align-middle">Combustible</td>
+                        <td className="p-2 align-middle">
+                          <div className="flex min-h-9 items-center rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-1 font-black text-[#052a79]">
+                            {COMBUSTIBLE_POSTERIOR_GLP}
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-2 text-center font-bold text-slate-400 align-middle">15</td>
+                        <td className="p-2 font-bold text-slate-700 align-middle">Peso neto (Kg.) <span className="text-red-500">*</span></td>
+                        <td className="p-2 align-middle">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            data-tipo-dato="entero"
+                            name="pesoNetoPosterior"
+                            value={formGlp.pesoNetoPosterior || ''}
+                            onChange={handleGlp}
+                            className={claseConError(CLASE_CAMPO, esError('glp.pesoNetoPosterior'))}
+                            data-campo-error={esError('glp.pesoNetoPosterior') ? true : undefined}
+                            placeholder="Peso neto final"
+                          />
+                          <MensajeError campo="glp.pesoNetoPosterior" errores={erroresCampo} />
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-2 text-center font-bold text-slate-400 align-middle">17</td>
+                        <td className="p-2 font-bold text-slate-700 align-middle">Carga útil (Kg.) <span className="text-red-500">*</span></td>
+                        <td className="p-2 align-middle">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            data-tipo-dato="entero"
+                            name="cargaUtilPosterior"
+                            value={formGlp.cargaUtilPosterior || ''}
+                            onChange={handleGlp}
+                            className={claseConError(CLASE_CAMPO, esError('glp.cargaUtilPosterior'))}
+                            data-campo-error={esError('glp.cargaUtilPosterior') ? true : undefined}
+                            placeholder="Carga útil final"
+                          />
+                          <MensajeError campo="glp.cargaUtilPosterior" errores={erroresCampo} />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                {combustibleGlpSinCambio && (
+                  <p role="alert" className="mt-2 text-xs font-bold leading-5 text-red-600">
+                    El combustible original no puede ser BI-COMBUSTIBLE GLP porque ese es el resultado de la conversión.
+                  </p>
+                )}
+              </section>
+            )}
+
+            {/* VERIFICACIONES DE SEGURIDAD GLP */}
+            <div
+              data-seccion-glp-anual={esGlpAnual ? 'verificaciones' : undefined}
+              data-seccion-glp-inicial={!esGlpAnual ? 'verificaciones' : undefined}
+            >
               <div className={claseConError("mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3", esError('glp.verificaciones'))} data-campo-error={esError('glp.verificaciones') ? true : undefined}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h5 className="font-bold text-[#052a79]">
-                      {esGlpAnual ? 'C. VERIFICACIONES DE SEGURIDAD GLP' : 'VERIFICACIONES DE SEGURIDAD GLP'}
+                      {esGlpAnual ? 'C. VERIFICACIONES DE SEGURIDAD GLP' : 'D. VERIFICACIONES DE SEGURIDAD GLP'}
                     </h5>
                     <p className="mt-1 text-xs leading-5 text-blue-800">Si toda la inspección es conforme, usa este único botón. Después sólo modifica el punto que presente una observación.</p>
                   </div>
@@ -932,7 +826,8 @@ export function VehiculoStep({
               </div>
             </div>
 
-            {esGlpAnual && (
+            {/* VIGENCIA / EXPEDIENTE */}
+            {esGlpAnual ? (
               <section
                 className="rounded-xl border border-slate-200 bg-white p-4"
                 data-seccion-glp-anual="vigencia-expediente"
@@ -943,6 +838,48 @@ export function VehiculoStep({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-500">
+                      VIGENCIA HASTA <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="fechaVigencia"
+                      value={formGlp.fechaVigencia || ''}
+                      onChange={handleGlp}
+                      className={claseConError(CLASE_CAMPO, esError('glp.fechaVigencia'))}
+                      data-campo-error={esError('glp.fechaVigencia') ? true : undefined}
+                    />
+                    <MensajeError campo="glp.fechaVigencia" errores={erroresCampo} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-bold text-slate-500">EXPEDIENTE TÉCNICO</label>
+                    <div className="rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-2">
+                      <p className="font-black text-[#052a79]">
+                        {numeroCertificadoOficial || 'Se asignará automáticamente al emitir'}
+                      </p>
+                      <p className="mt-1 text-[10px] font-bold text-blue-600">
+                        Usará el mismo número oficial del certificado. No consume un correlativo en este paso.
+                      </p>
+                    </div>
+                    {formGlp.expedienteTecnico
+                      && formGlp.expedienteTecnico !== numeroCertificadoOficial && (
+                        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                          Este borrador conserva el valor anterior {formGlp.expedienteTecnico}. Al emitir se reemplazará por el número oficial del certificado.
+                        </p>
+                      )}
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section
+                className="rounded-xl border border-slate-200 bg-white p-4"
+                data-seccion-glp-inicial="vigencia-expediente"
+              >
+                <h5 className="mb-4 border-b border-slate-200 pb-2 font-bold text-[#052a79]">
+                  E. VIGENCIA / EXPEDIENTE
+                </h5>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">
                       VIGENCIA HASTA <span className="text-red-500">*</span>
                     </label>
                     <input
@@ -1317,12 +1254,15 @@ export function VehiculoStep({
       <div
         className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
         data-seccion-glp-anual={esGlpAnual ? 'facturacion' : undefined}
+        data-seccion-glp-inicial={!esGlpAnual && tipoCertificado === 'GLP_ANUAL' ? 'facturacion' : undefined}
       >
-        {esGlpAnual && (
-          <h4 className="mb-6 border-b pb-2 text-lg font-bold capitalize tracking-wider text-[#052a79]">
-            E. DATOS PARA FACTURACIÓN
-          </h4>
-        )}
+        <h4 className="mb-6 border-b pb-2 text-lg font-bold capitalize tracking-wider text-[#052a79]">
+          {esGlpAnual
+            ? 'E. DATOS PARA FACTURACIÓN'
+            : !esGlpAnual && tipoCertificado === 'GLP_ANUAL'
+              ? 'F. DATOS PARA FACTURACIÓN'
+              : 'DATOS PARA FACTURACIÓN'}
+        </h4>
         <TitularesList
           titulares={titulares}
           setTitulares={setTitulares}

@@ -128,9 +128,7 @@ export const validarExpedienteTecnico = ({
       ['tallerAutorizadoId', 'el taller autorizado'],
       ['fechaVigencia', 'la vigencia GLP'],
     ];
-    if (String(modalidad || '').toUpperCase() === 'INICIAL') {
-      camposGlp.push(['expedienteTecnico', 'el número de expediente técnico']);
-    }
+
     agregarFaltantes(errores, glp, camposGlp);
     const componentes = glp.componentes || [];
     for (const tipo of ['CILINDRO', 'REGULADOR']) {
@@ -143,7 +141,7 @@ export const validarExpedienteTecnico = ({
         ['marca', `la marca del ${tipo}`],
         ['numeroSerie', `la serie del ${tipo}`],
       ];
-      if (!(esGlpAnual && tipo === 'CILINDRO')) {
+      if (tipo !== 'CILINDRO') {
         camposComponente.push(['modelo', `el modelo del ${tipo}`]);
       }
       agregarFaltantes(errores, componente, camposComponente);
@@ -152,9 +150,6 @@ export const validarExpedienteTecnico = ({
           ['capacidadLitros', 'la capacidad del cilindro'],
           ['anioFabricacion', 'el año de fabricación del cilindro'],
         ];
-        if (!esGlpAnual) {
-          camposCilindro.push(['mesFabricacion', 'el mes de fabricación del cilindro']);
-        }
         agregarFaltantes(errores, componente, camposCilindro);
       }
     }
@@ -410,9 +405,7 @@ export const validarDatosEspecificos = ({
       marcar(errores, 'glp.tallerAutorizadoId', 'Seleccione el taller autorizado.');
     }
     if (vacio(glp.fechaVigencia)) marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
-    if (String(modalidad || '').toUpperCase() === 'INICIAL' && vacio(glp.expedienteTecnico)) {
-      marcar(errores, 'glp.expedienteTecnico', 'Complete el número de expediente técnico.');
-    }
+
 
     const componentes = glp.componentes || [];
     for (const nombre of ['CILINDRO', 'REGULADOR']) {
@@ -425,7 +418,7 @@ export const validarDatosEspecificos = ({
         { campo: 'marca', etiqueta: `la marca del ${nombre}` },
         { campo: 'numeroSerie', etiqueta: `la serie del ${nombre}` },
       ];
-      if (!(esGlpAnual && nombre === 'CILINDRO')) {
+      if (nombre !== 'CILINDRO') {
         reglas.push({ campo: 'modelo', etiqueta: `el modelo del ${nombre}` });
       }
       if (nombre === 'CILINDRO') {
@@ -433,9 +426,6 @@ export const validarDatosEspecificos = ({
           { campo: 'capacidadLitros', etiqueta: 'la capacidad del cilindro', formato: 'entero' },
           { campo: 'anioFabricacion', etiqueta: 'el año de fabricación del cilindro' }
         );
-        if (!esGlpAnual) {
-          reglas.push({ campo: 'mesFabricacion', etiqueta: 'el mes de fabricación del cilindro' });
-        }
       }
       // Las claves de la regla coinciden con las del componente, así que se
       // lee el mismo nombre en ambos lados.
@@ -619,7 +609,7 @@ export const CAMPOS_VISIBLES_GLP = [
   'glp.fechaVigencia',
 ] as const;
 export const CAMPOS_VISIBLES_GLP_INICIAL = [
-  'glp.expedienteTecnico', 'glp.pesoNetoPosterior', 'glp.cargaUtilPosterior',
+  'glp.pesoNetoPosterior', 'glp.cargaUtilPosterior',
 ] as const;
 
 /** Bloque B, sección CONFORMIDAD. */

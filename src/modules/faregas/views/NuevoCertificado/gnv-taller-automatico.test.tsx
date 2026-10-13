@@ -76,7 +76,7 @@ describe('taller GNV automático por sede', () => {
     const erroresGlp = validarDatosEspecificos({ tipo: 'GLP_ANUAL', modalidad: 'INICIAL', gnv: {}, glp: {}, conformidad: {} });
     const erroresConformidad = validarDatosEspecificos({ tipo: 'CONFORMIDAD', gnv: {}, glp: {}, conformidad: {} });
     expect(erroresGlp['glp.fechaVigencia']).toBeDefined();
-    expect(erroresGlp['glp.expedienteTecnico']).toBeDefined();
+    expect(erroresGlp['glp.tallerAutorizadoId']).toBeDefined();
     expect(erroresConformidad['conformidad.tipoConformidad']).toBeDefined();
   });
 

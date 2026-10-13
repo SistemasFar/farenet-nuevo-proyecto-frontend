@@ -108,9 +108,7 @@ describe('formulario GLP ANUAL alineado al certificado oficial', () => {
       .toEqual(['numeroCilindros', 'numeroEjes', 'numeroAsientos', 'longitud']);
   });
 
-  it('no activa esta distribución en GLP Inicial, GNV ni Conformidad', () => {
-    expect(obtenerCamposVehiculoCertificado('GLP_ANUAL', 'INICIAL')
-      .every((campo) => campo.columnaCertificado === undefined)).toBe(true);
+  it('no activa esta distribución en GNV ni Conformidad', () => {
     expect(obtenerCamposVehiculoCertificado('GNV_ANUAL', 'ANUAL')
       .every((campo) => campo.columnaCertificado === undefined)).toBe(true);
     expect(obtenerCamposVehiculoCertificado('CONFORMIDAD')

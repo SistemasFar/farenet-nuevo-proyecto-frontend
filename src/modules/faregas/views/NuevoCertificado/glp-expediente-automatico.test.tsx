@@ -63,7 +63,7 @@ describe('expediente técnico automático de GLP ANUAL', () => {
     expect(html).toContain('se reemplazará por el número oficial');
   });
 
-  it('GLP INICIAL conserva su campo editable y obligatorio', () => {
+  it('GLP INICIAL no muestra un input manual de expediente y se asigna automáticamente al emitir', () => {
     const html = renderGlp('INICIAL');
     const errores = validarDatosEspecificos({
       tipo: 'GLP_ANUAL',
@@ -73,8 +73,9 @@ describe('expediente técnico automático de GLP ANUAL', () => {
       conformidad: {},
     });
 
-    expect(html).toContain('name="expedienteTecnico"');
-    expect(errores['glp.expedienteTecnico']).toBeDefined();
-    expect(camposObligatoriosVisibles('GLP_ANUAL', 'INICIAL')).toContain('glp.expedienteTecnico');
+    expect(html).not.toContain('name="expedienteTecnico"');
+    expect(html).toContain('Se asignará automáticamente al emitir');
+    expect(errores['glp.expedienteTecnico']).toBeUndefined();
+    expect(camposObligatoriosVisibles('GLP_ANUAL', 'INICIAL')).not.toContain('glp.expedienteTecnico');
   });
 });

@@ -1,3 +1,4 @@
+import { CombustibleOriginalSelect } from './CombustibleOriginalSelect';
 import React from 'react';
 import type { MaestroOption } from '@/types/maestros';
 import type { CampoVehiculoCertificado } from '../../faregas-certificado-campos';
@@ -7,6 +8,9 @@ import { esCampoEnteroCertificado, normalizarEnteroCertificado } from '../../far
 const CLASE_CAMPO = 'h-9 w-full rounded-lg border-2 border-slate-200 px-2 py-1 text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
 
 type Props = {
+  esGlpInicial?: boolean;
+  maestrosVehiculo?: any;
+  combustibles?: MaestroOption[];
   campos: CampoVehiculoCertificado[];
   formVehiculo: Record<string, unknown>;
   onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
@@ -26,6 +30,9 @@ export function CamposVehiculoCertificado({
   onCategoriaVehicularChange,
   erroresCampo,
   obligatorios,
+  esGlpInicial = false,
+  maestrosVehiculo,
+  combustibles,
 }: Props) {
   const valor = (campo: CampoVehiculoCertificado) => {
     if (campo.campo === 'combustibleGlpAnual') return 'BI-COMBUSTIBLE GLP';
@@ -129,6 +136,29 @@ export function CamposVehiculoCertificado({
             {String(valor(campo) || 'PENDIENTE')}
           </div>
           <p className="mt-1 text-[10px] font-semibold text-blue-700">Dato automático del proceso.</p>
+        </div>
+      );
+    }
+
+    if (campo.campo === 'combustible' && (esGlpInicial || campo.etiqueta === 'COMBUSTIBLE ORIGINAL')) {
+      return (
+        <div key={campo.campo} data-campo-certificado={campo.campo} data-columna-certificado={campo.columnaCertificado}>
+          {etiqueta}
+          <CombustibleOriginalSelect
+            value={String(valor(campo) || '')}
+            onChange={(val) => {
+              onChange({
+                target: {
+                  name: 'combustible',
+                  value: val,
+                },
+              } as React.ChangeEvent<HTMLInputElement>);
+            }}
+            maestrosVehiculo={maestrosVehiculo}
+            combustibles={combustibles}
+            esError={esError}
+          />
+          <MensajeError campo={campo.campo} errores={erroresCampo} />
         </div>
       );
     }
