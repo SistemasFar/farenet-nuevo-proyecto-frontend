@@ -27,35 +27,36 @@ interface FaregasUsuarioResumen {
   apellidos?: string;
 }
 
-function routeToTitle(tabId: string): string {
-  const map: Record<string, string> = {
-    inicio: 'Inicio',
-    inspecciones: 'Inspecciones',
-    personas: 'Personas',
-    vehiculos: 'Vehículos',
-    caja: 'Caja',
-    correlativos: 'Correlativos',
-    recibos: 'Recibos',
-    usuarios: 'Usuarios',
-    empresas: 'Empresas',
-    descuentos: 'Descuentos',
-    auditoria: 'Auditoría',
-    chips: 'Inventario',
-    configuracion: 'Configuración',
-    facturacion: 'Facturación'
-  };
 
-  return map[tabId] ?? 'Panel';
+
+
+
+export interface UserAvatarProps {
+  initial: string;
+  className?: string;
 }
 
+export function UserAvatar({ initial, className = '' }: UserAvatarProps) {
+  const char = (initial || 'U').trim().slice(0, 1) || 'U';
 
+  return (
+    <span
+      className={`bg-gold-3d inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-amber-300 text-base font-black text-white shadow-sm select-none ${className}`}
+      aria-label={`Inicial del operador: ${char}`}
+    >
+      <span className="flex items-center justify-center text-center leading-none select-none text-white font-black">
+        {char}
+      </span>
+    </span>
+  );
+}
 
 export function Header({
   user,
   plantaName,
   plantaSeleccionada,
   plantasDisponibles,
-  activeTab,
+  activeTab: _activeTab,
   onCambiarPlanta,
   onToggleSidebar,
   onLogout,
@@ -69,7 +70,7 @@ export function Header({
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const pageTitle = routeToTitle(activeTab);
+
 
   const [nombreOperador, setNombreOperador] = useState('');
 
@@ -145,10 +146,6 @@ export function Header({
             <div className="truncate text-sm font-black tracking-wide text-gold-3d sm:text-base md:text-lg">
               <span className="hidden sm:inline">SEDE ACTIVA: </span>{plantaName || 'SIN SEDE'}
             </div>
-
-            <div className="hidden truncate text-xs font-semibold tracking-wider text-gold-3d sm:block">
-              Código de sede: {plantaSeleccionada || 'N/A'} · {pageTitle}
-            </div>
           </div>
         </div>
 
@@ -162,16 +159,14 @@ export function Header({
             <button
               type="button"
               onClick={() => setDropdownOpen((p) => !p)}
-              className="flex items-center gap-3 text-white"
+              className="group flex items-center gap-3 text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 rounded-full"
+              aria-label={`Usuario: ${userName}`}
+              aria-expanded={dropdownOpen}
             >
-              <span
-                className="bg-gold-3d flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-amber-300 text-base font-black text-white"
-                aria-label={`Inicial del operador: ${userInitial}`}
-              >
-                <span className="block w-[1ch] max-w-[1ch] overflow-hidden text-center leading-none text-white">
-                  {userInitial.slice(0, 1)}
-                </span>
-              </span>
+              <UserAvatar
+                initial={userInitial}
+                className="transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-amber-300"
+              />
 
               <span className="text-sm font-bold tracking-wide hidden md:inline">
                 {userName}
@@ -180,20 +175,24 @@ export function Header({
 
             {dropdownOpen && (
               <div className="absolute right-0 z-50 mt-3 w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
-                <div className="px-3 py-2 border-b border-slate-100 mb-3">
-                  <span className="block text-xs font-bold text-slate-400 capitalize">
-                    Operador
-                  </span>
+                <div className="px-3 py-2 border-b border-slate-100 mb-3 flex items-center gap-3">
+                  <UserAvatar initial={userInitial} />
 
-                  <span className="block text-sm font-bold text-slate-800 break-words">
-                    {userName}
-                  </span>
-
-                  {user?.perfilId && (
-                    <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold capitalize text-blue-700">
-                      {user.perfilId}
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs font-bold text-slate-400 capitalize">
+                      Operador
                     </span>
-                  )}
+
+                    <span className="block text-sm font-bold text-slate-800 break-words">
+                      {userName}
+                    </span>
+
+                    {user?.perfilId && (
+                      <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold capitalize text-blue-700">
+                        {user.perfilId}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mb-3">

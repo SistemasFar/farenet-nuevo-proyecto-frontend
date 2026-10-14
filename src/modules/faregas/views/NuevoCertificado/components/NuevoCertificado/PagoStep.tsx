@@ -18,10 +18,15 @@ interface PagoStepProps {
   totalPagar: number;
   tarifaOriginal?: number;
   descuento?: number;
+  labelTarifaOriginal?: string;
   resumenComercial?: ResumenComercialFaregas | null;
   maestrosPago?: MaestrosPagoResponse['data'] | null;
   condicionPago: 'CONTADO' | 'CREDITO';
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
+  fechaInicioCredito: string;
+  fechaVencimientoCredito: string;
+  onFechaInicioCreditoChange: (fecha: string) => void;
+  onFechaVencimientoCreditoChange: (fecha: string) => void;
   compact?: boolean;
   erroresCampo?: ErroresCampo;
   onCorregirCampo?: (campo: string) => void;
@@ -43,6 +48,10 @@ export function PagoStep({
   labelTarifaOriginal = "Certificado:",
   condicionPago,
   onCondicionPagoChange,
+  fechaInicioCredito,
+  fechaVencimientoCredito,
+  onFechaInicioCreditoChange,
+  onFechaVencimientoCreditoChange,
   compact = false,
   erroresCampo = {},
   onCorregirCampo,
@@ -53,11 +62,6 @@ export function PagoStep({
   const cuentasFiltradas = (maestrosPago?.cuentasCorrientes || []).filter((cuenta) =>
     !formPago.entidadFinancieraKey || cuenta.entidadfinanciera_key === formPago.entidadFinancieraKey
   );
-  const tarjetaSeleccionada = (maestrosPago?.tarjetas || []).find((tarjeta) => tarjeta.key === formPago.tarjetaKey);
-  const tarjetaSinDigitos = ['CUPONIDAD', 'PAGO WEB', 'YAPE', 'PLIN'].some(tipo =>
-    String(tarjetaSeleccionada?.nombre || '').toUpperCase().includes(tipo)
-  );
-
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormPago((prev) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
   };
@@ -95,6 +99,34 @@ export function PagoStep({
               <option value="CONTADO">CONTADO — debe completar el pago</option>
               <option value="CREDITO">CRÉDITO — el saldo se distribuirá en cuotas</option>
             </select>
+            {condicionPago === 'CREDITO' && (
+              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+                <p className="mb-2 text-xs font-black tracking-wide text-[#052a79]">PERÍODO DEL CRÉDITO</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div data-campo-error={erroresCampo.fechaInicioCredito ? true : undefined}>
+                    <label className="mb-1 block text-xs font-bold text-slate-600">FECHA DE INICIO *</label>
+                    <input
+                      type="date"
+                      value={fechaInicioCredito}
+                      onChange={(event) => onFechaInicioCreditoChange(event.target.value)}
+                      className={`w-full rounded-lg border-2 p-2.5 font-semibold ${erroresCampo.fechaInicioCredito ? 'border-red-500' : 'border-slate-200'}`}
+                    />
+                    <MensajeError campo="fechaInicioCredito" errores={erroresCampo} />
+                  </div>
+                  <div data-campo-error={erroresCampo.fechaVencimientoCredito ? true : undefined}>
+                    <label className="mb-1 block text-xs font-bold text-slate-600">FECHA DE VENCIMIENTO *</label>
+                    <input
+                      type="date"
+                      min={fechaInicioCredito || undefined}
+                      value={fechaVencimientoCredito}
+                      onChange={(event) => onFechaVencimientoCreditoChange(event.target.value)}
+                      className={`w-full rounded-lg border-2 p-2.5 font-semibold ${erroresCampo.fechaVencimientoCredito ? 'border-red-500' : 'border-slate-200'}`}
+                    />
+                    <MensajeError campo="fechaVencimientoCredito" errores={erroresCampo} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex border-b border-slate-200 bg-slate-50">
@@ -128,7 +160,7 @@ export function PagoStep({
               </div>
 
               {pagoTab === 'TARJETA' && (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TARJETA</label>
                     <select name="tarjetaKey" value={formPago.tarjetaKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0">
@@ -138,12 +170,6 @@ export function PagoStep({
                       ))}
                     </select>
                   </div>
-                  {!tarjetaSinDigitos && (
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">ÚLTIMOS 4 DÍGITOS</label>
-                      <input type="text" name="digitosTarjeta" value={formPago.digitosTarjeta || ''} onChange={handleInput} maxLength={4} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0" placeholder="****" />
-                    </div>
-                  )}
                 </div>
               )}
 

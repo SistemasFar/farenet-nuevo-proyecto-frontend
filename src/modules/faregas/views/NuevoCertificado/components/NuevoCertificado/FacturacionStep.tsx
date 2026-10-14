@@ -5,6 +5,8 @@ import { faregasCertificadosApi } from '../../../../services/faregas-certificado
 import type { FacturacionContextoFaregas, FacturacionFaregas, ResumenTributarioFaregas } from '../../../../types/faregas-api';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import { DocumentosElectronicosPanel } from './DocumentosElectronicosPanel';
+import { faregasFetchBlob } from '../../../../services/faregas-http-client';
+import { abrirComprobanteFaregas } from '../../../../services/faregas-comprobante-visor.service';
 
 const mensajeError = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message ? error.message : fallback;
@@ -20,6 +22,39 @@ const importe = (value: number, moneda = 'PEN') => new Intl.NumberFormat('es-PE'
   currency: moneda || 'PEN',
   minimumFractionDigits: 2,
 }).format(Number(value || 0));
+
+function DatosAutomaticosComprobante({ resumen }: { resumen: ResumenTributarioFaregas | null }) {
+  if (!resumen) return null;
+  const datos = [
+    ['Sede / punto de venta', resumen.sede.nombre],
+    ['Placa', resumen.vehiculo?.placa],
+    ['Tipo de vehículo', resumen.vehiculo?.tipo],
+    ['Marca', resumen.vehiculo?.marca],
+    ['Modelo', resumen.vehiculo?.modelo],
+    ['Motor', resumen.vehiculo?.motor],
+    ['Servicio', resumen.certificado?.servicio],
+    ['Código de descuento', resumen.descuento?.codigo],
+  ];
+
+  return (
+    <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+      <div className="border-b border-blue-100 pb-2">
+        <h4 className="text-xs font-black text-[#052a79]">Datos que se incluirán en el comprobante</h4>
+        <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+          Faregas los obtiene automáticamente del certificado, la sede y la operación. No son editables aquí.
+        </p>
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-[11px] md:grid-cols-4">
+        {datos.map(([etiqueta, valor]) => (
+          <div key={etiqueta} className={etiqueta === 'Servicio' ? 'col-span-2' : ''}>
+            <dt className="text-[9px] font-bold uppercase text-slate-500">{etiqueta}</dt>
+            <dd className="mt-0.5 break-words font-black text-slate-800">{valor || 'NO REGISTRADO'}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
 
 function ResumenTributario({ resumen }: { resumen: ResumenTributarioFaregas | null }) {
   if (!resumen) {
@@ -349,6 +384,17 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
   mostrarCliente = true,
 }, ref) {
   const [isLoading, setIsLoading] = useState(Boolean(certificadoId));
+
+  const abrirPdfFaregas = useCallback(async () => {
+    if (!certificadoId) return;
+    await abrirComprobanteFaregas(certificadoId, {
+      facturacion,
+      onRegenerado: async () => {
+        const resp = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
+        if (resp?.data?.facturacion) onFacturacionChange(resp.data.facturacion);
+      },
+    });
+  }, [certificadoId, facturacion, onFacturacionChange]);
   const [isSaving, setIsSaving] = useState(false);
   const [isEmitting, setIsEmitting] = useState(false);
   const [integracion, setIntegracion] = useState<{ enabled: boolean; configured: boolean; simulationEnabled?: boolean; correlativosV2Enabled?: boolean } | null>(null);
@@ -381,6 +427,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
             emailFac: guardada.email || '',
             telefonoFac: guardada.telefono || '',
             condicionPagoFac: guardada.condicionPago || 'CONTADO',
+            fechaInicioCreditoFac: String(guardada.fechaInicioCredito || prev.fechaInicioCreditoFac || '').slice(0, 10),
             fechaVencimientoFac: String(guardada.fechaVencimiento || '').slice(0, 10),
             medioPagoFac: guardada.medioPago || '',
             cuotasFac: (guardada.cuotas || []).map(cuota => ({
@@ -411,6 +458,9 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
       email: formFacturacion.emailFac || null,
       telefono: formFacturacion.telefonoFac || null,
       condicionPago: formFacturacion.condicionPagoFac,
+      fechaInicioCredito: formFacturacion.condicionPagoFac === 'CREDITO'
+        ? formFacturacion.fechaInicioCreditoFac
+        : null,
       fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
       medioPago: medioPago || null,
       cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
@@ -554,6 +604,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
             onEditar={onEditarDatosCliente}
           />
         )}
+        <DatosAutomaticosComprobante resumen={resumenTributario} />
         <ResumenTributarioCompacto resumen={resumenTributario} />
         {formFacturacion.condicionPagoFac === 'CREDITO' && (
           <DetalleCreditoCompacto
@@ -616,7 +667,18 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
           <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${estadoColor}`}>
             <div className="flex items-center gap-2 font-black"><CheckCircle2 className="h-5 w-5" /> ESTADO: {facturacion.estado}</div>
             <div className="font-bold">{facturacion.nroComprobante || 'SIN NUMERO RESERVADO'}</div>
-            {facturacion.enlacePdf && <a href={facturacion.enlacePdf} target="_blank" rel="noreferrer" className="underline">VER PDF</a>}
+            {Boolean(facturacion.enlacePdfFaregas || facturacion.enlacePdf) && (
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => void abrirPdfFaregas()} className="font-bold underline text-blue-700">
+                  VER COMPROBANTE
+                </button>
+                {facturacion.enlacePdf && (
+                  <a href={facturacion.enlacePdf} target="_blank" rel="noreferrer" className="text-xs text-slate-500 underline" title="PDF oficial NubeFact de auditoría">
+                    VER PDF NUBEFACT
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -703,6 +765,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
           )}
         </div>
 
+        <DatosAutomaticosComprobante resumen={resumenTributario} />
         <ResumenTributario resumen={resumenTributario} />
 
         {preflight && (

@@ -7,6 +7,8 @@ import type { FacturacionFaregas } from '../../types/faregas-api';
 import Swal from 'sweetalert2';
 import { FileText, FileEdit, Eye, Ban, RefreshCw } from 'lucide-react';
 import { nombreTipoCertificadoPanel } from './tipo-certificado-panel';
+import { faregasFetchBlob } from '../../services/faregas-http-client';
+import { abrirComprobanteFaregas } from '../../services/faregas-comprobante-visor.service';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
@@ -29,6 +31,7 @@ interface BorradorPanel {
   aceptadaSunat?: boolean | null;
   entornoFacturador?: string | null;
   enlacePdf?: string | null;
+  enlacePdfFaregas?: string | null;
   nroComprobante?: string | null;
   anulacionId?: number | null;
   estadoAnulacion?: string | null;
@@ -132,6 +135,7 @@ const esResumenComprobanteOperable = (item: BorradorPanel) => {
 const tieneEtapaTributaria = (item: BorradorPanel) => Boolean(
   item.estadoFacturacion
   || item.nroComprobante
+  || item.enlacePdfFaregas
   || item.enlacePdf
   || ['PREVISUALIZACION', 'VERIFICACION_EMISION'].includes(String(item.pasoActual || '').toUpperCase())
 );
@@ -313,19 +317,19 @@ export function InicioView() {
 
   const comprobarComprobanteDisponible = async (
     certificadoId: number
-  ): Promise<(FacturacionFaregas & { enlacePdf: string }) | null> => {
+  ): Promise<FacturacionFaregas | null> => {
     const facturacion = await obtenerFacturacion(certificadoId);
 
-    if (!facturacion?.enlacePdf) {
+    if (!facturacion?.enlacePdfFaregas && !facturacion?.enlacePdf) {
       await Swal.fire({
         icon: 'info',
         title: 'Comprobante no disponible',
-        text: 'Nubefact todavía no ha proporcionado un PDF para este comprobante.',
+        text: 'Todavía no existe una representación impresa para este comprobante.',
         confirmButtonColor: '#052A79',
       });
       return null;
     }
-    return facturacion as FacturacionFaregas & { enlacePdf: string };
+    return facturacion;
   };
 
   const comprobarComprobanteOperable = async (certificadoId: number) => {
@@ -347,7 +351,10 @@ export function InicioView() {
       setAccionEnProceso(certificadoId);
       const facturacion = await comprobarComprobanteDisponible(certificadoId);
       if (!facturacion) return;
-      window.open(facturacion.enlacePdf, '_blank', 'noopener,noreferrer');
+      await abrirComprobanteFaregas(certificadoId, {
+        facturacion,
+        onRegenerado: () => cargarBorradores(),
+      });
     } catch (err) {
       await Swal.fire('No se pudo consultar', err instanceof Error ? err.message : 'No se pudo obtener el comprobante.', 'error');
     } finally {

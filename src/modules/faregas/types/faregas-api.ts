@@ -61,7 +61,6 @@ export interface PagoFaregasRequest {
   importe: number | string;
   tarjetaKey?: NullableText;
   nroOperacion?: NullableText;
-  digitosTarjeta?: NullableText;
   cuentaCorrienteKey?: NullableText;
   entidadFinancieraKey?: NullableText;
   fechaDeposito?: NullableText;
@@ -69,6 +68,9 @@ export interface PagoFaregasRequest {
 
 export interface GuardarPagosFaregasRequest {
   importeTotal: number | string;
+  condicionPago: 'CONTADO' | 'CREDITO';
+  fechaInicioCredito?: NullableText;
+  fechaVencimientoCredito?: NullableText;
   pagos: PagoFaregasRequest[];
 }
 
@@ -81,6 +83,7 @@ export interface GuardarFacturacionFaregasRequest {
   email?: NullableText;
   telefono?: NullableText;
   condicionPago?: 'CONTADO' | 'CREDITO';
+  fechaInicioCredito?: NullableText;
   fechaVencimiento?: NullableText;
   medioPago?: NullableText;
   cuotas?: Array<{
@@ -108,8 +111,15 @@ export interface FacturacionFaregas {
   direccion: string;
   email: NullableText;
   telefono: NullableText;
+  fechaDocumento?: NullableText;
+  sedeNombre?: NullableText;
+  sedeDireccion?: NullableText;
+  sedeTelefono?: NullableText;
+  sedeCorreo?: NullableText;
+  codigoDescuento?: NullableText;
 
   condicionPago: 'CONTADO' | 'CREDITO';
+  fechaInicioCredito: NullableText;
   fechaVencimiento: NullableText;
   medioPago: NullableText;
   cuotas: CuotaFacturacionFaregas[];
@@ -130,6 +140,7 @@ export interface FacturacionFaregas {
   aceptadaSunat: boolean | null;
   sunatDescription: NullableText;
   enlacePdf: NullableText;
+  enlacePdfFaregas?: NullableText;
   enlaceXml: NullableText;
   enlaceCdr: NullableText;
   intentos: number;
@@ -168,6 +179,8 @@ export interface ResumenTributarioFaregas {
     key: NullableText;
     nombre: NullableText;
     direccion: NullableText;
+    telefono: NullableText;
+    correo: NullableText;
   };
   integracion: {
     proveedor: 'NUBEFACT';
@@ -182,6 +195,7 @@ export interface ResumenTributarioFaregas {
     numero: number | null;
     numeroAsignado: boolean;
     fuenteSerie: 'SERIE_DOCUMENTO_BASE' | 'FG_SERIE_COMPROBANTE' | 'SIN_CONFIGURAR';
+    fechaDocumento: NullableText;
   };
   cliente: {
     tipoDocumento: NullableText;
@@ -189,6 +203,28 @@ export interface ResumenTributarioFaregas {
     nombreRazonSocial: NullableText;
     direccion: NullableText;
     email: NullableText;
+    telefono: NullableText;
+  };
+  vehiculo: {
+    placa: NullableText;
+    tipo: NullableText;
+    marca: NullableText;
+    modelo: NullableText;
+    motor: NullableText;
+  };
+  certificado: {
+    tipo: NullableText;
+    numero: NullableText;
+    servicio: NullableText;
+  };
+  operacion: {
+    id: number | null;
+  };
+  descuento: {
+    codigo: NullableText;
+    importeOriginal: number;
+    importe: number;
+    importeFinal: number;
   };
   items: ResumenTributarioItemFaregas[];
   totales: {

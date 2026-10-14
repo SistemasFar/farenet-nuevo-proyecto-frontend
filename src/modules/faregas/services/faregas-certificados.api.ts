@@ -178,6 +178,7 @@ export const faregasCertificadosApi = {
     method: 'POST', body: JSON.stringify(data)
   }),
   consultarAnulacionElectronica: (id: number, anulacionId: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/anulaciones/${anulacionId}/consultar`, { method: 'POST' }),
+  regenerarPdfFaregas: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/regenerar-pdf`, { method: 'POST' }),
   validarEmision: (id: number) => fetchWithToken(`/certificados/borradores/${id}/validar-emision`),
   emitirCertificado: (id: number) => fetchWithToken(`/certificados/borradores/${id}/emitir`, { method: 'POST' }),
   obtenerPrevisualizacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/previsualizacion`),

@@ -498,6 +498,8 @@ type DatosPago = {
   condicionPago: string;
   pagos: Array<Record<string, any>>;
   precioTotal: number;
+  fechaInicioCredito?: string;
+  fechaVencimientoCredito?: string;
 };
 
 /**
@@ -505,20 +507,36 @@ type DatosPago = {
  * CONTADO exige el total completo; CRÉDITO debe conservar saldo para
  * distribuirlo en cuotas.
  */
-export const validarPasoPago = ({ condicionPago, pagos, precioTotal }: DatosPago): ErroresCampo => {
+export const validarPasoPago = ({
+  condicionPago,
+  pagos,
+  precioTotal,
+  fechaInicioCredito,
+  fechaVencimientoCredito,
+}: DatosPago): ErroresCampo => {
   const totalPagado = pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0);
   const esCredito = condicionPago === 'CREDITO';
   const saldo = Math.max(0, precioTotal - totalPagado);
+  const errores: ErroresCampo = {};
+
+  if (esCredito) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaInicioCredito || '')) {
+      errores.fechaInicioCredito = 'Seleccione la fecha de inicio del crédito.';
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaVencimientoCredito || '')) {
+      errores.fechaVencimientoCredito = 'Seleccione la fecha de vencimiento del crédito.';
+    } else if (fechaInicioCredito && fechaVencimientoCredito < fechaInicioCredito) {
+      errores.fechaVencimientoCredito = 'La fecha de vencimiento no puede ser anterior a la fecha de inicio.';
+    }
+  }
 
   if (!esCredito && Math.abs(totalPagado - precioTotal) > 0.009) {
-    return {
-      pagos: `El pago debe completar S/ ${precioTotal.toFixed(2)}. Saldo pendiente: S/ ${saldo.toFixed(2)}.`,
-    };
+    errores.pagos = `El pago debe completar S/ ${precioTotal.toFixed(2)}. Saldo pendiente: S/ ${saldo.toFixed(2)}.`;
   }
   if (esCredito && totalPagado >= precioTotal - 0.009) {
-    return { pagos: 'Una venta al crédito debe conservar un saldo pendiente para distribuirlo en cuotas.' };
+    errores.pagos = 'Una venta al crédito debe conservar un saldo pendiente para distribuirlo en cuotas.';
   }
-  return {};
+  return errores;
 };
 
 /**

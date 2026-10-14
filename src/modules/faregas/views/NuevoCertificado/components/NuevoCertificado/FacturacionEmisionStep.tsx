@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import type { FacturacionFaregas } from '../../../../types/faregas-api';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
+import { abrirComprobanteFaregas } from '../../../../services/faregas-comprobante-visor.service';
 import type { PagoAgregado, FormFacturacionState } from '../../NuevoCertificadoView';
 import {
   ejecutarEmisionCertificado,
@@ -28,6 +29,7 @@ interface FacturacionEmisionStepProps {
   soloLectura?: boolean;
   onEmisionExitosa?: () => void;
   onAtras?: () => void;
+  retrocesoBloqueado?: boolean;
   tipoCertificado: TipoCertificadoFaregas;
   formCaja: any;
   formVehiculo: any;
@@ -68,6 +70,7 @@ export function FacturacionEmisionStep({
   soloLectura = false,
   onEmisionExitosa,
   onAtras,
+  retrocesoBloqueado = false,
   tipoCertificado,
   formCaja,
   formVehiculo,
@@ -119,68 +122,98 @@ export function FacturacionEmisionStep({
       });
       if (!confirmacion.isConfirmed) return;
 
-      const resultado = await ejecutarEmisionCombinada(certificadoId, facturacion, {
-        emitirComprobante: async () => {
-          if (!facturacionStepRef.current) {
-            throw new Error('No se pudo preparar la facturación.');
-          }
-          if (facturacion?.estado === 'RECHAZADO') {
-            throw new Error('NUBEFACT_RECHAZADO: el comprobante fue rechazado y requiere revisión operativa.');
-          }
-          if (facturacion?.estado === 'ANULADO') {
-            throw new Error('El comprobante está anulado y no puede utilizarse para emitir un certificado.');
-          }
-          if (facturacionStepRef.current.estaEnSimulacion()) {
-            const contexto = await facturacionStepRef.current.guardar(false);
-            return contexto.facturacion;
-          }
-          return facturacionStepRef.current.emitir({
-            confirmar: false,
-            propagarErrores: true,
-            mostrarMensajes: false,
-          });
-        },
-        validarCertificado: async (): Promise<ValidacionEmisionOperacion | null> => {
-          if (!verificacionStepRef.current) {
-            throw new Error('No se pudo validar el certificado.');
-          }
-          return verificacionStepRef.current.validar();
-        },
-        emitirCertificado: (id) => ejecutarEmisionCertificado(id),
-        marcarPasoVerificacion: async () => {
-          await faregasCertificadosApi.actualizarPasoBorrador(certificadoId, 'VERIFICACION_EMISION');
-        },
-      });
+      // Abrir la ventana inmediatamente tras la confirmación para evitar bloqueo de popups por el navegador
+      const ventanaPdf = window.open('', '_blank');
+      if (ventanaPdf) ventanaPdf.opener = null;
 
-      onFacturacionChange(resultado.facturacion);
-      let numeroCertificado = resultado.certificado.numero_certificado;
-      let fechaEmision = resultado.certificado.fecha_emision || new Date().toISOString();
       try {
-        const borradorResponse = await faregasCertificadosApi.obtenerBorradorCompleto(certificadoId);
-        const borradorEmitido = borradorResponse?.data;
-        if (borradorEmitido?.estado === 'EMITIDO') {
-          numeroCertificado = borradorEmitido.numeroCertificado || borradorEmitido.numero_certificado || numeroCertificado;
-          fechaEmision = borradorEmitido.fechaEmision || borradorEmitido.fecha_emision || fechaEmision;
-        }
-      } catch {
-        // La respuesta de emisión ya es suficiente para mostrar el resultado.
-      }
-      setResultadoEmision({
-        numero_certificado: numeroCertificado,
-        fecha_emision: fechaEmision,
-        estado: resultado.certificado.estado || 'EMITIDO',
-      });
-      // La respuesta definitiva se vuelve a obtener después de emitir; no se
-      // reutiliza el HTML de borrador que contenía PENDIENTE DE EMISIÓN.
-      await verificacionStepRef.current?.cargarDocumento();
-      onEmisionExitosa?.();
-      setErrorEmision('');
+        const resultado = await ejecutarEmisionCombinada(certificadoId, facturacion, {
+          emitirComprobante: async () => {
+            if (!facturacionStepRef.current) {
+              throw new Error('No se pudo preparar la facturación.');
+            }
+            if (facturacion?.estado === 'RECHAZADO') {
+              throw new Error('NUBEFACT_RECHAZADO: el comprobante fue rechazado y requiere revisión operativa.');
+            }
+            if (facturacion?.estado === 'ANULADO') {
+              throw new Error('El comprobante está anulado y no puede utilizarse para emitir un certificado.');
+            }
+            if (facturacionStepRef.current.estaEnSimulacion()) {
+              const contexto = await facturacionStepRef.current.guardar(false);
+              return contexto.facturacion;
+            }
+            return facturacionStepRef.current.emitir({
+              confirmar: false,
+              propagarErrores: true,
+              mostrarMensajes: false,
+            });
+          },
+          validarCertificado: async (): Promise<ValidacionEmisionOperacion | null> => {
+            if (!verificacionStepRef.current) {
+              throw new Error('No se pudo validar el certificado.');
+            }
+            return verificacionStepRef.current.validar();
+          },
+          emitirCertificado: (id) => ejecutarEmisionCertificado(id),
+          marcarPasoVerificacion: async () => {
+            await faregasCertificadosApi.actualizarPasoBorrador(certificadoId, 'VERIFICACION_EMISION');
+          },
+        });
 
-      await Swal.fire(
-        'Emisión completada',
-        `El comprobante ${resultado.facturacion.nroComprobante || 'generado'} y el certificado fueron emitidos correctamente.`,
-        'success',
-      );
+        // Refrescar facturación para obtener enlace_pdf_faregas actualizado tras emisión
+        let facturacionDefinitiva = resultado.facturacion;
+        try {
+          const respFact = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
+          if (respFact?.data?.facturacion) {
+            facturacionDefinitiva = respFact.data.facturacion;
+          }
+        } catch {
+          // Conservar resultado.facturacion si la consulta falla
+        }
+        onFacturacionChange(facturacionDefinitiva);
+
+        let numeroCertificado = resultado.certificado.numero_certificado;
+        let fechaEmision = resultado.certificado.fecha_emision || new Date().toISOString();
+        try {
+          const borradorResponse = await faregasCertificadosApi.obtenerBorradorCompleto(certificadoId);
+          const borradorEmitido = borradorResponse?.data;
+          if (borradorEmitido?.estado === 'EMITIDO') {
+            numeroCertificado = borradorEmitido.numeroCertificado || borradorEmitido.numero_certificado || numeroCertificado;
+            fechaEmision = borradorEmitido.fechaEmision || borradorEmitido.fecha_emision || fechaEmision;
+          }
+        } catch {
+          // La respuesta de emisión ya es suficiente para mostrar el resultado.
+        }
+        setResultadoEmision({
+          numero_certificado: numeroCertificado,
+          fecha_emision: fechaEmision,
+          estado: resultado.certificado.estado || 'EMITIDO',
+        });
+        // La respuesta definitiva se vuelve a obtener después de emitir; no se
+        // reutiliza el HTML de borrador que contenía PENDIENTE DE EMISIÓN.
+        await verificacionStepRef.current?.cargarDocumento();
+        onEmisionExitosa?.();
+        setErrorEmision('');
+
+        // Apertura inmediata del PDF FAREGAS (prioridad 1)
+        await abrirComprobanteFaregas(certificadoId, {
+          ventanaPrevia: ventanaPdf,
+          facturacion: facturacionDefinitiva,
+          onRegenerado: async () => {
+            const resp = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
+            if (resp?.data?.facturacion) onFacturacionChange(resp.data.facturacion);
+          },
+        });
+
+        await Swal.fire(
+          'Emisión completada',
+          `El comprobante ${facturacionDefinitiva.nroComprobante || 'generado'} y el certificado fueron emitidos correctamente.`,
+          'success',
+        );
+      } catch (errEmision) {
+        ventanaPdf?.close();
+        throw errEmision;
+      }
     } catch (error: unknown) {
       const errorMessage = mensajeError(error, '');
       // Si el servidor confirmó la emisión pero se perdió la respuesta, se
@@ -357,7 +390,13 @@ export function FacturacionEmisionStep({
       {!soloLectura && !certificadoEmitido && (
         <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           {onAtras ? (
-            <button type="button" onClick={onAtras} disabled={isEmitting} className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-50 sm:w-auto">ATRÁS</button>
+            <button
+              type="button"
+              onClick={onAtras}
+              disabled={isEmitting || retrocesoBloqueado}
+              title={retrocesoBloqueado ? 'El comprobante o certificado ya inició su emisión.' : 'Volver al paso Pago'}
+              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >ATRÁS</button>
           ) : <span className="hidden sm:block" />}
           <button
             type="button"

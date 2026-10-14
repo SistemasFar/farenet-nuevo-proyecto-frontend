@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { indicePasoVisual } from './faregas-emision';
+import { indicePasoVisual, puedeRetrocederWizard } from './faregas-emision';
 
 const fuenteWizard = readFileSync(new URL('./NuevoCertificadoView.tsx', import.meta.url), 'utf8');
 
@@ -62,6 +62,21 @@ describe('orden del wizard de Nuevo Certificado', () => {
     expect(indicePasoVisual('PREVISUALIZACION') - 1).toBe(indicePasoVisual('VEHICULO'));
     expect(indicePasoVisual('VEHICULO') - 1).toBe(indicePasoVisual('DATOS_INICIALES'));
     expect(fuenteWizard).toContain('irAtrasOStep(currentStepIndex - 1)');
+  });
+
+  it('permite volver desde Facturación a Pago mientras no exista emisión real', () => {
+    expect(puedeRetrocederWizard('BORRADOR', null)).toBe(true);
+    expect(puedeRetrocederWizard('BORRADOR', { estado: 'BORRADOR' } as any)).toBe(true);
+    expect(fuenteWizard).not.toContain("setMinimumEditableStepIndex(indicePaso('FACTURACION'))");
+    expect(fuenteWizard).toContain('retrocesoBloqueadoPorEmision');
+  });
+
+  it('bloquea el retroceso si el comprobante o certificado ya inició su emisión', () => {
+    expect(puedeRetrocederWizard('BORRADOR', { estado: 'ACEPTADO' } as any)).toBe(false);
+    expect(puedeRetrocederWizard('BORRADOR', { estado: 'PENDIENTE_SUNAT' } as any)).toBe(false);
+    expect(puedeRetrocederWizard('BORRADOR', { estado: 'PENDIENTE' } as any)).toBe(false);
+    expect(puedeRetrocederWizard('BORRADOR', { estado: 'ERROR' } as any)).toBe(false);
+    expect(puedeRetrocederWizard('EMITIDO', { estado: 'BORRADOR' } as any)).toBe(false);
   });
 
   it('autosave y carga de maestros usan pasos semánticos y no las posiciones antiguas', () => {

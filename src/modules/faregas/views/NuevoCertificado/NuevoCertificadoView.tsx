@@ -24,8 +24,10 @@ import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { useErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
-import { indicePasoVisual as indicePaso } from './faregas-emision';
+import { indicePasoVisual as indicePaso, puedeRetrocederWizard } from './faregas-emision';
 import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './faregas-formulario-operativo';
+import { faregasFetchBlob } from '../../services/faregas-http-client';
+import { abrirComprobanteFaregas } from '../../services/faregas-comprobante-visor.service';
 
 
 
@@ -57,7 +59,6 @@ export interface FormPagoState {
   fechaOperacion?: string;
   cuentaCorrienteKey?: string;
   fechaDeposito?: string;
-  digitosTarjeta?: string;
 }
 
 export interface PagoAgregado extends FormPagoState {
@@ -82,7 +83,7 @@ export interface FormFacturacionState {
   paisFac: string; departamentoFac: string; provinciaFac: string; distritoFac: string; direccionFac: string;
   emailFac: string; telefonoFac: string;
   usarTitularPrincipalFac: boolean;
-  condicionPagoFac: 'CONTADO' | 'CREDITO'; fechaVencimientoFac: string; medioPagoFac: string;
+  condicionPagoFac: 'CONTADO' | 'CREDITO'; fechaInicioCreditoFac: string; fechaVencimientoFac: string; medioPagoFac: string;
   cuotasFac: Array<{ numeroCuota: number; fechaPago: string; importe: string }>;
 }
 
@@ -94,6 +95,12 @@ export interface FormVerificacionState {
 }
 
 const textValue = (value: unknown) => value === null || value === undefined ? '' : String(value);
+const fechaLocalIso = (fecha = new Date()) => {
+  const anio = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  const dia = String(fecha.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+};
 const enteroValue = (value: unknown, maximoDigitos: number) =>
   normalizarEnteroCertificado(textValue(value), maximoDigitos);
 
@@ -164,6 +171,17 @@ export function NuevoCertificadoView() {
   const { plantaKey: plantaSeleccionada, plantaNombre } = useOutletContext<MainLayoutContext>();
   const { id } = useParams<{ id?: string }>();
   const [certificadoId, setCertificadoId] = useState<number | undefined>(id ? parseInt(id, 10) : undefined);
+
+  const abrirPdfFaregas = async () => {
+    if (!certificadoId) return;
+    await abrirComprobanteFaregas(certificadoId, {
+      facturacion,
+      onRegenerado: async () => {
+        const resp = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
+        if (resp?.data?.facturacion) setFacturacion(resp.data.facturacion);
+      },
+    });
+  };
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [furthestStepIndex, setFurthestStepIndex] = useState(0);
@@ -247,8 +265,7 @@ export function NuevoCertificadoView() {
     entidadFinancieraKey: '',
     cuentaCorrienteKey: '',
     nroOperacion: '',
-    digitosTarjeta: '',
-    fechaDeposito: new Date().toISOString().split('T')[0]
+    fechaDeposito: fechaLocalIso()
   });
 
   const [editingPagoIndex, setEditingPagoIndex] = useState<number | null>(null);
@@ -281,10 +298,11 @@ export function NuevoCertificadoView() {
     tipoDocFac: '', tipoDocumentoFac: 'DNI', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
     emailFac: '', telefonoFac: '', usarTitularPrincipalFac: true,
-    condicionPagoFac: 'CONTADO', fechaVencimientoFac: '',
+    condicionPagoFac: 'CONTADO', fechaInicioCreditoFac: fechaLocalIso(), fechaVencimientoFac: '',
     medioPagoFac: '', cuotasFac: []
   });
   const [facturacion, setFacturacion] = useState<FacturacionFaregas | null>(null);
+  const retrocesoBloqueadoPorEmision = !puedeRetrocederWizard(certificadoEstado, facturacion);
   const medioPagoCalculado = React.useMemo(
     () => calcularMedioPago(pagosAgregados),
     [pagosAgregados]
@@ -359,6 +377,7 @@ export function NuevoCertificadoView() {
     email: formFacturacion.emailFac || null,
     telefono: formFacturacion.telefonoFac || null,
     condicionPago: formFacturacion.condicionPagoFac,
+    fechaInicioCredito: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.fechaInicioCreditoFac : null,
     fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
     medioPago: medioPagoCalculado || null,
     cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
@@ -495,13 +514,18 @@ export function NuevoCertificadoView() {
 
           const pagosDetalle = await faregasCertificadosApi.obtenerPagos(certificadoId);
           aplicarResumenComercial(pagosDetalle.data);
+          setFormFacturacion((prev) => ({
+            ...prev,
+            condicionPagoFac: pagosDetalle.data?.condicionPago || prev.condicionPagoFac,
+            fechaInicioCreditoFac: String(pagosDetalle.data?.fechaInicioCredito || prev.fechaInicioCreditoFac || fechaLocalIso()).slice(0, 10),
+            fechaVencimientoFac: String(pagosDetalle.data?.fechaVencimientoCredito || prev.fechaVencimientoFac || '').slice(0, 10),
+          }));
           setPagosAgregados((pagosDetalle.data?.pagos || []).map((pago: any) => ({
             id: pago.id,
             tipo: String(pago.tipoContadoKey || '').toUpperCase(),
             importe: Number(pago.importe).toFixed(2),
             tarjetaKey: pago.tarjetaKey || '',
             nroOperacion: pago.nroOperacionBanco || pago.nroOperacionTarjeta || '',
-            digitosTarjeta: pago.digitosTarjeta || '',
             cuentaCorrienteKey: pago.cuentaCorrienteKey || '',
             entidadFinancieraKey: pago.entidadFinancieraKey || '',
             fechaDeposito: textValue(pago.fechdeposito).slice(0, 10),
@@ -526,6 +550,7 @@ export function NuevoCertificadoView() {
                 telefonoFac: fac.telefono || '',
                 usarTitularPrincipalFac: usaTitularPrincipal,
                 condicionPagoFac: fac.condicionPago || 'CONTADO',
+                fechaInicioCreditoFac: String(fac.fechaInicioCredito || prev.fechaInicioCreditoFac || fechaLocalIso()).slice(0, 10),
                 fechaVencimientoFac: String(fac.fechaVencimiento || '').slice(0, 10),
                 medioPagoFac: fac.medioPago || '',
                 cuotasFac: (fac.cuotas || []).map((cuota: any) => ({
@@ -616,7 +641,9 @@ export function NuevoCertificadoView() {
           const pasoRecuperado = indicePaso(res.data.pasoActual);
           setCurrentStepIndex(res.data.estado === 'BORRADOR' && new URLSearchParams(location.search).get('vista') !== 'consulta' ? pasoRecuperado : indicePaso('VERIFICACION_EMISION'));
           setFurthestStepIndex(pasoRecuperado);
-          setMinimumEditableStepIndex(pasoRecuperado >= indicePaso('FACTURACION') ? indicePaso('FACTURACION') : 0);
+          // Un borrador sigue siendo editable aunque haya llegado al último
+          // paso. El bloqueo real se decide con los estados de emisión.
+          setMinimumEditableStepIndex(0);
           setIsConsultado(true);
           setLastSavedAt(res.data.fechaActualizacion ? new Date(res.data.fechaActualizacion) : new Date());
           setSaveError('');
@@ -1124,12 +1151,14 @@ export function NuevoCertificadoView() {
   const guardarPasoPagos = async (idBorrador: number) => {
     const response = await faregasCertificadosApi.guardarPagos(idBorrador, {
       importeTotal: precioTotal,
+      condicionPago: formFacturacion.condicionPagoFac,
+      fechaInicioCredito: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.fechaInicioCreditoFac : null,
+      fechaVencimientoCredito: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.fechaVencimientoFac : null,
       pagos: pagosAgregados.map(pago => ({
         tipo: pago.tipo,
         importe: pago.importe,
         tarjetaKey: pago.tarjetaKey || null,
         nroOperacion: pago.nroOperacion || null,
-        digitosTarjeta: pago.digitosTarjeta || null,
         cuentaCorrienteKey: pago.cuentaCorrienteKey || null,
         entidadFinancieraKey: pago.entidadFinancieraKey || null,
         fechaDeposito: pago.fechaDeposito || null,
@@ -1176,12 +1205,16 @@ export function NuevoCertificadoView() {
 
   useEffect(() => {
     if (!certificadoId || loading || soloLectura || currentStepIndex !== indicePaso('PAGO') || precioTotal <= 0) return;
+    if (formFacturacion.condicionPagoFac === 'CREDITO'
+      && (!formFacturacion.fechaInicioCreditoFac
+        || !formFacturacion.fechaVencimientoFac
+        || formFacturacion.fechaVencimientoFac < formFacturacion.fechaInicioCreditoFac)) return;
     const timer = window.setTimeout(() => {
       void encolarAutosave(() => guardarPasoPagos(certificadoId)).catch(() => undefined);
     }, 1200);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, soloLectura, currentStepIndex, pagosAgregados, precioTotal]);
+  }, [certificadoId, loading, soloLectura, currentStepIndex, pagosAgregados, precioTotal, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac]);
 
   const eliminarTitularBorrador = async (titular: TitularState) => {
     if (!certificadoId || !titular.titularId) return;
@@ -1363,6 +1396,8 @@ export function NuevoCertificadoView() {
           condicionPago: formFacturacion.condicionPagoFac,
           pagos: pagosAgregados,
           precioTotal,
+          fechaInicioCredito: formFacturacion.fechaInicioCreditoFac,
+          fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
         }))) return;
         setIsSavingStep(true);
         try {
@@ -1378,7 +1413,7 @@ export function NuevoCertificadoView() {
             setFacturacion(facturacionGuardada.data as FacturacionFaregas);
           }
           await persistirPaso(certificadoId, 'FACTURACION');
-          setMinimumEditableStepIndex(indicePaso('FACTURACION'));
+          setMinimumEditableStepIndex(0);
         } catch (e: any) {
           if (e.codigo === 'PRODUCTO_FISCAL_CHIP_INVALIDO') {
             const productoChipId = Number(e.detalles?.productoChipId || resumenComercial?.productoChipId || 0);
@@ -1414,6 +1449,14 @@ export function NuevoCertificadoView() {
 
   const irAtrasOStep = async (destino: number) => {
     if (isSavingStep || destino < minimumEditableStepIndex || destino >= currentStepIndex || destino > furthestStepIndex) return;
+    if (STEPS[currentStepIndex].id === 'facturacion' && retrocesoBloqueadoPorEmision) {
+      await Swal.fire(
+        'Edición bloqueada',
+        'El comprobante o certificado ya inició su emisión. No puede modificar los datos asociados a esta operación.',
+        'warning',
+      );
+      return;
+    }
     if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
       setIsSavingStep(true);
       try {
@@ -1514,7 +1557,6 @@ export function NuevoCertificadoView() {
             entidadFinancieraKey: '',
             cuentaCorrienteKey: '',
             fechaDeposito: '',
-            digitosTarjeta: ''
           };
           setPagosAgregados([nuevoPago]);
         }
@@ -1553,18 +1595,11 @@ export function NuevoCertificadoView() {
       const nameUpper = selected ? selected.nombre.toUpperCase() : '';
       const isCuponidad = nameUpper.includes('CUPONIDAD');
       const isYapePlin = nameUpper.includes('YAPE') || nameUpper.includes('PLIN');
-      const isPagoWeb = nameUpper.includes('PAGO WEB');
-      const isEspecial = isCuponidad || isYapePlin || isPagoWeb;
 
       if (!formPago.tarjetaKey || !formPago.nroOperacion) {
         alert('Complete los campos obligatorios de la tarjeta.');
         return;
       }
-      if (!isEspecial && !formPago.digitosTarjeta) {
-        alert('Ingrese los últimos 4 dígitos de la tarjeta.');
-        return;
-      }
-
       if (isCuponidad) {
         if (formPago.nroOperacion.trim().length !== 10) {
           alert('El Nro de Cuponidad ingresado no es correcto. Debe tener exactamente 10 caracteres.');
@@ -1620,8 +1655,7 @@ export function NuevoCertificadoView() {
       entidadFinancieraKey: '',
       cuentaCorrienteKey: '',
       nroOperacion: '',
-      digitosTarjeta: '',
-      fechaDeposito: new Date().toISOString().split('T')[0]
+      fechaDeposito: fechaLocalIso()
     });
   };
 
@@ -1764,9 +1798,9 @@ export function NuevoCertificadoView() {
                 key={step.id}
                 type="button"
                 onClick={() => soloLectura ? setCurrentStepIndex(index) : irAtrasOStep(index)}
-                disabled={!soloLectura && (index >= currentStepIndex || index < minimumEditableStepIndex || isSavingStep)}
-                className={`flex flex-col items-center gap-2 bg-[#f4f9ff] px-2 ${soloLectura || (index < currentStepIndex && index >= minimumEditableStepIndex && !isSavingStep) ? 'cursor-pointer' : 'cursor-default'}`}
-                title={soloLectura ? `Consultar ${step.label}` : index < minimumEditableStepIndex ? 'Este paso ya no es editable porque el pago fue confirmado' : index < currentStepIndex ? `Volver a ${step.label}` : index === currentStepIndex ? 'Paso actual' : 'Complete el paso anterior'}
+                disabled={!soloLectura && (index >= currentStepIndex || index < minimumEditableStepIndex || isSavingStep || (currentStepIndex === indicePaso('FACTURACION') && index < currentStepIndex && retrocesoBloqueadoPorEmision))}
+                className={`flex flex-col items-center gap-2 bg-[#f4f9ff] px-2 ${soloLectura || (index < currentStepIndex && index >= minimumEditableStepIndex && !isSavingStep && !retrocesoBloqueadoPorEmision) ? 'cursor-pointer' : 'cursor-default'}`}
+                title={soloLectura ? `Consultar ${step.label}` : retrocesoBloqueadoPorEmision && currentStepIndex === indicePaso('FACTURACION') && index < currentStepIndex ? 'El comprobante o certificado ya inició su emisión' : index < minimumEditableStepIndex ? 'Este paso no es editable' : index < currentStepIndex ? `Volver a ${step.label}` : index === currentStepIndex ? 'Paso actual' : 'Complete el paso anterior'}
               >
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-[#052a79] text-white shadow-md ring-4 ring-blue-100' :
@@ -1912,16 +1946,29 @@ export function NuevoCertificadoView() {
             resumenComercial={resumenComercial}
             maestrosPago={maestrosPago}
             condicionPago={formFacturacion.condicionPagoFac}
+            fechaInicioCredito={formFacturacion.fechaInicioCreditoFac}
+            fechaVencimientoCredito={formFacturacion.fechaVencimientoFac}
             erroresCampo={errores}
             onCorregirCampo={limpiarErrorCampo}
             onCondicionPagoChange={(condicionPago) => {
               limpiarErrorCampo('pagos');
+              limpiarErrorCampo('fechaInicioCredito');
+              limpiarErrorCampo('fechaVencimientoCredito');
               setFormFacturacion((prev) => ({
                 ...prev,
                 condicionPagoFac: condicionPago,
-                fechaVencimientoFac: condicionPago === 'CONTADO' ? '' : prev.fechaVencimientoFac,
+                fechaInicioCreditoFac: prev.fechaInicioCreditoFac || fechaLocalIso(),
                 cuotasFac: condicionPago === 'CONTADO' ? [] : prev.cuotasFac,
               }));
+            }}
+            onFechaInicioCreditoChange={(fecha) => {
+              limpiarErrorCampo('fechaInicioCredito');
+              limpiarErrorCampo('fechaVencimientoCredito');
+              setFormFacturacion((prev) => ({ ...prev, fechaInicioCreditoFac: fecha }));
+            }}
+            onFechaVencimientoCreditoChange={(fecha) => {
+              limpiarErrorCampo('fechaVencimientoCredito');
+              setFormFacturacion((prev) => ({ ...prev, fechaVencimientoFac: fecha }));
             }}
           />
         )}
@@ -1967,6 +2014,7 @@ export function NuevoCertificadoView() {
               setIsEmitido(true);
             }}
             onAtras={irPasoAnterior}
+            retrocesoBloqueado={retrocesoBloqueadoPorEmision}
             tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
             formCaja={formCaja}
             formVehiculo={formVehiculo}
@@ -2013,21 +2061,33 @@ export function NuevoCertificadoView() {
         <div className="flex flex-col items-end gap-1.5">
           {soloLectura ? (
             <div className="flex items-center gap-3">
-              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && facturacion?.enlacePdf && (
-                <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
-                  VER COMPROBANTE
-                </a>
+              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && (facturacion?.enlacePdfFaregas || facturacion?.enlacePdf) && (
+                <>
+                  <button type="button" onClick={() => void abrirPdfFaregas()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
+                    VER / DESCARGAR COMPROBANTE
+                  </button>
+                  {facturacion?.enlacePdf && (
+                    <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="PDF oficial NubeFact de auditoría">
+                      VER PDF NUBEFACT
+                    </a>
+                  )}
+                </>
               )}
               <button type="button" onClick={salirAlInicio} className="rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">
                 {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 ? 'IR A INICIO' : 'VOLVER AL INICIO'}
               </button>
             </div>
           ) : currentStepIndex === STEPS.length - 1 ? (
-            (isEmitido || facturacion?.enlacePdf) ? (
+            (isEmitido || facturacion?.enlacePdf || facturacion?.enlacePdfFaregas) ? (
               <div className="flex items-center gap-3">
+                {(facturacion?.enlacePdfFaregas || facturacion?.enlacePdf) && (
+                  <button type="button" onClick={() => void abrirPdfFaregas()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
+                    VER / DESCARGAR COMPROBANTE
+                  </button>
+                )}
                 {facturacion?.enlacePdf && (
-                  <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
-                    VER COMPROBANTE
+                  <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="PDF oficial NubeFact de auditoría">
+                    VER PDF NUBEFACT
                   </a>
                 )}
                 {isEmitido && (

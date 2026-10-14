@@ -61,3 +61,31 @@ export const faregasFetch = (endpoint: string, options: FaregasRequestInit = {})
 
 export const faregasFetchWithStatus = (endpoint: string, options: FaregasRequestInit = {}) =>
   request(endpoint, options, true);
+
+export const faregasFetchBlob = async (endpoint: string, options: FaregasRequestInit = {}) => {
+  const { handleUnauthorized = true, ...fetchOptions } = options;
+  const token = sessionStorage.getItem('faregasAccessToken');
+  if (!token) throw new Error('No hay sesion activa en FAREGAS');
+
+  const response = await fetch(`${API_URL}/faregas${endpoint}`, {
+    ...fetchOptions,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...fetchOptions.headers,
+    },
+  });
+  if (response.status === 401 && handleUnauthorized) {
+    window.dispatchEvent(new CustomEvent('unauthorized-error'));
+  }
+  if (!response.ok) {
+    let message = 'No se pudo abrir el comprobante';
+    try {
+      const errorData = await response.json();
+      message = errorData.message || message;
+    } catch {
+      // La descarga puede responder texto o una página de error del proxy.
+    }
+    throw new Error(message);
+  }
+  return response.blob();
+};

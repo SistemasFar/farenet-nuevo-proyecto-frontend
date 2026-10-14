@@ -53,6 +53,19 @@ export const esComprobanteOperable = (
 export const esComprobanteYaEmitido = (facturacion: FacturacionFaregas | null): boolean =>
   facturacion?.estado === 'ACEPTADO' || facturacion?.estado === 'PENDIENTE_SUNAT';
 
+/**
+ * Estados en los que el contenido fiscal ya fue emitido o ya tiene una
+ * reserva/intento real. Coincide con el bloqueo de edición de FacturacionStep:
+ * no se permite volver al wizard y alterar los datos asociados.
+ */
+export const esComprobanteFiscalBloqueado = (facturacion: FacturacionFaregas | null): boolean =>
+  ['ACEPTADO', 'PENDIENTE_SUNAT', 'PENDIENTE', 'ERROR'].includes(String(facturacion?.estado || ''));
+
+export const puedeRetrocederWizard = (
+  certificadoEstado: string | undefined,
+  facturacion: FacturacionFaregas | null,
+): boolean => certificadoEstado === 'BORRADOR' && !esComprobanteFiscalBloqueado(facturacion);
+
 /** Mantiene aliasados los estados técnicos históricos en el nodo visual final. */
 export const indicePasoVisual = (paso?: PasoBorradorFaregas | string): number => ({
   DATOS_INICIALES: 0,
