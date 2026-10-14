@@ -126,7 +126,6 @@ export const validarExpedienteTecnico = ({
     const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
     agregarFaltantes(errores, vehiculo, [['cargaUtil', 'la carga útil']]);
     const camposGlp: Array<[string, string]> = [
-      ['tallerAutorizadoId', 'el taller autorizado'],
       ['fechaVigencia', 'la vigencia GLP'],
     ];
 
@@ -402,9 +401,6 @@ export const validarDatosEspecificos = ({
 
   if (tipo === 'GLP_ANUAL') {
     const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
-    if (vacio(glp.tallerAutorizadoId)) {
-      marcar(errores, 'glp.tallerAutorizadoId', 'Seleccione el taller autorizado.');
-    }
     if (vacio(glp.fechaVigencia)) marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
 
 
@@ -576,6 +572,9 @@ export const validarDatosFacturacionCampos = (
     errores.tipoDocumentoFac = 'La factura requiere un documento de tipo RUC.';
   } else if (tipoComprobante === 'FACTURA' && tipoDocumento === 'RUC' && !errores.nroDocFac && !esRucValido(documento)) {
     errores.nroDocFac = 'El RUC ingresado no tiene un dígito verificador válido. Revise el número antes de facturar.';
+  }
+  if (tipoComprobante === 'BOLETA' && tipoDocumento === 'RUC') {
+    errores.tipoDocumentoFac = 'La boleta requiere un documento de tipo DNI o Carné de Extranjería.';
   }
   if (vacio(facturacion.razonSocialFac)) {
     errores.razonSocialFac = 'Complete el nombre o razón social de facturación.';

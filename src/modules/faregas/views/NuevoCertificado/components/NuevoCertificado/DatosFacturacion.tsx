@@ -68,28 +68,77 @@ export function DatosFacturacion({
     });
   };
 
+  const handleTipoComprobanteChange = (comprobante: string) => {
+    const comprobanteNormalizado = comprobante.trim().toUpperCase();
+    onCorregirCampo?.('tipoDocFac');
+    onCorregirCampo?.('tipoDocumentoFac');
+
+    if (comprobanteNormalizado === 'FACTURA') {
+      const eraIncompatible = tipoDocumentoSeleccionado !== 'RUC';
+      if (eraIncompatible) {
+        onCorregirCampo?.('nroDocFac');
+        onCorregirCampo?.('razonSocialFac');
+        onCorregirCampo?.('direccionFac');
+      }
+      setErrorDocumentoConsulta(null);
+      setFormFacturacion((prev) => ({
+        ...prev,
+        tipoDocFac: 'FACTURA',
+        tipoDocumentoFac: 'RUC',
+        nroDocFac: eraIncompatible ? '' : prev.nroDocFac,
+        razonSocialFac: eraIncompatible ? '' : prev.razonSocialFac,
+        direccionFac: eraIncompatible ? '' : prev.direccionFac,
+      }));
+      return;
+    }
+
+    if (comprobanteNormalizado === 'BOLETA') {
+      const eraIncompatible = tipoDocumentoSeleccionado === 'RUC';
+      if (eraIncompatible) {
+        onCorregirCampo?.('nroDocFac');
+        onCorregirCampo?.('razonSocialFac');
+        onCorregirCampo?.('direccionFac');
+      }
+      setErrorDocumentoConsulta(null);
+      setFormFacturacion((prev) => ({
+        ...prev,
+        tipoDocFac: 'BOLETA',
+        tipoDocumentoFac: eraIncompatible ? 'DNI' : (prev.tipoDocumentoFac || 'DNI'),
+        nroDocFac: eraIncompatible ? '' : prev.nroDocFac,
+        razonSocialFac: eraIncompatible ? '' : prev.razonSocialFac,
+        direccionFac: eraIncompatible ? '' : prev.direccionFac,
+      }));
+      return;
+    }
+
+    setFormFacturacion((prev) => ({
+      ...prev,
+      tipoDocFac: comprobanteNormalizado,
+    }));
+  };
+
   const handleTipoDocumentoChange = (tipo: string) => {
     const tipoNormalizado = normalizarTipoDocumento(tipo);
-    const errorDocumento = formFacturacion.nroDocFac
-      ? validarDocumento(claveCatalogoDocumento(tipoNormalizado), formFacturacion.nroDocFac)
-      : null;
-    setErrorDocumentoConsulta(errorDocumento);
+    const nuevoComprobante = tipoNormalizado === 'RUC' ? 'FACTURA' : 'BOLETA';
+    const eraIncompatible = (tipoNormalizado === 'RUC' && tipoDocumentoSeleccionado !== 'RUC')
+      || (tipoNormalizado !== 'RUC' && tipoDocumentoSeleccionado === 'RUC');
+
     onCorregirCampo?.('tipoDocumentoFac');
-    onCorregirCampo?.('nroDocFac');
-    onCorregirCampo?.('razonSocialFac');
-    onCorregirCampo?.('direccionFac');
-    onCorregirCampo?.('emailFac');
-    onCorregirCampo?.('telefonoFac');
+    onCorregirCampo?.('tipoDocFac');
+    if (eraIncompatible) {
+      onCorregirCampo?.('nroDocFac');
+      onCorregirCampo?.('razonSocialFac');
+      onCorregirCampo?.('direccionFac');
+    }
+    setErrorDocumentoConsulta(null);
+
     setFormFacturacion((prev) => ({
       ...prev,
       tipoDocumentoFac: tipoNormalizado,
-      tipoDocFac: tipoNormalizado === 'RUC'
-        ? 'FACTURA'
-        : prev.tipoDocFac === 'FACTURA' ? 'BOLETA' : prev.tipoDocFac,
-      razonSocialFac: '',
-      direccionFac: '',
-      emailFac: '',
-      telefonoFac: '',
+      tipoDocFac: nuevoComprobante,
+      nroDocFac: eraIncompatible ? '' : prev.nroDocFac,
+      razonSocialFac: eraIncompatible ? '' : prev.razonSocialFac,
+      direccionFac: eraIncompatible ? '' : prev.direccionFac,
     }));
   };
 
@@ -270,7 +319,7 @@ export function DatosFacturacion({
           <select
             value={formFacturacion.tipoDocFac}
             disabled={facturarAlTitular}
-            onChange={(event) => handleFacturacionChange('tipoDocFac', event.target.value)}
+            onChange={(event) => handleTipoComprobanteChange(event.target.value)}
             className={claseConError(
               'h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] disabled:bg-slate-100 disabled:text-slate-500',
               Boolean(erroresCampo['tipoDocFac'])

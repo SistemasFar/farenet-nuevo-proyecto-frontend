@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Swal from 'sweetalert2';
 import { DatosFacturacion } from './components/NuevoCertificado/DatosFacturacion';
+import { validarFormularioVehiculoVisible } from './faregas-wizard.validation';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import type { FormFacturacionState } from './NuevoCertificadoView';
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
@@ -479,7 +480,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       }
     });
 
-    it('CASO 8: cambiar DNI a RUC conserva el número, limpia datos encontrados y lo revalida', async () => {
+    it('CASO 8: cambiar DNI a RUC limpia el documento incompatible pero preserva correo y teléfono', async () => {
       const contenedor = document.createElement('div');
       document.body.appendChild(contenedor);
       contenedores.push(contenedor);
@@ -501,12 +502,12 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       });
 
       expect(estadoActual.tipoDocumentoFac).toBe('RUC');
-      expect(estadoActual.nroDocFac).toBe('74045612');
+      expect(estadoActual.tipoDocFac).toBe('FACTURA');
+      expect(estadoActual.nroDocFac).toBe('');
       expect(estadoActual.razonSocialFac).toBe('');
       expect(estadoActual.direccionFac).toBe('');
-      expect(estadoActual.emailFac).toBe('');
-      expect(estadoActual.telefonoFac).toBe('');
-      expect(contenedor.textContent).toContain('El RUC debe contener exactamente 11 dígitos.');
+      expect(estadoActual.emailFac).toBe('grace@gmail.com');
+      expect(estadoActual.telefonoFac).toBe('999999999');
 
       await act(async () => root.unmount());
     });
@@ -655,5 +656,241 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
 
       await act(async () => root.unmount());
     });
+
+  describe('CASOS OBLIGATORIOS AUDITORÍA Y REGRESIÓN (Problemas 1 y 2)', () => {
+    it('CASO 1: Seleccionar BOLETA -> Tipo Documento = DNI automáticamente', async () => {
+      const contenedor = document.createElement('div');
+      document.body.appendChild(contenedor);
+      contenedores.push(contenedor);
+      const root = createRoot(contenedor);
+
+      let estadoActual = {
+        ...baseFacturacion,
+        tipoDocFac: 'FACTURA',
+        tipoDocumentoFac: 'RUC',
+        nroDocFac: '20600444531',
+      };
+      const Caso = () => {
+        const [facturacion, setFacturacion] = useState(estadoActual);
+        estadoActual = facturacion;
+        return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
+      };
+
+      await act(async () => root.render(<Caso />));
+      const selectorComprobante = contenedor.querySelector<HTMLSelectElement>('select:not([aria-label])');
+      await act(async () => {
+        if (selectorComprobante) {
+          selectorComprobante.value = 'BOLETA';
+          selectorComprobante.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      expect(estadoActual.tipoDocFac).toBe('BOLETA');
+      expect(estadoActual.tipoDocumentoFac).toBe('DNI');
+      await act(async () => root.unmount());
+    });
+
+    it('CASO 2: Seleccionar FACTURA -> Tipo Documento = RUC automáticamente', async () => {
+      const contenedor = document.createElement('div');
+      document.body.appendChild(contenedor);
+      contenedores.push(contenedor);
+      const root = createRoot(contenedor);
+
+      let estadoActual = {
+        ...baseFacturacion,
+        tipoDocFac: 'BOLETA',
+        tipoDocumentoFac: 'DNI',
+        nroDocFac: '74045612',
+      };
+      const Caso = () => {
+        const [facturacion, setFacturacion] = useState(estadoActual);
+        estadoActual = facturacion;
+        return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
+      };
+
+      await act(async () => root.render(<Caso />));
+      const selectorComprobante = contenedor.querySelector<HTMLSelectElement>('select:not([aria-label])');
+      await act(async () => {
+        if (selectorComprobante) {
+          selectorComprobante.value = 'FACTURA';
+          selectorComprobante.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      expect(estadoActual.tipoDocFac).toBe('FACTURA');
+      expect(estadoActual.tipoDocumentoFac).toBe('RUC');
+      await act(async () => root.unmount());
+    });
+
+    it('CASO 3: BOLETA con DNI cargado -> cambiar a FACTURA limpia documento incompatible y conserva correo y teléfono', async () => {
+      const contenedor = document.createElement('div');
+      document.body.appendChild(contenedor);
+      contenedores.push(contenedor);
+      const root = createRoot(contenedor);
+
+      let estadoActual = {
+        ...baseFacturacion,
+        tipoDocFac: 'BOLETA',
+        tipoDocumentoFac: 'DNI',
+        nroDocFac: '74045612',
+        razonSocialFac: 'GRACE RODAS',
+        direccionFac: 'CALLE AREQUIPA 152',
+        emailFac: 'manual@empresa.com',
+        telefonoFac: '987654321',
+      };
+      const Caso = () => {
+        const [facturacion, setFacturacion] = useState(estadoActual);
+        estadoActual = facturacion;
+        return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
+      };
+
+      await act(async () => root.render(<Caso />));
+      const selectorComprobante = contenedor.querySelector<HTMLSelectElement>('select:not([aria-label])');
+      await act(async () => {
+        if (selectorComprobante) {
+          selectorComprobante.value = 'FACTURA';
+          selectorComprobante.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      expect(estadoActual.tipoDocFac).toBe('FACTURA');
+      expect(estadoActual.tipoDocumentoFac).toBe('RUC');
+      expect(estadoActual.nroDocFac).toBe('');
+      expect(estadoActual.razonSocialFac).toBe('');
+      expect(estadoActual.direccionFac).toBe('');
+      expect(estadoActual.emailFac).toBe('manual@empresa.com');
+      expect(estadoActual.telefonoFac).toBe('987654321');
+      await act(async () => root.unmount());
+    });
+
+    it('CASO 4: FACTURA con RUC válido a tercero y campos visibles completos -> SIGUIENTE PASO permitido', () => {
+      const facturacionTercero = {
+        tipoDocFac: 'FACTURA',
+        tipoDocumentoFac: 'RUC',
+        nroDocFac: '20600444531',
+        razonSocialFac: 'EMPRESA TERCERO S.A.C.',
+        direccionFac: 'CALLE MIGUEL DASSO 180',
+        emailFac: 'ssss@gmail.com',
+        telefonoFac: '897878887',
+        usarTitularPrincipalFac: false,
+      };
+
+      const vehiculoCompleto = {
+        marca: 'TOYOTA', modelo: 'YARIS', version: 'STD', anioFabricacion: '2020',
+        vin: '9BD1234567890', serieChasis: '9BD1234567890', numeroMotor: 'MOT12345',
+        numeroCilindros: '4', cilindrada: '1500', combustible: 'GASOLINA',
+        numeroEjes: '2', numeroRuedas: '4', numeroAsientos: '5', numeroPasajeros: '4',
+        longitud: '4.2', ancho: '1.7', alto: '1.5', pesoNeto: '1100', pesoBruto: '1500', cargaUtil: '400',
+        color: 'ROJO',
+      };
+
+      const glpCompleto = {
+        fechaVigencia: '2027-10-14',
+        verificaciones: Array.from({ length: 7 }, (_, i) => ({ codigo: String(i + 1), cumple: true })),
+        componentes: [
+          { componente: 'CILINDRO', marca: 'FABER', numeroSerie: '12345', capacidadLitros: '60', anioFabricacion: '2020' },
+          { componente: 'REGULADOR', marca: 'TOMASETTO', numeroSerie: '67890', modelo: 'AT09' },
+        ],
+      };
+
+      const errores = validarFormularioVehiculoVisible({
+        tipoCertificado: 'GLP_ANUAL',
+        modalidad: 'ANUAL',
+        caja: { categoria: 'M1', placa: 'ABC123', tarifaCodigo: 'GLP01' },
+        vehiculo: vehiculoCompleto,
+        titulares: [{ nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
+        glp: glpCompleto,
+        gnv: {},
+        conformidad: {},
+        facturacion: facturacionTercero,
+      });
+
+      expect(errores).toEqual({});
+    });
+
+    it('CASO 5: Quitar un campo REALMENTE obligatorio visible -> bloquea, marca campo y mensaje coherente', () => {
+      const vehiculoIncompleto = {
+        marca: '', modelo: 'YARIS', version: 'STD', anioFabricacion: '2020',
+        vin: '9BD1234567890', serieChasis: '9BD1234567890', numeroMotor: 'MOT12345',
+        numeroCilindros: '4', cilindrada: '1500', combustible: 'GASOLINA',
+        numeroEjes: '2', numeroRuedas: '4', numeroAsientos: '5', numeroPasajeros: '4',
+        longitud: '4.2', ancho: '1.7', alto: '1.5', pesoNeto: '1100', pesoBruto: '1500', cargaUtil: '400',
+      };
+
+      const errores = validarFormularioVehiculoVisible({
+        tipoCertificado: 'GLP_ANUAL',
+        modalidad: 'ANUAL',
+        caja: { categoria: 'M1', placa: 'ABC123', tarifaCodigo: 'GLP01' },
+        vehiculo: vehiculoIncompleto,
+        titulares: [{ nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
+        glp: {
+          fechaVigencia: '2027-10-14',
+          verificaciones: Array.from({ length: 7 }, (_, i) => ({ codigo: String(i + 1), cumple: true })),
+          componentes: [
+            { componente: 'CILINDRO', marca: 'FABER', numeroSerie: '12345', capacidadLitros: '60', anioFabricacion: '2020' },
+            { componente: 'REGULADOR', marca: 'TOMASETTO', numeroSerie: '67890', modelo: 'AT09' },
+          ],
+        },
+        gnv: {},
+        conformidad: {},
+        facturacion: {
+          tipoDocFac: 'BOLETA',
+          tipoDocumentoFac: 'DNI',
+          nroDocFac: '74045612',
+          razonSocialFac: 'JUAN PEREZ',
+          direccionFac: 'AV PERU 123',
+          emailFac: '',
+          telefonoFac: '987654321',
+          usarTitularPrincipalFac: false,
+        },
+      });
+
+      expect(errores['marca']).toBe('Este campo es obligatorio.');
+      expect(errores['emailFac']).toBe('Complete el correo electrónico de facturación.');
+    });
+
+    it('CASO 6: Campo oculto/no aplicable vacío (ej. glp.tallerAutorizadoId) -> NO bloquea', () => {
+      const glpSinTaller = {
+        fechaVigencia: '2027-10-14',
+        verificaciones: Array.from({ length: 7 }, (_, i) => ({ codigo: String(i + 1), cumple: true })),
+        componentes: [
+          { componente: 'CILINDRO', marca: 'FABER', numeroSerie: '12345', capacidadLitros: '60', anioFabricacion: '2020' },
+          { componente: 'REGULADOR', marca: 'TOMASETTO', numeroSerie: '67890', modelo: 'AT09' },
+        ],
+      };
+
+      const errores = validarFormularioVehiculoVisible({
+        tipoCertificado: 'GLP_ANUAL',
+        modalidad: 'ANUAL',
+        caja: { categoria: 'M1', placa: 'ABC123', tarifaCodigo: 'GLP01' },
+        vehiculo: {
+          marca: 'TOYOTA', modelo: 'YARIS', version: 'STD', anioFabricacion: '2020',
+          vin: '9BD1234567890', serieChasis: '9BD1234567890', numeroMotor: 'MOT12345',
+          numeroCilindros: '4', cilindrada: '1500', combustible: 'GASOLINA',
+          numeroEjes: '2', numeroRuedas: '4', numeroAsientos: '5', numeroPasajeros: '4',
+          longitud: '4.2', ancho: '1.7', alto: '1.5', pesoNeto: '1100', pesoBruto: '1500', cargaUtil: '400',
+          color: 'ROJO',
+        },
+        titulares: [{ nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
+        glp: glpSinTaller,
+        gnv: {},
+        conformidad: {},
+        facturacion: {
+          tipoDocFac: 'BOLETA',
+          tipoDocumentoFac: 'DNI',
+          nroDocFac: '74045612',
+          razonSocialFac: 'JUAN PEREZ',
+          direccionFac: 'AV PERU 123',
+          emailFac: 'juan@gmail.com',
+          telefonoFac: '987654321',
+          usarTitularPrincipalFac: false,
+        },
+      });
+
+      expect(errores['glp.tallerAutorizadoId']).toBeUndefined();
+      expect(errores).toEqual({});
+    });
+  });
+
   });
 });

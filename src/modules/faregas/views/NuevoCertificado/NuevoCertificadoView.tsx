@@ -1279,8 +1279,11 @@ export function NuevoCertificadoView() {
       return false;
     }
 
+    if (tieneErroresCampo) {
+      registrarErrores(campos);
+    }
+
     if (regresarAlPasoTecnico) {
-      if (tieneErroresCampo) registrarErrores(campos);
       setMinimumEditableStepIndex((actual) => Math.min(actual, indicePaso('VEHICULO')));
       setCurrentStepIndex(indicePaso('VEHICULO'));
     }
@@ -1299,11 +1302,7 @@ export function NuevoCertificadoView() {
     }
 
     if (tieneErroresCampo) {
-      if (regresarAlPasoTecnico) {
-        window.setTimeout(enfocarPrimerError, 0);
-      } else {
-        enfocarPrimerError();
-      }
+      window.setTimeout(enfocarPrimerError, 0);
     }
     return true;
   };
