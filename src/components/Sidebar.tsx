@@ -40,6 +40,16 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
+    key: 'dashboard', path: '/dashboard',
+    label: 'DASHBOARD',
+    permisos: ['MENU_DASHBOARD', 'DASHBOARD_GLOBAL', 'DASHBOARD_SEDE'],
+    icon: (
+      <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
+        <path d="M4 4h7v7H4V4zm10 0h6v4h-6V4zm6 7h-6v9h6v-9zM4 14h7v6H4v-6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     key: 'inspecciones', path: '/inspecciones',
     label: 'INSPECCIONES',
     permisos: ['LISTA_INSPECCION', 'VER_INSPECCION', 'CREAR_INSPECCION'],
@@ -316,6 +326,16 @@ export function Sidebar({
     // permisos asignados al perfil del usuario, nunca del nombre del perfil:
     // cualquier restricción se corrige asignando o quitando el permiso.
     if (isFaregas) {
+      if (item.key === 'dashboard') {
+        const pId = (perfilId || '').toLowerCase();
+        return (
+          permisos.includes('MENU_DASHBOARD') ||
+          permisos.includes('DASHBOARD_GLOBAL') ||
+          permisos.includes('DASHBOARD_SEDE') ||
+          pId === 'sistemas' ||
+          pId === 'aministrador'
+        );
+      }
       if (item.key === 'descuentos') {
         return permisos.includes('MENU_DESCUENTOS');
       }

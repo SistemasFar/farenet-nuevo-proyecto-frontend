@@ -75,6 +75,7 @@ export function MainLayout({
   else if (path.startsWith('/configuracion') || path.startsWith('/faregas/configuracion')) activeMenu = 'configuracion';
   else if (path.startsWith('/faregas/facturacion')) activeMenu = 'facturacion';
   else if (path.startsWith('/faregas/chips')) activeMenu = 'chips';
+  else if (path.startsWith('/faregas/dashboard')) activeMenu = 'dashboard';
   
 
   const isCertificadoWizard =

@@ -24,6 +24,7 @@ import { AuditoriaView as FaregasAuditoriaView } from './modules/faregas/views/A
 import { FaregasConfiguracionView } from './modules/faregas/views/Configuracion/FaregasConfiguracionView';
 import { FaregasFacturacionView } from './modules/faregas/views/Facturacion/FaregasFacturacionView';
 import { DescuentosView as FaregasDescuentosView } from './modules/faregas/views/Descuentos/DescuentosView';
+import { FaregasDashboardView } from './modules/faregas/views/Dashboard/FaregasDashboardView';
 import { ChipsView as FaregasChipsView } from './modules/faregas/views/Chips/ChipsView';
 
 import { useEmpresa } from './context/EmpresaContext';
@@ -40,10 +41,10 @@ interface PlantaUpdateDetail {
 }
 
 const SEDES_VALIDAS_FAREGAS = [
-  'AREQUIPA', 'ATE', 'CAMACHO', 'CHORRILLOS', 'CHORRILLOS MAKALU', 'COLINA', 
-  'COLINA MAKALU', 'DERBY', 'FAUCETT', 'ICA', 'INDEPENDENCIA', 'JESUS MARIA', 
-  'JICAMARCA', 'MOLINA', 'OLGUIN', 'PIURA', 'PLANTA 1', 'RIMAC', 'SAN BORJA', 
-  'SAN JUAN DE LURIGANCHO', 'SAN MIGUEL', 'SANTA ANITA', 'SATIPO', 'SURCO', 
+  'AREQUIPA', 'ATE', 'CAMACHO', 'CHORRILLOS', 'CHORRILLOS MAKALU', 'COLINA',
+  'COLINA MAKALU', 'DERBY', 'FAUCETT', 'ICA', 'INDEPENDENCIA', 'JESUS MARIA',
+  'JICAMARCA', 'MOLINA', 'OLGUIN', 'PIURA', 'PLANTA 1', 'RIMAC', 'SAN BORJA',
+  'SAN JUAN DE LURIGANCHO', 'SAN MIGUEL', 'SANTA ANITA', 'SATIPO', 'SURCO',
   'SURQUILLO', 'TRENEMAN', 'TRUJILLO', 'VICTORIA', 'VICTORIA BIRMINGHAM'
 ];
 const leerPlantasFaregas = () => {
@@ -81,7 +82,7 @@ export default function App() {
   const [faregasPlantasDisponibles, setFaregasPlantasDisponibles] = useState<PlantaAsignada[]>([]);
   const [faregasUser, setFaregasUser] = useState<FaregasUserSession | null>(null);
   const [faregasPlanta, setFaregasPlanta] = useState<PlantaAsignada | null>(null);
-  
+
   const { empresasDisponibles, establecerEmpresasDisponibles, limpiarEmpresa, empresaSeleccionada } = useEmpresa();
 
   const isFaregas = empresaSeleccionada?.nombre?.toUpperCase().includes('FAREGAS');
@@ -211,7 +212,7 @@ export default function App() {
     if (empresas.length > 0) {
       establecerEmpresasDisponibles(empresas);
     }
-    
+
     // Determinamos si redirigir a faregas o farenet según si se autoseleccionó faregas
     const esSedeFaregas = plantaSeleccionada.nombre.toUpperCase().includes('FAREGAS');
     setTimeout(() => {
@@ -219,38 +220,38 @@ export default function App() {
     }, 0);
   };
 
-  
+
   const ejecutarLoginEmpresa = async (empresa: EmpresaAsignada, usernameArg?: string, passwordArg?: string, isAutoRedirect: boolean = false) => {
     const userToUse = usernameArg || usernameContext;
     const passToUse = passwordArg || pendingPassword;
-    
+
     const esFaregas = empresa.nombre.toUpperCase().includes('FAREGAS');
     if (esFaregas) {
       try {
         const resp = await authFaregasApi.loginAsync(userToUse, passToUse);
-        
+
         setFaregasPreToken(resp.preToken);
         sessionStorage.setItem('faregasPreToken', resp.preToken);
-        
+
         const SEDES_VALIDAS_FAREGAS = [
-          'AREQUIPA', 'ATE', 'CAMACHO', 'CHORRILLOS', 'CHORRILLOS MAKALU', 'COLINA', 
-          'COLINA MAKALU', 'DERBY', 'FAUCETT', 'ICA', 'INDEPENDENCIA', 'JESUS MARIA', 
-          'JICAMARCA', 'MOLINA', 'OLGUIN', 'PIURA', 'PLANTA 1', 'RIMAC', 'SAN BORJA', 
-          'SAN JUAN DE LURIGANCHO', 'SAN MIGUEL', 'SANTA ANITA', 'SATIPO', 'SURCO', 
+          'AREQUIPA', 'ATE', 'CAMACHO', 'CHORRILLOS', 'CHORRILLOS MAKALU', 'COLINA',
+          'COLINA MAKALU', 'DERBY', 'FAUCETT', 'ICA', 'INDEPENDENCIA', 'JESUS MARIA',
+          'JICAMARCA', 'MOLINA', 'OLGUIN', 'PIURA', 'PLANTA 1', 'RIMAC', 'SAN BORJA',
+          'SAN JUAN DE LURIGANCHO', 'SAN MIGUEL', 'SANTA ANITA', 'SATIPO', 'SURCO',
           'SURQUILLO', 'TRENEMAN', 'TRUJILLO', 'VICTORIA', 'VICTORIA BIRMINGHAM'
         ];
         const plantasFaregasBruto = resp.plantas || [];
-        const plantasFaregas = plantasFaregasBruto.filter((p: any) => 
+        const plantasFaregas = plantasFaregasBruto.filter((p: any) =>
           SEDES_VALIDAS_FAREGAS.some(sede => p.nombre.toUpperCase().includes(sede))
         );
         setFaregasPlantasDisponibles(plantasFaregas);
         sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(plantasFaregas));
-        
+
         if (resp.user) {
           setFaregasUser(resp.user);
           sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
         }
-        
+
         setPendingPassword('');
         setTimeout(() => {
           navigate('/faregas/seleccionar-planta', { replace: isAutoRedirect });
@@ -261,17 +262,17 @@ export default function App() {
         throw e;
       }
     }
-    
+
     // ES FARENET -> Ejecutar Login original!
     try {
       const resp = await authApi.loginAsync(userToUse, passToUse);
-      
+
       setPendingPassword('');
-      
+
       const plantasReales = resp.plantas || [];
       const permisosLocales = resp.permisos || [];
       const empresasLocales = resp.empresas || [];
-      
+
       if (resp.requiereSeleccionarPlanta) {
         handleRequirePlanta(
           userToUse,
@@ -295,7 +296,7 @@ export default function App() {
         );
         return;
       }
-      
+
       throw new Error('No se recibió una sesión válida desde el servidor.');
     } catch (e: unknown) {
        setPendingPassword('');
@@ -324,9 +325,9 @@ export default function App() {
     }
     sessionStorage.setItem('plantasDisponibles', JSON.stringify(plantas));
     permisosSession.guardar(userPermisos);
-    
+
     establecerEmpresasDisponibles(empresas);
-    
+
     if (empresas.length === 1 && password) {
       await ejecutarLoginEmpresa(empresas[0], username, password, true);
     } else {
@@ -381,7 +382,7 @@ export default function App() {
     const permisosFinales = resp.permisos || permisos;
 
     guardarSesionFrontend(token, userData, permisosFinales, resp.plantaSeleccionada, plantasDisponibles);
-    
+
     setTimeout(() => {
       const actualIsFaregas = JSON.parse(sessionStorage.getItem('empresaSeleccionada') || '{}')?.nombre?.toUpperCase().includes('FAREGAS');
       navigate(actualIsFaregas ? '/faregas/inicio' : '/inicio');
@@ -414,16 +415,16 @@ export default function App() {
     if (!token) throw new Error('No hay sesión activa en FAREGAS.');
 
     const resp = await authFaregasApi.cambiarPlantaAsync(plantaKey, token);
-    
+
     setFaregasAccessToken(resp.accessToken);
     sessionStorage.setItem('faregasAccessToken', resp.accessToken);
-    
+
     setFaregasPlanta(resp.plantaSeleccionada);
     sessionStorage.setItem('faregasPlanta', JSON.stringify(resp.plantaSeleccionada));
-    
+
     setFaregasUser(resp.user);
     sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
-    
+
     setTimeout(() => {
       navigate('/faregas/inicio');
     }, 0);
@@ -481,25 +482,25 @@ export default function App() {
           )
         }
       />
-      
-      <Route 
-        path="/seleccionar-empresa" 
+
+      <Route
+        path="/seleccionar-empresa"
         element={
           !(isAuthenticated || empresasDisponibles.length > 0) ? (
             <Navigate to="/login" replace />
           ) : (
-            <SeleccionEmpresaView 
-              onLogout={handleLogout} 
+            <SeleccionEmpresaView
+              onLogout={handleLogout}
               onSelect={async (empresa) => {
                 await ejecutarLoginEmpresa(empresa);
-              }} 
+              }}
             />
           )
         }
       />
 
-      <Route 
-        path="/seleccionar-planta" 
+      <Route
+        path="/seleccionar-planta"
         element={
           !isAuthenticated ? (
             <Navigate to="/login" replace />
@@ -518,8 +519,8 @@ export default function App() {
         path="/faregas/*"
         element={
           <Routes>
-            <Route 
-              path="seleccionar-planta" 
+            <Route
+              path="seleccionar-planta"
               element={
                 (!faregasPreToken && !sessionStorage.getItem('faregasPreToken')) ? (
                   <Navigate to="/login" replace />
@@ -529,18 +530,18 @@ export default function App() {
                     onConfirmPlanta={async (plantaKey) => {
                       const token = faregasPreToken || sessionStorage.getItem('faregasPreToken') || '';
                       const resp = await authFaregasApi.confirmarPlantaAsync(plantaKey, token);
-                      
+
                       setFaregasAccessToken(resp.accessToken);
                       sessionStorage.setItem('faregasAccessToken', resp.accessToken);
-                      
+
                       setFaregasUser(resp.user);
                       sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
-                      
+
                       setFaregasPlanta(resp.plantaSeleccionada);
                       sessionStorage.setItem('faregasPlanta', JSON.stringify(resp.plantaSeleccionada));
-                      
+
                       navigate('/faregas/inicio');
-                      
+
                       setTimeout(() => {
                         setFaregasPreToken('');
                         sessionStorage.removeItem('faregasPreToken');
@@ -549,7 +550,7 @@ export default function App() {
                     onCancel={handleLogoutFaregas}
                   />
                 )
-              } 
+              }
             />
             <Route
               element={
@@ -568,10 +569,25 @@ export default function App() {
               }
             >
               <Route path="inicio" element={<FaregasInicioView />} />
+              <Route
+                path="dashboard"
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    const pId = String(fUser?.perfilId || fUser?.perfil_id || '').toUpperCase();
+                    return userPerms.includes('MENU_DASHBOARD') || userPerms.includes('DASHBOARD_GLOBAL') || userPerms.includes('DASHBOARD_SEDE') || pId === 'SISTEMAS' || pId === 'AMINISTRADOR' ? (
+                      <FaregasDashboardView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                }
+              />
               <Route path="certificados/nuevo" element={<FaregasNuevoCertificadoView />} />
               <Route path="certificados/:id/continuar" element={<FaregasNuevoCertificadoView />} />
-              <Route 
-                path="usuarios" 
+              <Route
+                path="usuarios"
                 element={
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
@@ -582,10 +598,10 @@ export default function App() {
                       <ForbiddenView />
                     );
                   })()
-                } 
+                }
               />
-              <Route 
-                path="auditoria" 
+              <Route
+                path="auditoria"
                 element={
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
@@ -596,10 +612,10 @@ export default function App() {
                       <ForbiddenView />
                     );
                   })()
-                } 
+                }
               />
-              <Route 
-                path="descuentos" 
+              <Route
+                path="descuentos"
                 element={
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
@@ -611,7 +627,7 @@ export default function App() {
                       <ForbiddenView />
                     );
                   })()
-                } 
+                }
               />
               <Route path="configuracion" element={<FaregasConfiguracionView />} />
               <Route

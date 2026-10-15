@@ -3,10 +3,11 @@ import { useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../../Dashboard/MainLayout';
 import TabSeries from './TabSeries';
 import TabDocumentosFacturacion from './TabDocumentosFacturacion';
+import TabClientesFacturacion from './TabClientesFacturacion';
 import NubefactReadinessPanel from './NubefactReadinessPanel';
 
 /**
- * Facturación: un módulo, tres pestañas gobernadas por submódulos.
+ * Facturación: un módulo, cuatro pestañas gobernadas por submódulos.
  *
  * Series sigue siendo un solo módulo con UNA sola tabla: la tabla reúne las
  * series Nubefact y las DMS/Legacy de `fg_serie_comprobante`, y la columna Origen
@@ -17,12 +18,13 @@ import NubefactReadinessPanel from './NubefactReadinessPanel';
  * CONTADOR con sólo Comprobantes ve una sola pestaña y entra directamente en
  * ella; nunca queda seleccionado un tab que no tiene.
  */
-type VistaFacturacion = 'PREPARACION' | 'SERIES' | 'DOCUMENTOS';
+type VistaFacturacion = 'PREPARACION' | 'SERIES' | 'DOCUMENTOS' | 'CLIENTES';
 
 const PESTANAS: ReadonlyArray<{ id: VistaFacturacion; permiso: string; label: string }> = [
   { id: 'PREPARACION', permiso: 'MENU_FACTURACION_PREPARACION', label: 'PREPARACIÓN' },
   { id: 'SERIES', permiso: 'MENU_FACTURACION_SERIES', label: 'SERIES' },
-  { id: 'DOCUMENTOS', permiso: 'MENU_FACTURACION_COMPROBANTES', label: 'COMPROBANTES' }
+  { id: 'DOCUMENTOS', permiso: 'MENU_FACTURACION_COMPROBANTES', label: 'COMPROBANTES' },
+  { id: 'CLIENTES', permiso: 'MENU_FACTURACION_COMPROBANTES', label: 'CLIENTES' }
 ];
 
 export default function TabFacturacion({ plantaKey, plantaNombre }: { plantaKey: string; plantaNombre: string }) {
@@ -61,5 +63,6 @@ export default function TabFacturacion({ plantaKey, plantaNombre }: { plantaKey:
     {vista === 'PREPARACION' && <NubefactReadinessPanel plantaKey={plantaKey} plantaNombre={plantaNombre} />}
     {vista === 'SERIES' && <TabSeries />}
     {vista === 'DOCUMENTOS' && <TabDocumentosFacturacion />}
+    {vista === 'CLIENTES' && <TabClientesFacturacion />}
   </div>;
 }
