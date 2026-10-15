@@ -61,7 +61,16 @@ const ALTO_DOCUMENTO = 'h-[680px] min-h-[420px]';
 const detalleError = (error: unknown): string | null => {
   if (!error || typeof error !== 'object' || !('detalles' in error)) return null;
   const detalles = (error as { detalles?: unknown }).detalles;
-  return Array.isArray(detalles) ? detalles.map(String).join('\n') : null;
+  const motivo = Array.isArray(detalles)
+    ? detalles.map(String).join('\n')
+    : detalles && typeof detalles === 'object' && 'motivo' in detalles
+      ? String((detalles as { motivo?: unknown }).motivo || '')
+      : '';
+  if (!motivo) return null;
+  if (/50\s+documentos/i.test(motivo) && /demo/i.test(motivo)) {
+    return 'NubeFact rechazó el comprobante: la cuenta DEMO alcanzó el límite de 50 documentos.';
+  }
+  return motivo.length <= 500 ? motivo : `${motivo.slice(0, 497)}...`;
 };
 
 export function FacturacionEmisionStep({

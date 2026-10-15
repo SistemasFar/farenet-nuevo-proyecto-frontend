@@ -491,11 +491,41 @@ export const validarPasoExpedienteTecnico = ({
 };
 
 type DatosPago = {
+  tipoComprobante?: string;
   condicionPago: string;
   pagos: Array<Record<string, any>>;
   precioTotal: number;
   fechaInicioCredito?: string;
   fechaVencimientoCredito?: string;
+  cuotas?: Array<{ numeroCuota: number; fechaPago: string; importe: string | number }>;
+};
+
+const redondearMoneda = (valor: number) => Math.round((valor + Number.EPSILON) * 100) / 100;
+
+export const resolverCuotasCredito = ({
+  condicionPago,
+  pagos,
+  precioTotal,
+  fechaVencimientoCredito,
+  cuotas = [],
+}: Pick<DatosPago, 'condicionPago' | 'pagos' | 'precioTotal' | 'fechaVencimientoCredito' | 'cuotas'>) => {
+  if (condicionPago !== 'CREDITO') return [];
+  const totalPagado = redondearMoneda(pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0));
+  const saldo = redondearMoneda(precioTotal - totalPagado);
+  if (saldo <= 0) return [];
+
+  // El flujo anterior no ofrecía una forma de crear la primera cuota. Para un
+  // plan vacío (o para el plan automático de una sola cuota), la fuente de
+  // verdad es el saldo actual y el vencimiento general. Los planes de varias
+  // cuotas que ya fueron editados se conservan y se validan sin sobrescribirlos.
+  if (cuotas.length <= 1) {
+    return [{
+      numeroCuota: 1,
+      fechaPago: fechaVencimientoCredito || '',
+      importe: saldo.toFixed(2),
+    }];
+  }
+  return cuotas.map((cuota, index) => ({ ...cuota, numeroCuota: index + 1 }));
 };
 
 /**
@@ -505,15 +535,22 @@ type DatosPago = {
  */
 export const validarPasoPago = ({
   condicionPago,
+  tipoComprobante,
   pagos,
   precioTotal,
   fechaInicioCredito,
   fechaVencimientoCredito,
+  cuotas = [],
 }: DatosPago): ErroresCampo => {
-  const totalPagado = pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0);
+  const totalPagado = redondearMoneda(pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0));
   const esCredito = condicionPago === 'CREDITO';
-  const saldo = Math.max(0, precioTotal - totalPagado);
+  const saldo = redondearMoneda(Math.max(0, precioTotal - totalPagado));
   const errores: ErroresCampo = {};
+
+  if (String(tipoComprobante || '').toUpperCase() === 'BOLETA' && esCredito) {
+    errores.pagos = 'La boleta sólo admite condición de pago CONTADO.';
+    return errores;
+  }
 
   if (esCredito) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaInicioCredito || '')) {
@@ -530,7 +567,36 @@ export const validarPasoPago = ({
     errores.pagos = `El pago debe completar S/ ${precioTotal.toFixed(2)}. Saldo pendiente: S/ ${saldo.toFixed(2)}.`;
   }
   if (esCredito && totalPagado >= precioTotal - 0.009) {
-    errores.pagos = 'Una venta al crédito debe conservar un saldo pendiente para distribuirlo en cuotas.';
+    errores.pagos = 'Una venta a crédito debe conservar un saldo pendiente. Cambie la condición a CONTADO o reduzca el pago inicial.';
+  } else if (esCredito) {
+    if (cuotas.length === 0) {
+      errores.cuotas = 'La factura a crédito requiere al menos una cuota.';
+    } else {
+      let sumaCuotas = 0;
+      for (const cuota of cuotas) {
+        const importe = Number(cuota.importe || 0);
+        sumaCuotas += importe;
+        if (!Number.isFinite(importe) || importe <= 0) {
+          errores.cuotas = 'Cada cuota debe tener un monto mayor a cero.';
+          break;
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(cuota.fechaPago || '')) {
+          errores.cuotas = 'Cada cuota debe tener una fecha válida.';
+          break;
+        }
+        if (fechaInicioCredito && cuota.fechaPago < fechaInicioCredito) {
+          errores.cuotas = 'La fecha de cada cuota debe ser igual o posterior al inicio del crédito.';
+          break;
+        }
+        if (fechaVencimientoCredito && cuota.fechaPago > fechaVencimientoCredito) {
+          errores.cuotas = 'La fecha de cada cuota no puede superar el vencimiento general.';
+          break;
+        }
+      }
+      if (!errores.cuotas && Math.abs(redondearMoneda(sumaCuotas) - saldo) > 0.009) {
+        errores.cuotas = `Las cuotas deben sumar el saldo financiado de S/ ${saldo.toFixed(2)}.`;
+      }
+    }
   }
   return errores;
 };

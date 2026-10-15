@@ -107,6 +107,9 @@ export function DatosFacturacion({
         nroDocFac: eraIncompatible ? '' : prev.nroDocFac,
         razonSocialFac: eraIncompatible ? '' : prev.razonSocialFac,
         direccionFac: eraIncompatible ? '' : prev.direccionFac,
+        condicionPagoFac: 'CONTADO',
+        fechaVencimientoFac: '',
+        cuotasFac: [],
       }));
       return;
     }
@@ -139,6 +142,9 @@ export function DatosFacturacion({
       nroDocFac: eraIncompatible ? '' : prev.nroDocFac,
       razonSocialFac: eraIncompatible ? '' : prev.razonSocialFac,
       direccionFac: eraIncompatible ? '' : prev.direccionFac,
+      condicionPagoFac: nuevoComprobante === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
+      fechaVencimientoFac: nuevoComprobante === 'BOLETA' ? '' : prev.fechaVencimientoFac,
+      cuotasFac: nuevoComprobante === 'BOLETA' ? [] : prev.cuotasFac,
     }));
   };
 
@@ -158,6 +164,9 @@ export function DatosFacturacion({
       nroDocFac: titularPrincipal.nroDocumento,
       razonSocialFac: titularPrincipal.nombreRazonSocial,
       direccionFac: titularPrincipal.direccion,
+      condicionPagoFac: tipoDocumentoFac === 'RUC' ? prev.condicionPagoFac : 'CONTADO',
+      fechaVencimientoFac: tipoDocumentoFac === 'RUC' ? prev.fechaVencimientoFac : '',
+      cuotasFac: tipoDocumentoFac === 'RUC' ? prev.cuotasFac : [],
     }));
   };
 
@@ -203,6 +212,9 @@ export function DatosFacturacion({
           direccionFac: cliente.direccion || prev.direccionFac,
           emailFac: cliente.correo || cliente.email || prev.emailFac,
           telefonoFac: cliente.telefono || prev.telefonoFac,
+          condicionPagoFac: tipoComprobante === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
+          fechaVencimientoFac: tipoComprobante === 'BOLETA' ? '' : prev.fechaVencimientoFac,
+          cuotasFac: tipoComprobante === 'BOLETA' ? [] : prev.cuotasFac,
         }));
 
         const textoOrigen = response.origen === 'FAREGAS'

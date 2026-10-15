@@ -21,7 +21,7 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
+import { resolverCuotasCredito, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { useErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual as indicePaso, puedeRetrocederWizard } from './faregas-emision';
@@ -53,6 +53,7 @@ export interface FormCajaState {
 export interface FormPagoState {
   importe: string;
   tarjetaKey: string;
+  modalidadTarjeta?: '' | 'DEBITO' | 'CREDITO';
   entidadFinancieraKey: string;
   voucher?: string;
   nroOperacion?: string;
@@ -262,6 +263,7 @@ export function NuevoCertificadoView() {
   const [formPago, setFormPago] = useState<FormPagoState>({
     importe: '',
     tarjetaKey: '',
+    modalidadTarjeta: '',
     entidadFinancieraKey: '',
     cuentaCorrienteKey: '',
     nroOperacion: '',
@@ -297,7 +299,7 @@ export function NuevoCertificadoView() {
   const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
     tipoDocFac: '', tipoDocumentoFac: 'DNI', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
-    emailFac: '', telefonoFac: '', usarTitularPrincipalFac: true,
+    emailFac: '', telefonoFac: '', usarTitularPrincipalFac: false,
     condicionPagoFac: 'CONTADO', fechaInicioCreditoFac: fechaLocalIso(), fechaVencimientoFac: '',
     medioPagoFac: '', cuotasFac: []
   });
@@ -306,6 +308,16 @@ export function NuevoCertificadoView() {
   const medioPagoCalculado = React.useMemo(
     () => calcularMedioPago(pagosAgregados),
     [pagosAgregados]
+  );
+  const cuotasCreditoResueltas = React.useMemo(
+    () => resolverCuotasCredito({
+      condicionPago: formFacturacion.condicionPagoFac,
+      pagos: pagosAgregados,
+      precioTotal,
+      fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
+      cuotas: formFacturacion.cuotasFac,
+    }).map((cuota) => ({ ...cuota, importe: String(cuota.importe) })),
+    [formFacturacion.condicionPagoFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal]
   );
 
   const titularPrincipal = React.useMemo(
@@ -329,6 +341,9 @@ export function NuevoCertificadoView() {
         nroDocFac: titularPrincipal.nroDocumento,
         razonSocialFac: titularPrincipal.nombreRazonSocial,
         direccionFac: titularPrincipal.direccion,
+        condicionPagoFac: tipoComprobante === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
+        fechaVencimientoFac: tipoComprobante === 'BOLETA' ? '' : prev.fechaVencimientoFac,
+        cuotasFac: tipoComprobante === 'BOLETA' ? [] : prev.cuotasFac,
       };
       const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
         && prev.tipoDocumentoFac === sincronizada.tipoDocumentoFac
@@ -368,21 +383,25 @@ export function NuevoCertificadoView() {
     };
   }, [formFacturacion.usarTitularPrincipalFac, titularPrincipal]);
 
-  const construirPayloadFacturacion = () => ({
-    tipoComprobante: formFacturacion.tipoDocFac || 'BOLETA',
+  const construirPayloadFacturacion = (cuotas = formFacturacion.cuotasFac) => {
+    const tipoComprobante = formFacturacion.tipoDocFac || 'BOLETA';
+    const condicionPago = tipoComprobante === 'BOLETA' ? 'CONTADO' : formFacturacion.condicionPagoFac;
+    return ({
+    tipoComprobante,
     tipoDocumentoCliente: formFacturacion.tipoDocumentoFac || (formFacturacion.nroDocFac.length === 11 ? 'RUC' : 'DNI'),
     nroDocumento: formFacturacion.nroDocFac,
     nombreRazonSocial: formFacturacion.razonSocialFac,
     direccion: formFacturacion.direccionFac,
     email: formFacturacion.emailFac || null,
     telefono: formFacturacion.telefonoFac || null,
-    condicionPago: formFacturacion.condicionPagoFac,
-    fechaInicioCredito: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.fechaInicioCreditoFac : null,
-    fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
+    condicionPago,
+    fechaInicioCredito: condicionPago === 'CREDITO' ? formFacturacion.fechaInicioCreditoFac : null,
+    fechaVencimiento: condicionPago === 'CREDITO' ? (formFacturacion.fechaVencimientoFac || null) : null,
     medioPago: medioPagoCalculado || null,
-    cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
-    usarTitularPrincipalFac: formFacturacion.usarTitularPrincipalFac,
-  });
+    cuotas: condicionPago === 'CREDITO' ? cuotas : [],
+    facturarAlDuenoPrincipal: formFacturacion.usarTitularPrincipalFac,
+    });
+  };
 
 
 
@@ -525,6 +544,7 @@ export function NuevoCertificadoView() {
             tipo: String(pago.tipoContadoKey || '').toUpperCase(),
             importe: Number(pago.importe).toFixed(2),
             tarjetaKey: pago.tarjetaKey || '',
+            modalidadTarjeta: pago.modalidadTarjeta || '',
             nroOperacion: pago.nroOperacionBanco || pago.nroOperacionTarjeta || '',
             cuentaCorrienteKey: pago.cuentaCorrienteKey || '',
             entidadFinancieraKey: pago.entidadFinancieraKey || '',
@@ -535,10 +555,6 @@ export function NuevoCertificadoView() {
             const facturacionRes = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
             const fac = facturacionRes.data?.facturacion;
             if (fac) {
-              const principalGuardado = [...titularesCargados].sort((a, b) => a.orden - b.orden)[0];
-              const usaTitularPrincipal = Boolean(principalGuardado)
-                && String(fac.nroDocumento || '') === principalGuardado.nroDocumento
-                && String(fac.nombreRazonSocial || '').trim().toUpperCase() === principalGuardado.nombreRazonSocial.trim().toUpperCase();
               setFormFacturacion(prev => ({
                 ...prev,
                 tipoDocFac: fac.tipoComprobante || 'BOLETA',
@@ -548,12 +564,14 @@ export function NuevoCertificadoView() {
                 direccionFac: fac.direccion || '',
                 emailFac: fac.email || '',
                 telefonoFac: fac.telefono || '',
-                usarTitularPrincipalFac: usaTitularPrincipal,
-                condicionPagoFac: fac.condicionPago || 'CONTADO',
+                // Es una decisión persistida del operador; nunca se infiere
+                // comparando documento o nombre con el titular.
+                usarTitularPrincipalFac: fac.facturarAlDuenoPrincipal === true,
+                condicionPagoFac: fac.tipoComprobante === 'BOLETA' ? 'CONTADO' : (fac.condicionPago || 'CONTADO'),
                 fechaInicioCreditoFac: String(fac.fechaInicioCredito || prev.fechaInicioCreditoFac || fechaLocalIso()).slice(0, 10),
-                fechaVencimientoFac: String(fac.fechaVencimiento || '').slice(0, 10),
+                fechaVencimientoFac: fac.tipoComprobante === 'BOLETA' ? '' : String(fac.fechaVencimiento || '').slice(0, 10),
                 medioPagoFac: fac.medioPago || '',
-                cuotasFac: (fac.cuotas || []).map((cuota: any) => ({
+                cuotasFac: fac.tipoComprobante === 'BOLETA' ? [] : (fac.cuotas || []).map((cuota: any) => ({
                   numeroCuota: Number(cuota.numeroCuota),
                   fechaPago: String(cuota.fechaPago || '').slice(0, 10),
                   importe: String(cuota.importe)
@@ -1158,6 +1176,7 @@ export function NuevoCertificadoView() {
         tipo: pago.tipo,
         importe: pago.importe,
         tarjetaKey: pago.tarjetaKey || null,
+        modalidadTarjeta: pago.modalidadTarjeta || null,
         nroOperacion: pago.nroOperacion || null,
         cuentaCorrienteKey: pago.cuentaCorrienteKey || null,
         entidadFinancieraKey: pago.entidadFinancieraKey || null,
@@ -1166,9 +1185,43 @@ export function NuevoCertificadoView() {
     });
     aplicarResumenComercial(response.data);
     setLastSavedAt(new Date());
+    return response.data;
   };
 
-  const encolarAutosave = (guardar: () => Promise<void>) => {
+  const guardarPasoPagoCompleto = async (idBorrador: number, exigirFacturacion = false) => {
+    const resumenPago = await guardarPasoPagos(idBorrador);
+    const cuotas = formFacturacion.condicionPagoFac === 'CREDITO' ? cuotasCreditoResueltas : [];
+    const erroresPago = validarPasoPago({
+      tipoComprobante: formFacturacion.tipoDocFac,
+      condicionPago: formFacturacion.condicionPagoFac,
+      pagos: pagosAgregados,
+      precioTotal,
+      fechaInicioCredito: formFacturacion.fechaInicioCreditoFac,
+      fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
+      cuotas,
+    });
+    const erroresCliente = validarDatosFacturacionCampos(formFacturacion);
+    const primerError = Object.values({ ...erroresCliente, ...erroresPago })[0];
+    if (primerError) {
+      if (exigirFacturacion) throw new Error(primerError);
+      return resumenPago;
+    }
+
+    if (formFacturacion.condicionPagoFac === 'CREDITO') {
+      setFormFacturacion((prev) => {
+        const sinCambios = JSON.stringify(prev.cuotasFac) === JSON.stringify(cuotas);
+        return sinCambios ? prev : { ...prev, cuotasFac: cuotas };
+      });
+    }
+    const facturacionGuardada = await faregasCertificadosApi.guardarFacturacion(
+      idBorrador,
+      construirPayloadFacturacion(cuotas)
+    );
+    setFacturacion(facturacionGuardada.data as FacturacionFaregas);
+    return resumenPago;
+  };
+
+  const encolarAutosave = (guardar: () => Promise<unknown>) => {
     autosaveQueueRef.current = autosaveQueueRef.current
       .catch(() => undefined)
       .then(async () => {
@@ -1210,11 +1263,11 @@ export function NuevoCertificadoView() {
         || !formFacturacion.fechaVencimientoFac
         || formFacturacion.fechaVencimientoFac < formFacturacion.fechaInicioCreditoFac)) return;
     const timer = window.setTimeout(() => {
-      void encolarAutosave(() => guardarPasoPagos(certificadoId)).catch(() => undefined);
+      void encolarAutosave(() => guardarPasoPagoCompleto(certificadoId)).catch(() => undefined);
     }, 1200);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, soloLectura, currentStepIndex, pagosAgregados, precioTotal, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac]);
+  }, [certificadoId, loading, soloLectura, currentStepIndex, pagosAgregados, precioTotal, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac, cuotasCreditoResueltas]);
 
   const eliminarTitularBorrador = async (titular: TitularState) => {
     if (!certificadoId || !titular.titularId) return;
@@ -1392,25 +1445,31 @@ export function NuevoCertificadoView() {
         // puede saltar los datos técnicos que ahora aparecen antes en el flujo.
         if (exigirDatosTecnicosCompletos(true)) return;
         if (bloquearPaso(validarPasoPago({
+          tipoComprobante: formFacturacion.tipoDocFac,
           condicionPago: formFacturacion.condicionPagoFac,
           pagos: pagosAgregados,
           precioTotal,
           fechaInicioCredito: formFacturacion.fechaInicioCreditoFac,
           fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
+          cuotas: cuotasCreditoResueltas,
         }))) return;
         setIsSavingStep(true);
         try {
+          // Orden, cliente fiscal y plan de cuotas se guardan antes de cambiar
+          // de paso. Así un crédito nunca llega a emisión sin fg_facturacion_cuota.
           await guardarPasoPagos(certificadoId);
-          // La facturación a contado depende de la orden que acaba de crear o
-          // actualizar guardarPasoPagos. No debe ejecutarse al guardar los
-          // datos técnicos, porque Vehículo y Previsualización ocurren antes.
-          if (formFacturacion.condicionPagoFac === 'CONTADO') {
-            const facturacionGuardada = await faregasCertificadosApi.guardarFacturacion(
-              certificadoId,
-              construirPayloadFacturacion()
-            );
-            setFacturacion(facturacionGuardada.data as FacturacionFaregas);
+          const cuotas = formFacturacion.condicionPagoFac === 'CREDITO' ? cuotasCreditoResueltas : [];
+          if (formFacturacion.condicionPagoFac === 'CREDITO') {
+            setFormFacturacion((prev) => {
+              const sinCambios = JSON.stringify(prev.cuotasFac) === JSON.stringify(cuotas);
+              return sinCambios ? prev : { ...prev, cuotasFac: cuotas };
+            });
           }
+          const facturacionGuardada = await faregasCertificadosApi.guardarFacturacion(
+            certificadoId,
+            construirPayloadFacturacion(cuotas)
+          );
+          setFacturacion(facturacionGuardada.data as FacturacionFaregas);
           await persistirPaso(certificadoId, 'FACTURACION');
           setMinimumEditableStepIndex(0);
         } catch (e: any) {
@@ -1470,7 +1529,7 @@ export function NuevoCertificadoView() {
     } else if (STEPS[currentStepIndex].id === 'pago' && certificadoId) {
       setIsSavingStep(true);
       try {
-        await guardarPasoPagos(certificadoId);
+        await guardarPasoPagoCompleto(certificadoId);
       } catch (e: any) {
         Swal.fire('No se pudo guardar', e.message || 'No se cambió de paso para evitar perder los pagos.', 'error');
         return;
@@ -1594,9 +1653,14 @@ export function NuevoCertificadoView() {
       const nameUpper = selected ? selected.nombre.toUpperCase() : '';
       const isCuponidad = nameUpper.includes('CUPONIDAD');
       const isYapePlin = nameUpper.includes('YAPE') || nameUpper.includes('PLIN');
+      const requiereModalidad = Boolean(selected) && !isCuponidad && !isYapePlin;
 
       if (!formPago.tarjetaKey || !formPago.nroOperacion) {
         alert('Complete los campos obligatorios de la tarjeta.');
+        return;
+      }
+      if (requiereModalidad && !formPago.modalidadTarjeta) {
+        alert('Seleccione si la operación fue con tarjeta de débito o crédito.');
         return;
       }
       if (isCuponidad) {
@@ -1651,6 +1715,7 @@ export function NuevoCertificadoView() {
     setFormPago({
       importe: '',
       tarjetaKey: '',
+      modalidadTarjeta: '',
       entidadFinancieraKey: '',
       cuentaCorrienteKey: '',
       nroOperacion: '',
@@ -1677,7 +1742,7 @@ export function NuevoCertificadoView() {
         await faregasCertificadosApi.actualizarBorrador(certificadoId, { tarifaCodigo: formCaja.tarifaCodigo });
         await faregasCertificadosApi.guardarVehiculoBorrador(certificadoId, { placa: formCaja.placa, categoria: formCaja.categoria });
       } else if (currentStepIndex === indicePaso('PAGO') && precioTotal > 0) {
-        await guardarPasoPagos(certificadoId);
+        await guardarPasoPagoCompleto(certificadoId);
       } else if (currentStepIndex === indicePaso('VEHICULO')) {
         if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
         else await guardarPasoVehiculo(certificadoId);
@@ -1944,15 +2009,19 @@ export function NuevoCertificadoView() {
             descuento={descuento}
             resumenComercial={resumenComercial}
             maestrosPago={maestrosPago}
+            tipoComprobante={formFacturacion.tipoDocFac}
             condicionPago={formFacturacion.condicionPagoFac}
             fechaInicioCredito={formFacturacion.fechaInicioCreditoFac}
             fechaVencimientoCredito={formFacturacion.fechaVencimientoFac}
+            cuotasCredito={cuotasCreditoResueltas}
             erroresCampo={errores}
             onCorregirCampo={limpiarErrorCampo}
             onCondicionPagoChange={(condicionPago) => {
+              if (formFacturacion.tipoDocFac === 'BOLETA' && condicionPago === 'CREDITO') return;
               limpiarErrorCampo('pagos');
               limpiarErrorCampo('fechaInicioCredito');
               limpiarErrorCampo('fechaVencimientoCredito');
+              limpiarErrorCampo('cuotas');
               setFormFacturacion((prev) => ({
                 ...prev,
                 condicionPagoFac: condicionPago,
@@ -1963,10 +2032,12 @@ export function NuevoCertificadoView() {
             onFechaInicioCreditoChange={(fecha) => {
               limpiarErrorCampo('fechaInicioCredito');
               limpiarErrorCampo('fechaVencimientoCredito');
+              limpiarErrorCampo('cuotas');
               setFormFacturacion((prev) => ({ ...prev, fechaInicioCreditoFac: fecha }));
             }}
             onFechaVencimientoCreditoChange={(fecha) => {
               limpiarErrorCampo('fechaVencimientoCredito');
+              limpiarErrorCampo('cuotas');
               setFormFacturacion((prev) => ({ ...prev, fechaVencimientoFac: fecha }));
             }}
           />

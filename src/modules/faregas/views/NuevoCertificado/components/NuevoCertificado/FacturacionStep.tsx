@@ -426,6 +426,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
             direccionFac: guardada.direccion,
             emailFac: guardada.email || '',
             telefonoFac: guardada.telefono || '',
+            usarTitularPrincipalFac: guardada.facturarAlDuenoPrincipal === true,
             condicionPagoFac: guardada.condicionPago || 'CONTADO',
             fechaInicioCreditoFac: String(guardada.fechaInicioCredito || prev.fechaInicioCreditoFac || '').slice(0, 10),
             fechaVencimientoFac: String(guardada.fechaVencimiento || '').slice(0, 10),
@@ -463,6 +464,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
         : null,
       fechaVencimiento: formFacturacion.fechaVencimientoFac || null,
       medioPago: medioPago || null,
+      facturarAlDuenoPrincipal: formFacturacion.usarTitularPrincipalFac,
       cuotas: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.cuotasFac : [],
     };
   };

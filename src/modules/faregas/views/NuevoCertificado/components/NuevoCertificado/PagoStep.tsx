@@ -21,10 +21,12 @@ interface PagoStepProps {
   labelTarifaOriginal?: string;
   resumenComercial?: ResumenComercialFaregas | null;
   maestrosPago?: MaestrosPagoResponse['data'] | null;
+  tipoComprobante: string;
   condicionPago: 'CONTADO' | 'CREDITO';
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
   fechaInicioCredito: string;
   fechaVencimientoCredito: string;
+  cuotasCredito?: Array<{ numeroCuota: number; fechaPago: string; importe: string | number }>;
   onFechaInicioCreditoChange: (fecha: string) => void;
   onFechaVencimientoCreditoChange: (fecha: string) => void;
   compact?: boolean;
@@ -45,11 +47,13 @@ export function PagoStep({
   descuento = 0,
   resumenComercial,
   maestrosPago,
+  tipoComprobante,
   labelTarifaOriginal = "Certificado:",
   condicionPago,
   onCondicionPagoChange,
   fechaInicioCredito,
   fechaVencimientoCredito,
+  cuotasCredito = [],
   onFechaInicioCreditoChange,
   onFechaVencimientoCreditoChange,
   compact = false,
@@ -62,8 +66,16 @@ export function PagoStep({
   const cuentasFiltradas = (maestrosPago?.cuentasCorrientes || []).filter((cuenta) =>
     !formPago.entidadFinancieraKey || cuenta.entidadfinanciera_key === formPago.entidadFinancieraKey
   );
+  const tarjetaSeleccionada = (maestrosPago?.tarjetas || []).find((tarjeta) => tarjeta.key === formPago.tarjetaKey);
+  const nombreTarjetaSeleccionada = String(tarjetaSeleccionada?.nombre || '').toUpperCase();
+  const esMedioAlternativo = ['YAPE', 'PLIN', 'CUPONIDAD'].some((nombre) => nombreTarjetaSeleccionada.includes(nombre));
+  const esBoleta = String(tipoComprobante || '').toUpperCase() === 'BOLETA';
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormPago((prev) => ({ ...prev, [e.target.name]: e.target.value.toUpperCase() }));
+    setFormPago((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value.toUpperCase(),
+      ...(e.target.name === 'tarjetaKey' ? { modalidadTarjeta: '' } : {}),
+    }));
   };
 
   const agregarMockPago = () => {
@@ -93,12 +105,14 @@ export function PagoStep({
             <label className="mb-2 block text-xs font-bold text-slate-500">CONDICIÓN DE PAGO</label>
             <select
               value={condicionPago}
+              disabled={esBoleta}
               onChange={(event) => onCondicionPagoChange(event.target.value as 'CONTADO' | 'CREDITO')}
-              className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold text-[#052a79]"
+              className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold text-[#052a79] disabled:bg-slate-100 disabled:text-slate-600"
             >
               <option value="CONTADO">CONTADO — debe completar el pago</option>
-              <option value="CREDITO">CRÉDITO — el saldo se distribuirá en cuotas</option>
+              {!esBoleta && <option value="CREDITO">CRÉDITO — el saldo se distribuirá en cuotas</option>}
             </select>
+            {esBoleta && <p className="mt-2 text-xs font-semibold text-slate-500">La boleta sólo admite condición de pago CONTADO.</p>}
             {condicionPago === 'CREDITO' && (
               <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
                 <p className="mb-2 text-xs font-black tracking-wide text-[#052a79]">PERÍODO DEL CRÉDITO</p>
@@ -124,6 +138,28 @@ export function PagoStep({
                     />
                     <MensajeError campo="fechaVencimientoCredito" errores={erroresCampo} />
                   </div>
+                </div>
+                <div className="mt-3" data-campo-error={erroresCampo.cuotas ? true : undefined}>
+                  <p className="mb-2 text-xs font-black tracking-wide text-[#052a79]">PLAN DE CUOTAS</p>
+                  {cuotasCredito.length === 0 ? (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
+                      Complete el vencimiento y conserve un saldo pendiente para generar la cuota.
+                    </p>
+                  ) : (
+                    <div className="overflow-hidden rounded-lg border border-blue-200 bg-white">
+                      <div className="grid grid-cols-3 bg-blue-100/70 px-3 py-2 text-[10px] font-black text-[#052a79]">
+                        <span>CUOTA</span><span>VENCIMIENTO</span><span className="text-right">MONTO</span>
+                      </div>
+                      {cuotasCredito.map((cuota) => (
+                        <div key={cuota.numeroCuota} className="grid grid-cols-3 px-3 py-2 text-xs font-bold text-slate-700">
+                          <span>{String(cuota.numeroCuota).padStart(3, '0')}</span>
+                          <span>{cuota.fechaPago || 'PENDIENTE'}</span>
+                          <span className="text-right">S/ {Number(cuota.importe || 0).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <MensajeError campo="cuotas" errores={erroresCampo} />
                 </div>
               </div>
             )}
@@ -160,9 +196,9 @@ export function PagoStep({
               </div>
 
               {pagoTab === 'TARJETA' && (
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE TARJETA</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">MARCA / MEDIO</label>
                     <select name="tarjetaKey" value={formPago.tarjetaKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0">
                       <option value="">-- SELECCIONAR --</option>
                       {(maestrosPago?.tarjetas || []).map((tarjeta) => (
@@ -170,6 +206,16 @@ export function PagoStep({
                       ))}
                     </select>
                   </div>
+                  {tarjetaSeleccionada && !esMedioAlternativo && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">MODALIDAD DE TARJETA</label>
+                      <select name="modalidadTarjeta" value={formPago.modalidadTarjeta || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold focus:border-[#f59e0b] focus:ring-0">
+                        <option value="">-- SELECCIONAR --</option>
+                        <option value="DEBITO">DÉBITO</option>
+                        <option value="CREDITO">CRÉDITO</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -222,7 +268,7 @@ export function PagoStep({
                 {pagosAgregados.map((p, idx) => (
                   <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
                     <div>
-                      <p className="font-bold text-slate-800">{p.tipo} {p.tarjetaKey ? `- ${p.tarjetaKey}` : ''}</p>
+                      <p className="font-bold text-slate-800">{p.tipo} {p.tarjetaKey ? `- ${p.tarjetaKey}` : ''} {p.modalidadTarjeta ? `(${p.modalidadTarjeta === 'DEBITO' ? 'DÉBITO' : 'CRÉDITO'})` : ''}</p>
                       <p className="text-xs text-slate-500 capitalize">{p.nroOperacion ? `Operación: ${p.nroOperacion}` : 'Sin referencia'}</p>
                     </div>
                     <div className="flex items-center gap-4">

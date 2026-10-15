@@ -86,6 +86,7 @@ export interface GuardarFacturacionFaregasRequest {
   fechaInicioCredito?: NullableText;
   fechaVencimiento?: NullableText;
   medioPago?: NullableText;
+  facturarAlDuenoPrincipal?: boolean;
   cuotas?: Array<{
     numeroCuota: number;
     fechaPago: string;
@@ -122,6 +123,7 @@ export interface FacturacionFaregas {
   fechaInicioCredito: NullableText;
   fechaVencimiento: NullableText;
   medioPago: NullableText;
+  facturarAlDuenoPrincipal: boolean;
   cuotas: CuotaFacturacionFaregas[];
   baseImponible: number;
   igv: number;
