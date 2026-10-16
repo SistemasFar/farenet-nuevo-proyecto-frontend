@@ -1,5 +1,5 @@
 import React from 'react';
-import type { CertificadoDetalleItem, PaginadoResponse } from '../../services/faregas-dashboard.api';
+import type { CertificadoDetalleItem, PaginadoResponse } from '../../../services/faregas-dashboard.api';
 
 interface DashboardCertificadosProps {
   data: PaginadoResponse<CertificadoDetalleItem> | null;
@@ -15,7 +15,7 @@ export const DashboardCertificados: React.FC<DashboardCertificadosProps> = ({
   onCambiarPagina
 }) => {
   if (cargando) {
-    return <div className="bg-white rounded-xl p-8 text-center text-slate-400 text-xs">Cargando certificados...</div>;
+    return <div className="bg-white rounded-xl p-8 text-center text-slate-400 text-sm">Cargando certificados...</div>;
   }
 
   const items = data?.items || [];
@@ -27,7 +27,7 @@ export const DashboardCertificados: React.FC<DashboardCertificadosProps> = ({
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-slate-800">Certificados Registrados</h3>
-          <p className="text-xs text-slate-500">Listado oficial de certificados GLP, GNV y Conformidad</p>
+          <p className="text-sm text-slate-500">Listado oficial de certificados GLP, GNV y Conformidad</p>
         </div>
         <span className="text-xs px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-full">
           Total: {total}
@@ -35,8 +35,8 @@ export const DashboardCertificados: React.FC<DashboardCertificadosProps> = ({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-xs">
             <tr>
               <th className="py-2.5 px-3">ID / Certificado</th>
               <th className="py-2.5 px-3">Tipo</th>
@@ -61,22 +61,22 @@ export const DashboardCertificados: React.FC<DashboardCertificadosProps> = ({
                   <td className="py-2.5 px-3 font-semibold text-slate-800">
                     <div>#{c.id}</div>
                     {c.numeroCertificado && (
-                      <div className="text-[11px] text-blue-700 font-mono">{c.numeroCertificado}</div>
+                      <div className="text-xs text-blue-700 font-mono">{c.numeroCertificado}</div>
                     )}
                   </td>
                   <td className="py-2.5 px-3">
                     <span className="font-semibold text-slate-700">{c.tipoCertificado}</span>
                   </td>
                   <td className="py-2.5 px-3">
-                    <span className="font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
+                    <span className="font-mono font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded text-xs">
                       {c.placa || 'SIN PLACA'}
                     </span>
-                    {c.marca && <div className="text-[10px] text-slate-400">{c.marca} {c.modelo}</div>}
+                    {c.marca && <div className="text-xs text-slate-400">{c.marca} {c.modelo}</div>}
                   </td>
                   <td className="py-2.5 px-3 text-slate-700">{c.plantaNombre}</td>
                   <td className="py-2.5 px-3">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`px-2 py-0.5 rounded text-xs font-semibold ${
                         c.estado === 'EMITIDO'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : c.estado === 'ANULADO'
@@ -93,7 +93,7 @@ export const DashboardCertificados: React.FC<DashboardCertificadosProps> = ({
                   <td className="py-2.5 px-3 text-slate-500">
                     {new Date(c.fechaCreacion).toLocaleDateString('es-PE')}
                   </td>
-                  <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">
+                  <td className="py-2.5 px-3 text-slate-600 font-mono text-xs">
                     {c.usuarioCreacion}
                   </td>
                 </tr>

@@ -14,11 +14,21 @@ export interface SerieDiariaItem {
   operaciones: number;
 }
 
+export interface SerieCertificadoItem {
+  fecha: string;
+  total: number;
+  emitidos: number;
+  borradores: number;
+  anulados: number;
+}
+
 export interface DistribucionCertificadoItem {
   tipo: string;
   cantidad: number;
   emitidos: number;
   pendientes: number;
+  anulados: number;
+  porcentaje: number;
   totalSoles: number;
 }
 
@@ -54,8 +64,13 @@ export interface DashboardResumenResponse {
     saldoPendiente: KpiValor;
     cantidadOperaciones: KpiValor;
     ticketPromedio: KpiValor;
+    ventaOperativaCertificados: KpiValor;
+    ventaBrutaCertificados: KpiValor;
+    ventaNetaCertificados: KpiValor;
+    ticketPromedioCertificados: KpiValor;
     certificadosEmitidos: KpiValor;
     certificadosPendientes: KpiValor;
+    certificadosAnulados: KpiValor;
     productosVendidos: KpiValor;
     montoDescontado: KpiValor;
     facturasAceptadas: KpiValor;
@@ -63,7 +78,9 @@ export interface DashboardResumenResponse {
     comprobantesRechazadosOError: KpiValor;
   };
   serieDiaria: SerieDiariaItem[];
+  serieCertificados: SerieCertificadoItem[];
   distribucionCertificados: DistribucionCertificadoItem[];
+  distribucionProductos?: ProductoDetalleItem[];
   distribucionPagos: DistribucionPagoItem[];
   alertas: AlertaInconsistencia[];
 }
@@ -97,6 +114,7 @@ export interface CertificadoDetalleItem {
 }
 
 export interface ProductoDetalleItem {
+  id?: number;
   sku: string;
   descripcion: string;
   unidad: string;
@@ -122,6 +140,9 @@ export interface ComprobanteDetalleItem {
   importeTotal: number;
   fechaDocumento: string;
   fechaCreacion: string;
+  cuotasCantidad: number;
+  cuotasImporteProgramado: number;
+  proximoVencimiento: string | null;
   plantaKey: string;
   plantaNombre: string;
 }
@@ -176,6 +197,25 @@ export interface PaginadoResponse<T> {
   limite: number;
 }
 
+export interface DashboardExportacionResponse {
+  metadatos: {
+    rango: string;
+    fechaGeneracion: string;
+    usuarioExportador: string;
+    sedesIncluidas: string;
+  };
+  hojas: {
+    resumen: DashboardResumenResponse;
+    sedes: SedeDetalleItem[];
+    certificados: CertificadoDetalleItem[];
+    ventasProductos: ProductoDetalleItem[];
+    comprobantes: ComprobanteDetalleItem[];
+    pagos: PagoDetalleItem[];
+    descuentos: DescuentoDetalleItem[];
+    usuarios: UsuarioDetalleItem[];
+  };
+}
+
 export interface FiltrosDashboard {
   alcance?: 'GLOBAL' | 'SEDE';
   plantaKey?: string;
@@ -183,12 +223,17 @@ export interface FiltrosDashboard {
   desde?: string;
   hasta?: string;
   tipoCertificado?: string;
+  productoId?: number;
   estado?: string;
   usuario?: string;
   medioPago?: string;
   tipoComprobante?: string;
   pagina?: number;
   limite?: number;
+}
+
+export interface DashboardRequestOptions {
+  signal?: AbortSignal;
 }
 
 function construirQueryString(params: Record<string, unknown>) {
@@ -207,55 +252,55 @@ function construirQueryString(params: Record<string, unknown>) {
 }
 
 export const faregasDashboardApi = {
-  obtenerResumen: async (filtros: FiltrosDashboard): Promise<DashboardResumenResponse> => {
+  obtenerResumen: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<DashboardResumenResponse> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
-    const res = await faregasFetch(`/dashboard/resumen${qs}`);
+    const res = await faregasFetch(`/dashboard/resumen${qs}`, { signal: options.signal });
     return res.data;
   },
 
-  obtenerSedes: async (filtros: FiltrosDashboard): Promise<SedeDetalleItem[]> => {
+  obtenerSedes: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<SedeDetalleItem[]> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
-    const res = await faregasFetch(`/dashboard/sedes${qs}`);
+    const res = await faregasFetch(`/dashboard/sedes${qs}`, { signal: options.signal });
     return res.data;
   },
 
-  obtenerCertificados: async (filtros: FiltrosDashboard): Promise<PaginadoResponse<CertificadoDetalleItem>> => {
+  obtenerCertificados: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<PaginadoResponse<CertificadoDetalleItem>> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
-    const res = await faregasFetch(`/dashboard/detalle/certificados${qs}`);
+    const res = await faregasFetch(`/dashboard/detalle/certificados${qs}`, { signal: options.signal });
     return res.data;
   },
 
-  obtenerProductos: async (filtros: FiltrosDashboard): Promise<PaginadoResponse<ProductoDetalleItem>> => {
+  obtenerProductos: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<PaginadoResponse<ProductoDetalleItem>> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
-    const res = await faregasFetch(`/dashboard/detalle/productos${qs}`);
+    const res = await faregasFetch(`/dashboard/detalle/productos${qs}`, { signal: options.signal });
     return res.data;
   },
 
-  obtenerComprobantes: async (filtros: FiltrosDashboard): Promise<PaginadoResponse<ComprobanteDetalleItem>> => {
+  obtenerComprobantes: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<PaginadoResponse<ComprobanteDetalleItem>> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
-    const res = await faregasFetch(`/dashboard/detalle/comprobantes${qs}`);
+    const res = await faregasFetch(`/dashboard/detalle/comprobantes${qs}`, { signal: options.signal });
     return res.data;
   },
 
-  obtenerPagos: async (filtros: FiltrosDashboard): Promise<PaginadoResponse<PagoDetalleItem>> => {
+  obtenerPagos: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<PaginadoResponse<PagoDetalleItem>> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
-    const res = await faregasFetch(`/dashboard/detalle/pagos${qs}`);
+    const res = await faregasFetch(`/dashboard/detalle/pagos${qs}`, { signal: options.signal });
     return res.data;
   },
 
-  obtenerDescuentos: async (filtros: FiltrosDashboard): Promise<PaginadoResponse<DescuentoDetalleItem>> => {
+  obtenerDescuentos: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<PaginadoResponse<DescuentoDetalleItem>> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
-    const res = await faregasFetch(`/dashboard/detalle/descuentos${qs}`);
+    const res = await faregasFetch(`/dashboard/detalle/descuentos${qs}`, { signal: options.signal });
     return res.data;
   },
 
-  obtenerUsuarios: async (filtros: FiltrosDashboard): Promise<UsuarioDetalleItem[]> => {
+  obtenerUsuarios: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<UsuarioDetalleItem[]> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
-    const res = await faregasFetch(`/dashboard/detalle/usuarios${qs}`);
+    const res = await faregasFetch(`/dashboard/detalle/usuarios${qs}`, { signal: options.signal });
     return res.data;
   },
 
-  obtenerExportacion: async (filtros: FiltrosDashboard) => {
+  obtenerExportacion: async (filtros: FiltrosDashboard): Promise<DashboardExportacionResponse> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
     const res = await faregasFetch(`/dashboard/exportacion${qs}`);
     return res.data;

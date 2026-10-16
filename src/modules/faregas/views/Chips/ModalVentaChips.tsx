@@ -8,6 +8,7 @@ import { ChipScannerInput } from './ChipScannerInput';
 import { parseChipScan } from './chips-ingreso-masivo';
 import { esComprobanteReintentable } from './facturacionReintento';
 import { PagoStep } from '../NuevoCertificado/components/NuevoCertificado/PagoStep';
+import { GestorCuotasCredito } from '../components/GestorCuotasCredito';
 import { maestrosApi } from '@/services/api';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../NuevoCertificado/NuevoCertificadoView';
@@ -81,6 +82,11 @@ export function ModalVentaChips({
   const [buscandoCliente, setBuscandoCliente] = useState(false);
 
   const [condicionPago, setCondicionPago] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
+  const fechaHoy = new Date().toISOString().slice(0, 10);
+  const fechaMas30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [fechaInicioCredito, setFechaInicioCredito] = useState(fechaHoy);
+  const [fechaVencimiento, setFechaVencimiento] = useState(fechaMas30);
+  const [cuotas, setCuotas] = useState<Array<{ numeroCuota: number; fechaPago: string; importe: string }>>([]);
   const [pagoTab, setPagoTab] = useState<PagoAgregado['tipo']>('EFECTIVO');
   const [pagosAgregados, setPagosAgregados] = useState<PagoAgregado[]>([]);
   const [formPago, setFormPago] = useState<FormPagoState>(crearFormPagoVacio);
@@ -124,7 +130,56 @@ export function ModalVentaChips({
     return sum + (Number.isFinite(importe) ? importe : 0);
   }, 0);
   const pendiente = totalMonto - totalPagado;
+  const saldoAFinanciar = Math.max(0, totalMonto - totalPagado);
   const pagoCompleto = validacionCompleta && Math.abs(pendiente) <= toleranciaMonto;
+
+  const cuotasEfectivas = cuotas.length > 0 ? cuotas : (condicionPago === 'CREDITO' && saldoAFinanciar > 0 ? [{
+    numeroCuota: 1,
+    fechaPago: fechaVencimiento || fechaMas30,
+    importe: saldoAFinanciar.toFixed(2)
+  }] : []);
+
+  const totalCuotasProgramado = cuotasEfectivas.reduce((sum, c) => sum + (Number(c.importe) || 0), 0);
+  const diferenciaCuotas = Math.round((totalCuotasProgramado - saldoAFinanciar) * 100) / 100;
+  const cuotasCuadran = Math.abs(diferenciaCuotas) <= toleranciaMonto;
+
+  const agregarCuota = () => {
+    setCuotas(() => {
+      const base = cuotasEfectivas;
+      return [...base, {
+        numeroCuota: base.length + 1,
+        fechaPago: fechaVencimiento || fechaMas30,
+        importe: ''
+      }];
+    });
+  };
+
+  const actualizarCuota = (index: number, campo: 'fechaPago' | 'importe', valor: string) => {
+    setCuotas(() => {
+      const base = [...cuotasEfectivas];
+      base[index] = { ...base[index], [campo]: valor };
+      return base;
+    });
+  };
+
+  const eliminarCuota = (index: number) => {
+    setCuotas(() => {
+      const base = cuotasEfectivas.filter((_, i) => i !== index);
+      return base.map((c, i) => ({ ...c, numeroCuota: i + 1 }));
+    });
+  };
+
+  const creditoValido = Boolean(
+    condicionPago === 'CREDITO'
+    && tipoComprobante === 'FACTURA'
+    && saldoAFinanciar > 0.009
+    && cuotasEfectivas.length > 0
+    && cuotasCuadran
+    && cuotasEfectivas.every(c => Number(c.importe) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(c.fechaPago))
+    && (!fechaInicioCredito || !fechaVencimiento || fechaVencimiento >= fechaInicioCredito)
+  );
+
+  const pagoValido = condicionPago === 'CONTADO' ? pagoCompleto : (validacionCompleta && creditoValido);
   const errorFiscalDocumento = errorDocumentoFiscal(
     tipoComprobante,
     tipoDocumentoCliente,
@@ -329,6 +384,17 @@ export function ModalVentaChips({
       if (condicionPago === 'CONTADO' && pendiente > toleranciaMonto) {
         throw new Error('Debe completar el pago para confirmar la venta al contado.');
       }
+      if (condicionPago === 'CREDITO') {
+        if (tipoComprobante !== 'FACTURA') {
+          throw new Error('Solo las FACTURAS pueden emitirse al crédito.');
+        }
+        if (saldoAFinanciar <= toleranciaMonto) {
+          throw new Error('Una venta a crédito debe conservar saldo pendiente.');
+        }
+        if (!cuotasCuadran) {
+          throw new Error(`Las cuotas programadas (S/ ${totalCuotasProgramado.toFixed(2)}) no coinciden con el saldo financiado (S/ ${saldoAFinanciar.toFixed(2)}).`);
+        }
+      }
       if (pendiente < -toleranciaMonto) {
         throw new Error('El pago no puede superar el total de la venta.');
       }
@@ -344,6 +410,13 @@ export function ModalVentaChips({
         email: normalizarEmail(email) || null,
         telefono: telefono.trim() || null,
         condicionPago,
+        fechaInicioCredito: condicionPago === 'CREDITO' ? fechaInicioCredito : null,
+        fechaVencimiento: condicionPago === 'CREDITO' ? fechaVencimiento : null,
+        cuotas: condicionPago === 'CREDITO' ? cuotasEfectivas.map(c => ({
+          numeroCuota: c.numeroCuota,
+          fechaPago: c.fechaPago,
+          importe: Number(c.importe)
+        })) : [],
         medioPago: pagosAgregados[0]?.tipo || 'EFECTIVO',
         pagosAgregados,
         ...(esCantidad
@@ -468,8 +541,13 @@ export function ModalVentaChips({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block text-sm font-bold text-slate-700">Comprobante
                 <select value={tipoComprobante} disabled={ventaRegistrada} onChange={e => {
-                  setTipoComprobante(e.target.value);
-                  setTipoDocumentoCliente(e.target.value === 'FACTURA' ? 'RUC' : 'DNI');
+                  const val = e.target.value;
+                  setTipoComprobante(val);
+                  setTipoDocumentoCliente(val === 'FACTURA' ? 'RUC' : 'DNI');
+                  if (val !== 'FACTURA') {
+                    setCondicionPago('CONTADO');
+                    setCuotas([]);
+                  }
                 }} className="mt-1 w-full rounded-lg border border-slate-300 p-2 focus:border-blue-500 focus:outline-none disabled:bg-slate-100">
                   <option value="BOLETA">BOLETA</option>
                   <option value="FACTURA">FACTURA</option>
@@ -616,10 +694,40 @@ export function ModalVentaChips({
               totalPagar={totalMonto}
               tarifaOriginal={totalMonto}
               maestrosPago={maestrosPago}
+              tipoComprobante={tipoComprobante}
               condicionPago={condicionPago}
-              onCondicionPagoChange={setCondicionPago}
+              onCondicionPagoChange={(cond) => {
+                setCondicionPago(cond);
+                if (cond === 'CONTADO') setCuotas([]);
+              }}
+              fechaInicioCredito={fechaInicioCredito}
+              fechaVencimientoCredito={fechaVencimiento}
+              cuotasCredito={cuotasEfectivas}
+              onFechaInicioCreditoChange={setFechaInicioCredito}
+              onFechaVencimientoCreditoChange={(f) => {
+                setFechaVencimiento(f);
+                if (cuotas.length <= 1) {
+                  setCuotas([{ numeroCuota: 1, fechaPago: f, importe: saldoAFinanciar.toFixed(2) }]);
+                }
+              }}
               compact
             />
+            {condicionPago === 'CREDITO' && (
+              <div className="mt-4">
+                <GestorCuotasCredito
+                  saldoAFinanciar={saldoAFinanciar}
+                  fechaInicioCredito={fechaInicioCredito}
+                  fechaVencimientoCredito={fechaVencimiento}
+                  cuotas={cuotasEfectivas}
+                  onChangeCuotas={(nuevas) => setCuotas(nuevas.map(c => ({
+                    numeroCuota: c.numeroCuota,
+                    fechaPago: c.fechaPago,
+                    importe: String(c.importe)
+                  })))}
+                  compact
+                />
+              </div>
+            )}
           </fieldset>
         </div>
 
@@ -630,7 +738,7 @@ export function ModalVentaChips({
           <button onClick={onClose} disabled={loadingVenta || validandoChips} className="w-full rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Cancelar</button>
           <button
             onClick={() => void handleSubmit()}
-            disabled={loadingVenta || validandoChips || ventaRegistrada || !validacionCompleta || !datosFiscalesValidos || !pagoCompleto}
+            disabled={loadingVenta || validandoChips || ventaRegistrada || !validacionCompleta || !datosFiscalesValidos || !pagoValido}
             className="w-full rounded-lg bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {loadingVenta ? 'Procesando...' : 'Confirmar Venta y Emitir'}

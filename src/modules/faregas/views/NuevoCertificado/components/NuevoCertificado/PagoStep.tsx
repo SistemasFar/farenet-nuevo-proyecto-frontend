@@ -1,9 +1,10 @@
-import React from 'react';
-import { CreditCard, PlusCircle, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { CreditCard, PlusCircle, Trash2, AlertCircle, ShieldAlert } from 'lucide-react';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../../NuevoCertificadoView';
 import type { ResumenComercialFaregas } from '../../../../types/faregas-api';
 import { MensajeError, type ErroresCampo } from '../../faregas-wizard-errores';
+import { GestorCuotasCredito, type CuotaCreditoItem } from '../../../components/GestorCuotasCredito';
 
 type TipoPago = PagoAgregado['tipo'];
 
@@ -26,7 +27,8 @@ interface PagoStepProps {
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
   fechaInicioCredito: string;
   fechaVencimientoCredito: string;
-  cuotasCredito?: Array<{ numeroCuota: number; fechaPago: string; importe: string | number }>;
+  cuotasCredito?: CuotaCreditoItem[];
+  onCuotasCreditoChange?: (cuotas: CuotaCreditoItem[]) => void;
   onFechaInicioCreditoChange: (fecha: string) => void;
   onFechaVencimientoCreditoChange: (fecha: string) => void;
   compact?: boolean;
@@ -54,6 +56,7 @@ export function PagoStep({
   fechaInicioCredito,
   fechaVencimientoCredito,
   cuotasCredito = [],
+  onCuotasCreditoChange,
   onFechaInicioCreditoChange,
   onFechaVencimientoCreditoChange,
   compact = false,
@@ -61,6 +64,7 @@ export function PagoStep({
   onCorregirCampo,
 }: PagoStepProps) {
 
+  const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
   const pendiente = totalPagar - pagado;
   const cuentasFiltradas = (maestrosPago?.cuentasCorrientes || []).filter((cuenta) =>
@@ -113,9 +117,10 @@ export function PagoStep({
               {!esBoleta && <option value="CREDITO">CRÉDITO — el saldo se distribuirá en cuotas</option>}
             </select>
             {esBoleta && <p className="mt-2 text-xs font-semibold text-slate-500">La boleta sólo admite condición de pago CONTADO.</p>}
+            
             {condicionPago === 'CREDITO' && (
-              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
-                <p className="mb-2 text-xs font-black tracking-wide text-[#052a79]">PERÍODO DEL CRÉDITO</p>
+              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3 space-y-3">
+                <p className="text-xs font-black tracking-wide text-[#052a79]">PERÍODO DEL CRÉDITO</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div data-campo-error={erroresCampo.fechaInicioCredito ? true : undefined}>
                     <label className="mb-1 block text-xs font-bold text-slate-600">FECHA DE INICIO *</label>
@@ -139,31 +144,38 @@ export function PagoStep({
                     <MensajeError campo="fechaVencimientoCredito" errores={erroresCampo} />
                   </div>
                 </div>
-                <div className="mt-3" data-campo-error={erroresCampo.cuotas ? true : undefined}>
-                  <p className="mb-2 text-xs font-black tracking-wide text-[#052a79]">PLAN DE CUOTAS</p>
-                  {cuotasCredito.length === 0 ? (
-                    <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-                      Complete el vencimiento y conserve un saldo pendiente para generar la cuota.
-                    </p>
-                  ) : (
-                    <div className="overflow-hidden rounded-lg border border-blue-200 bg-white">
-                      <div className="grid grid-cols-3 bg-blue-100/70 px-3 py-2 text-[10px] font-black text-[#052a79]">
-                        <span>CUOTA</span><span>VENCIMIENTO</span><span className="text-right">MONTO</span>
-                      </div>
-                      {cuotasCredito.map((cuota) => (
-                        <div key={cuota.numeroCuota} className="grid grid-cols-3 px-3 py-2 text-xs font-bold text-slate-700">
-                          <span>{String(cuota.numeroCuota).padStart(3, '0')}</span>
-                          <span>{cuota.fechaPago || 'PENDIENTE'}</span>
-                          <span className="text-right">S/ {Number(cuota.importe || 0).toFixed(2)}</span>
-                        </div>
-                      ))}
+
+                {pendiente <= 0 ? (
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs font-semibold text-amber-900 shadow-sm">
+                    <div className="flex items-center gap-2 font-bold text-amber-800 mb-1">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Pago Completo Confirmado</span>
                     </div>
-                  )}
-                  <MensajeError campo="cuotas" errores={erroresCampo} />
-                </div>
+                    <p>
+                      Esta operación registra pagos confirmados por el 100% del importe (S/ {totalPagar.toFixed(2)}). No existe saldo pendiente para financiar al crédito.
+                    </p>
+                    <p className="mt-1 text-slate-600">
+                      Para emitir a crédito, la operación debe conservar un saldo pendiente por financiar. Si se completó el pago, la condición debe ser <strong>CONTADO</strong>.
+                    </p>
+                  </div>
+                ) : (
+                  <div data-campo-error={erroresCampo.cuotas ? true : undefined}>
+                    <GestorCuotasCredito
+                      saldoAFinanciar={pendiente}
+                      fechaInicioCredito={fechaInicioCredito}
+                      fechaVencimientoCredito={fechaVencimientoCredito}
+                      cuotas={cuotasCredito}
+                      onChangeCuotas={(nuevas) => onCuotasCreditoChange?.(nuevas)}
+                      compact={compact}
+                      error={erroresCampo.cuotas}
+                    />
+                    <MensajeError campo="cuotas" errores={erroresCampo} />
+                  </div>
+                )}
               </div>
             )}
           </div>
+
           <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex border-b border-slate-200 bg-slate-50">
               {['EFECTIVO', 'TARJETA', 'BANCO'].map((tab) => (
@@ -261,6 +273,24 @@ export function PagoStep({
             data-campo-error={erroresCampo.pagos ? true : undefined}
           >
             <h4 className={`text-sm font-bold text-slate-700 capitalize ${compact ? 'mb-2' : 'mb-4'}`}>Pagos Registrados</h4>
+            
+            {avisoPagoConfirmado && (
+              <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 flex items-start gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-bold text-amber-800">Operación protegida</p>
+                  <p>{avisoPagoConfirmado}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAvisoPagoConfirmado('')}
+                  className="text-amber-700 hover:text-amber-900 font-bold ml-1"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {pagosAgregados.length === 0 ? (
               <p className="text-slate-400 text-sm italic">No hay pagos registrados.</p>
             ) : (
@@ -268,12 +298,36 @@ export function PagoStep({
                 {pagosAgregados.map((p, idx) => (
                   <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
                     <div>
-                      <p className="font-bold text-slate-800">{p.tipo} {p.tarjetaKey ? `- ${p.tarjetaKey}` : ''} {p.modalidadTarjeta ? `(${p.modalidadTarjeta === 'DEBITO' ? 'DÉBITO' : 'CRÉDITO'})` : ''}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-slate-800">{p.tipo} {p.tarjetaKey ? `- ${p.tarjetaKey}` : ''} {p.modalidadTarjeta ? `(${p.modalidadTarjeta === 'DEBITO' ? 'DÉBITO' : 'CRÉDITO'})` : ''}</p>
+                        {p.id && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            CONFIRMADO
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500 capitalize">{p.nroOperacion ? `Operación: ${p.nroOperacion}` : 'Sin referencia'}</p>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="font-bold text-[#052a79] text-lg">S/ {parseFloat(p.importe).toFixed(2)}</span>
-                      <button onClick={() => { onCorregirCampo?.('pagos'); eliminarPago(idx); }} className="text-red-400 hover:text-red-600 transition">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (p.id) {
+                            setAvisoPagoConfirmado('Este pago está confirmado en caja y no puede eliminarse desde el borrador. Requiere el proceso de anulación o ajuste autorizado por caja.');
+                            return;
+                          }
+                          setAvisoPagoConfirmado('');
+                          onCorregirCampo?.('pagos');
+                          eliminarPago(idx);
+                        }}
+                        className={`transition ${
+                          p.id
+                            ? 'text-slate-300 hover:text-amber-600 cursor-pointer'
+                            : 'text-red-400 hover:text-red-600'
+                        }`}
+                        title={p.id ? 'Pago confirmado en caja (protegido)' : 'Eliminar pago'}
+                      >
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PagoDetalleItem, PaginadoResponse } from '../../services/faregas-dashboard.api';
+import type { PagoDetalleItem, PaginadoResponse } from '../../../services/faregas-dashboard.api';
 
 interface DashboardPagosProps {
   data: PaginadoResponse<PagoDetalleItem> | null;
@@ -15,7 +15,7 @@ export const DashboardPagos: React.FC<DashboardPagosProps> = ({
   onCambiarPagina
 }) => {
   if (cargando) {
-    return <div className="bg-white rounded-xl p-8 text-center text-slate-400 text-xs">Cargando pagos...</div>;
+    return <div className="bg-white rounded-xl p-8 text-center text-slate-400 text-sm">Cargando pagos...</div>;
   }
 
   const items = data?.items || [];
@@ -27,7 +27,7 @@ export const DashboardPagos: React.FC<DashboardPagosProps> = ({
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-slate-800">Cobros y Medios de Pago</h3>
-          <p className="text-xs text-slate-500">Pagos reales registrados en caja / tesorería</p>
+          <p className="text-sm text-slate-500">Pagos reales registrados en caja / tesorería</p>
         </div>
         <span className="text-xs px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-full">
           Total: {total}
@@ -35,8 +35,8 @@ export const DashboardPagos: React.FC<DashboardPagosProps> = ({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-xs">
             <tr>
               <th className="py-2.5 px-3">ID Pago</th>
               <th className="py-2.5 px-3">Orden</th>
@@ -61,20 +61,20 @@ export const DashboardPagos: React.FC<DashboardPagosProps> = ({
                   <td className="py-2.5 px-3 font-mono font-bold text-slate-800">#{p.id}</td>
                   <td className="py-2.5 px-3 font-mono text-slate-600">Orden #{p.ordenPagoId}</td>
                   <td className="py-2.5 px-3">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
                       {p.medioPago}
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-slate-600">
                     {p.banco && <span className="font-semibold">{p.banco} </span>}
-                    {p.nroOperacion && <span className="text-slate-400 font-mono text-[11px]">• Op: {p.nroOperacion}</span>}
+                    {p.nroOperacion && <span className="text-slate-400 font-mono text-xs">• Op: {p.nroOperacion}</span>}
                     {!p.banco && !p.nroOperacion && <span className="text-slate-400">-</span>}
                   </td>
                   <td className="py-2.5 px-3 text-right font-bold text-emerald-700">
                     S/ {p.importe.toFixed(2)}
                   </td>
                   <td className="py-2.5 px-3 text-slate-700">{p.plantaNombre}</td>
-                  <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">{p.registradoPor}</td>
+                  <td className="py-2.5 px-3 text-slate-600 font-mono text-xs">{p.registradoPor}</td>
                   <td className="py-2.5 px-3 text-slate-500">{new Date(p.fechaCreacion).toLocaleDateString('es-PE')}</td>
                 </tr>
               ))

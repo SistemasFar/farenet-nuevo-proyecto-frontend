@@ -183,6 +183,24 @@ export function ModalDetalleVentaChips({
                     </div>
                     {detalle.facturacion.mensajeRechazo && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><b>Motivo:</b> {detalle.facturacion.mensajeRechazo}{detalle.facturacion.sunatResponseCode ? ` (código ${detalle.facturacion.sunatResponseCode})` : ''}</p>}
                     {detalle.facturacion.ultimoIntento && <p className="text-xs text-slate-500">Último intento: #{detalle.facturacion.ultimoIntento.numero} · {detalle.facturacion.ultimoIntento.estado} · HTTP {detalle.facturacion.ultimoIntento.httpStatus || '—'}</p>}
+                    {Array.isArray(detalle.facturacion.cuotas) && detalle.facturacion.cuotas.length > 0 && (
+                      <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+                        <p className="mb-2 text-xs font-black tracking-wide text-[#052A79]">CUOTAS DEL CRÉDITO</p>
+                        <div className="overflow-hidden rounded-lg border border-blue-200 bg-white">
+                          <div className="grid grid-cols-4 bg-blue-100/70 px-3 py-2 text-[10px] font-black text-[#052A79]">
+                            <span>CUOTA</span><span>VENCIMIENTO</span><span>ESTADO</span><span className="text-right">MONTO</span>
+                          </div>
+                          {detalle.facturacion.cuotas.map((c) => (
+                            <div key={c.numeroCuota} className="grid grid-cols-4 border-b border-slate-100 px-3 py-2 text-xs font-bold text-slate-700 last:border-0">
+                              <span>N° {String(c.numeroCuota).padStart(3, '0')}</span>
+                              <span>{c.fechaPago ? new Date(c.fechaPago).toLocaleDateString('es-PE') : '—'}</span>
+                              <span className="text-amber-700">{c.estado || 'PENDIENTE'}</span>
+                              <span className="text-right font-mono">{money(Number(c.importe))}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {detalle.facturacion.enlacePdf && <a href={detalle.facturacion.enlacePdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"><FileText className="h-4 w-4" /> VER COMPROBANTE</a>}
                     {errorReintento && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{errorReintento}</p>}
                     {esComprobanteReintentable(detalle.facturacion) && (

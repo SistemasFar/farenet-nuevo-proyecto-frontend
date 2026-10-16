@@ -2014,6 +2014,17 @@ export function NuevoCertificadoView() {
             fechaInicioCredito={formFacturacion.fechaInicioCreditoFac}
             fechaVencimientoCredito={formFacturacion.fechaVencimientoFac}
             cuotasCredito={cuotasCreditoResueltas}
+            onCuotasCreditoChange={(nuevasCuotas) => {
+              limpiarErrorCampo('cuotas');
+              setFormFacturacion((prev) => ({
+                ...prev,
+                cuotasFac: nuevasCuotas.map((c) => ({
+                  numeroCuota: c.numeroCuota,
+                  fechaPago: c.fechaPago,
+                  importe: String(c.importe),
+                })),
+              }));
+            }}
             erroresCampo={errores}
             onCorregirCampo={limpiarErrorCampo}
             onCondicionPagoChange={(condicionPago) => {
@@ -2038,7 +2049,12 @@ export function NuevoCertificadoView() {
             onFechaVencimientoCreditoChange={(fecha) => {
               limpiarErrorCampo('fechaVencimientoCredito');
               limpiarErrorCampo('cuotas');
-              setFormFacturacion((prev) => ({ ...prev, fechaVencimientoFac: fecha }));
+              setFormFacturacion((prev) => {
+                const cuotasActualizadas = prev.cuotasFac.length <= 1
+                  ? prev.cuotasFac.map((c) => ({ ...c, fechaPago: fecha }))
+                  : prev.cuotasFac;
+                return { ...prev, fechaVencimientoFac: fecha, cuotasFac: cuotasActualizadas };
+              });
             }}
           />
         )}

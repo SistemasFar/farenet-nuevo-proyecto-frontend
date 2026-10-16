@@ -514,24 +514,26 @@ export const resolverCuotasCredito = ({
   const saldo = redondearMoneda(precioTotal - totalPagado);
   if (saldo <= 0) return [];
 
-  // El flujo anterior no ofrecía una forma de crear la primera cuota. Para un
-  // plan vacío (o para el plan automático de una sola cuota), la fuente de
-  // verdad es el saldo actual y el vencimiento general. Los planes de varias
-  // cuotas que ya fueron editados se conservan y se validan sin sobrescribirlos.
-  if (cuotas.length <= 1) {
+  // Si ya existen cuotas (1, 2 o 3), conservamos las cuotas editadas por el usuario.
+  // Solo cuando el arreglo de cuotas está vacío generamos la cuota por defecto por el saldo actual.
+  if (cuotas.length === 0) {
     return [{
       numeroCuota: 1,
       fechaPago: fechaVencimientoCredito || '',
       importe: saldo.toFixed(2),
     }];
   }
-  return cuotas.map((cuota, index) => ({ ...cuota, numeroCuota: index + 1 }));
+  return cuotas.map((cuota, index) => ({
+    ...cuota,
+    numeroCuota: index + 1,
+    importe: typeof cuota.importe === 'number' ? cuota.importe.toFixed(2) : String(cuota.importe || '0.00'),
+  }));
 };
 
 /**
  * Reglas de pago ya existentes en el asistente, expresadas por campo.
  * CONTADO exige el total completo; CRÉDITO debe conservar saldo para
- * distribuirlo en cuotas.
+ * distribuirlo en cuotas (de 1 a 3 cuotas como máximo).
  */
 export const validarPasoPago = ({
   condicionPago,
@@ -571,9 +573,18 @@ export const validarPasoPago = ({
   } else if (esCredito) {
     if (cuotas.length === 0) {
       errores.cuotas = 'La factura a crédito requiere al menos una cuota.';
+    } else if (cuotas.length > 3) {
+      errores.cuotas = 'El crédito permite como máximo 3 cuotas.';
     } else {
       let sumaCuotas = 0;
+      const numerosVistos = new Set<number>();
       for (const cuota of cuotas) {
+        if (numerosVistos.has(cuota.numeroCuota)) {
+          errores.cuotas = 'No se permiten cuotas duplicadas.';
+          break;
+        }
+        numerosVistos.add(cuota.numeroCuota);
+
         const importe = Number(cuota.importe || 0);
         sumaCuotas += importe;
         if (!Number.isFinite(importe) || importe <= 0) {

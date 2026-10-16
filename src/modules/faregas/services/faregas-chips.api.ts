@@ -69,6 +69,14 @@ export interface MovimientoInventarioCantidad {
 }
 
 
+export interface CuotaFacturacion {
+  id?: number;
+  numeroCuota: number;
+  fechaPago: string;
+  importe: number | string;
+  estado?: string;
+}
+
 export interface VentaDirectaFacturacion {
   id: number;
   certificadoId?: number | null;
@@ -77,6 +85,10 @@ export interface VentaDirectaFacturacion {
   nroComprobante?: string | null;
   serie?: string | null;
   numero?: number | null;
+  condicionPago?: string;
+  fechaInicioCredito?: string | null;
+  fechaVencimiento?: string | null;
+  cuotas?: CuotaFacturacion[];
   sunatDescription?: string | null;
   enlacePdf?: string | null;
   enlaceXml?: string | null;
@@ -104,6 +116,9 @@ export interface VentaDirectaPayload {
   email?: string | null;
   telefono?: string | null;
   condicionPago: string;
+  fechaInicioCredito?: string | null;
+  fechaVencimiento?: string | null;
+  cuotas?: Array<{ numeroCuota: number; fechaPago: string; importe: string | number }>;
   medioPago: string;
   pagosAgregados: PagoAgregado[];
   chips?: string[];
@@ -234,6 +249,9 @@ export interface DetalleFacturacionVentaChip {
   serie: string | null;
   numero: number | null;
   nroComprobante: string | null;
+  condicionPago?: string | null;
+  fechaVencimiento?: string | null;
+  cuotas?: CuotaFacturacion[];
   sunatResponseCode: string | number | null;
   sunatDescription: string | null;
   mensajeRechazo: string | null;

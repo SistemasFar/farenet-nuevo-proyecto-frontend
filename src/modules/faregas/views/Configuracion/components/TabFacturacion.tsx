@@ -14,7 +14,7 @@ import NubefactReadinessPanel from './NubefactReadinessPanel';
  * dice de qué conjunto es cada fila además de habilitar sus acciones.
  *
  * La jerarquía es la de Chips: MENU_FACTURACION da el módulo y cada
- * MENU_FACTURACION_* da su pestaña (PREPARACION, SERIES, DOCUMENTOS). Un perfil
+ * MENU_FACTURACION_* da su pestaña (PREPARACION, SERIES, DOCUMENTOS, CLIENTES). Un perfil
  * CONTADOR con sólo Comprobantes ve una sola pestaña y entra directamente en
  * ella; nunca queda seleccionado un tab que no tiene.
  */
@@ -24,7 +24,7 @@ const PESTANAS: ReadonlyArray<{ id: VistaFacturacion; permiso: string; label: st
   { id: 'PREPARACION', permiso: 'MENU_FACTURACION_PREPARACION', label: 'PREPARACIÓN' },
   { id: 'SERIES', permiso: 'MENU_FACTURACION_SERIES', label: 'SERIES' },
   { id: 'DOCUMENTOS', permiso: 'MENU_FACTURACION_COMPROBANTES', label: 'COMPROBANTES' },
-  { id: 'CLIENTES', permiso: 'MENU_FACTURACION_COMPROBANTES', label: 'CLIENTES' }
+  { id: 'CLIENTES', permiso: 'MENU_FACTURACION_CLIENTES', label: 'CLIENTES' }
 ];
 
 export default function TabFacturacion({ plantaKey, plantaNombre }: { plantaKey: string; plantaNombre: string }) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DescuentoDetalleItem, PaginadoResponse } from '../../services/faregas-dashboard.api';
+import type { DescuentoDetalleItem, PaginadoResponse } from '../../../services/faregas-dashboard.api';
 
 interface DashboardDescuentosProps {
   data: PaginadoResponse<DescuentoDetalleItem> | null;
@@ -8,7 +8,7 @@ interface DashboardDescuentosProps {
 
 export const DashboardDescuentos: React.FC<DashboardDescuentosProps> = ({ data, cargando }) => {
   if (cargando) {
-    return <div className="bg-white rounded-xl p-8 text-center text-slate-400 text-xs">Cargando descuentos...</div>;
+    return <div className="bg-white rounded-xl p-8 text-center text-slate-400 text-sm">Cargando descuentos...</div>;
   }
 
   const items = data?.items || [];
@@ -18,13 +18,13 @@ export const DashboardDescuentos: React.FC<DashboardDescuentosProps> = ({ data, 
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-slate-800">Descuentos y Cupones Aplicados</h3>
-          <p className="text-xs text-slate-500">Histórico de cupones y campañas comerciales efectivas</p>
+          <p className="text-sm text-slate-500">Histórico de cupones y campañas comerciales efectivas</p>
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-xs">
             <tr>
               <th className="py-2.5 px-3">Cupón / Código</th>
               <th className="py-2.5 px-3">Campaña</th>
@@ -50,7 +50,7 @@ export const DashboardDescuentos: React.FC<DashboardDescuentosProps> = ({ data, 
                   <td className="py-2.5 px-3 font-medium text-slate-800">{d.campana}</td>
                   <td className="py-2.5 px-3 text-slate-700">{d.plantaNombre}</td>
                   <td className="py-2.5 px-3">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {d.estado}
                     </span>
                   </td>
