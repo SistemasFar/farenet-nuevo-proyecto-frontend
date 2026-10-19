@@ -5,7 +5,7 @@ import { resolverCuotasCredito, validarPasoPago } from './faregas-wizard.validat
 
 const renderPago = (
   condicionPago: 'CONTADO' | 'CREDITO',
-  pagoTab: 'EFECTIVO' | 'TARJETA' = 'EFECTIVO',
+  pagoTab: 'EFECTIVO' | 'TARJETA' | 'BANCO' = 'EFECTIVO',
   tipoComprobante = 'FACTURA',
 ) =>
   renderToStaticMarkup(
@@ -76,6 +76,49 @@ describe('paso compartido de Pago Faregas', () => {
     expect(html).toContain('MODALIDAD DE TARJETA');
     expect(html).toContain('DÉBITO');
     expect(html).toContain('CRÉDITO');
+  });
+
+  it('muestra únicamente la cuenta y el CCI autorizados para FAREGAS', () => {
+    const html = renderToStaticMarkup(
+      <PagoStep
+        pagoTab="BANCO"
+        setPagoTab={() => undefined}
+        formPago={{ importe: '', entidadFinancieraKey: '', cuentaCorrienteKey: '' }}
+        setFormPago={() => undefined}
+        pagosAgregados={[]}
+        handleAgregarPago={() => undefined}
+        eliminarPago={() => undefined}
+        totalPagar={80}
+        tipoComprobante="BOLETA"
+        condicionPago="CONTADO"
+        onCondicionPagoChange={() => undefined}
+        fechaInicioCredito=""
+        fechaVencimientoCredito=""
+        cuotasCredito={[]}
+        onFechaInicioCreditoChange={() => undefined}
+        onFechaVencimientoCreditoChange={() => undefined}
+        maestrosPago={{
+          formasPago: [],
+          tarjetas: [],
+          entidadesFinancieras: [{ key: '6', nombre: 'BBVA CONTINENTAL' }],
+          cuentasCorrientes: [{
+            key: 'FG_BBVA_00020564',
+            nombre: '0011-0397-0100020564',
+            entidadfinanciera_key: '6',
+          }],
+          cuentaFaregas: {
+            numero: '0100020564',
+            numeroCompleto: '0011-0397-0100020564',
+            cci: '011-397-000100020564-79',
+            entidad: 'BBVA CONTINENTAL',
+          },
+        }}
+      />
+    );
+    expect(html).toContain('CUENTA FAREGAS');
+    expect(html).toContain('0100020564');
+    expect(html).toContain('011-397-000100020564-79');
+    expect(html).not.toContain('0011-0397-01-00027895');
   });
 
   it('bloquea visualmente crédito cuando el comprobante es boleta', () => {

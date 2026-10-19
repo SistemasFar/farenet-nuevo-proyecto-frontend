@@ -1,15 +1,15 @@
-import { CombustibleOriginalSelect } from './CombustibleOriginalSelect';
+import { CombustibleOriginalSelect, type CombustibleOriginalSelectProps } from './CombustibleOriginalSelect';
 import React from 'react';
 import type { MaestroOption } from '@/types/maestros';
 import type { CampoVehiculoCertificado } from '../../faregas-certificado-campos';
 import { MensajeError, propsCampo, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
-import { esCampoEnteroCertificado, normalizarEnteroCertificado } from '../../faregas-formulario-operativo';
+import { esCampoEnteroCertificado, formatearConteoDosDigitos, normalizarEnteroCertificado } from '../../faregas-formulario-operativo';
 
 const CLASE_CAMPO = 'h-9 w-full rounded-lg border-2 border-slate-200 px-2 py-1 text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
 
 type Props = {
   esGlpInicial?: boolean;
-  maestrosVehiculo?: any;
+  maestrosVehiculo?: CombustibleOriginalSelectProps['maestrosVehiculo'];
   combustibles?: MaestroOption[];
   campos: CampoVehiculoCertificado[];
   formVehiculo: Record<string, unknown>;
@@ -36,7 +36,6 @@ export function CamposVehiculoCertificado({
 }: Props) {
   const valor = (campo: CampoVehiculoCertificado) => {
     if (campo.valorAutomatico) return campo.valorAutomatico;
-    if (campo.campo === 'combustibleGlpAnual') return 'BI-COMBUSTIBLE GLP';
     if (campo.grupo === 'vin-serie') return formVehiculo.vin || formVehiculo.serieChasis || '';
     return formVehiculo[campo.campo] || '';
   };
@@ -71,9 +70,12 @@ export function CamposVehiculoCertificado({
             : 'flex flex-wrap items-center gap-2 sm:flex-nowrap'}>
             {campo.campos.map((sub, subIdx) => {
               const valorCrudo = String(formVehiculo[sub.campo] ?? '');
-              const valorSub = esCampoEnteroCertificado(sub.campo)
+              const valorEntero = esCampoEnteroCertificado(sub.campo)
                 ? normalizarEnteroCertificado(valorCrudo)
                 : valorCrudo;
+              const valorSub = sub.formato === 'dos-digitos'
+                ? formatearConteoDosDigitos(valorEntero)
+                : valorEntero;
               return (
                 <React.Fragment key={sub.campo}>
                   {subIdx > 0 && (
@@ -88,6 +90,7 @@ export function CamposVehiculoCertificado({
                       onChange={onChange}
                       placeholder={sub.placeholder || sub.campo}
                       inputMode={esCampoEnteroCertificado(sub.campo) ? 'numeric' : undefined}
+                      maxLength={sub.formato === 'dos-digitos' ? 2 : undefined}
                       data-tipo-dato={esCampoEnteroCertificado(sub.campo) ? 'entero' : 'texto'}
                       {...propsCampo(sub.campo, erroresCampo, CLASE_CAMPO)}
                     />
@@ -141,6 +144,27 @@ export function CamposVehiculoCertificado({
       );
     }
 
+    if (campo.opciones?.length) {
+      return (
+        <div key={campo.campo} data-campo-certificado={campo.campo} data-columna-certificado={campo.columnaCertificado}>
+          {etiqueta}
+          <select
+            name={campo.campo}
+            value={String(valor(campo))}
+            onChange={onChange}
+            className={claseConError(CLASE_CAMPO, esError)}
+            data-campo-error={esError || undefined}
+          >
+            {campo.opciones.map((opcion) => (
+              <option key={opcion.valor} value={opcion.valor}>{opcion.etiqueta}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-[10px] font-semibold text-blue-700">Seleccione el combustible que figurará en el certificado.</p>
+          <MensajeError campo={campo.campo} errores={erroresCampo} />
+        </div>
+      );
+    }
+
     if (campo.campo === 'combustible' && (esGlpInicial || campo.etiqueta === 'COMBUSTIBLE ORIGINAL')) {
       return (
         <div key={campo.campo} data-campo-certificado={campo.campo} data-columna-certificado={campo.columnaCertificado}>
@@ -158,6 +182,7 @@ export function CamposVehiculoCertificado({
             maestrosVehiculo={maestrosVehiculo}
             combustibles={combustibles}
             esError={esError}
+            esGlpInicial={esGlpInicial}
           />
           <MensajeError campo={campo.campo} errores={erroresCampo} />
         </div>

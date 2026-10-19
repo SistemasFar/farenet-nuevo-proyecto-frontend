@@ -38,6 +38,12 @@ export const normalizarEnteroCertificado = (valor: string, maximoDigitos = 8): s
   return (coincidencia?.[0] || '').slice(0, maximoDigitos);
 };
 
+/** Presenta conteos técnicos con la nomenclatura de dos dígitos del certificado. */
+export const formatearConteoDosDigitos = (valor: string): string => {
+  const entero = normalizarEnteroCertificado(valor);
+  return entero ? entero.padStart(2, '0') : '';
+};
+
 const esControlEditable = (elemento: Element): elemento is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement => {
   if (!(elemento instanceof HTMLInputElement || elemento instanceof HTMLSelectElement || elemento instanceof HTMLTextAreaElement)) {
     return false;

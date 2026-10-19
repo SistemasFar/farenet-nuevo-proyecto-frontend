@@ -9,7 +9,7 @@ import { parseChipScan } from './chips-ingreso-masivo';
 import { esComprobanteReintentable } from './facturacionReintento';
 import { PagoStep } from '../NuevoCertificado/components/NuevoCertificado/PagoStep';
 import { GestorCuotasCredito } from '../components/GestorCuotasCredito';
-import { maestrosApi } from '@/services/api';
+import { faregasPagosApi } from '../../services/faregas-pagos.api';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../NuevoCertificado/NuevoCertificadoView';
 import { entradaVentaCantidad, esProductoCantidad, etiquetaControlInventario } from './inventario-control';
@@ -197,7 +197,7 @@ export function ModalVentaChips({
   const pagoDisponible = validacionCompleta && !loadingVenta && !validandoChips && !ventaRegistrada;
 
   useEffect(() => {
-    maestrosApi.obtenerMaestrosPagoAsync()
+    faregasPagosApi.obtenerMaestros()
       .then(res => setMaestrosPago(res.data))
       .catch(err => {
         console.error("Error al cargar maestros pago:", err);

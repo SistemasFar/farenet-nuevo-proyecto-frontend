@@ -2,8 +2,14 @@
 
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { formatAlfanumericoConEspacios } from '../../utils/vehiculo-formatters';
 import {
+  descomponerPeriodoFabricacion,
+  formatAlfanumericoConEspacios,
+  formatPeriodoFabricacion,
+  presentarPeriodoFabricacion,
+} from '../../utils/vehiculo-formatters';
+import {
+  formatearConteoDosDigitos,
   manejarNavegacionFormulario,
   normalizarEnteroCertificado,
 } from './faregas-formulario-operativo';
@@ -66,6 +72,22 @@ describe('reglas operativas compartidas de certificados', () => {
     expect(formatAlfanumericoConEspacios('TOMASETTO ACHILLE')).toBe('TOMASETTO ACHILLE');
     expect(formatAlfanumericoConEspacios('AT 09')).toBe('AT 09');
     expect(formatAlfanumericoConEspacios('ABC 123')).toBe('ABC 123');
+  });
+
+  it('presenta ejes, ruedas, asientos y pasajeros con dos dígitos', () => {
+    expect(formatearConteoDosDigitos('1')).toBe('01');
+    expect(formatearConteoDosDigitos('2')).toBe('02');
+    expect(formatearConteoDosDigitos('10')).toBe('10');
+    expect(formatearConteoDosDigitos('')).toBe('');
+  });
+
+  it('acepta mes y año del cilindro separados por guion sin mezclar las columnas', () => {
+    expect(formatPeriodoFabricacion('05-1999')).toBe('05-1999');
+    expect(descomponerPeriodoFabricacion('05-1999')).toEqual({ mes: '05', anio: '1999' });
+    expect(descomponerPeriodoFabricacion('1999-05')).toEqual({ mes: '05', anio: '1999' });
+    expect(descomponerPeriodoFabricacion('1999')).toEqual({ mes: '', anio: '1999' });
+    expect(descomponerPeriodoFabricacion('15-1999')).toEqual({ mes: '', anio: '' });
+    expect(presentarPeriodoFabricacion('5', '1999')).toBe('05-1999');
   });
 
   it('Enter y Shift+Enter recorren los controles editables sin enviar formulario', () => {

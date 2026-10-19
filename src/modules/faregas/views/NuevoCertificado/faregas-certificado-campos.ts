@@ -5,6 +5,7 @@ export type SubcampoVehiculo = {
   placeholder?: string;
   etiqueta?: string;
   automatico?: boolean;
+  formato?: 'dos-digitos';
 };
 
 export type CampoVehiculoCertificado = {
@@ -15,6 +16,7 @@ export type CampoVehiculoCertificado = {
   grupo?: 'simple' | 'vin-serie';
   automatico?: boolean;
   valorAutomatico?: string;
+  opciones?: Array<{ valor: string; etiqueta: string }>;
   campos?: SubcampoVehiculo[];
   separador?: string;
   colSpan?: number;
@@ -50,8 +52,8 @@ const CAMPOS_GLP_INICIAL: CampoVehiculoCertificado[] = [
     etiqueta: 'N° EJES / N° RUEDAS',
     numero: 12,
     campos: [
-      { campo: 'numeroEjes', placeholder: 'N° Ejes' },
-      { campo: 'numeroRuedas', placeholder: 'N° Ruedas' },
+      { campo: 'numeroEjes', placeholder: 'N° Ejes', formato: 'dos-digitos' },
+      { campo: 'numeroRuedas', placeholder: 'N° Ruedas', formato: 'dos-digitos' },
     ],
     separador: '/',
     colSpan: 2,
@@ -63,8 +65,8 @@ const CAMPOS_GLP_INICIAL: CampoVehiculoCertificado[] = [
     etiqueta: 'N° ASIENTOS / PASAJEROS',
     numero: 13,
     campos: [
-      { campo: 'numeroAsientos', placeholder: 'N° Asientos' },
-      { campo: 'numeroPasajeros', placeholder: 'Pasajeros' },
+      { campo: 'numeroAsientos', placeholder: 'N° Asientos', formato: 'dos-digitos' },
+      { campo: 'numeroPasajeros', placeholder: 'Pasajeros', formato: 'dos-digitos' },
     ],
     separador: '/',
     colSpan: 2,
@@ -111,15 +113,24 @@ const CAMPOS_GLP_ANUAL: CampoVehiculoCertificado[] = [
     colSpan: 2,
     columnaCertificado: 'derecha',
   },
-  { campo: 'combustibleGlpAnual', etiqueta: 'COMBUSTIBLE', numero: 11, automatico: true, columnaCertificado: 'derecha' },
+  {
+    campo: 'combustible',
+    etiqueta: 'COMBUSTIBLE',
+    numero: 11,
+    opciones: [
+      { valor: 'BI-COMBUSTIBLE GLP', etiqueta: 'BI-COMBUSTIBLE GLP' },
+      { valor: 'GLP', etiqueta: 'GLP' },
+    ],
+    columnaCertificado: 'derecha',
+  },
   {
     tipo: 'grupo',
     campo: 'numeroEjes',
     etiqueta: 'N° EJES / N° RUEDAS',
     numero: 12,
     campos: [
-      { campo: 'numeroEjes', placeholder: 'N° Ejes' },
-      { campo: 'numeroRuedas', placeholder: 'N° Ruedas' },
+      { campo: 'numeroEjes', placeholder: 'N° Ejes', formato: 'dos-digitos' },
+      { campo: 'numeroRuedas', placeholder: 'N° Ruedas', formato: 'dos-digitos' },
     ],
     separador: '/',
     colSpan: 2,
@@ -131,8 +142,8 @@ const CAMPOS_GLP_ANUAL: CampoVehiculoCertificado[] = [
     etiqueta: 'N° ASIENTOS / PASAJEROS',
     numero: 13,
     campos: [
-      { campo: 'numeroAsientos', placeholder: 'N° Asientos' },
-      { campo: 'numeroPasajeros', placeholder: 'Pasajeros' },
+      { campo: 'numeroAsientos', placeholder: 'N° Asientos', formato: 'dos-digitos' },
+      { campo: 'numeroPasajeros', placeholder: 'Pasajeros', formato: 'dos-digitos' },
     ],
     separador: '/',
     colSpan: 2,
@@ -338,12 +349,12 @@ export const CODIGOS_CAMBIO_MOTOR = [
 
 export const CODIGOS_PESADOS = [
   '0047', '0087', '0107', '0127', '0147', '0167', '0187', '0207',
-  '0352', '0391', 'CONFORMIDAD_PESADO',
+  '0352', '0391', '0227', 'CONFORMIDAD_PESADO',
 ];
 
 export const CODIGOS_MODIFICACION_DATOS = [
   '0025', '0045', '0085', '0105', '0125', '0145', '0165', '0185',
-  '0205', '0213', '0350', '0389', '0302', '0512', 'CONFORMIDAD_LIVIANO',
+  '0205', '0213', '0225', '0350', '0389', '0302', '0512', 'CONFORMIDAD_LIVIANO',
 ];
 
 export const CARACTERISTICAS_REGISTRABLES_CATALOGO = [

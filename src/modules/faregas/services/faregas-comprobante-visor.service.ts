@@ -15,6 +15,63 @@ export interface AbrirComprobanteFaregasOptions {
   onRegenerado?: () => void | Promise<void>;
 }
 
+export function descargarBlobComoArchivo(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = filename;
+  enlace.style.display = 'none';
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+export async function descargarComprobanteFaregas(certificadoId: number): Promise<boolean> {
+  try {
+    const blob = await faregasFetchBlob(`/certificados/borradores/${certificadoId}/facturacion/pdf`);
+    descargarBlobComoArchivo(blob, `COMPROBANTE-FAREGAS-${certificadoId}.pdf`);
+    return true;
+  } catch (error) {
+    await Swal.fire(
+      'No se pudo descargar',
+      error instanceof Error ? error.message : 'No se pudo descargar el comprobante FAREGAS.',
+      'error',
+    );
+    return false;
+  }
+}
+
+export async function descargarPdfNubefact(certificadoId: number): Promise<boolean> {
+  try {
+    const blob = await faregasFetchBlob(`/certificados/borradores/${certificadoId}/facturacion/pdf-nubefact`);
+    descargarBlobComoArchivo(blob, `COMPROBANTE-NUBEFACT-${certificadoId}.pdf`);
+    return true;
+  } catch (error) {
+    await Swal.fire(
+      'No se pudo descargar',
+      error instanceof Error ? error.message : 'No se pudo descargar el PDF de NubeFact.',
+      'error',
+    );
+    return false;
+  }
+}
+
+export async function descargarCertificadoFaregas(certificadoId: number): Promise<boolean> {
+  try {
+    const blob = await faregasFetchBlob(`/certificados/borradores/${certificadoId}/certificado/pdf`);
+    descargarBlobComoArchivo(blob, `CERTIFICADO-FAREGAS-${certificadoId}.pdf`);
+    return true;
+  } catch (error) {
+    await Swal.fire(
+      'No se pudo descargar',
+      error instanceof Error ? error.message : 'No se pudo generar el PDF del certificado.',
+      'error',
+    );
+    return false;
+  }
+}
+
 /**
  * Abre la representación impresa personalizada FAREGAS desde el endpoint
  * /certificados/borradores/:id/facturacion/pdf.

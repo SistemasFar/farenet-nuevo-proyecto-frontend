@@ -157,6 +157,13 @@ export const validarExpedienteTecnico = ({
     if (verificaciones.length !== 7 || verificaciones.some((item: any) => item.cumple !== true)) {
       errores.push('Las 7 verificaciones GLP deben estar evaluadas como CUMPLE.');
     }
+    const esGlpInicialExp = String(modalidad || '').toUpperCase() === 'INICIAL';
+    if (esGlpInicialExp) {
+      const combustibleLimpio = String(vehiculo.combustible || '').trim().toUpperCase();
+      if (combustibleLimpio && combustibleLimpio !== 'GASOLINA' && combustibleLimpio !== 'DIESEL') {
+        errores.push('Para GLP INICIAL, el combustible original debe ser GASOLINA o DIESEL.');
+      }
+    }
   }
 
   if (tipoCertificado === 'GLP_ANUAL' || tipoCertificado === 'CONFORMIDAD') {
@@ -908,15 +915,29 @@ export const validarFormularioVehiculoVisible = ({
       }
     }
   }
-  if (tipoCertificado === 'GLP_ANUAL') {
+  const esGlpInicial = (tipoCertificado === 'GLP_ANUAL' && esInicial) || (tipoCertificado as string) === 'GLP_INICIAL';
+  if (tipoCertificado === 'GLP_ANUAL' || (tipoCertificado as string) === 'GLP_INICIAL') {
     marcarVacias(errores, { glp }, CAMPOS_VISIBLES_GLP);
-    if (esInicial) {
+    if (esGlpInicial) {
       marcarVacias(errores, { glp }, CAMPOS_VISIBLES_GLP_INICIAL);
-      if (combustiblesSonEquivalentes(vehiculo.combustible, 'BI-COMBUSTIBLE GLP')) {
+      const combustibleLimpio = String(vehiculo.combustible || '').trim().toUpperCase();
+      if (!combustibleLimpio) {
         marcar(
           errores,
           'combustible',
-          'El combustible original debe ser diferente a BI-COMBUSTIBLE GLP, que es el resultado de la conversión.'
+          'El combustible original es obligatorio. Debe seleccionar GASOLINA o DIESEL.'
+        );
+      } else if (combustiblesSonEquivalentes(combustibleLimpio, 'BI-COMBUSTIBLE GLP')) {
+        marcar(
+          errores,
+          'combustible',
+          'El combustible original debe ser diferente a BI-COMBUSTIBLE GLP, que es el resultado de la conversión. Debe seleccionar GASOLINA o DIESEL.'
+        );
+      } else if (combustibleLimpio !== 'GASOLINA' && combustibleLimpio !== 'DIESEL') {
+        marcar(
+          errores,
+          'combustible',
+          'Para GLP INICIAL, el combustible original debe ser GASOLINA o DIESEL.'
         );
       }
     }

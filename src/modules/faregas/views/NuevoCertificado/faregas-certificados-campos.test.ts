@@ -111,10 +111,9 @@ describe('Campos vehiculares por template real y agrupaciones visuales', () => {
     // Item 11: Combustible GLP Anual automático
     const combField = campos[9];
     expect(combField).toMatchObject({
-      campo: 'combustibleGlpAnual',
+      campo: 'combustible',
       etiqueta: 'COMBUSTIBLE',
-      numero: 11,
-      automatico: true
+      numero: 11
     });
 
     // Item 12: N° ejes / N° ruedas

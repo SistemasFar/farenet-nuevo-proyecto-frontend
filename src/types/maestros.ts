@@ -39,6 +39,12 @@ export interface MaestrosPagoResponse {
     tarjetas: MaestroOption[];
     entidadesFinancieras: MaestroOption[];
     cuentasCorrientes: CuentaCorrienteOption[];
+    cuentaFaregas?: {
+      numero: string;
+      numeroCompleto: string;
+      cci: string;
+      entidad: string;
+    };
   };
 }
 

@@ -1,11 +1,12 @@
 
 import { forwardRef, useState, useEffect, useImperativeHandle, useRef, type RefObject } from 'react';
-import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Printer, RefreshCw, Eye } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Printer, RefreshCw, Eye, Download } from 'lucide-react';
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
 import { ejecutarEmisionCertificado, esComprobanteOperable, type ResultadoEmisionCertificado } from '../../faregas-emision';
 import Swal from 'sweetalert2';
 import type { FacturacionFaregas } from '../../../../types/faregas-api';
+import { descargarCertificadoFaregas } from '../../../../services/faregas-comprobante-visor.service';
 
 const mensajePrevisualizacion = (error: unknown): string => {
   const mensaje = error instanceof Error ? error.message : '';
@@ -54,7 +55,9 @@ function PreviewCertificadoCompacto({
   error,
   frameRef,
   onPrint,
+  onDownload,
   mostrarImprimir,
+  downloading,
   emitted,
   altoPreview = 'h-[44vh] min-h-[320px]',
 }: {
@@ -63,7 +66,9 @@ function PreviewCertificadoCompacto({
   error: string;
   frameRef: RefObject<HTMLIFrameElement | null>;
   onPrint: () => void;
+  onDownload: () => void;
   mostrarImprimir: boolean;
+  downloading: boolean;
   emitted: boolean;
   /** Altura del iframe. Sólo presentación: el contenido no cambia. */
   altoPreview?: string;
@@ -83,9 +88,14 @@ function PreviewCertificadoCompacto({
         <div className="flex items-center gap-2">
           {!emitted && <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-800">PENDIENTE DE EMISIÓN</span>}
           {mostrarImprimir && (
-            <button type="button" onClick={onPrint} disabled={!html || loading} className="inline-flex items-center gap-1.5 rounded-md bg-amber-400 px-2.5 py-1.5 text-[10px] font-black text-slate-900 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50">
-              <Printer className="h-3.5 w-3.5" /> IMPRIMIR CERTIFICADO
-            </button>
+            <>
+              <button type="button" onClick={onPrint} disabled={!html || loading} className="inline-flex items-center gap-1.5 rounded-md bg-amber-400 px-2.5 py-1.5 text-[10px] font-black text-slate-900 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50">
+                <Printer className="h-3.5 w-3.5" /> IMPRIMIR CERTIFICADO
+              </button>
+              <button type="button" onClick={onDownload} disabled={!html || loading || downloading} className="inline-flex items-center gap-1.5 rounded-md border border-white/40 bg-white px-2.5 py-1.5 text-[10px] font-black text-[#052a79] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
+                {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} DESCARGAR CERTIFICADO
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -129,6 +139,7 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
   const [certificadoHtml, setCertificadoHtml] = useState<string | null>(null);
   const [isLoadingCertificado, setIsLoadingCertificado] = useState(certificadoEstado === 'EMITIDO');
   const [certificadoError, setCertificadoError] = useState('');
+  const [isDownloadingCertificado, setIsDownloadingCertificado] = useState(false);
   const certificadoFrameRef = useRef<HTMLIFrameElement>(null);
   const resultadoVisible = emisionResult || resultadoEmision;
   const facturacionSimulada = validacionResult?.modoFacturacion === 'SIMULACION';
@@ -158,6 +169,16 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
     }
     ventana.focus();
     ventana.print();
+  };
+
+  const descargarCertificado = async () => {
+    if (!certificadoId || isDownloadingCertificado) return;
+    setIsDownloadingCertificado(true);
+    try {
+      await descargarCertificadoFaregas(certificadoId);
+    } finally {
+      setIsDownloadingCertificado(false);
+    }
   };
 
   const validar = async (): Promise<ValidacionEmisionResult | null> => {
@@ -384,7 +405,9 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
           error={certificadoError}
           frameRef={certificadoFrameRef}
           onPrint={imprimirCertificado}
+          onDownload={() => void descargarCertificado()}
           mostrarImprimir={Boolean(resultadoVisible || certificadoEstado === 'EMITIDO')}
+          downloading={isDownloadingCertificado}
           emitted={Boolean(resultadoVisible || certificadoEstado === 'EMITIDO')}
           altoPreview={altoPreview}
         />
@@ -450,6 +473,14 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
                 className="inline-flex items-center gap-2 rounded-lg bg-amber-400 px-4 py-2 text-xs font-black text-slate-900 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Printer className="h-4 w-4" /> Imprimir certificado
+              </button>
+              <button
+                type="button"
+                onClick={() => void descargarCertificado()}
+                disabled={!certificadoHtml || isLoadingCertificado || isDownloadingCertificado}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/40 bg-white px-4 py-2 text-xs font-black text-[#052a79] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDownloadingCertificado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Descargar certificado
               </button>
             </div>
           </div>

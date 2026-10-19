@@ -1,10 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import React from 'react';
 import { CombustibleOriginalSelect } from './components/NuevoCertificado/CombustibleOriginalSelect';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import { validarFormularioVehiculoVisible } from './faregas-wizard.validation';
-import { combustiblesSonEquivalentes } from './gnv-conversion';
 import type { MaestroOption } from '@/types/maestros';
 
 const catalogoSimulado: MaestroOption[] = [
@@ -18,13 +16,14 @@ const catalogoSimulado: MaestroOption[] = [
   { key: '8', nombre: 'GLP' },
 ];
 
-describe('GLP INICIAL - Selector buscable Combustible Original', () => {
-  it('Caso 1 y 2: renderiza selector y excluye estrictamente BI-COMBUSTIBLE GLP y sus variantes', () => {
+describe('GLP INICIAL - Selector de Combustible Original (Exclusivo GASOLINA o DIESEL)', () => {
+  it('Requisito 1: exclusivamente en GLP INICIAL muestra solo GASOLINA y DIESEL en las opciones', () => {
     const html = renderToStaticMarkup(
       <CombustibleOriginalSelect
         value=""
         onChange={() => undefined}
         combustibles={catalogoSimulado}
+        esGlpInicial={true}
       />
     );
 
@@ -32,70 +31,90 @@ describe('GLP INICIAL - Selector buscable Combustible Original', () => {
     expect(html).toContain('combustible-original-select');
     expect(html).toContain('Buscar o seleccionar combustible...');
 
-    // BI-COMBUSTIBLE GLP y BI COMBUSTIBLE/GLP están terminantemente excluidos
+    // No incluye combustibles no permitidos
     expect(html).not.toContain('BI-COMBUSTIBLE GLP');
     expect(html).not.toContain('BI COMBUSTIBLE/GLP');
+    expect(html).not.toContain('BI COMBUSTIBLE/GNV');
+    expect(html).not.toContain('GAS NATURAL');
+    expect(html).not.toContain('GASOHOL');
   });
 
-  it('Caso 2b: el detector de equivalencia reconoce y bloquea todas las formas de BI-COMBUSTIBLE GLP', () => {
-    expect(combustiblesSonEquivalentes('BI-COMBUSTIBLE GLP', 'BI-COMBUSTIBLE GLP')).toBe(true);
-    expect(combustiblesSonEquivalentes('BI COMBUSTIBLE/GLP', 'BI-COMBUSTIBLE GLP')).toBe(true);
-    expect(combustiblesSonEquivalentes('BI - COMBUSTIBLE GLP', 'BI-COMBUSTIBLE GLP')).toBe(true);
-    expect(combustiblesSonEquivalentes('BICOMBUSTIBLE GLP', 'BI-COMBUSTIBLE GLP')).toBe(true);
-
-    // No excluye otros combustibles válidos
-    expect(combustiblesSonEquivalentes('GASOLINA', 'BI-COMBUSTIBLE GLP')).toBe(false);
-    expect(combustiblesSonEquivalentes('DIESEL', 'BI-COMBUSTIBLE GLP')).toBe(false);
-    expect(combustiblesSonEquivalentes('BI COMBUSTIBLE/GNV', 'BI-COMBUSTIBLE GLP')).toBe(false);
-    expect(combustiblesSonEquivalentes('GAS NATURAL', 'BI-COMBUSTIBLE GLP')).toBe(false);
-  });
-
-  it('Caso 3 y 4: maneja valor seleccionado válido (GASOLINA) en input oculto y singleValue', () => {
+  it('Requisito 4 y 6: GASOLINA es un valor válido, se selecciona y se mantiene en el input oculto', () => {
     const html = renderToStaticMarkup(
       <CombustibleOriginalSelect
         value="GASOLINA"
         onChange={() => undefined}
         combustibles={catalogoSimulado}
+        esGlpInicial={true}
       />
     );
 
     expect(html).toContain('value="GASOLINA"');
     expect(html).toContain('GASOLINA');
-    // Sin advertencia ya que existe en catálogo
-    expect(html).not.toContain('no figura en el catálogo activo');
+    expect(html).not.toContain('no es válido para GLP INICIAL');
   });
 
-  it('Caso 5: conserva borrador existente con combustible válido como "BI COMBUSTIBLE/GNV"', () => {
+  it('Requisito 4 y 6: DIESEL es un valor válido, se selecciona y se mantiene en el input oculto', () => {
     const html = renderToStaticMarkup(
+      <CombustibleOriginalSelect
+        value="DIESEL"
+        onChange={() => undefined}
+        combustibles={catalogoSimulado}
+        esGlpInicial={true}
+      />
+    );
+
+    expect(html).toContain('value="DIESEL"');
+    expect(html).toContain('DIESEL');
+    expect(html).not.toContain('no es válido para GLP INICIAL');
+  });
+
+  it('Requisito 5: un borrador antiguo con valor inválido (GLP o GNV) no se reemplaza silenciosamente y avisa al operador', () => {
+    const htmlGlp = renderToStaticMarkup(
+      <CombustibleOriginalSelect
+        value="GLP"
+        onChange={() => undefined}
+        combustibles={catalogoSimulado}
+        esGlpInicial={true}
+      />
+    );
+
+    // Mantiene el valor en el input sin sobreescribirlo silenciosamente
+    expect(htmlGlp).toContain('value="GLP"');
+    // Muestra aviso funcional de advertencia indicando que debe elegir GASOLINA o DIESEL
+    expect(htmlGlp).toContain('no es válido para GLP INICIAL. Debe seleccionar GASOLINA o DIESEL');
+
+    const htmlGnv = renderToStaticMarkup(
       <CombustibleOriginalSelect
         value="BI COMBUSTIBLE/GNV"
         onChange={() => undefined}
         combustibles={catalogoSimulado}
+        esGlpInicial={true}
       />
     );
 
-    expect(html).toContain('value="BI COMBUSTIBLE/GNV"');
-    expect(html).toContain('BI COMBUSTIBLE/GNV');
-    expect(html).not.toContain('no figura en el catálogo activo');
+    expect(htmlGnv).toContain('value="BI COMBUSTIBLE/GNV"');
+    expect(htmlGnv).toContain('no es válido para GLP INICIAL. Debe seleccionar GASOLINA o DIESEL');
   });
 
-  it('Caso 5b: si existe un valor antiguo no presente en catálogo, lo preserva y muestra aviso informativo', () => {
-    const html = renderToStaticMarkup(
+  it('Requisito 3: otros flujos (no GLP INICIAL) conservan su catálogo general', () => {
+    const htmlGeneral = renderToStaticMarkup(
       <CombustibleOriginalSelect
-        value="KEROSENE MOTOR"
+        value="GAS NATURAL"
         onChange={() => undefined}
         combustibles={catalogoSimulado}
+        esGlpInicial={false}
       />
     );
 
-    expect(html).toContain('value="KEROSENE MOTOR"');
-    expect(html).toContain('KEROSENE MOTOR');
-    expect(html).toContain('no figura en el catálogo activo');
-    expect(html).toContain('Se conserva visualmente');
+    expect(htmlGeneral).toContain('value="GAS NATURAL"');
+    expect(htmlGeneral).toContain('GAS NATURAL');
+    expect(htmlGeneral).not.toContain('no es válido para GLP INICIAL');
   });
 
-  it('Caso 6: dejar vacío el combustible es bloqueado por la validación del wizard', () => {
-    const errores = validarFormularioVehiculoVisible({
+  it('Requisito 4: validación frontend para GLP INICIAL exige GASOLINA o DIESEL y rechaza vacíos o inválidos', () => {
+    // Caso vacío
+    const erroresVacio = validarFormularioVehiculoVisible({
       tipoCertificado: 'GLP_ANUAL',
       modalidad: 'INICIAL',
       caja: { placa: 'ABC-123', categoria: 'M1' } as any,
@@ -123,11 +142,103 @@ describe('GLP INICIAL - Selector buscable Combustible Original', () => {
       conformidad: {},
       facturacion: {} as any,
     });
+    expect(erroresVacio.combustible).toBeDefined();
 
-    expect(errores.combustible).toBeDefined();
+    // Caso inválido (GLP o GNV antiguo)
+    const erroresInvalido = validarFormularioVehiculoVisible({
+      tipoCertificado: 'GLP_ANUAL',
+      modalidad: 'INICIAL',
+      caja: { placa: 'ABC-123', categoria: 'M1' } as any,
+      vehiculo: {
+        marca: 'TOYOTA',
+        modelo: 'YARIS',
+        anioFabricacion: '2020',
+        numeroMotor: '1NZ123',
+        numeroCilindros: '4',
+        combustible: 'GLP', // INVÁLIDO EN GLP INICIAL
+        numeroEjes: '2',
+        numeroRuedas: '4',
+        numeroAsientos: '5',
+        numeroPasajeros: '4',
+        longitud: '4.3',
+        ancho: '1.69',
+        alto: '1.46',
+        pesoNeto: '1301',
+        pesoBruto: '1450',
+        vin: '12345678901234567',
+      } as any,
+      titulares: [],
+      gnv: {},
+      glp: {},
+      conformidad: {},
+      facturacion: {} as any,
+    });
+    expect(erroresInvalido.combustible).toBe('Para GLP INICIAL, el combustible original debe ser GASOLINA o DIESEL.');
+
+    // Caso válido: GASOLINA
+    const erroresGasolina = validarFormularioVehiculoVisible({
+      tipoCertificado: 'GLP_ANUAL',
+      modalidad: 'INICIAL',
+      caja: { placa: 'ABC-123', categoria: 'M1' } as any,
+      vehiculo: {
+        marca: 'TOYOTA',
+        modelo: 'YARIS',
+        anioFabricacion: '2020',
+        numeroMotor: '1NZ123',
+        numeroCilindros: '4',
+        combustible: 'GASOLINA',
+        numeroEjes: '2',
+        numeroRuedas: '4',
+        numeroAsientos: '5',
+        numeroPasajeros: '4',
+        longitud: '4.3',
+        ancho: '1.69',
+        alto: '1.46',
+        pesoNeto: '1301',
+        pesoBruto: '1450',
+        vin: '12345678901234567',
+      } as any,
+      titulares: [],
+      gnv: {},
+      glp: {},
+      conformidad: {},
+      facturacion: {} as any,
+    });
+    expect(erroresGasolina.combustible).toBeUndefined();
+
+    // Caso válido: DIESEL
+    const erroresDiesel = validarFormularioVehiculoVisible({
+      tipoCertificado: 'GLP_ANUAL',
+      modalidad: 'INICIAL',
+      caja: { placa: 'ABC-123', categoria: 'M1' } as any,
+      vehiculo: {
+        marca: 'TOYOTA',
+        modelo: 'YARIS',
+        anioFabricacion: '2020',
+        numeroMotor: '1NZ123',
+        numeroCilindros: '4',
+        combustible: 'DIESEL',
+        numeroEjes: '2',
+        numeroRuedas: '4',
+        numeroAsientos: '5',
+        numeroPasajeros: '4',
+        longitud: '4.3',
+        ancho: '1.69',
+        alto: '1.46',
+        pesoNeto: '1301',
+        pesoBruto: '1450',
+        vin: '12345678901234567',
+      } as any,
+      titulares: [],
+      gnv: {},
+      glp: {},
+      conformidad: {},
+      facturacion: {} as any,
+    });
+    expect(erroresDiesel.combustible).toBeUndefined();
   });
 
-  it('Caso 7: VehiculoStep en GLP INICIAL integra el selector en la columna derecha de datos técnicos', () => {
+  it('Requisito 7: VehiculoStep en GLP INICIAL integra el selector restringido en la columna derecha', () => {
     const html = renderToStaticMarkup(
       <VehiculoStep
         tipoCertificado="GLP_ANUAL"
@@ -181,7 +292,7 @@ describe('GLP INICIAL - Selector buscable Combustible Original', () => {
           emailFac: 'cliente@correo.com',
           telefonoFac: '987654321',
           usarTitularPrincipalFac: false,
-        }}
+        } as any}
         setFormFacturacion={() => undefined}
         maestrosVehiculo={{ combustibles: catalogoSimulado }}
         categoriaVehicular="M1"

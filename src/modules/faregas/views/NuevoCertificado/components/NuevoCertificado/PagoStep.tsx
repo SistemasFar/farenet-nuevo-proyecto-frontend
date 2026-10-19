@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CreditCard, PlusCircle, Trash2, AlertCircle, ShieldAlert } from 'lucide-react';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../../NuevoCertificadoView';
@@ -67,13 +67,37 @@ export function PagoStep({
   const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
   const pendiente = totalPagar - pagado;
-  const cuentasFiltradas = (maestrosPago?.cuentasCorrientes || []).filter((cuenta) =>
-    !formPago.entidadFinancieraKey || cuenta.entidadfinanciera_key === formPago.entidadFinancieraKey
+  const cuentaFaregas = maestrosPago?.cuentasCorrientes?.[0];
+  const entidadFaregas = maestrosPago?.entidadesFinancieras?.find(
+    (entidad) => entidad.key === cuentaFaregas?.entidadfinanciera_key
   );
+  const detalleCuentaFaregas = maestrosPago?.cuentaFaregas;
   const tarjetaSeleccionada = (maestrosPago?.tarjetas || []).find((tarjeta) => tarjeta.key === formPago.tarjetaKey);
   const nombreTarjetaSeleccionada = String(tarjetaSeleccionada?.nombre || '').toUpperCase();
   const esMedioAlternativo = ['YAPE', 'PLIN', 'CUPONIDAD'].some((nombre) => nombreTarjetaSeleccionada.includes(nombre));
   const esBoleta = String(tipoComprobante || '').toUpperCase() === 'BOLETA';
+
+  useEffect(() => {
+    if (pagoTab !== 'BANCO' || !cuentaFaregas) return;
+    setFormPago((prev) => {
+      if (
+        prev.entidadFinancieraKey === cuentaFaregas.entidadfinanciera_key
+        && prev.cuentaCorrienteKey === cuentaFaregas.key
+      ) return prev;
+      return {
+        ...prev,
+        entidadFinancieraKey: cuentaFaregas.entidadfinanciera_key,
+        cuentaCorrienteKey: cuentaFaregas.key,
+      };
+    });
+  }, [
+    cuentaFaregas,
+    formPago.cuentaCorrienteKey,
+    formPago.entidadFinancieraKey,
+    pagoTab,
+    setFormPago,
+  ]);
+
   const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormPago((prev) => ({
       ...prev,
@@ -232,29 +256,43 @@ export function PagoStep({
               )}
 
               {pagoTab === 'BANCO' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">ENTIDAD FINANCIERA</label>
-                    <select name="entidadFinancieraKey" value={formPago.entidadFinancieraKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0">
-                      <option value="">-- SELECCIONAR --</option>
-                      {(maestrosPago?.entidadesFinancieras || []).map((entidad) => (
-                        <option key={entidad.key} value={entidad.key}>{entidad.nombre}</option>
-                      ))}
-                    </select>
+                    <input
+                      type="text"
+                      readOnly
+                      value={detalleCuentaFaregas?.entidad || entidadFaregas?.nombre || ''}
+                      className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 p-3 font-bold text-slate-700"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">CUENTA CORRIENTE</label>
-                    <select name="cuentaCorrienteKey" value={formPago.cuentaCorrienteKey || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0">
-                      <option value="">-- SELECCIONAR --</option>
-                      {cuentasFiltradas.map((cuenta) => (
-                        <option key={cuenta.key} value={cuenta.key}>{cuenta.nombre}</option>
-                      ))}
-                    </select>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">CUENTA FAREGAS</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={detalleCuentaFaregas?.numero || ''}
+                      className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 p-3 font-bold text-slate-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">CCI</label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={detalleCuentaFaregas?.cci || ''}
+                      className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 p-3 font-bold text-slate-700"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">FECHA DEPÓSITO</label>
                     <input type="date" name="fechaDeposito" max={new Date().toISOString().slice(0, 10)} value={formPago.fechaDeposito || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold focus:border-[#f59e0b] focus:ring-0" />
                   </div>
+                  {!cuentaFaregas && (
+                    <p className="md:col-span-2 xl:col-span-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                      La cuenta bancaria FAREGAS no está configurada. No registre el pago hasta corregir la configuración.
+                    </p>
+                  )}
                 </div>
               )}
 

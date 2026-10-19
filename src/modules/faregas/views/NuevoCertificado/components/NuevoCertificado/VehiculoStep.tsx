@@ -13,7 +13,10 @@ import {
   formatDecimal,
   formatAlfanumericoConEspacios,
   formatMes,
-  formatAnio
+  formatAnio,
+  formatPeriodoFabricacion,
+  descomponerPeriodoFabricacion,
+  presentarPeriodoFabricacion
 } from '../../../../utils/vehiculo-formatters';
 import { MensajeError, propsCampo, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
 import { camposObligatoriosVisibles } from '../../faregas-wizard.validation';
@@ -34,6 +37,17 @@ const CLASE_CAMPO = 'w-full p-2 border-2 border-slate-200 rounded-lg text-slate-
 /** Clase original de los campos dentro de la tabla de conversión antes/después. */
 const CLASE_TABLA = 'w-full p-1.5 border-2 border-amber-300 rounded text-slate-800 font-bold focus:border-amber-500 focus:ring-0 text-xs';
 const COMBUSTIBLE_POSTERIOR_GLP = 'BI-COMBUSTIBLE GLP';
+const COMBUSTIBLES_GLP_ANUAL = new Set(['BI-COMBUSTIBLE GLP', 'GLP']);
+
+const normalizarCombustibleGlpAnual = (valor: unknown) => {
+  const normalizado = String(valor || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+/g, ' ');
+  if (normalizado === 'BI COMBUSTIBLE GLP') return 'BI-COMBUSTIBLE GLP';
+  return COMBUSTIBLES_GLP_ANUAL.has(normalizado) ? normalizado : COMBUSTIBLE_POSTERIOR_GLP;
+};
 
 interface VehiculoStepProps {
   tipoCertificado: TipoCertificadoFaregas;
@@ -139,6 +153,13 @@ export function VehiculoStep({
   }, [tipoCertificado, resolucionConformidad, setFormConformidad]);
   const esGlpAnual = tipoCertificado === 'GLP_ANUAL'
     && String(modalidadCertificado || '').toUpperCase() === 'ANUAL';
+
+  React.useEffect(() => {
+    if (!esGlpAnual) return;
+    const combustible = normalizarCombustibleGlpAnual(formVehiculo.combustible);
+    if (combustible === formVehiculo.combustible) return;
+    setFormVehiculo((prev: any) => ({ ...prev, combustible }));
+  }, [esGlpAnual, formVehiculo.combustible, setFormVehiculo]);
   const required = (campo: string) => (obligatorio.has(campo) ? ' *' : '');
   const esError = (campo: string) => Boolean(erroresCampo[campo]);
   const limpiar = (campo: string) => onCorregirCampo?.(campo);
@@ -359,6 +380,27 @@ export function VehiculoStep({
       }
       nc[idx] = { ...nc[idx], [campo]: finalValue };
       return { ...prev, componentes: nc };
+    });
+  };
+
+  const handlePeriodoFabricacionGlp = (idx: number, valor: string) => {
+    const componente = formGlp.componentes?.[idx]?.componente;
+    if (componente) {
+      limpiar(claveComponente('glp', componente, 'anioFabricacion'));
+      limpiar(claveComponente('glp', componente, 'mesFabricacion'));
+    }
+
+    const periodoFabricacionInput = formatPeriodoFabricacion(valor);
+    const { mes, anio } = descomponerPeriodoFabricacion(periodoFabricacionInput);
+    setFormGlp((prev: any) => {
+      const componentes = [...(prev.componentes || [])];
+      componentes[idx] = {
+        ...componentes[idx],
+        periodoFabricacionInput,
+        mesFabricacion: mes,
+        anioFabricacion: anio,
+      };
+      return { ...prev, componentes };
     });
   };
 
@@ -744,16 +786,19 @@ export function VehiculoStep({
                                 </div>
                                 <span className="select-none pt-5 text-base font-black text-slate-400" aria-hidden="true">/</span>
                                 <div className="min-w-0">
-                                  <label className="mb-0.5 block text-[10px] font-bold text-slate-500">AÑO *</label>
+                                  <label className="mb-0.5 block text-[10px] font-bold text-slate-500">MES-AÑO *</label>
                                   <input
-                                    value={comp.anioFabricacion || ''}
-                                    onChange={e => handleComponenteGlp(idx, 'anioFabricacion', e.target.value)}
-                                    inputMode="numeric"
-                                    data-tipo-dato="entero"
-                                    maxLength={4}
+                                    value={comp.periodoFabricacionInput !== undefined
+                                      ? comp.periodoFabricacionInput
+                                      : presentarPeriodoFabricacion(comp.mesFabricacion, comp.anioFabricacion)}
+                                    onChange={e => handlePeriodoFabricacionGlp(idx, e.target.value)}
+                                    inputMode="text"
+                                    data-tipo-dato="mes-anio"
+                                    maxLength={7}
                                     className={claseConError("h-9 w-full rounded-md border-2 border-slate-200 px-2 text-center text-xs font-semibold text-slate-800 focus:border-[#f59e0b] focus:ring-0", esError(claveComponente('glp', comp.componente, 'anioFabricacion')))}
                                     data-campo-error={esError(claveComponente('glp', comp.componente, 'anioFabricacion')) ? true : undefined}
-                                    placeholder="AAAA"
+                                    placeholder="MM-AAAA"
+                                    title="Ingrese MM-AAAA. También se acepta AAAA-MM o solo AAAA."
                                   />
                                   <MensajeError campo={claveComponente('glp', comp.componente, 'anioFabricacion')} errores={erroresCampo} />
                                 </div>

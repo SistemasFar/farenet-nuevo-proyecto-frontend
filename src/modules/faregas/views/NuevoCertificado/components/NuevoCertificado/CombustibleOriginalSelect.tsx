@@ -4,6 +4,13 @@ import type { MaestroOption } from '@/types/maestros';
 import { maestrosApi } from '@/services/api';
 import { combustiblesSonEquivalentes, combustiblesGnvSonEquivalentes } from '../../gnv-conversion';
 
+export const COMBUSTIBLES_GLP_INICIAL = ['GASOLINA', 'DIESEL'] as const;
+
+export const OPCIONES_GLP_INICIAL: Array<{ value: string; label: string }> = [
+  { value: 'GASOLINA', label: 'GASOLINA' },
+  { value: 'DIESEL', label: 'DIESEL' },
+];
+
 export interface CombustibleOriginalSelectProps {
   value: string;
   onChange: (value: string) => void;
@@ -16,6 +23,7 @@ export interface CombustibleOriginalSelectProps {
   disabled?: boolean;
   id?: string;
   name?: string;
+  esGlpInicial?: boolean;
 }
 
 export function CombustibleOriginalSelect({
@@ -27,10 +35,12 @@ export function CombustibleOriginalSelect({
   disabled = false,
   id = 'combustible-original-select',
   name = 'combustible',
+  esGlpInicial = false,
 }: CombustibleOriginalSelectProps) {
   const [combustiblesApi, setCombustiblesApi] = useState<MaestroOption[]>([]);
 
   useEffect(() => {
+    if (esGlpInicial) return;
     const listaProps = combustibles || maestrosVehiculo?.combustibles;
     if (Array.isArray(listaProps) && listaProps.length > 0) {
       return;
@@ -49,7 +59,7 @@ export function CombustibleOriginalSelect({
     return () => {
       activo = false;
     };
-  }, [combustibles, maestrosVehiculo]);
+  }, [esGlpInicial, combustibles, maestrosVehiculo]);
 
   const listaBase = useMemo(() => {
     if (Array.isArray(combustibles) && combustibles.length > 0) return combustibles;
@@ -61,6 +71,10 @@ export function CombustibleOriginalSelect({
 
   // Excluir estrictamente cualquier variante de BI-COMBUSTIBLE GLP
   const opcionesCatalogo = useMemo(() => {
+    if (esGlpInicial) {
+      return OPCIONES_GLP_INICIAL;
+    }
+
     const resultado: Array<{ value: string; label: string }> = [];
     const vistos = new Set<string>();
 
@@ -88,22 +102,31 @@ export function CombustibleOriginalSelect({
     }
 
     return resultado;
-  }, [listaBase]);
+  }, [esGlpInicial, listaBase]);
 
   const valorLimpio = String(value || '').trim().toUpperCase();
 
-  // Buscar coincidencia en catálogo
+  const esCombustibleGlpInicialValido = esGlpInicial && (valorLimpio === 'GASOLINA' || valorLimpio === 'DIESEL');
+  const esValorInvalidoGlpInicial = esGlpInicial && Boolean(valorLimpio && !esCombustibleGlpInicialValido);
+
+  // Buscar coincidencia en catálogo o en opciones GLP Inicial
   const opcionSeleccionada = useMemo(() => {
     if (!valorLimpio) return null;
+    if (esGlpInicial) {
+      return esCombustibleGlpInicialValido
+        ? OPCIONES_GLP_INICIAL.find((opt) => opt.value === valorLimpio) || null
+        : null;
+    }
     return (
       opcionesCatalogo.find(
         (opt) => opt.value === valorLimpio || combustiblesSonEquivalentes(opt.value, valorLimpio)
       ) || null
     );
-  }, [opcionesCatalogo, valorLimpio]);
+  }, [esGlpInicial, esCombustibleGlpInicialValido, opcionesCatalogo, valorLimpio]);
 
-  // Si existe un valor previo en borrador/registro pero no figura en catálogo (y no es BI-COMBUSTIBLE GLP)
+  // Si existe un valor previo en borrador/registro pero no figura en catálogo (solo fuera de GLP INICIAL)
   const esValorHistoricoFueraDeCatalogo = Boolean(
+    !esGlpInicial &&
     valorLimpio &&
     !opcionSeleccionada &&
     !combustiblesSonEquivalentes(valorLimpio, 'BI-COMBUSTIBLE GLP') &&
@@ -111,29 +134,35 @@ export function CombustibleOriginalSelect({
   );
 
   const opcionesTotales = useMemo(() => {
+    if (esGlpInicial) {
+      return OPCIONES_GLP_INICIAL;
+    }
     if (esValorHistoricoFueraDeCatalogo) {
       return [
         {
           value: valorLimpio,
-          label: `${valorLimpio} (VALOR ACTUAL REGISTRADO)`,
+          label: valorLimpio + ' (VALOR ACTUAL REGISTRADO)',
         },
         ...opcionesCatalogo,
       ];
     }
     return opcionesCatalogo;
-  }, [esValorHistoricoFueraDeCatalogo, valorLimpio, opcionesCatalogo]);
+  }, [esGlpInicial, esValorHistoricoFueraDeCatalogo, valorLimpio, opcionesCatalogo]);
 
   const valorActualSelect = useMemo(() => {
     if (!valorLimpio) return null;
+    if (esGlpInicial) {
+      return opcionSeleccionada;
+    }
     if (opcionSeleccionada) return opcionSeleccionada;
     if (esValorHistoricoFueraDeCatalogo) {
       return {
         value: valorLimpio,
-        label: `${valorLimpio} (VALOR ACTUAL REGISTRADO)`,
+        label: valorLimpio + ' (VALOR ACTUAL REGISTRADO)',
       };
     }
     return null;
-  }, [valorLimpio, opcionSeleccionada, esValorHistoricoFueraDeCatalogo]);
+  }, [esGlpInicial, valorLimpio, opcionSeleccionada, esValorHistoricoFueraDeCatalogo]);
 
   const customStyles = useMemo(
     () => ({
@@ -143,14 +172,14 @@ export function CombustibleOriginalSelect({
         height: '36px',
         borderRadius: '0.5rem',
         borderWidth: '2px',
-        borderColor: esError
+        borderColor: (esError || esValorInvalidoGlpInicial)
           ? '#ef4444'
           : state.isFocused
             ? '#f59e0b'
             : '#e2e8f0',
         boxShadow: state.isFocused ? '0 0 0 1px #f59e0b' : 'none',
         '&:hover': {
-          borderColor: esError
+          borderColor: (esError || esValorInvalidoGlpInicial)
             ? '#ef4444'
             : state.isFocused
               ? '#f59e0b'
@@ -224,7 +253,7 @@ export function CombustibleOriginalSelect({
         },
       }),
     }),
-    [esError, disabled]
+    [esError, esValorInvalidoGlpInicial, disabled]
   );
 
   return (
@@ -248,6 +277,15 @@ export function CombustibleOriginalSelect({
         className="combustible-original-select"
         classNamePrefix="combustible-select"
       />
+      {esValorInvalidoGlpInicial && (
+        <div
+          role="alert"
+          data-testid="aviso-combustible-invalido-glp"
+          className="mt-1 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-900 border border-amber-300"
+        >
+          ⚠️ El valor actual registrado &quot;{valorLimpio}&quot; no es válido para GLP INICIAL. Debe seleccionar GASOLINA o DIESEL antes de continuar o emitir.
+        </div>
+      )}
       {esValorHistoricoFueraDeCatalogo && (
         <div className="mt-1 rounded bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 border border-amber-200">
           ⚠️ El valor &quot;{valorLimpio}&quot; es un registro existente que no figura en el catálogo activo. Se conserva visualmente para no perder información histórica.

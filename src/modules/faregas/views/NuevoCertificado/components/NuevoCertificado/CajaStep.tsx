@@ -43,7 +43,7 @@ const contieneBusqueda = (
 ) => {
   const termino = normalizarBusqueda(busqueda);
   if (!termino) return true;
-  return normalizarBusqueda(`${servicio.nombre} ${servicio.codigo} ${categoria.nombre}`).includes(termino);
+  return normalizarBusqueda(`${servicio.nombre} ${servicio.codigoServicio || servicio.codigo} ${categoria.nombre}`).includes(termino);
 };
 
 export function CajaStep({
@@ -196,7 +196,7 @@ export function CajaStep({
                     </div>
                   )}
                   <div className="mt-2 flex items-end justify-between gap-2">
-                    <span className="text-[10px] font-semibold text-slate-400">{servicio.codigo}</span>
+                    <span className="text-[10px] font-semibold text-slate-400">{servicio.codigoServicio || servicio.codigo}</span>
                     <div className="text-right">
                       <span className="block text-lg font-black text-[#052a79] leading-none">S/ {servicio.tarifa.importeTotal.toFixed(2)}</span>
                       {servicio.tarifa.requiereChip && <span className="mt-1 block text-[10px] font-black capitalize text-emerald-700 leading-none">Incluye chip</span>}

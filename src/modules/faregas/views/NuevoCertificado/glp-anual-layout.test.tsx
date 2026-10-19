@@ -15,6 +15,7 @@ const formVehiculo = {
   numeroMotor: 'MOTOR123',
   numeroCilindros: '4',
   cilindrada: '2359',
+  combustible: 'BI-COMBUSTIBLE GLP',
   numeroEjes: '2',
   numeroRuedas: '4',
   numeroAsientos: '7',
@@ -123,6 +124,13 @@ describe('formulario GLP ANUAL alineado al certificado oficial', () => {
     expect(propietario).toBeGreaterThan(-1);
     expect(placa).toBeGreaterThan(propietario);
     expect(html).toContain('BI-COMBUSTIBLE GLP');
+    expect(html).toContain('name="combustible"');
+    expect(html).toContain('<option value="GLP">GLP</option>');
+    expect(html).toContain('Seleccione el combustible que figurará en el certificado.');
+    expect(html).toContain('name="numeroEjes" value="02"');
+    expect(html).toContain('name="numeroRuedas" value="04"');
+    expect(html).toContain('name="numeroAsientos" value="07"');
+    expect(html).toContain('name="numeroPasajeros" value="06"');
   });
 
   it('respeta el orden: Propietario -> Facturación -> Vehículo -> Componentes -> Verificaciones -> Vigencia', () => {
@@ -144,9 +152,9 @@ describe('formulario GLP ANUAL alineado al certificado oficial', () => {
     expect(html).toContain('>Q</td>');
     expect(html).toContain('CAPACIDAD (L)');
     expect(html).toContain('value="48"');
-    expect(html).toContain('value="2026"');
+    expect(html).toContain('value="07-2026"');
     expect(html).toContain('h-9 w-full');
-    expect(html).not.toContain('>MES');
+    expect(html).toContain('>MES-AÑO');
     expect(html).not.toContain('Impresión en certificado');
     expect(html).not.toContain('Modelo (ej: Cilíndrico / Toroidal)');
     expect(html).toContain('Se asignará automáticamente al emitir');

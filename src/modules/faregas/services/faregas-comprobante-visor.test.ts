@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { abrirComprobanteFaregas } from './faregas-comprobante-visor.service';
+import { abrirComprobanteFaregas, descargarCertificadoFaregas, descargarComprobanteFaregas, descargarPdfNubefact } from './faregas-comprobante-visor.service';
 import * as httpClient from './faregas-http-client';
 import { faregasCertificadosApi } from './faregas-certificados.api';
 import Swal from 'sweetalert2';
@@ -121,5 +122,34 @@ describe('faregas-comprobante-visor.service', () => {
     expect(onRegenerado).toHaveBeenCalled();
     expect(mockVentanaRetry.location.href).toBe('blob:http://localhost/test-blob');
     expect(res).toBe(true);
+  });
+
+  it.each([
+    ['comprobante FAREGAS', descargarComprobanteFaregas, '/certificados/borradores/91/facturacion/pdf', 'COMPROBANTE-FAREGAS-91.pdf'],
+    ['PDF NubeFact', descargarPdfNubefact, '/certificados/borradores/91/facturacion/pdf-nubefact', 'COMPROBANTE-NUBEFACT-91.pdf'],
+    ['certificado', descargarCertificadoFaregas, '/certificados/borradores/91/certificado/pdf', 'CERTIFICADO-FAREGAS-91.pdf'],
+  ])('descarga automáticamente %s', async (_nombre, descargar, endpoint, filename) => {
+    const mockBlob = new Blob(['%PDF-1.4 test'], { type: 'application/pdf' });
+    const spyFetchBlob = vi.spyOn(httpClient, 'faregasFetchBlob').mockResolvedValue(mockBlob);
+    const click = vi.fn();
+    const remove = vi.fn();
+    const createElementOriginal = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      if (tagName.toLowerCase() === 'a') {
+        return { href: '', download: '', style: {}, click, remove } as unknown as HTMLAnchorElement;
+      }
+      return createElementOriginal(tagName);
+    }) as typeof document.createElement);
+    vi.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+
+    const resultado = await descargar(91);
+
+    expect(spyFetchBlob).toHaveBeenCalledWith(endpoint);
+    expect(document.createElement).toHaveBeenCalledWith('a');
+    expect(click).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledOnce();
+    const enlace = (document.createElement as any).mock.results[0].value as HTMLAnchorElement;
+    expect(enlace.download).toBe(filename);
+    expect(resultado).toBe(true);
   });
 });

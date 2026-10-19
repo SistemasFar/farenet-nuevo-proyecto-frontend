@@ -142,9 +142,14 @@ describe('formulario GLP INICIAL alineado al certificado real', () => {
     expect(html).toContain('D. VERIFICACIONES DE SEGURIDAD GLP');
     expect(html).toContain('E. VIGENCIA / EXPEDIENTE');
     expect(html).toContain('DATOS PARA FACTURACIÓN');
+    // Ítems 12 y 13 con formato dos dígitos (cero a la izquierda cuando es un solo dígito)
+    expect(html).toContain('name="numeroEjes" value="02"');
+    expect(html).toContain('name="numeroRuedas" value="04"');
+    expect(html).toContain('name="numeroAsientos" value="05"');
+    expect(html).toContain('name="numeroPasajeros" value="04"');
   });
 
-  it('componentes están antes de conversión y la fila del cilindro es compacta (sin Mes ni Modelo redundante)', () => {
+  it('componentes están antes de conversión y la fila del cilindro usa un único campo MES-AÑO', () => {
     const html = renderGlpInicial();
 
     const componentesPos = html.indexOf('B. COMPONENTES INSTALADOS GLP');
@@ -155,7 +160,8 @@ describe('formulario GLP INICIAL alineado al certificado real', () => {
     expect(html).toContain('CAPACIDAD (L)');
     expect(html).toContain('value="48"');
     expect(html).toContain('value="2025"');
-    expect(html).not.toContain('>MES');
+    expect(html).toContain('MES-AÑO *');
+    expect(html).toContain('placeholder="MM-AAAA"');
     expect(html).not.toContain('Modelo (ej: Cilíndrico / Toroidal)');
     expect(html).not.toContain('Impresión en certificado');
 

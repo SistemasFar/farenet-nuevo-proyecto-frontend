@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { maestrosApi, inspeccionesApi } from '@/services/api';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 import { faregasClientesApi } from '../../services/faregas-clientes.api';
+import { faregasPagosApi } from '../../services/faregas-pagos.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
 import { CheckCircle2, FileText, CreditCard, ArrowLeft, Search, Loader2, Save, Eye } from 'lucide-react';
@@ -26,8 +27,7 @@ import { useErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual as indicePaso, puedeRetrocederWizard } from './faregas-emision';
 import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './faregas-formulario-operativo';
-import { faregasFetchBlob } from '../../services/faregas-http-client';
-import { abrirComprobanteFaregas } from '../../services/faregas-comprobante-visor.service';
+import { descargarComprobanteFaregas, descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 
 
 
@@ -173,15 +173,14 @@ export function NuevoCertificadoView() {
   const { id } = useParams<{ id?: string }>();
   const [certificadoId, setCertificadoId] = useState<number | undefined>(id ? parseInt(id, 10) : undefined);
 
-  const abrirPdfFaregas = async () => {
+  const descargarPdfFaregas = async () => {
     if (!certificadoId) return;
-    await abrirComprobanteFaregas(certificadoId, {
-      facturacion,
-      onRegenerado: async () => {
-        const resp = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
-        if (resp?.data?.facturacion) setFacturacion(resp.data.facturacion);
-      },
-    });
+    await descargarComprobanteFaregas(certificadoId);
+  };
+
+  const descargarPdfOficialNubefact = async () => {
+    if (!certificadoId) return;
+    await descargarPdfNubefact(certificadoId);
   };
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -691,7 +690,7 @@ export function NuevoCertificadoView() {
   const cargarMaestrosPago = async () => {
     try {
       setLoading(true);
-      const res = await maestrosApi.obtenerMaestrosPagoAsync();
+      const res = await faregasPagosApi.obtenerMaestros();
       setMaestrosPago(res.data);
     } catch (err: any) {
       setError(err.message || 'Error cargando maestros de pago');
@@ -2149,13 +2148,13 @@ export function NuevoCertificadoView() {
             <div className="flex items-center gap-3">
               {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && (facturacion?.enlacePdfFaregas || facturacion?.enlacePdf) && (
                 <>
-                  <button type="button" onClick={() => void abrirPdfFaregas()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
+                  <button type="button" onClick={() => void descargarPdfFaregas()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
                     VER / DESCARGAR COMPROBANTE
                   </button>
                   {facturacion?.enlacePdf && (
-                    <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="PDF oficial NubeFact de auditoría">
+                    <button type="button" onClick={() => void descargarPdfOficialNubefact()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="Descargar PDF oficial de NubeFact">
                       VER PDF NUBEFACT
-                    </a>
+                    </button>
                   )}
                 </>
               )}
@@ -2167,14 +2166,14 @@ export function NuevoCertificadoView() {
             (isEmitido || facturacion?.enlacePdf || facturacion?.enlacePdfFaregas) ? (
               <div className="flex items-center gap-3">
                 {(facturacion?.enlacePdfFaregas || facturacion?.enlacePdf) && (
-                  <button type="button" onClick={() => void abrirPdfFaregas()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
+                  <button type="button" onClick={() => void descargarPdfFaregas()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
                     VER / DESCARGAR COMPROBANTE
                   </button>
                 )}
                 {facturacion?.enlacePdf && (
-                  <a href={facturacion.enlacePdf} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="PDF oficial NubeFact de auditoría">
+                  <button type="button" onClick={() => void descargarPdfOficialNubefact()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="Descargar PDF oficial de NubeFact">
                     VER PDF NUBEFACT
-                  </a>
+                  </button>
                 )}
                 {isEmitido && (
                   <button type="button" onClick={() => navigate('/faregas/inicio')} className="rounded-lg bg-gold-3d px-6 py-2.5 text-xs font-black transition shadow-sm">
