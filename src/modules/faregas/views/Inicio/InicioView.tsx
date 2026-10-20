@@ -9,6 +9,7 @@ import { FileText, FileEdit, Eye, Ban, RefreshCw } from 'lucide-react';
 import { nombreTipoCertificadoPanel } from './tipo-certificado-panel';
 import { faregasFetchBlob } from '../../services/faregas-http-client';
 import { abrirComprobanteFaregas } from '../../services/faregas-comprobante-visor.service';
+import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
@@ -178,6 +179,7 @@ export function InicioView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
+  const [mostrarDuplicado, setMostrarDuplicado] = useState(false);
 
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -614,13 +616,22 @@ export function InicioView() {
       <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <span className="font-semibold text-gray-700">Operaciones recientes</span>
-          <button
-            type="button"
-            onClick={() => navigate('/faregas/certificados/nuevo')}
-            className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900"
-          >
-            + Nuevo Certificado
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setMostrarDuplicado(true)}
+              className="rounded-lg border border-amber-500 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+            >
+              + Nuevo Duplicado
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/faregas/certificados/nuevo')}
+              className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900"
+            >
+              + Nuevo Certificado
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-x-auto">
@@ -974,6 +985,7 @@ export function InicioView() {
         </div>
       </div>
 
+      {mostrarDuplicado && <DuplicadoCertificadoModal onClose={() => setMostrarDuplicado(false)} />}
     </div>
   );
 }
