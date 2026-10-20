@@ -16,6 +16,7 @@ export type CampoVehiculoCertificado = {
   grupo?: 'simple' | 'vin-serie';
   automatico?: boolean;
   valorAutomatico?: string;
+  formato?: 'dos-digitos';
   opciones?: Array<{ valor: string; etiqueta: string }>;
   campos?: SubcampoVehiculo[];
   separador?: string;
@@ -196,8 +197,8 @@ const CAMPOS_GNV: CampoVehiculoCertificado[] = [
     etiqueta: 'N° EJES / N° RUEDAS',
     numero: 11,
     campos: [
-      { campo: 'numeroEjes', placeholder: 'N° Ejes' },
-      { campo: 'numeroRuedas', placeholder: 'N° Ruedas' },
+      { campo: 'numeroEjes', placeholder: 'N° Ejes', formato: 'dos-digitos' },
+      { campo: 'numeroRuedas', placeholder: 'N° Ruedas', formato: 'dos-digitos' },
     ],
     separador: '/',
     colSpan: 2,
@@ -208,8 +209,8 @@ const CAMPOS_GNV: CampoVehiculoCertificado[] = [
     etiqueta: 'N° ASIENTOS / PASAJEROS',
     numero: 12,
     campos: [
-      { campo: 'numeroAsientos', placeholder: 'N° Asientos' },
-      { campo: 'numeroPasajeros', placeholder: 'Pasajeros' },
+      { campo: 'numeroAsientos', placeholder: 'N° Asientos', formato: 'dos-digitos' },
+      { campo: 'numeroPasajeros', placeholder: 'Pasajeros', formato: 'dos-digitos' },
     ],
     separador: '/',
     colSpan: 2,
@@ -239,7 +240,12 @@ const CAMPOS_GNV_ANUAL: CampoVehiculoCertificado[] = CAMPOS_GNV.map((campo) => (
   ...campo,
   columnaCertificado: (campo.numero || 0) <= 8 ? 'izquierda' : 'derecha',
   ...(campo.campo === 'combustible'
-    ? { automatico: true, valorAutomatico: 'BI-COMBUSTIBLE GNV' }
+    ? {
+        opciones: [
+          { valor: 'BI-COMBUSTIBLE GNV', etiqueta: 'BI-COMBUSTIBLE GNV' },
+          { valor: 'GNV', etiqueta: 'GNV' },
+        ],
+      }
     : {}),
 }));
 
@@ -295,7 +301,7 @@ export const CAMPOS_CONFORMIDAD: CampoVehiculoCertificado[] = [
 
   // Fila 10: Potencia (kw / rpm) (izq) / N° Ejes (der)
   { campo: 'potencia', etiqueta: 'POTENCIA (KW / RPM)', columnaCertificado: 'izquierda' },
-  { campo: 'numeroEjes', etiqueta: 'N° EJES', columnaCertificado: 'derecha' },
+  { campo: 'numeroEjes', etiqueta: 'N° EJES', formato: 'dos-digitos', columnaCertificado: 'derecha' },
 
   // Fila 11: Asientos / Pasajeros (izq) / N° Ruedas (der)
   {
@@ -303,14 +309,14 @@ export const CAMPOS_CONFORMIDAD: CampoVehiculoCertificado[] = [
     campo: 'numeroAsientos',
     etiqueta: 'ASIENTOS / PASAJEROS',
     campos: [
-      { campo: 'numeroAsientos', placeholder: 'Asientos' },
-      { campo: 'numeroPasajeros', placeholder: 'Pasajeros' },
+      { campo: 'numeroAsientos', placeholder: 'Asientos', formato: 'dos-digitos' },
+      { campo: 'numeroPasajeros', placeholder: 'Pasajeros', formato: 'dos-digitos' },
     ],
     separador: '/',
     colSpan: 2,
     columnaCertificado: 'izquierda',
   },
-  { campo: 'numeroRuedas', etiqueta: 'N° RUEDAS', columnaCertificado: 'derecha' },
+  { campo: 'numeroRuedas', etiqueta: 'N° RUEDAS', formato: 'dos-digitos', columnaCertificado: 'derecha' },
 
   // Fila 12: Cilindrada (cc) / Cilindros (izq) / Versión (der)
   {
@@ -331,6 +337,24 @@ export const CAMPOS_CONFORMIDAD: CampoVehiculoCertificado[] = [
   { campo: 'longitud', etiqueta: 'LONGITUD (METROS)', columnaCertificado: 'izquierda' },
   { campo: 'vin', etiqueta: 'VIN', columnaCertificado: 'derecha' },
 ];
+
+const COMBUSTIBLES_GNV_ANUAL = new Set(['BI-COMBUSTIBLE GNV', 'GNV']);
+
+/**
+ * El padrón vehicular puede traer el combustible original (por ejemplo DIESEL),
+ * pero el certificado anual GNV sólo declara la configuración inspeccionada.
+ */
+export const normalizarCombustibleGnvAnual = (valor: unknown): 'BI-COMBUSTIBLE GNV' | 'GNV' => {
+  const normalizado = String(valor || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+/g, ' ');
+  if (normalizado === 'BI COMBUSTIBLE GNV') return 'BI-COMBUSTIBLE GNV';
+  return COMBUSTIBLES_GNV_ANUAL.has(normalizado)
+    ? normalizado as 'BI-COMBUSTIBLE GNV' | 'GNV'
+    : 'BI-COMBUSTIBLE GNV';
+};
 
 export interface ResolucionServicioConformidad {
   esCambioDeMotor: boolean;

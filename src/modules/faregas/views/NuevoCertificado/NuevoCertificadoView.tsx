@@ -23,11 +23,12 @@ import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/farega
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { resolverCuotasCredito, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
-import { useErroresPaso } from './faregas-wizard-errores';
+import { useErroresPaso, PanelResumenErroresWizard, estructurarErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual as indicePaso, puedeRetrocederWizard } from './faregas-emision';
 import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './faregas-formulario-operativo';
 import { descargarComprobanteFaregas, descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
+import { normalizarCombustibleGnvAnual } from './faregas-certificado-campos';
 
 
 
@@ -458,16 +459,30 @@ export function NuevoCertificadoView() {
     limpiarCampo: limpiarErrorCampo,
     limpiarTodo: limpiarErroresPaso,
     enfocarPrimerError,
+    enfocarCampo,
   } = useErroresPaso();
 
-  const bloquearPaso = (erroresCampo: Record<string, string>) => {
+  const bloquearPaso = (erroresCampo: Record<string, string>, seccionPorDefecto = 'Datos del Certificado') => {
     if (registrarErrores(erroresCampo)) {
-      enfocarPrimerError();
+      const lista = estructurarErroresPaso(erroresCampo, seccionPorDefecto);
+      const total = lista.length;
       Swal.fire({
         icon: 'warning',
-        title: 'Complete los campos obligatorios',
-        text: 'Los campos marcados en rojo deben corregirse para continuar.',
+        title: `Falta${total > 1 ? 'n' : ''} ${total} dato${total > 1 ? 's' : ''} para continuar`,
+        html: `
+          <div style="text-align: left; font-size: 13px;">
+            <p style="font-weight: 700; color: #991b1b; margin-bottom: 8px;">
+              No puedes continuar. Corrige los siguientes campos:
+            </p>
+            <ol style="padding-left: 20px; margin: 0; line-height: 1.6; color: #1e293b;">
+              ${lista.map(item => `<li style="margin-bottom: 4px;"><strong>${item.etiqueta}:</strong> ${item.mensaje}</li>`).join('')}
+            </ol>
+          </div>
+        `,
         confirmButtonColor: '#052a79',
+        confirmButtonText: 'Entendido, voy a corregir',
+      }).then(() => {
+        window.setTimeout(enfocarPrimerError, 100);
       });
       return true;
     }
@@ -1045,6 +1060,14 @@ export function NuevoCertificadoView() {
     const guardarVehiculo = confirmarMaestro
       ? faregasCertificadosApi.confirmarVehiculoBorrador
       : faregasCertificadosApi.guardarVehiculoBorrador;
+    const esGnvAnual = formCaja.tipoCertificado === 'GNV_ANUAL'
+      && String(formCaja.modalidadCertificado || '').toUpperCase() === 'ANUAL';
+    const combustibleVehiculo = esGnvAnual
+      ? normalizarCombustibleGnvAnual(formVehiculo.combustible)
+      : formVehiculo.combustible || (formCaja.tipoCertificado === 'GLP_ANUAL'
+          && String(formCaja.modalidadCertificado || '').toUpperCase() === 'ANUAL'
+        ? 'BI COMBUSTIBLE GLP'
+        : null);
     await guardarVehiculo(idBorrador, {
       placa: formCaja.placa || formVehiculo.placaNueva || null,
       categoria: formCaja.categoria || null,
@@ -1057,7 +1080,7 @@ export function NuevoCertificadoView() {
       vin: formVehiculo.vin || formVehiculo.serieChasis || null,
       serieChasis: formVehiculo.serieChasis || (formCaja.tipoCertificado !== 'CONFORMIDAD' ? formVehiculo.vin : null) || null,
       numeroMotor: formVehiculo.numeroMotor || null,
-      combustible: formVehiculo.combustible || (formCaja.tipoCertificado === 'GLP_ANUAL' && String(formCaja.modalidadCertificado || '').toUpperCase() === 'ANUAL' ? 'BI COMBUSTIBLE GLP' : null),
+      combustible: combustibleVehiculo,
       color: formVehiculo.color || null,
       carroceria: formVehiculo.carroceria || null,
       numeroCilindros: normalizarEnteroCertificado(formVehiculo.numeroCilindros, 4) || null,
@@ -1340,22 +1363,38 @@ export function NuevoCertificadoView() {
       setCurrentStepIndex(indicePaso('VEHICULO'));
     }
 
-    if (resumen.length > 0) {
-      mostrarErroresPaso(resumen);
-    } else {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Complete los campos obligatorios',
-        text: regresarAlPasoTecnico
-          ? 'El borrador tiene datos incompletos. Regresamos a Vehículo y Datos Técnicos para que corrija los campos marcados en rojo.'
-          : 'Los campos marcados en rojo deben corregirse para continuar.',
-        confirmButtonColor: '#052a79',
+    const lista = estructurarErroresPaso(campos, 'Vehículo y Datos Técnicos');
+    resumen.forEach((msg, idx) => {
+      lista.push({
+        campo: `formato_${idx}`,
+        etiqueta: 'Formato de Inspección',
+        seccion: 'Taller',
+        mensaje: msg,
       });
-    }
+    });
 
-    if (tieneErroresCampo) {
-      window.setTimeout(enfocarPrimerError, 0);
-    }
+    const total = lista.length;
+    Swal.fire({
+      icon: 'warning',
+      title: `Falta${total > 1 ? 'n' : ''} ${total} dato${total > 1 ? 's' : ''} para continuar`,
+      html: `
+        <div style="text-align: left; font-size: 13px;">
+          <p style="font-weight: 700; color: #991b1b; margin-bottom: 8px;">
+            ${regresarAlPasoTecnico
+              ? 'El borrador tiene datos incompletos. Regresamos a Vehículo y Datos Técnicos para que corrija los siguientes campos:'
+              : 'No puedes continuar. Corrige los siguientes campos:'}
+          </p>
+          <ol style="padding-left: 20px; margin: 0; line-height: 1.6; color: #1e293b;">
+            ${lista.map(item => `<li style="margin-bottom: 4px;"><strong>${item.etiqueta}:</strong> ${item.mensaje}</li>`).join('')}
+          </ol>
+        </div>
+      `,
+      confirmButtonColor: '#052a79',
+      confirmButtonText: 'Entendido, voy a corregir',
+    }).then(() => {
+      window.setTimeout(enfocarPrimerError, 100);
+    });
+
     return true;
   };
 
@@ -1885,6 +1924,11 @@ export function NuevoCertificadoView() {
       {/* Content Area */}
       <div className="p-5 sm:p-6 lg:p-8">
         {soloLectura && <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800">Consulta de solo lectura. Puede recorrer todos los pasos sin modificar el registro.</p>}
+        <PanelResumenErroresWizard
+          errores={estructurarErroresPaso(errores)}
+          onEnfocarCampo={enfocarCampo}
+          onCerrar={limpiarErroresPaso}
+        />
         <fieldset disabled={soloLectura} className="faregas-formulario-operativo m-0 min-w-0 w-full border-0 p-0"
           onKeyDownCapture={manejarNavegacionFormulario}
           onClickCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}

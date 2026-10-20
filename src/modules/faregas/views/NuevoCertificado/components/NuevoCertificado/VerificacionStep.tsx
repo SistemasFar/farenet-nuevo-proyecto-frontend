@@ -727,7 +727,7 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
                 <div className="text-slate-500 font-semibold">Vigencia Hasta:</div>
                 <div className="font-bold text-slate-800 capitalize">{formGnv.fechaVigencia || '-'}</div>
                 <div className="text-slate-500 font-semibold">Observaciones:</div>
-                <div className="font-bold text-slate-800 capitalize">{formGnv.observaciones || 'NINGUNA'}</div>
+                <div className="font-bold text-slate-800 capitalize">{formGnv.observaciones || '-'}</div>
               </div>
             )}
 

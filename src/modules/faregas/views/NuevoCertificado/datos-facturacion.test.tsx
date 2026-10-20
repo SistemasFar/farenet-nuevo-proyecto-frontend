@@ -846,7 +846,38 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       });
 
       expect(errores['marca']).toBe('Este campo es obligatorio.');
-      expect(errores['emailFac']).toBe('Complete el correo electrónico de facturación.');
+      // Correo es opcional: vacío no produce error
+      expect(errores['emailFac']).toBeUndefined();
+
+      // Si se ingresa con formato inválido, sí produce error
+      const erroresFormatoInvalido = validarFormularioVehiculoVisible({
+        tipoCertificado: 'GLP_ANUAL',
+        modalidad: 'ANUAL',
+        caja: { categoria: 'M1', placa: 'ABC123', tarifaCodigo: 'GLP01' },
+        vehiculo: { ...vehiculoIncompleto, marca: 'TOYOTA' },
+        titulares: [{ nombreRazonSocial: 'JUAN PEREZ' }],
+        glp: {
+          fechaVigencia: '2027-10-14',
+          verificaciones: Array.from({ length: 7 }, (_, i) => ({ codigo: String(i + 1), cumple: true })),
+          componentes: [
+            { componente: 'CILINDRO', marca: 'FABER', numeroSerie: '12345', capacidadLitros: '60', anioFabricacion: '2020' },
+            { componente: 'REGULADOR', marca: 'TOMASETTO', numeroSerie: '67890', modelo: 'AT09' },
+          ],
+        },
+        gnv: {},
+        conformidad: {},
+        facturacion: {
+          tipoDocFac: 'BOLETA',
+          tipoDocumentoFac: 'DNI',
+          nroDocFac: '74045612',
+          razonSocialFac: 'JUAN PEREZ',
+          direccionFac: 'AV PERU 123',
+          emailFac: 'correo-sin-arroba',
+          telefonoFac: '987654321',
+          usarTitularPrincipalFac: false,
+        },
+      });
+      expect(erroresFormatoInvalido['emailFac']).toBe('El correo de facturación no tiene un formato válido.');
     });
 
     it('CASO 6: Campo oculto/no aplicable vacío (ej. glp.tallerAutorizadoId) -> NO bloquea', () => {

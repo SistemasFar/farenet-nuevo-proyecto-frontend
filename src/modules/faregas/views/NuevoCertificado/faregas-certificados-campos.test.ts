@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   obtenerCamposVehiculoCertificado,
   camposVehiculoEditables,
+  normalizarCombustibleGnvAnual,
 } from './faregas-certificado-campos';
 import {
   camposObligatoriosVisibles,
@@ -171,13 +172,27 @@ describe('Campos vehiculares por template real y agrupaciones visuales', () => {
       campos: [{ campo: 'numeroCilindros' }, { campo: 'cilindrada' }]
     });
 
+    // Item 10: el combustible anual se elige y se guarda, no es sólo texto visual.
+    expect(campos[9]).toMatchObject({
+      campo: 'combustible',
+      numero: 10,
+      opciones: [
+        { valor: 'BI-COMBUSTIBLE GNV', etiqueta: 'BI-COMBUSTIBLE GNV' },
+        { valor: 'GNV', etiqueta: 'GNV' },
+      ],
+    });
+    expect(campos[9].automatico).not.toBe(true);
+
     // Item 11 Ejes / Ruedas
     expect(campos[10]).toMatchObject({
       tipo: 'grupo',
       numero: 11,
       etiqueta: 'N° EJES / N° RUEDAS',
       separador: '/',
-      campos: [{ campo: 'numeroEjes' }, { campo: 'numeroRuedas' }]
+      campos: [
+        { campo: 'numeroEjes', formato: 'dos-digitos' },
+        { campo: 'numeroRuedas', formato: 'dos-digitos' },
+      ]
     });
 
     // Item 12 Asientos / Pasajeros
@@ -186,7 +201,10 @@ describe('Campos vehiculares por template real y agrupaciones visuales', () => {
       numero: 12,
       etiqueta: 'N° ASIENTOS / PASAJEROS',
       separador: '/',
-      campos: [{ campo: 'numeroAsientos' }, { campo: 'numeroPasajeros' }]
+      campos: [
+        { campo: 'numeroAsientos', formato: 'dos-digitos' },
+        { campo: 'numeroPasajeros', formato: 'dos-digitos' },
+      ]
     });
 
     // Item 13 Largo / Ancho / Alto
@@ -206,6 +224,13 @@ describe('Campos vehiculares por template real y agrupaciones visuales', () => {
     // Carga útil no existe en el certificado GNV
     const camposNombres = campos.map(c => c.campo);
     expect(camposNombres).not.toContain('cargaUtil');
+  });
+
+  it('GNV Anual: conserva GNV o BI-COMBUSTIBLE GNV y reemplaza combustibles heredados', () => {
+    expect(normalizarCombustibleGnvAnual('GNV')).toBe('GNV');
+    expect(normalizarCombustibleGnvAnual('BI COMBUSTIBLE GNV')).toBe('BI-COMBUSTIBLE GNV');
+    expect(normalizarCombustibleGnvAnual('BI - COMBUSTIBLE GNV')).toBe('BI-COMBUSTIBLE GNV');
+    expect(normalizarCombustibleGnvAnual('DIESEL')).toBe('BI-COMBUSTIBLE GNV');
   });
 
   it('Conformidad: formato versión 2 vigente con agrupaciones Asientos/Pasajeros y Cilindrada/Cilindros', () => {
@@ -350,7 +375,7 @@ describe('Validacion frontend de campos visibles y obligatorios', () => {
 
   it('Facturación permanece en todos los certificados', () => {
     expect(CAMPOS_VISIBLES_FACTURACION).toEqual([
-      'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac', 'emailFac'
+      'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac'
     ]);
   });
 

@@ -58,8 +58,10 @@ describe('formulario GNV ANUAL alineado al certificado oficial', () => {
       .toEqual(['numeroCilindros', 'numeroEjes', 'numeroAsientos', 'longitud']);
     expect(campos.find((campo) => campo.numero === 10)).toMatchObject({
       campo: 'combustible',
-      automatico: true,
-      valorAutomatico: 'BI-COMBUSTIBLE GNV',
+      opciones: [
+        { valor: 'BI-COMBUSTIBLE GNV', etiqueta: 'BI-COMBUSTIBLE GNV' },
+        { valor: 'GNV', etiqueta: 'GNV' },
+      ],
     });
     expect(campos.map((campo) => campo.campo)).not.toContain('cargaUtil');
   });
@@ -83,5 +85,10 @@ describe('formulario GNV ANUAL alineado al certificado oficial', () => {
     expect(observaciones).toBeGreaterThan(vigencia);
     expect(html).toContain('✓ MARCAR LOS 8 COMO CUMPLE');
     expect(html).toContain('BI-COMBUSTIBLE GNV');
+    expect(html).toContain('<option value="GNV">GNV</option>');
+    expect(html).toContain('name="numeroEjes" value="02"');
+    expect(html).toContain('name="numeroRuedas" value="04"');
+    expect(html).toContain('name="numeroAsientos" value="05"');
+    expect(html).toContain('name="numeroPasajeros" value="04"');
   });
 });

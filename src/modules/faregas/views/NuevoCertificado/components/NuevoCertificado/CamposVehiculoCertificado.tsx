@@ -194,11 +194,14 @@ export function CamposVehiculoCertificado({
         {etiqueta}
         <input
           name={campo.campo}
-          value={esCampoEnteroCertificado(campo.campo)
-            ? normalizarEnteroCertificado(String(valor(campo)))
-            : String(valor(campo))}
+          value={campo.formato === 'dos-digitos'
+            ? formatearConteoDosDigitos(String(valor(campo)))
+            : esCampoEnteroCertificado(campo.campo)
+              ? normalizarEnteroCertificado(String(valor(campo)))
+              : String(valor(campo))}
           onChange={onChange}
           inputMode={esCampoEnteroCertificado(campo.campo) ? 'numeric' : undefined}
+          maxLength={campo.formato === 'dos-digitos' ? 2 : undefined}
           data-tipo-dato={esCampoEnteroCertificado(campo.campo) ? 'entero' : 'texto'}
           {...propsCampo(campo.campo, erroresCampo, CLASE_CAMPO)}
         />

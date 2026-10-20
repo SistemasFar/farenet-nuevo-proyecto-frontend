@@ -19,12 +19,13 @@ import {
   presentarPeriodoFabricacion
 } from '../../../../utils/vehiculo-formatters';
 import { MensajeError, propsCampo, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
-import { camposObligatoriosVisibles } from '../../faregas-wizard.validation';
+import { camposObligatoriosVisibles, obtenerFechaHoyPeru } from '../../faregas-wizard.validation';
 import { alternarIncumplimientoGnv, marcarTodasVerificacionesGnvComoCumple } from '../../gnv-verificaciones';
 import { alternarIncumplimientoGlp, marcarTodasVerificacionesGlpComoCumple } from '../../glp-verificaciones';
 import { combustiblesGnvSonEquivalentes, combustiblesSonEquivalentes, pesosGnvSonIguales } from '../../gnv-conversion';
 import {
   obtenerCamposVehiculoCertificado,
+  normalizarCombustibleGnvAnual,
   resolverServicioConformidad,
   USOS_ORIGINALES_CATALOGO,
 } from '../../faregas-certificado-campos';
@@ -153,6 +154,8 @@ export function VehiculoStep({
   }, [tipoCertificado, resolucionConformidad, setFormConformidad]);
   const esGlpAnual = tipoCertificado === 'GLP_ANUAL'
     && String(modalidadCertificado || '').toUpperCase() === 'ANUAL';
+  const esGnvAnual = tipoCertificado === 'GNV_ANUAL'
+    && String(modalidadCertificado || '').toUpperCase() === 'ANUAL';
 
   React.useEffect(() => {
     if (!esGlpAnual) return;
@@ -160,6 +163,13 @@ export function VehiculoStep({
     if (combustible === formVehiculo.combustible) return;
     setFormVehiculo((prev: any) => ({ ...prev, combustible }));
   }, [esGlpAnual, formVehiculo.combustible, setFormVehiculo]);
+
+  React.useEffect(() => {
+    if (!esGnvAnual) return;
+    const combustible = normalizarCombustibleGnvAnual(formVehiculo.combustible);
+    if (combustible === formVehiculo.combustible) return;
+    setFormVehiculo((prev: any) => ({ ...prev, combustible }));
+  }, [esGnvAnual, formVehiculo.combustible, setFormVehiculo]);
   const required = (campo: string) => (obligatorio.has(campo) ? ' *' : '');
   const esError = (campo: string) => Boolean(erroresCampo[campo]);
   const limpiar = (campo: string) => onCorregirCampo?.(campo);
@@ -1006,11 +1016,7 @@ export function VehiculoStep({
                     <label className="mb-1 block text-xs font-bold text-slate-500">
                       VIGENCIA HASTA <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
-                      name="fechaVigencia"
-                      value={formGlp.fechaVigencia || ''}
-                      onChange={handleGlp}
+                    <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} min={obtenerFechaHoyPeru()}
                       className={claseConError(CLASE_CAMPO, esError('glp.fechaVigencia'))}
                       data-campo-error={esError('glp.fechaVigencia') ? true : undefined}
                     />
@@ -1048,11 +1054,7 @@ export function VehiculoStep({
                     <label className="block text-xs font-bold text-slate-500 mb-1">
                       VIGENCIA HASTA <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
-                      name="fechaVigencia"
-                      value={formGlp.fechaVigencia || ''}
-                      onChange={handleGlp}
+                    <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} min={obtenerFechaHoyPeru()}
                       className={claseConError(CLASE_CAMPO, esError('glp.fechaVigencia'))}
                       data-campo-error={esError('glp.fechaVigencia') ? true : undefined}
                     />
@@ -1296,7 +1298,7 @@ export function VehiculoStep({
                     maxLength={250}
                     className={claseConError(CLASE_CAMPO, esError('gnv.observaciones'))}
                     data-campo-error={esError('gnv.observaciones') ? true : undefined}
-                    placeholder="EJ: NINGUNA"
+                    placeholder="Ingrese observaciones si corresponde (opcional)"
                   />
                 </section>
               </>
@@ -1388,11 +1390,7 @@ export function VehiculoStep({
                     <h5 className="mb-4 border-b border-slate-200 pb-2 font-bold text-[#052a79]">VIGENCIA</h5>
                     <div>
                       <label className="mb-1 block text-xs font-bold text-slate-500">VIGENCIA HASTA <span className="text-red-500">*</span></label>
-                      <input
-                        type="date"
-                        name="fechaVigencia"
-                        value={formGnv.fechaVigencia || ''}
-                        onChange={handleGnv}
+                      <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} min={obtenerFechaHoyPeru()}
                         className={claseConError(CLASE_CAMPO, esError('gnv.fechaVigencia'))}
                         data-campo-error={esError('gnv.fechaVigencia') ? true : undefined}
                       />
@@ -1411,7 +1409,7 @@ export function VehiculoStep({
                       maxLength={250}
                       className={claseConError(CLASE_CAMPO, esError('gnv.observaciones'))}
                       data-campo-error={esError('gnv.observaciones') ? true : undefined}
-                      placeholder="EJ: NINGUNA"
+                      placeholder="Ingrese observaciones si corresponde (opcional)"
                     />
                   </section>
                 </div>

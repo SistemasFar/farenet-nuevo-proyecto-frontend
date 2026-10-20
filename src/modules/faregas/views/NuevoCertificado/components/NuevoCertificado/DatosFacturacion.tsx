@@ -450,12 +450,10 @@ export function DatosFacturacion({
 
         <div className="md:col-span-2">
           <label className="mb-1 block text-xs font-bold text-slate-500">
-            CORREO ELECTRÓNICO <span className="text-red-500" aria-hidden="true">*</span>
+            CORREO ELECTRÓNICO (OPCIONAL)
           </label>
           <input
             type="email"
-            required
-            aria-required="true"
             value={formFacturacion.emailFac}
             onChange={(event) => handleFacturacionChange('emailFac', event.target.value)}
             className={claseConError(

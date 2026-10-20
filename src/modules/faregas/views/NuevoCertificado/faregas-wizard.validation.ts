@@ -1,3 +1,12 @@
+export const obtenerFechaHoyPeru = (): string => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+};
+
 import type { TipoCertificadoFaregas } from '../../types/faregas';
 import { camposVehiculoEditables } from './faregas-certificado-campos';
 import type { CampoFormatoDinamicoFaregas } from '../../types/faregas-api';
@@ -114,7 +123,12 @@ export const validarExpedienteTecnico = ({
   if (tipoCertificado === 'GNV_ANUAL') {
     agregarFaltantes(errores, vehiculo, [['color', 'el color']]);
     if (String(modalidad || '').toUpperCase() === 'ANUAL') {
-      agregarFaltantes(errores, gnv, [['fechaVigencia', 'la vigencia GNV']]);
+      const hoyPeru = obtenerFechaHoyPeru();
+      if (vacio(gnv.fechaVigencia)) {
+        errores.push('Complete la vigencia GNV.');
+      } else if (String(gnv.fechaVigencia).slice(0, 10) < hoyPeru) {
+        errores.push('La fecha de vigencia no puede ser anterior a la fecha actual.');
+      }
       const verificaciones = gnv.verificaciones || [];
       if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
         errores.push('Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
@@ -125,11 +139,12 @@ export const validarExpedienteTecnico = ({
   if (tipoCertificado === 'GLP_ANUAL') {
     const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
     agregarFaltantes(errores, vehiculo, [['cargaUtil', 'la carga útil']]);
-    const camposGlp: Array<[string, string]> = [
-      ['fechaVigencia', 'la vigencia GLP'],
-    ];
-
-    agregarFaltantes(errores, glp, camposGlp);
+    const hoyPeru = obtenerFechaHoyPeru();
+    if (vacio(glp.fechaVigencia)) {
+      errores.push('Complete la vigencia GLP.');
+    } else if (String(glp.fechaVigencia).slice(0, 10) < hoyPeru) {
+      errores.push('La fecha de vigencia no puede ser anterior a la fecha actual.');
+    }
     const componentes = glp.componentes || [];
     for (const tipo of ['CILINDRO', 'REGULADOR']) {
       const componente = componentes.find((item: any) => item.componente === tipo);
@@ -398,7 +413,12 @@ export const validarDatosEspecificos = ({
 
   if (tipo === 'GNV_ANUAL') {
     if (String(modalidad || '').toUpperCase() === 'ANUAL') {
-      if (vacio(gnv.fechaVigencia)) marcar(errores, 'gnv.fechaVigencia', 'Complete la vigencia del certificado GNV.');
+      const hoyPeru = obtenerFechaHoyPeru();
+      if (vacio(gnv.fechaVigencia)) {
+        marcar(errores, 'gnv.fechaVigencia', 'Complete la vigencia del certificado GNV.');
+      } else if (String(gnv.fechaVigencia).slice(0, 10) < hoyPeru) {
+        marcar(errores, 'gnv.fechaVigencia', 'La fecha de vigencia no puede ser anterior a la fecha actual.');
+      }
       const verificaciones = gnv.verificaciones || [];
       if (verificaciones.length !== 8 || verificaciones.some((item: any) => item.cumple !== true)) {
         marcar(errores, 'gnv.verificaciones', 'Las 8 verificaciones GNV deben estar evaluadas como CUMPLE.');
@@ -408,7 +428,12 @@ export const validarDatosEspecificos = ({
 
   if (tipo === 'GLP_ANUAL') {
     const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
-    if (vacio(glp.fechaVigencia)) marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
+    const hoyPeru = obtenerFechaHoyPeru();
+    if (vacio(glp.fechaVigencia)) {
+      marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
+    } else if (String(glp.fechaVigencia).slice(0, 10) < hoyPeru) {
+      marcar(errores, 'glp.fechaVigencia', 'La fecha de vigencia no puede ser anterior a la fecha actual.');
+    }
 
 
     const componentes = glp.componentes || [];
@@ -669,9 +694,8 @@ export const validarDatosFacturacionCampos = (
   if (vacio(facturacion.telefonoFac)) {
     errores.telefonoFac = 'Complete el teléfono de facturación.';
   }
-  if (!email) {
-    errores.emailFac = 'Complete el correo electrónico de facturación.';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  // Correo es opcional: solo se valida formato si el usuario lo ingresó
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     errores.emailFac = 'El correo de facturación no tiene un formato válido.';
   }
 
@@ -732,7 +756,7 @@ export const CAMPOS_VISIBLES_TITULAR = [
 
 /** Datos de facturación, que se capturan en el mismo paso. */
 export const CAMPOS_VISIBLES_FACTURACION = [
-  'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac', 'emailFac',
+  'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac',
 ] as const;
 
 /**
