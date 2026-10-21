@@ -78,7 +78,7 @@ describe('taller GNV automático por sede', () => {
     const erroresConformidad = validarDatosEspecificos({ tipo: 'CONFORMIDAD', gnv: {}, glp: {}, conformidad: {} });
     expect(erroresGlp['glp.fechaVigencia']).toBeDefined();
     expect(erroresGlp['glp.tallerAutorizadoId']).toBeUndefined();
-    expect(erroresConformidad['conformidad.tipoConformidad']).toBeDefined();
+    expect(erroresConformidad['conformidad.caracteristicaRegistrable']).toBeDefined();
   });
 
   it('una sola acción marca los ocho puntos como cumple', () => {

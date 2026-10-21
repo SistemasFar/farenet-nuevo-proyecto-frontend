@@ -33,6 +33,9 @@ export const DashboardSedes: React.FC<DashboardSedesProps> = ({ sedes, cargando 
               <th className="py-2.5 px-3 text-right">Ticket Prom.</th>
               <th className="py-2.5 px-3 text-right">Cert. Emitidos</th>
               <th className="py-2.5 px-3 text-right">Cert. Pendientes</th>
+              <th className="py-2.5 px-3 text-right">Dups. Emitidos</th>
+              <th className="py-2.5 px-3 text-right">Venta Dups.</th>
+              <th className="py-2.5 px-3 text-right">Cobrado Dups.</th>
               <th className="py-2.5 px-3 text-right">Cobrado</th>
               <th className="py-2.5 px-3 text-right">Saldo Pendiente</th>
             </tr>
@@ -40,7 +43,7 @@ export const DashboardSedes: React.FC<DashboardSedesProps> = ({ sedes, cargando 
           <tbody className="divide-y divide-slate-100">
             {sedes.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-slate-400">
+                <td colSpan={11} className="py-8 text-center text-slate-400">
                   No hay datos para las sedes autorizadas en este período.
                 </td>
               </tr>
@@ -63,6 +66,13 @@ export const DashboardSedes: React.FC<DashboardSedesProps> = ({ sedes, cargando 
                   <td className="py-2.5 px-3 text-right text-slate-600">S/ {s.ticketPromedio.toFixed(2)}</td>
                   <td className="py-2.5 px-3 text-right font-semibold text-emerald-700">{s.certificadosEmitidos}</td>
                   <td className="py-2.5 px-3 text-right text-amber-600">{s.certificadosPendientes}</td>
+                  <td className="py-2.5 px-3 text-right font-semibold text-cyan-700">{s.duplicadosEmitidos || 0}</td>
+                  <td className="py-2.5 px-3 text-right font-medium text-slate-700">
+                    S/ {(s.ventaDuplicados || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-medium text-emerald-700">
+                    S/ {(s.totalCobradoDuplicados || 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                  </td>
                   <td className="py-2.5 px-3 text-right font-semibold text-emerald-800">
                     S/ {s.totalCobrado.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                   </td>

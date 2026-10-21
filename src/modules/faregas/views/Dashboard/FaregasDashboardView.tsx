@@ -155,14 +155,21 @@ export const FaregasDashboardView: React.FC = () => {
         <CertificadosTab
           resumen={dashboard.resumen}
           certificados={dashboard.certificados}
+          duplicados={dashboard.duplicados}
           sedes={dashboard.sedes}
           cargando={dashboard.cargando}
           tipoCertificadoSeleccionado={filtros.tipoCertificado}
+          tipoDuplicadoSeleccionado={filtros.tipoDuplicado}
           onSeleccionarTipoCertificado={(tipo) => handleCambiarFiltros({
             tipoCertificado: filtros.tipoCertificado === tipo ? undefined : tipo
           })}
-          pagina={dashboard.paginas.certificados}
-          onCambiarPagina={(pagina) => dashboard.cambiarPagina('certificados', pagina)}
+          onSeleccionarTipoDuplicado={(tipo) => handleCambiarFiltros({
+            tipoDuplicado: filtros.tipoDuplicado === tipo ? undefined : tipo
+          })}
+          paginaCertificados={dashboard.paginas.certificados}
+          paginaDuplicados={dashboard.paginas.duplicados}
+          onCambiarPaginaCertificados={(pagina) => dashboard.cambiarPagina('certificados', pagina)}
+          onCambiarPaginaDuplicados={(pagina) => dashboard.cambiarPagina('duplicados', pagina)}
         />
       )}
       {tabActiva === 'cobranza' && (

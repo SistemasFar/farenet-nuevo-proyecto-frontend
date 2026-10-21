@@ -48,6 +48,11 @@ const filasResumen = (
     { indicador: 'Certificados emitidos', clave: 'certificadosEmitidos', unidad: 'cantidad' },
     { indicador: 'Certificados pendientes', clave: 'certificadosPendientes', unidad: 'cantidad' },
     { indicador: 'Certificados anulados', clave: 'certificadosAnulados', unidad: 'cantidad' },
+    { indicador: 'Certificados duplicados emitidos', clave: 'duplicadosEmitidos', unidad: 'cantidad' },
+    { indicador: 'Venta de duplicados', clave: 'ventaDuplicados', unidad: 'S/' },
+    { indicador: 'Total cobrado duplicados', clave: 'totalCobradoDuplicados', unidad: 'S/' },
+    { indicador: 'Saldo pendiente duplicados', clave: 'saldoPendienteDuplicados', unidad: 'S/' },
+    { indicador: 'Ticket promedio duplicados', clave: 'ticketPromedioDuplicados', unidad: 'S/' },
     { indicador: 'Productos vendidos', clave: 'productosVendidos', unidad: 'cantidad' },
     { indicador: 'Monto descontado', clave: 'montoDescontado', unidad: 'S/' },
     { indicador: 'Facturas emitidas', clave: 'facturasAceptadas', unidad: 'cantidad' },
@@ -61,12 +66,15 @@ const filasResumen = (
     { indicador: 'Usuario exportador', valor: metadatos.usuarioExportador, anterior: '', variacion: '', unidad: '' },
     { indicador: 'Sedes incluidas', valor: metadatos.sedesIncluidas, anterior: '', variacion: '', unidad: '' },
     ...definiciones.map(({ indicador, clave, unidad }) => {
-      const kpi = resumen.kpis[clave];
+      const kpi = resumen.kpis?.[clave];
+      const actual = kpi?.actual ?? 0;
+      const anterior = kpi?.anterior ?? 0;
+      const variacion = kpi?.porcentaje ?? 0;
       return {
         indicador,
-        valor: unidad === 'S/' ? moneda(kpi.actual) : kpi.actual,
-        anterior: unidad === 'S/' ? moneda(kpi.anterior) : kpi.anterior,
-        variacion: kpi.porcentaje,
+        valor: unidad === 'S/' ? moneda(actual) : actual,
+        anterior: unidad === 'S/' ? moneda(anterior) : anterior,
+        variacion,
         unidad
       };
     })
@@ -90,12 +98,15 @@ export function construirHojasDashboard(reporte: DashboardExportacionResponse): 
         ['plantaKey', 'Código sede', 14, 'text'], ['plantaNombre', 'Sede', 28],
         ['operaciones', 'Operaciones', 14], ['venta', 'Venta operativa (S/)', 20, 'decimal2'],
         ['emitidos', 'Certificados emitidos', 20], ['pendientes', 'Certificados pendientes', 22],
+        ['duplicados', 'Duplicados emitidos', 18], ['ventaDuplicados', 'Venta duplicados (S/)', 20, 'decimal2'],
+        ['cobradoDuplicados', 'Cobrado duplicados (S/)', 20, 'decimal2'],
         ['cobrado', 'Total cobrado (S/)', 18, 'decimal2'], ['saldo', 'Saldo pendiente (S/)', 20, 'decimal2'],
         ['ticket', 'Ticket promedio (S/)', 20, 'decimal2']
       ),
       rows: h.sedes.map((s) => ({
         plantaKey: s.plantaKey, plantaNombre: s.plantaNombre, operaciones: s.cantidadOperaciones,
         venta: moneda(s.ventaOperativa), emitidos: s.certificadosEmitidos, pendientes: s.certificadosPendientes,
+        duplicados: s.duplicadosEmitidos || 0, ventaDuplicados: moneda(s.ventaDuplicados || 0), cobradoDuplicados: moneda(s.totalCobradoDuplicados || 0),
         cobrado: moneda(s.totalCobrado), saldo: moneda(s.saldoPendiente), ticket: moneda(s.ticketPromedio)
       }))
     },
@@ -112,6 +123,39 @@ export function construirHojasDashboard(reporte: DashboardExportacionResponse): 
         sede: c.plantaNombre, placa: c.placa || '', marca: c.marca || '', modelo: c.modelo || '',
         importe: moneda(c.importeTotal), fechaCreacion: fechaTexto(c.fechaCreacion),
         fechaEmision: fechaTexto(c.fechaEmision), usuario: c.usuarioCreacion
+      }))
+    },
+    {
+      name: 'Duplicados de Certificados',
+      columns: columnas(
+        ['id', 'ID', 10],
+        ['numeroDuplicado', 'N.º duplicado', 16, 'text'],
+        ['fechaEmision', 'Fecha emisión', 20],
+        ['sede', 'Sede', 25],
+        ['placa', 'Placa', 12, 'text'],
+        ['certificadoOriginal', 'Certificado original', 20, 'text'],
+        ['tipo', 'Tipo certificado', 18],
+        ['modalidad', 'Modalidad', 14],
+        ['importe', 'Importe facturado (S/)', 20, 'decimal2'],
+        ['comprobante', 'Comprobante', 20, 'text'],
+        ['tipoComprobante', 'Tipo comprobante', 18],
+        ['estado', 'Estado', 14],
+        ['solicitadoPor', 'Solicitado por', 18]
+      ),
+      rows: (h.duplicados || []).map((d) => ({
+        id: d.id,
+        numeroDuplicado: `Duplicado #${d.numeroDuplicado}`,
+        fechaEmision: fechaTexto(d.fechaEmisionDuplicado),
+        sede: d.plantaNombre,
+        placa: d.placa || '',
+        certificadoOriginal: d.numeroCertificadoOriginal || `ID #${d.certificadoOriginalId}`,
+        tipo: d.tipoCertificado || d.tipoNombre,
+        modalidad: d.modalidad || '',
+        importe: moneda(d.importe),
+        comprobante: d.numeroComprobante || '—',
+        tipoComprobante: d.tipoComprobante || '',
+        estado: d.estado,
+        solicitadoPor: d.solicitadoPor
       }))
     },
     {

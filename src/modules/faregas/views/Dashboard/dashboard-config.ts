@@ -9,8 +9,9 @@ export const DASHBOARD_TAB_CONFIG: ReadonlyArray<{ id: DashboardTabId; label: st
 
 export function resolverPermisosDashboard(permisos: string[], perfilId?: string | null) {
   const esSistemas = perfilId === 'SISTEMAS';
+  const esSupervisor = perfilId === 'SUPERVISOR';
   return {
     puedeVerGlobal: permisos.includes('DASHBOARD_GLOBAL') || esSistemas,
-    puedeExportar: permisos.includes('DASHBOARD_EXPORTAR') || esSistemas
+    puedeExportar: permisos.includes('DASHBOARD_EXPORTAR') || esSistemas || esSupervisor
   };
 }

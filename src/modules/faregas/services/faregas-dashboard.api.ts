@@ -71,6 +71,11 @@ export interface DashboardResumenResponse {
     certificadosEmitidos: KpiValor;
     certificadosPendientes: KpiValor;
     certificadosAnulados: KpiValor;
+    duplicadosEmitidos: KpiValor;
+    ventaDuplicados: KpiValor;
+    totalCobradoDuplicados: KpiValor;
+    saldoPendienteDuplicados: KpiValor;
+    ticketPromedioDuplicados: KpiValor;
     productosVendidos: KpiValor;
     montoDescontado: KpiValor;
     facturasAceptadas: KpiValor;
@@ -79,7 +84,9 @@ export interface DashboardResumenResponse {
   };
   serieDiaria: SerieDiariaItem[];
   serieCertificados: SerieCertificadoItem[];
+  serieDuplicados?: Array<{ fecha: string; emitidos: number }>;
   distribucionCertificados: DistribucionCertificadoItem[];
+  distribucionDuplicados?: Array<{ tipo: string; cantidad: number; porcentaje: number }>;
   distribucionProductos?: ProductoDetalleItem[];
   distribucionPagos: DistribucionPagoItem[];
   alertas: AlertaInconsistencia[];
@@ -92,9 +99,40 @@ export interface SedeDetalleItem {
   ventaOperativa: number;
   certificadosEmitidos: number;
   certificadosPendientes: number;
+  duplicadosEmitidos?: number;
+  ventaDuplicados?: number;
+  totalCobradoDuplicados?: number;
+  saldoPendienteDuplicados?: number;
+  ticketPromedioDuplicados?: number;
   totalCobrado: number;
   saldoPendiente: number;
   ticketPromedio: number;
+}
+
+
+export interface DuplicadoDetalleItem {
+  id: number;
+  certificadoOriginalId: number;
+  operacionId: number;
+  facturacionId: number;
+  plantaKey: string;
+  plantaNombre: string;
+  placa: string;
+  tipoCertificadoClave: string;
+  tipoCertificado: string;
+  tipoNombre: string;
+  modalidad: string;
+  numeroCertificadoOriginal: string;
+  fechaCertificadoOriginal: string;
+  fechaEmisionDuplicado: string;
+  numeroDuplicado: number;
+  importe: number;
+  tipoComprobante: string;
+  numeroComprobante: string;
+  fechaComprobante: string;
+  estado: string;
+  estadoFacturacion: string;
+  solicitadoPor: string;
 }
 
 export interface CertificadoDetalleItem {
@@ -208,6 +246,7 @@ export interface DashboardExportacionResponse {
     resumen: DashboardResumenResponse;
     sedes: SedeDetalleItem[];
     certificados: CertificadoDetalleItem[];
+    duplicados?: DuplicadoDetalleItem[];
     ventasProductos: ProductoDetalleItem[];
     comprobantes: ComprobanteDetalleItem[];
     pagos: PagoDetalleItem[];
@@ -223,6 +262,7 @@ export interface FiltrosDashboard {
   desde?: string;
   hasta?: string;
   tipoCertificado?: string;
+  tipoDuplicado?: string;
   productoId?: number;
   estado?: string;
   usuario?: string;
@@ -267,6 +307,12 @@ export const faregasDashboardApi = {
   obtenerCertificados: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<PaginadoResponse<CertificadoDetalleItem>> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
     const res = await faregasFetch(`/dashboard/detalle/certificados${qs}`, { signal: options.signal });
+    return res.data;
+  },
+
+  obtenerDuplicados: async (filtros: FiltrosDashboard, options: DashboardRequestOptions = {}): Promise<PaginadoResponse<DuplicadoDetalleItem>> => {
+    const qs = construirQueryString(filtros as Record<string, unknown>);
+    const res = await faregasFetch(`/dashboard/detalle/duplicados${qs}`, { signal: options.signal });
     return res.data;
   },
 

@@ -189,9 +189,6 @@ export const validarExpedienteTecnico = ({
         ['nroDocumento', `el documento del titular ${index + 1}`],
         ['nombreRazonSocial', `el nombre del titular ${index + 1}`],
       ]);
-      if (tipoCertificado === 'CONFORMIDAD' && vacio(titular.direccion)) {
-        errores.push(`Complete la dirección del titular ${index + 1}.`);
-      }
     });
   }
 
@@ -201,7 +198,6 @@ export const validarExpedienteTecnico = ({
       ['cargaUtil', 'la carga útil'], ['anioModelo', 'el año modelo'],
       ['formulaRodante', 'la fórmula rodante'], ['potencia', 'la potencia'],
     ]);
-    if (vacio(conformidad.tipoConformidad)) { errores.push('Seleccione el tipo de conformidad.'); }
     agregarFaltantes(errores, conformidad, [
       ['caracteristicaRegistrable', 'la característica registrable'],
       ['usoOriginalVehiculo', 'el uso original del vehículo'],
@@ -383,9 +379,6 @@ export const validarTitulares = (
     const reglas: ReglaCampo[] = [
       { campo: 'nombreRazonSocial', etiqueta: `el nombre del titular ${numero}` },
     ];
-    if (tipo === 'CONFORMIDAD') {
-      reglas.push({ campo: 'direccion', etiqueta: `la dirección del titular ${numero}` });
-    }
     for (const regla of reglas) {
       if (vacio(titular[regla.campo])) {
         marcar(errores, `titular.${indice}.${regla.campo}`, `Complete ${regla.etiqueta}.`);
@@ -473,9 +466,6 @@ export const validarDatosEspecificos = ({
   }
 
   if (tipo === 'CONFORMIDAD') {
-    if (vacio(conformidad.tipoConformidad)) {
-      marcar(errores, 'conformidad.tipoConformidad', 'Seleccione el tipo de conformidad.');
-    }
     const reglas: ReglaCampo[] = [
       { campo: 'caracteristicaRegistrable', etiqueta: 'la característica registrable' },
       { campo: 'usoOriginalVehiculo', etiqueta: 'el uso original del vehículo' },
@@ -484,7 +474,46 @@ export const validarDatosEspecificos = ({
       const mensaje = errorDeCampo(conformidad[regla.campo], regla);
       if (mensaje) marcar(errores, `conformidad.${regla.campo}`, mensaje);
     }
+    const usoOriginal = String(conformidad.usoOriginalVehiculo || '').trim().toUpperCase();
+    if (usoOriginal && !['PERSONAS', 'MERCANCÍAS'].includes(usoOriginal)) {
+      marcar(
+        errores,
+        'conformidad.usoOriginalVehiculo',
+        'Seleccione PERSONAS o MERCANCÍAS. El valor anterior del borrador no está permitido para una nueva emisión.'
+      );
+    }
   }
+
+  return errores;
+};
+
+const PATRON_TEXTO_TECNICO = /^[\p{L}\p{N} ./-]+$/u;
+const PATRON_MOTOR_TECNICO = /^[\p{L}\p{N}/-]+$/u;
+const PATRON_POTENCIA_TECNICA = /^[\p{L}\p{N}\s@/.,-]+$/u;
+const PATRON_CILINDRADA_DECIMAL = /^\d{1,7}(?:\.\d{1,3})?$/;
+const PATRON_VIN_CONFORMIDAD = /^[A-HJ-NPR-Za-hj-npr-z0-9*]+$/;
+
+/**
+ * Conformidad admite la notación literal de la tarjeta de propiedad. Estas
+ * reglas sólo informan errores: nunca reescriben ni eliminan caracteres.
+ */
+export const validarCaracteresTecnicosConformidad = (
+  tipo: TipoCertificadoFaregas,
+  vehiculo: Record<string, any>
+): ErroresCampo => {
+  if (tipo !== 'CONFORMIDAD') return {};
+  const errores: ErroresCampo = {};
+  const validar = (campo: string, patron: RegExp, mensaje: string) => {
+    const valor = String(vehiculo[campo] ?? '');
+    if (valor && !patron.test(valor)) marcar(errores, campo, mensaje);
+  };
+
+  validar('modelo', PATRON_TEXTO_TECNICO, 'El modelo sólo admite letras, números, espacios, punto, / y -.');
+  validar('version', PATRON_TEXTO_TECNICO, 'La versión sólo admite letras, números, espacios, punto, / y -.');
+  validar('numeroMotor', PATRON_MOTOR_TECNICO, 'El motor sólo admite letras, números, / y -.');
+  validar('potencia', PATRON_POTENCIA_TECNICA, 'La potencia contiene caracteres no admitidos. Puede usar letras, números, espacios, @, /, punto, coma y guion.');
+  validar('cilindrada', PATRON_CILINDRADA_DECIMAL, 'La cilindrada debe ser un número desde 0 y puede incluir hasta 3 decimales. Los cilindros se registran en el campo separado.');
+  validar('vin', PATRON_VIN_CONFORMIDAD, 'El VIN sólo admite letras válidas de VIN, números y asteriscos.');
 
   return errores;
 };
@@ -517,6 +546,7 @@ export const validarPasoExpedienteTecnico = ({
     ...validarCamposTecnicos(tipo, vehiculoConCategoria),
     ...validarIdentificacionVehiculo(vehiculo),
     ...validarAniosVehiculo(vehiculo),
+    ...validarCaracteresTecnicosConformidad(tipo, vehiculo),
     ...validarTitulares(titulares, tipo),
     ...validarDatosEspecificos({ tipo, modalidad, gnv, glp, conformidad }),
   };
@@ -745,13 +775,13 @@ export const CAMPOS_VISIBLES_GLP_INICIAL = [
 
 /** Bloque B, sección CONFORMIDAD. */
 export const CAMPOS_VISIBLES_CONFORMIDAD = [
-  'conformidad.tipoConformidad', 'conformidad.caracteristicaRegistrable',
+  'conformidad.caracteristicaRegistrable',
   'conformidad.usoOriginalVehiculo',
 ] as const;
 
 /** Campos de cada fila de titular. */
 export const CAMPOS_VISIBLES_TITULAR = [
-  'tipoDocumento', 'nroDocumento', 'nombreRazonSocial', 'direccion',
+  'tipoDocumento', 'nroDocumento', 'nombreRazonSocial',
 ] as const;
 
 /** Datos de facturación, que se capturan en el mismo paso. */
@@ -968,6 +998,7 @@ export const validarFormularioVehiculoVisible = ({
   }
   if (tipoCertificado === 'CONFORMIDAD') {
     marcarVacias(errores, { conformidad }, CAMPOS_VISIBLES_CONFORMIDAD);
+    Object.assign(errores, validarCaracteresTecnicosConformidad(tipoCertificado, vehiculo));
   }
 
   // Taller, componentes y verificaciones forman parte de la misma puerta de
@@ -996,9 +1027,7 @@ export const validarFormularioVehiculoVisible = ({
   // niveles para que la ruta se pueda recorrer segmento a segmento.
   titulares.forEach((titular, indice) => {
     if (tipoCertificado !== 'GLP_ANUAL' && tipoCertificado !== 'CONFORMIDAD') return;
-    const camposTitular = tipoCertificado === 'CONFORMIDAD'
-      ? ['nombreRazonSocial', 'direccion']
-      : ['nombreRazonSocial'];
+    const camposTitular = ['nombreRazonSocial'];
     marcarVacias(
       errores,
       { titular: { [indice]: titular } },

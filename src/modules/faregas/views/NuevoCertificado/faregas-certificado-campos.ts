@@ -396,7 +396,6 @@ export const CARACTERISTICAS_REGISTRABLES_CATALOGO = [
 export const USOS_ORIGINALES_CATALOGO = [
   'PERSONAS',
   'MERCANCÍAS',
-  'MIXTO',
 ];
 
 export function resolverServicioConformidad(

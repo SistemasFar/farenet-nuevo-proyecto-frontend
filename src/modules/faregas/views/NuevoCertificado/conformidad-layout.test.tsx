@@ -1,10 +1,8 @@
 // @vitest-environment jsdom
-import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import {
-  CAMPOS_CONFORMIDAD,
   obtenerCamposVehiculoCertificado,
   resolverServicioConformidad,
   CODIGOS_CAMBIO_MOTOR,
@@ -49,7 +47,7 @@ const titularBase = [
     tipoDocumento: 'RUC',
     numeroDocumento: '20123456789',
     nombreRazonSocial: 'EMPRESA PRUEBA S.A.C.',
-    direccion: 'AV. FAREGAS 500',
+    direccion: 'AV. PROPIETARIO 500',
     esPrincipal: true,
   },
 ];
@@ -59,7 +57,7 @@ const facturacionBase = {
   tipoDocumento: 'RUC',
   numeroDocumento: '20123456789',
   razonSocial: 'EMPRESA PRUEBA S.A.C.',
-  direccion: 'AV. FAREGAS 500',
+  direccion: 'AV. FACTURACION 500',
   email: 'facturacion@prueba.com',
   telefono: '999888777',
   facturarADuenoPrincipal: true,
@@ -185,7 +183,7 @@ describe('Conformidad: Layout oficial y reglas por servicio', () => {
     }
   });
 
-  it('5. Render VehiculoStep en CAMBIO DE MOTOR: Propietario con dirección, facturación una sola vez, tabla dos columnas y sección B con característica fija', () => {
+  it('5. Render VehiculoStep en CAMBIO DE MOTOR: propietario sin dirección, facturación una sola vez y característica editable', () => {
     const html = renderToStaticMarkup(
       <VehiculoStep
         tipoCertificado="CONFORMIDAD"
@@ -216,10 +214,10 @@ describe('Conformidad: Layout oficial y reglas por servicio', () => {
       />
     );
 
-    // Propietario visible con dirección
+    // El bloque propietario conserva el nombre, pero ya no solicita su dirección.
     expect(html).toContain('data-seccion-conformidad="propietario"');
     expect(html).toContain('EMPRESA PRUEBA S.A.C.');
-    expect(html).toContain('AV. FAREGAS 500');
+    expect(html).not.toContain('AV. PROPIETARIO 500');
 
     // Facturación debajo de propietario (aparece una sola vez)
     expect(html).toContain('data-seccion-conformidad="facturacion"');
@@ -237,18 +235,23 @@ describe('Conformidad: Layout oficial y reglas por servicio', () => {
 
     // Sección B específica
     expect(html).toContain('data-seccion-conformidad="especifica"');
-    expect(html).toContain('1. Tipo de trabajo realizado');
-    expect(html).toContain('¿QUÉ TRABAJO SE CERTIFICA?');
-    expect(html).toContain('MODIFICACIÓN');
-    expect(html).toContain('MONTAJE');
-    expect(html).toContain('FABRICACIÓN');
+    expect((html.match(/B\. INFORMACIÓN ESPECÍFICA: CONFORMIDAD/g) || [])).toHaveLength(1);
+        expect(html).not.toContain('Tipo de trabajo realizado');
+    expect(html).not.toContain('data-seccion-conformidad="tipo-trabajo"');
+    expect(html).toContain('1. Rectificación de características registrables');
+    expect(html).not.toContain('2. Rectificación de características registrables');
 
-    // Característica fija para Cambio de Motor
-    expect(html).toContain('data-caracteristica-fija="true"');
-    expect(html).toContain('CAMBIO DE MOTOR');
+    // La característica sugerida por el servicio queda editable.
+    expect(html).not.toContain('data-caracteristica-fija="true"');
+    expect(html).toContain('aria-label="Característica registrable"');
+    expect(html).toContain('value="CAMBIO DE MOTOR"');
 
     // Uso original
     expect(html).toContain('USO ORIGINAL DEL VEHÍCULO');
+    expect(html).toContain('PERSONAS');
+    expect(html).toContain('MERCANCÍAS');
+    expect(html).not.toContain('MIXTO');
+    expect(html).not.toContain('OTRO USO');
 
     // Campos sobrantes eliminados NO deben aparecer
     expect(html).not.toContain('Trámite solicitado');
@@ -256,7 +259,7 @@ describe('Conformidad: Layout oficial y reglas por servicio', () => {
     expect(html).not.toContain('Descripción complementaria');
   });
 
-  it('6. Render VehiculoStep en PESADOS: Característica es selector controlado dinámico y NO muestra badge fijo de Cambio de Motor', () => {
+  it('6. Render VehiculoStep en PESADOS: característica es texto libre y conserva slash y guion', () => {
     const html = renderToStaticMarkup(
       <VehiculoStep
         tipoCertificado="CONFORMIDAD"
@@ -273,7 +276,7 @@ describe('Conformidad: Layout oficial y reglas por servicio', () => {
         setFormGnv={() => undefined}
         formConformidad={{
           tipoConformidad: 'MODIFICACION',
-          caracteristicaRegistrable: 'CAMBIO DE CARROCERÍA',
+          caracteristicaRegistrable: 'RECTIFICACIÓN DE COLOR / MODELO-1',
           usoOriginalVehiculo: 'MERCANCÍAS',
         }}
         setFormConformidad={() => undefined}
@@ -287,14 +290,13 @@ describe('Conformidad: Layout oficial y reglas por servicio', () => {
       />
     );
 
-    // NO tiene badge fijo de cambio de motor
     expect(html).not.toContain('data-caracteristica-fija="true"');
-    // Selector de características presentes
-    expect(html).toContain('aria-label="Selector de característica registrable"');
-    expect(html).toContain('CAMBIO DE CARROCERÍA');
+    expect(html).not.toContain('aria-label="Selector de característica registrable"');
+    expect(html).toContain('aria-label="Característica registrable"');
+    expect(html).toContain('value="RECTIFICACIÓN DE COLOR / MODELO-1"');
   });
 
-  it('7. Render VehiculoStep en MODIFICACIÓN DE DATOS: Selector dinámico sin forzar Cambio de Motor', () => {
+  it('7. Render VehiculoStep en MODIFICACIÓN DE DATOS: muestra entrada libre sin catálogo obligatorio', () => {
     const html = renderToStaticMarkup(
       <VehiculoStep
         tipoCertificado="CONFORMIDAD"
@@ -326,7 +328,89 @@ describe('Conformidad: Layout oficial y reglas por servicio', () => {
     );
 
     expect(html).not.toContain('data-caracteristica-fija="true"');
-    expect(html).toContain('aria-label="Selector de característica registrable"');
-    expect(html).toContain('SELECCIONAR CARACTERÍSTICA');
+    expect(html).not.toContain('aria-label="Selector de característica registrable"');
+    expect(html).toContain('aria-label="Característica registrable"');
+    expect(html).toContain('placeholder="Ej. RECTIFICACIÓN DE COLOR / MODELO"');
+  });
+
+  it('8. Presenta sin recortar los caracteres técnicos admitidos en Conformidad', () => {
+    const html = renderToStaticMarkup(
+      <VehiculoStep
+        tipoCertificado="CONFORMIDAD"
+        modalidadCertificado=""
+        servicioCodigo="0085"
+        servicioNombre="CERTIFICADO DE CONFORMIDAD MODIFICACION DE DATOS"
+        formVehiculo={{
+          ...vehiculoBase,
+          modelo: 'ACCENT-GL',
+          version: 'GL-1.6/AT',
+          numeroMotor: 'ABC-123/456',
+          potencia: '75 kW @ 4500 RPM',
+          cilindrada: '0.8',
+          vin: 'KMHCT41BAGU99****',
+        }}
+        setFormVehiculo={() => undefined}
+        formPropietario={{}}
+        setFormPropietario={() => undefined}
+        formGlp={{}}
+        setFormGlp={() => undefined}
+        formGnv={{}}
+        setFormGnv={() => undefined}
+        formConformidad={{
+          tipoConformidad: 'MODIFICACION',
+          caracteristicaRegistrable: 'MOTOR / SERIE-1',
+          usoOriginalVehiculo: 'PERSONAS',
+        }}
+        setFormConformidad={() => undefined}
+        titulares={titularBase as any}
+        setTitulares={() => undefined}
+        formFacturacion={facturacionBase as any}
+        setFormFacturacion={() => undefined}
+        categoriaVehicular="M1"
+        categoriasVehiculares={[]}
+        onCategoriaVehicularChange={() => undefined}
+      />
+    );
+
+    expect(html).toContain('value="ACCENT-GL"');
+    expect(html).toContain('value="GL-1.6/AT"');
+    expect(html).toContain('value="ABC-123/456"');
+    expect(html).toContain('value="75 kW @ 4500 RPM"');
+    expect(html).toContain('value="0.8"');
+    expect(html).toContain('value="KMHCT41BAGU99****"');
+  });
+
+  it('9. Conserva e informa un uso histórico no permitido sin ofrecerlo como opción', () => {
+    const html = renderToStaticMarkup(
+      <VehiculoStep
+        tipoCertificado="CONFORMIDAD"
+        modalidadCertificado=""
+        formVehiculo={vehiculoBase}
+        setFormVehiculo={() => undefined}
+        formPropietario={{}}
+        setFormPropietario={() => undefined}
+        formGlp={{}}
+        setFormGlp={() => undefined}
+        formGnv={{}}
+        setFormGnv={() => undefined}
+        formConformidad={{
+          tipoConformidad: 'MODIFICACION',
+          caracteristicaRegistrable: 'CAMBIO DE MOTOR',
+          usoOriginalVehiculo: 'MIXTO',
+        }}
+        setFormConformidad={() => undefined}
+        titulares={titularBase as any}
+        setTitulares={() => undefined}
+        formFacturacion={facturacionBase as any}
+        setFormFacturacion={() => undefined}
+        categoriaVehicular="M1"
+        categoriasVehiculares={[]}
+        onCategoriaVehicularChange={() => undefined}
+      />
+    );
+
+    expect(html).toContain('El borrador conserva el valor anterior “MIXTO”');
+    expect(html).not.toContain('<option value="MIXTO"');
+    expect(html).not.toContain('OTRO USO');
   });
 });

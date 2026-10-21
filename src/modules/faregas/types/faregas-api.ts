@@ -308,7 +308,7 @@ export interface VehiculoBorradorFaregasRequest {
   pesoNeto?: NullableNumberInput;
   pesoBruto?: NullableNumberInput;
   cargaUtil?: NullableNumberInput;
-  potencia?: NullableNumberInput;
+  potencia?: NullableText;
   formulaRodante?: NullableText;
 }
 

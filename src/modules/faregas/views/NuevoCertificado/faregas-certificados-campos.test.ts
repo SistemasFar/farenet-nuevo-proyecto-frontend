@@ -8,6 +8,7 @@ import {
   camposObligatoriosVisibles,
   validarFormularioVehiculoVisible,
   validarExpedienteTecnico,
+  validarCaracteresTecnicosConformidad,
   CAMPOS_VISIBLES_CONFORMIDAD,
   CAMPOS_VISIBLES_FACTURACION,
 } from './faregas-wizard.validation';
@@ -270,13 +271,12 @@ describe('Validacion frontend de campos visibles y obligatorios', () => {
 
   it('Conformidad: no exige tipoTramite, motivo ni descripcion; sí exige tipoConformidad, caracteristicaRegistrable y usoOriginal', () => {
     expect(CAMPOS_VISIBLES_CONFORMIDAD).toEqual([
-      'conformidad.tipoConformidad',
       'conformidad.caracteristicaRegistrable',
       'conformidad.usoOriginalVehiculo'
     ]);
 
     const obligatorios = camposObligatoriosVisibles('CONFORMIDAD');
-    expect(obligatorios).toContain('conformidad.tipoConformidad');
+    expect(obligatorios).not.toContain('conformidad.tipoConformidad');
     expect(obligatorios).toContain('conformidad.caracteristicaRegistrable');
     expect(obligatorios).toContain('conformidad.usoOriginalVehiculo');
     expect(obligatorios).not.toContain('conformidad.tipoTramite');
@@ -291,16 +291,76 @@ describe('Validacion frontend de campos visibles y obligatorios', () => {
         clase: 'M1', carroceria: 'SEDAN', anioModelo: '2020', serieChasis: '3BJ123',
         potencia: '100', formulaRodante: '4x2'
       },
-      titulares: [{ nombreRazonSocial: 'JUAN PEREZ', direccion: 'AV. LIMA 123' }],
+      titulares: [{ nombreRazonSocial: 'JUAN PEREZ', direccion: '' }],
       gnv: {},
       glp: {},
       conformidad: {},
       facturacion: facturacionValida,
     });
 
-    expect(errores['conformidad.tipoConformidad']).toBeDefined();
+    expect(errores['conformidad.tipoConformidad']).toBeUndefined();
     expect(errores['conformidad.caracteristicaRegistrable']).toBeDefined();
+    expect(errores['titular.0.direccion']).toBeUndefined();
     expect(obligatorios).not.toContain('conformidad.tipoTramite');
+
+    const erroresUsoHistorico = validarFormularioVehiculoVisible({
+      tipoCertificado: 'CONFORMIDAD',
+      caja: { categoria: 'M1' },
+      vehiculo: {
+        ...vehiculoBase,
+        clase: 'M1', carroceria: 'SEDAN', anioModelo: '2020', serieChasis: '3BJ123',
+        potencia: '100', formulaRodante: '4x2'
+      },
+      titulares: [{ nombreRazonSocial: 'JUAN PEREZ', direccion: '' }],
+      gnv: {},
+      glp: {},
+      conformidad: {
+        tipoConformidad: 'MODIFICACION',
+        caracteristicaRegistrable: 'CAMBIO DE MOTOR',
+        usoOriginalVehiculo: 'MIXTO',
+      },
+      facturacion: facturacionValida,
+    });
+    expect(erroresUsoHistorico['conformidad.usoOriginalVehiculo']).toContain('PERSONAS o MERCANCÍAS');
+  });
+
+  it('Conformidad acepta los caracteres técnicos solicitados sin afectar GLP/GNV', () => {
+    expect(validarCaracteresTecnicosConformidad('CONFORMIDAD', {
+      modelo: 'ACCENT-GL',
+      version: 'GL-1.6/AT',
+      numeroMotor: 'ABC-123/456',
+      potencia: '75 kW @ 4500 RPM',
+      cilindrada: '0.8',
+      vin: 'KMHCT41BAGU99****',
+    })).toEqual({});
+
+    expect(validarCaracteresTecnicosConformidad('CONFORMIDAD', {
+      modelo: 'GL/SPORT',
+      version: 'GL-1.6/AT',
+      numeroMotor: 'ABC/123456',
+      potencia: '75/4500',
+      cilindrada: '0',
+      vin: '****',
+    })).toEqual({});
+
+    expect(validarCaracteresTecnicosConformidad('CONFORMIDAD', {
+      modelo: 'MODELO_OK',
+      version: 'STD',
+      numeroMotor: 'MOTOR 123',
+      potencia: '75#4500',
+      cilindrada: '796/04',
+      vin: 'VIN CON ESPACIO',
+    })).toMatchObject({
+      modelo: expect.any(String),
+      numeroMotor: expect.any(String),
+      potencia: expect.any(String),
+      cilindrada: expect.any(String),
+      vin: expect.any(String),
+    });
+
+    expect(validarCaracteresTecnicosConformidad('GLP_ANUAL', {
+      modelo: 'MODELO_OK',
+    })).toEqual({});
   });
 
   it('GNV Inicial: no exige verificaciones anuales, exige componentes y conversion', () => {

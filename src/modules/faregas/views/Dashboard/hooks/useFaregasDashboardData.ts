@@ -4,6 +4,7 @@ import {
   type CertificadoDetalleItem,
   type ComprobanteDetalleItem,
   type DashboardResumenResponse,
+  type DuplicadoDetalleItem,
   type DescuentoDetalleItem,
   type FiltrosDashboard,
   type PagoDetalleItem,
@@ -15,16 +16,18 @@ import {
 import { validarRangoFechasDashboard } from '../../../utils/faregas-dashboard-fechas';
 
 export type DashboardTabId = 'resumen' | 'ventas' | 'certificados' | 'cobranza';
-export type DashboardPageKey = 'certificados' | 'comprobantes' | 'pagos';
+export type DashboardPageKey = 'certificados' | 'duplicados' | 'comprobantes' | 'pagos';
 
 interface DashboardPages {
   certificados: number;
+  duplicados: number;
   comprobantes: number;
   pagos: number;
 }
 
 const PAGINAS_INICIALES: DashboardPages = {
   certificados: 1,
+  duplicados: 1,
   comprobantes: 1,
   pagos: 1
 };
@@ -38,6 +41,7 @@ export function useFaregasDashboardData(filtros: FiltrosDashboard, tabActiva: Da
   const [resumen, setResumen] = useState<DashboardResumenResponse | null>(null);
   const [sedes, setSedes] = useState<SedeDetalleItem[]>([]);
   const [certificados, setCertificados] = useState<PaginadoResponse<CertificadoDetalleItem> | null>(null);
+  const [duplicados, setDuplicados] = useState<PaginadoResponse<DuplicadoDetalleItem> | null>(null);
   const [ventas, setVentas] = useState<PaginadoResponse<ProductoDetalleItem> | null>(null);
   const [comprobantes, setComprobantes] = useState<PaginadoResponse<ComprobanteDetalleItem> | null>(null);
   const [pagos, setPagos] = useState<PaginadoResponse<PagoDetalleItem> | null>(null);
@@ -60,6 +64,7 @@ export function useFaregasDashboardData(filtros: FiltrosDashboard, tabActiva: Da
     desde: filtros.desde,
     hasta: filtros.hasta,
     tipoCertificado: filtros.tipoCertificado,
+    tipoDuplicado: filtros.tipoDuplicado,
     productoId: filtros.productoId,
     estado: filtros.estado,
     usuario: filtros.usuario,
@@ -72,6 +77,7 @@ export function useFaregasDashboardData(filtros: FiltrosDashboard, tabActiva: Da
     filtros.desde,
     filtros.hasta,
     filtros.tipoCertificado,
+    filtros.tipoDuplicado,
     filtros.productoId,
     filtros.estado,
     filtros.usuario,
@@ -92,7 +98,7 @@ export function useFaregasDashboardData(filtros: FiltrosDashboard, tabActiva: Da
     if (forzar) firmasPestanas.current = {};
 
     const paginaFirma = tabActiva === 'certificados'
-      ? paginas.certificados
+      ? `${paginas.certificados}-${paginas.duplicados}`
       : tabActiva === 'cobranza'
         ? `${paginas.comprobantes}-${paginas.pagos}`
         : 1;
@@ -139,14 +145,16 @@ export function useFaregasDashboardData(filtros: FiltrosDashboard, tabActiva: Da
         setUsuarios(nuevosUsuarios);
         if (necesitaSedes) firmaSedes.current = firmaFiltros;
       } else if (tabActiva === 'certificados') {
-        const [nuevoResumen, nuevosCertificados, nuevasSedes] = await Promise.all([
+        const [nuevoResumen, nuevosCertificados, nuevosDuplicados, nuevasSedes] = await Promise.all([
           solicitudResumen,
           faregasDashboardApi.obtenerCertificados({ ...filtrosBase, pagina: paginas.certificados, limite: 20 }, options),
+          faregasDashboardApi.obtenerDuplicados({ ...filtrosBase, pagina: paginas.duplicados, limite: 20 }, options),
           necesitaSedes ? faregasDashboardApi.obtenerSedes(filtrosBase, options) : Promise.resolve(null)
         ]);
         if (idActual !== requestId.current) return;
         if (nuevoResumen) setResumen(nuevoResumen);
         setCertificados(nuevosCertificados);
+        setDuplicados(nuevosDuplicados);
         if (nuevasSedes) setSedes(nuevasSedes);
         if (necesitaSedes) firmaSedes.current = firmaFiltros;
       } else {
@@ -191,6 +199,7 @@ export function useFaregasDashboardData(filtros: FiltrosDashboard, tabActiva: Da
     resumen,
     sedes,
     certificados,
+    duplicados,
     ventas,
     comprobantes,
     pagos,

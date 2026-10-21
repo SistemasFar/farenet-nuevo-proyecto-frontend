@@ -30,15 +30,15 @@ const reporte: DashboardExportacionResponse = {
 };
 
 describe('exportación del dashboard', () => {
-  it('construye las ocho hojas con columnas compatibles con el generador XLSX', () => {
+  it('construye las hojas con columnas compatibles con el generador XLSX, incluyendo duplicados', () => {
     const hojas = construirHojasDashboard(reporte);
-    expect(hojas).toHaveLength(8);
+    expect(hojas).toHaveLength(9);
     expect(hojas.map((hoja) => hoja.name)).toEqual([
-      'Resumen Ejecutivo', 'Sedes', 'Certificados', 'Ventas por Producto',
+      'Resumen Ejecutivo', 'Sedes', 'Certificados', 'Duplicados de Certificados', 'Ventas por Producto',
       'Comprobantes Fiscales', 'Cobranzas y Pagos', 'Descuentos Aplicados', 'Productividad Usuarios'
     ]);
     expect(hojas.every((hoja) => Array.isArray(hoja.columns) && hoja.columns.length > 0)).toBe(true);
-    expect(hojas[0].rows).toHaveLength(20);
+    expect(hojas[0].rows).toHaveLength(25);
     const archivo = crearExcelVariasHojasBytes(hojas);
     expect(archivo.byteLength).toBeGreaterThan(1000);
     expect(Array.from(archivo.slice(0, 2))).toEqual([0x50, 0x4b]);

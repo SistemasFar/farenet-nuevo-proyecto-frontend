@@ -35,8 +35,6 @@ import { normalizarEnteroCertificado } from '../../faregas-formulario-operativo'
 /** Clase original de los campos del paso; el error sólo sustituye el color. */
 const CLASE_CAMPO = 'w-full p-2 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
 
-/** Clase original de los campos dentro de la tabla de conversión antes/después. */
-const CLASE_TABLA = 'w-full p-1.5 border-2 border-amber-300 rounded text-slate-800 font-bold focus:border-amber-500 focus:ring-0 text-xs';
 const COMBUSTIBLE_POSTERIOR_GLP = 'BI-COMBUSTIBLE GLP';
 const COMBUSTIBLES_GLP_ANUAL = new Set(['BI-COMBUSTIBLE GLP', 'GLP']);
 
@@ -135,18 +133,8 @@ export function VehiculoStep({
     setFormConformidad((prev: any) => {
       let cambio = false;
       const act = { ...prev };
-      if (resolucionConformidad.esCambioDeMotor) {
-        if (act.caracteristicaRegistrable !== 'CAMBIO DE MOTOR') {
-          act.caracteristicaRegistrable = 'CAMBIO DE MOTOR';
-          cambio = true;
-        }
-      }
-      if (!act.tipoConformidad) {
-        act.tipoConformidad = resolucionConformidad.tipoTrabajoSugerido || 'MODIFICACION';
-        cambio = true;
-      }
-      if (!act.usoOriginalVehiculo) {
-        act.usoOriginalVehiculo = resolucionConformidad.usoOriginalSugerido || 'PERSONAS';
+      if (resolucionConformidad.esCambioDeMotor && !act.caracteristicaRegistrable) {
+        act.caracteristicaRegistrable = 'CAMBIO DE MOTOR';
         cambio = true;
       }
       return cambio ? act : prev;
@@ -255,16 +243,26 @@ export function VehiculoStep({
 
   const handleVehiculo = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    let finalValue = value.toUpperCase();
+    const conservarTextoExacto = tipoCertificado === 'CONFORMIDAD'
+      && ['modelo', 'version', 'vin', 'numeroMotor', 'potencia', 'cilindrada'].includes(name);
+    let finalValue = conservarTextoExacto ? value : value.toUpperCase();
     limpiar(name);
     if (name === 'combustible') limpiar('gnv.combustiblePosterior');
     if (name === 'pesoNeto') limpiar('gnv.pesoNetoPosterior');
 
     switch (name) {
-      case 'vin': finalValue = formatVIN(finalValue); break;
+      case 'vin':
+        finalValue = tipoCertificado === 'CONFORMIDAD'
+          ? finalValue.slice(0, 17)
+          : formatVIN(finalValue);
+        break;
       case 'serieChasis':
-      case 'numeroMotor':
         finalValue = formatAlfanumericoConEspacios(finalValue, 30); break;
+      case 'numeroMotor':
+        finalValue = tipoCertificado === 'CONFORMIDAD'
+          ? finalValue.slice(0, 30)
+          : formatAlfanumericoConEspacios(finalValue, 30);
+        break;
       case 'formulaRodante': finalValue = formatFormulaRodante(finalValue); break;
       case 'numeroCilindros':
       case 'numeroEjes':
@@ -276,13 +274,19 @@ export function VehiculoStep({
       case 'anioModelo':
         finalValue = formatAnio(finalValue); break;
       case 'cilindrada':
-        finalValue = normalizarEnteroCertificado(finalValue, 5); break;
+        finalValue = tipoCertificado === 'CONFORMIDAD'
+          ? finalValue.slice(0, 11)
+          : normalizarEnteroCertificado(finalValue, 5);
+        break;
       case 'pesoNeto':
       case 'pesoBruto':
       case 'cargaUtil':
         finalValue = normalizarEnteroCertificado(finalValue, 6); break;
       case 'potencia':
-        finalValue = formatDecimal(finalValue, 6, 2); break;
+        finalValue = tipoCertificado === 'CONFORMIDAD'
+          ? finalValue.slice(0, 100)
+          : formatDecimal(finalValue, 6, 2);
+        break;
       case 'longitud':
       case 'ancho':
       case 'alto':
@@ -318,7 +322,7 @@ export function VehiculoStep({
     let finalValue = value.toUpperCase();
     limpiar(`conformidad.${name}`);
     if (name === 'caracteristicaRegistrable') {
-       finalValue = formatAlfanumericoConEspacios(finalValue, 300);
+       finalValue = value.slice(0, 300);
     } else if (['motivo', 'usoOriginalVehiculo'].includes(name)) {
        finalValue = formatAlfanumericoConEspacios(finalValue, 100);
     } else if (name === 'descripcion') {
@@ -485,7 +489,6 @@ export function VehiculoStep({
               onCorregirCampo={onCorregirCampo}
               mostrarTitulares={true}
               mostrarFacturacion={false}
-              mostrarDireccionTitular={true}
             />
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-seccion-conformidad="facturacion">
@@ -574,6 +577,7 @@ export function VehiculoStep({
           obligatorios={obligatorio}
           esGlpInicial={tipoCertificado === 'GLP_ANUAL' && String(modalidadCertificado || '').toUpperCase() === 'INICIAL'}
           maestrosVehiculo={maestrosVehiculo}
+          permitirCilindradaDecimal={tipoCertificado === 'CONFORMIDAD'}
         />
         {camposVehiculoCertificado.length === 0 && <>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -722,7 +726,6 @@ export function VehiculoStep({
               ? 'B. COMPONENTES INSTALADOS GNV'
               : <>B. INFORMACIÓN ESPECÍFICA:{' '}
                 {tipoCertificado === 'GNV_ANUAL' ? 'GNV'
-                  : tipoCertificado === 'GLP_ANUAL' ? 'GLP'
                   : tipoCertificado === 'CONFORMIDAD' ? 'CONFORMIDAD'
                   : tipoCertificado || 'NO SELECCIONADO'}
               </>}
@@ -1421,107 +1424,33 @@ export function VehiculoStep({
         {/* --- DATOS CONFORMIDAD --- */}
         {tipoCertificado === 'CONFORMIDAD' && (
           <div className="space-y-4" data-seccion-conformidad="especifica">
-            <h4 className="text-lg font-bold text-slate-800 capitalize tracking-wider mb-2 border-b pb-2">
-              B. INFORMACIÓN ESPECÍFICA: CONFORMIDAD
-            </h4>
-
-            {/* 1. TIPO DE TRABAJO */}
-            <section className="rounded-lg border border-slate-200 bg-white p-4" data-seccion-conformidad="tipo-trabajo">
-              <h5 className="mb-3 font-bold text-[#052a79]">1. Tipo de trabajo realizado</h5>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-600">
-                  ¿QUÉ TRABAJO SE CERTIFICA?{required('conformidad.tipoConformidad')}
-                </label>
-                <select
-                  name="tipoConformidad"
-                  value={formConformidad.tipoConformidad || ''}
-                  onChange={handleConformidad}
-                  className={claseConError(CLASE_CAMPO, esError('conformidad.tipoConformidad'))}
-                  data-campo-error={esError('conformidad.tipoConformidad') ? true : undefined}
-                >
-                  <option value="">SELECCIONAR TIPO</option>
-                  <option value="MODIFICACION">MODIFICACIÓN</option>
-                  <option value="MONTAJE">MONTAJE</option>
-                  <option value="FABRICACION">FABRICACIÓN</option>
-                </select>
-                <MensajeError campo="conformidad.tipoConformidad" errores={erroresCampo} />
-                <p className="mt-1 text-xs text-slate-500">Selecciona una de las opciones del certificado.</p>
-              </div>
-            </section>
-
-            {/* 2. RECTIFICACIÓN DE CARACTERÍSTICAS REGISTRABLES */}
+            {/* 1. RECTIFICACIÓN DE CARACTERÍSTICAS REGISTRABLES */}
             <section className="rounded-lg border border-slate-200 bg-white p-4" data-seccion-conformidad="caracteristica-registrable">
-              <h5 className="mb-3 font-bold text-[#052a79]">2. Rectificación de características registrables</h5>
+              <h5 className="mb-3 font-bold text-[#052a79]">1. Rectificación de características registrables</h5>
               <div className="space-y-4">
                 <div>
                   <label className="mb-1 block text-xs font-bold text-slate-600">
                     RECTIFICACIÓN DE CARACTERÍSTICAS REGISTRABLES{required('conformidad.caracteristicaRegistrable')}
                   </label>
-                  {resolucionConformidad.caracteristicaFija ? (
-                    <div>
-                      <div
-                        className="flex min-h-9 items-center rounded-lg border-2 border-blue-100 bg-blue-50 px-3 py-1 font-bold text-[#052a79]"
-                        data-caracteristica-fija="true"
-                      >
-                        {resolucionConformidad.caracteristicaFija}
-                      </div>
-                      <p className="mt-1 text-[10px] font-semibold text-blue-700">
-                        Característica fija derivada automáticamente del servicio.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <select
-                        aria-label="Selector de característica registrable"
-                        value={
-                          resolucionConformidad.opcionesCaracteristica.includes(formConformidad.caracteristicaRegistrable)
-                            ? formConformidad.caracteristicaRegistrable
-                            : formConformidad.caracteristicaRegistrable
-                              ? '__OTRO__'
-                              : ''
-                        }
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '__OTRO__') {
-                            handleConformidad({
-                              target: { name: 'caracteristicaRegistrable', value: '' }
-                            } as any);
-                          } else {
-                            handleConformidad({
-                              target: { name: 'caracteristicaRegistrable', value: val }
-                            } as any);
-                          }
-                        }}
-                        className={claseConError(CLASE_CAMPO, esError('conformidad.caracteristicaRegistrable'))}
-                        data-campo-error={esError('conformidad.caracteristicaRegistrable') ? true : undefined}
-                      >
-                        <option value="">SELECCIONAR CARACTERÍSTICA</option>
-                        {resolucionConformidad.opcionesCaracteristica.map((opc) => (
-                          <option key={opc} value={opc}>{opc}</option>
-                        ))}
-                        <option value="__OTRO__">OTRA CARACTERÍSTICA (ESPECIFICAR)</option>
-                      </select>
-                      {(!resolucionConformidad.opcionesCaracteristica.includes(formConformidad.caracteristicaRegistrable) ||
-                        formConformidad.caracteristicaRegistrable === '__OTRO__') && (
-                        <input
-                          name="caracteristicaRegistrable"
-                          value={formConformidad.caracteristicaRegistrable === '__OTRO__' ? '' : formConformidad.caracteristicaRegistrable || ''}
-                          onChange={handleConformidad}
-                          maxLength={300}
-                          className={claseConError(CLASE_CAMPO, esError('conformidad.caracteristicaRegistrable'))}
-                          data-campo-error={esError('conformidad.caracteristicaRegistrable') ? true : undefined}
-                          placeholder="ESPECIFICAR CARACTERÍSTICA REGISTRABLE"
-                        />
-                      )}
-                      <MensajeError campo="conformidad.caracteristicaRegistrable" errores={erroresCampo} />
-                      <p className="mt-1 text-xs text-slate-500">
-                        Selecciona del catálogo oficial o especifica la característica a rectificar.
-                      </p>
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <input
+                      name="caracteristicaRegistrable"
+                      aria-label="Característica registrable"
+                      value={formConformidad.caracteristicaRegistrable || ''}
+                      onChange={handleConformidad}
+                      maxLength={300}
+                      className={claseConError(CLASE_CAMPO, esError('conformidad.caracteristicaRegistrable'))}
+                      data-campo-error={esError('conformidad.caracteristicaRegistrable') ? true : undefined}
+                      placeholder="Ej. RECTIFICACIÓN DE COLOR / MODELO"
+                    />
+                    <MensajeError campo="conformidad.caracteristicaRegistrable" errores={erroresCampo} />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Escribe la rectificación tal como debe aparecer en el certificado.
+                    </p>
+                  </div>
                 </div>
 
-                {/* 3. USO ORIGINAL DEL VEHÍCULO */}
+                {/* 2. USO ORIGINAL DEL VEHÍCULO */}
                 <div data-seccion-conformidad="uso-original">
                   <label className="mb-1 block text-xs font-bold text-slate-600">
                     USO ORIGINAL DEL VEHÍCULO{required('conformidad.usoOriginalVehiculo')}
@@ -1529,24 +1458,13 @@ export function VehiculoStep({
                   <div className="space-y-2">
                     <select
                       aria-label="Selector de uso original del vehículo"
-                      value={
-                        USOS_ORIGINALES_CATALOGO.includes(formConformidad.usoOriginalVehiculo)
-                          ? formConformidad.usoOriginalVehiculo
-                          : formConformidad.usoOriginalVehiculo
-                            ? '__OTRO__'
-                            : ''
-                      }
+                      value={USOS_ORIGINALES_CATALOGO.includes(formConformidad.usoOriginalVehiculo)
+                        ? formConformidad.usoOriginalVehiculo
+                        : ''}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '__OTRO__') {
-                          handleConformidad({
-                            target: { name: 'usoOriginalVehiculo', value: '' }
-                          } as any);
-                        } else {
-                          handleConformidad({
-                            target: { name: 'usoOriginalVehiculo', value: val }
-                          } as any);
-                        }
+                        handleConformidad({
+                          target: { name: 'usoOriginalVehiculo', value: e.target.value }
+                        } as any);
                       }}
                       className={claseConError(CLASE_CAMPO, esError('conformidad.usoOriginalVehiculo'))}
                       data-campo-error={esError('conformidad.usoOriginalVehiculo') ? true : undefined}
@@ -1555,19 +1473,13 @@ export function VehiculoStep({
                       {USOS_ORIGINALES_CATALOGO.map((uso) => (
                         <option key={uso} value={uso}>{uso}</option>
                       ))}
-                      <option value="__OTRO__">OTRO USO (ESPECIFICAR)</option>
                     </select>
-                    {(!USOS_ORIGINALES_CATALOGO.includes(formConformidad.usoOriginalVehiculo) ||
-                      formConformidad.usoOriginalVehiculo === '__OTRO__') && (
-                      <input
-                        name="usoOriginalVehiculo"
-                        value={formConformidad.usoOriginalVehiculo === '__OTRO__' ? '' : formConformidad.usoOriginalVehiculo || ''}
-                        onChange={handleConformidad}
-                        maxLength={100}
-                        className={claseConError(CLASE_CAMPO, esError('conformidad.usoOriginalVehiculo'))}
-                        data-campo-error={esError('conformidad.usoOriginalVehiculo') ? true : undefined}
-                        placeholder="EJ.: TRANSPORTE DE PERSONAS"
-                      />
+                    {formConformidad.usoOriginalVehiculo &&
+                      !USOS_ORIGINALES_CATALOGO.includes(formConformidad.usoOriginalVehiculo) && (
+                      <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                        El borrador conserva el valor anterior “{formConformidad.usoOriginalVehiculo}”.
+                        Selecciona PERSONAS o MERCANCÍAS antes de emitir.
+                      </p>
                     )}
                     <MensajeError campo="conformidad.usoOriginalVehiculo" errores={erroresCampo} />
                     <p className="mt-1 text-xs text-slate-500">

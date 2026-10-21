@@ -1062,6 +1062,7 @@ export function NuevoCertificadoView() {
       : faregasCertificadosApi.guardarVehiculoBorrador;
     const esGnvAnual = formCaja.tipoCertificado === 'GNV_ANUAL'
       && String(formCaja.modalidadCertificado || '').toUpperCase() === 'ANUAL';
+    const esConformidad = formCaja.tipoCertificado === 'CONFORMIDAD';
     const combustibleVehiculo = esGnvAnual
       ? normalizarCombustibleGnvAnual(formVehiculo.combustible)
       : formVehiculo.combustible || (formCaja.tipoCertificado === 'GLP_ANUAL'
@@ -1084,7 +1085,9 @@ export function NuevoCertificadoView() {
       color: formVehiculo.color || null,
       carroceria: formVehiculo.carroceria || null,
       numeroCilindros: normalizarEnteroCertificado(formVehiculo.numeroCilindros, 4) || null,
-      cilindrada: normalizarEnteroCertificado(formVehiculo.cilindrada, 5) || null,
+      cilindrada: esConformidad
+        ? (String(formVehiculo.cilindrada ?? '').trim() || null)
+        : (normalizarEnteroCertificado(formVehiculo.cilindrada, 5) || null),
       numeroEjes: normalizarEnteroCertificado(formVehiculo.numeroEjes, 4) || null,
       numeroRuedas: normalizarEnteroCertificado(formVehiculo.numeroRuedas, 4) || null,
       numeroAsientos: normalizarEnteroCertificado(formVehiculo.numeroAsientos, 4) || null,

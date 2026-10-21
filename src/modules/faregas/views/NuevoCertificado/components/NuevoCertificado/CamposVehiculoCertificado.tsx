@@ -19,6 +19,7 @@ type Props = {
   onCategoriaVehicularChange: (categoria: string) => void;
   erroresCampo: ErroresCampo;
   obligatorios: Set<string>;
+  permitirCilindradaDecimal?: boolean;
 };
 
 export function CamposVehiculoCertificado({
@@ -33,11 +34,12 @@ export function CamposVehiculoCertificado({
   esGlpInicial = false,
   maestrosVehiculo,
   combustibles,
+  permitirCilindradaDecimal = false,
 }: Props) {
   const valor = (campo: CampoVehiculoCertificado) => {
     if (campo.valorAutomatico) return campo.valorAutomatico;
     if (campo.grupo === 'vin-serie') return formVehiculo.vin || formVehiculo.serieChasis || '';
-    return formVehiculo[campo.campo] || '';
+    return formVehiculo[campo.campo] ?? '';
   };
 
   const renderCampo = (campo: CampoVehiculoCertificado, dentroDeColumna = false) => {
@@ -70,7 +72,9 @@ export function CamposVehiculoCertificado({
             : 'flex flex-wrap items-center gap-2 sm:flex-nowrap'}>
             {campo.campos.map((sub, subIdx) => {
               const valorCrudo = String(formVehiculo[sub.campo] ?? '');
-              const valorEntero = esCampoEnteroCertificado(sub.campo)
+              const esCilindradaDecimal = permitirCilindradaDecimal && sub.campo === 'cilindrada';
+              const esEntero = esCampoEnteroCertificado(sub.campo) && !esCilindradaDecimal;
+              const valorEntero = esEntero
                 ? normalizarEnteroCertificado(valorCrudo)
                 : valorCrudo;
               const valorSub = sub.formato === 'dos-digitos'
@@ -89,9 +93,9 @@ export function CamposVehiculoCertificado({
                       value={valorSub}
                       onChange={onChange}
                       placeholder={sub.placeholder || sub.campo}
-                      inputMode={esCampoEnteroCertificado(sub.campo) ? 'numeric' : undefined}
+                      inputMode={esEntero ? 'numeric' : esCilindradaDecimal ? 'decimal' : undefined}
                       maxLength={sub.formato === 'dos-digitos' ? 2 : undefined}
-                      data-tipo-dato={esCampoEnteroCertificado(sub.campo) ? 'entero' : 'texto'}
+                      data-tipo-dato={esEntero ? 'entero' : esCilindradaDecimal ? 'decimal' : 'texto'}
                       {...propsCampo(sub.campo, erroresCampo, CLASE_CAMPO)}
                     />
                     <MensajeError campo={sub.campo} errores={erroresCampo} />
@@ -189,6 +193,9 @@ export function CamposVehiculoCertificado({
       );
     }
 
+    const esCilindradaDecimal = permitirCilindradaDecimal && campo.campo === 'cilindrada';
+    const esEntero = esCampoEnteroCertificado(campo.campo) && !esCilindradaDecimal;
+
     return (
       <div key={campo.campo} data-campo-certificado={campo.campo} data-columna-certificado={campo.columnaCertificado}>
         {etiqueta}
@@ -196,13 +203,13 @@ export function CamposVehiculoCertificado({
           name={campo.campo}
           value={campo.formato === 'dos-digitos'
             ? formatearConteoDosDigitos(String(valor(campo)))
-            : esCampoEnteroCertificado(campo.campo)
+            : esEntero
               ? normalizarEnteroCertificado(String(valor(campo)))
               : String(valor(campo))}
           onChange={onChange}
-          inputMode={esCampoEnteroCertificado(campo.campo) ? 'numeric' : undefined}
+          inputMode={esEntero ? 'numeric' : esCilindradaDecimal ? 'decimal' : undefined}
           maxLength={campo.formato === 'dos-digitos' ? 2 : undefined}
-          data-tipo-dato={esCampoEnteroCertificado(campo.campo) ? 'entero' : 'texto'}
+          data-tipo-dato={esEntero ? 'entero' : esCilindradaDecimal ? 'decimal' : 'texto'}
           {...propsCampo(campo.campo, erroresCampo, CLASE_CAMPO)}
         />
         <MensajeError campo={campo.campo} errores={erroresCampo} />
