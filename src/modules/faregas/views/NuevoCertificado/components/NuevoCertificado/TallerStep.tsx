@@ -84,11 +84,14 @@ export const TallerStep: React.FC<TallerStepProps> = ({
               <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 lg:grid-cols-3 animate-fade-in">
                 {campos.map((campo) => {
                   const esObservacion = campo.key.includes('observacion');
+                  const esTelefono = campo.key === 'taller.telefono';
+                  const campoRequerido = esTelefono ? false : campo.requerido;
+                  const labelTexto = esTelefono ? 'TELÉFONO (OPCIONAL)' : campo.label;
                   
                   // Validar estado para feedback visual en vivo
                   const valor = valores[campo.key] ?? '';
                   let errorStr = '';
-                  if (campo.requerido && !valor.trim()) {
+                  if (campoRequerido && !valor.trim()) {
                     errorStr = 'Campo requerido';
                   } else if (valor && campo.minLength && valor.trim().length < campo.minLength) {
                     errorStr = `Mínimo ${campo.minLength} caracteres`;
@@ -106,8 +109,8 @@ export const TallerStep: React.FC<TallerStepProps> = ({
                   return (
                     <div key={campo.key} className={`flex flex-col gap-1.5 ${esObservacion ? 'md:col-span-2' : ''}`}>
                       <div className="flex justify-between items-end">
-                        <label htmlFor={`formato-${campo.key}`} className="text-xs font-bold capitalize tracking-wider text-slate-600">
-                          {campo.label} {campo.requerido && <span className="text-red-500">*</span>}
+                        <label htmlFor={`formato-${campo.key}`} className={`text-xs font-bold ${esTelefono ? '' : 'capitalize'} tracking-wider text-slate-600`}>
+                          {labelTexto} {campoRequerido && <span className="text-red-500">*</span>}
                         </label>
                         {errorStr && <span className="text-[10px] font-bold text-red-500">{errorStr}</span>}
                       </div>

@@ -18,21 +18,23 @@ export const formatPlaca = (val: string): string => {
 };
 
 export const formatVIN = (val: string): string => {
-  // Remove I, O, Q and special characters
-  return val.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '').slice(0, 17);
+  // Remove I, O, Q and special characters (allows * for physical card notation)
+  return val.toUpperCase().replace(/[^A-HJ-NPR-Z0-9*]/g, '').slice(0, 17);
 };
 
 export const formatAlfanumerico = (val: string, max: number = 50): string => {
-  return val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, max);
+  return val.toUpperCase().replace(/[^A-Z0-9*]/g, '').slice(0, max);
 };
 
 export const formatAlfanumericoConEspacios = (val: string, max: number = 50): string => {
-  return val.toUpperCase().replace(/[^A-Z0-9 ]/g, '').slice(0, max);
+  return val.toUpperCase().replace(/[^A-Z0-9ÁÉÍÓÚÜÑ *./-]/g, '').slice(0, max);
 };
 
 export const formatFormulaRodante = (val: string): string => {
+  const limpio = val.trim();
+  if (/^\*+$/.test(limpio)) return limpio.slice(0, 7);
   // Solo numeros y X/x
-  let v = val.toUpperCase().replace(/[^0-9X]/g, '');
+  let v = val.toUpperCase().replace(/[^0-9X*]/g, '');
   // No permitir más de una X
   const xCount = (v.match(/X/g) || []).length;
   if (xCount > 1) {
@@ -42,10 +44,14 @@ export const formatFormulaRodante = (val: string): string => {
 };
 
 export const formatEntero = (val: string, maxDigits: number): string => {
-  return val.replace(/[^0-9]/g, '').slice(0, maxDigits);
+  const limpio = val.trim();
+  if (/^\*+$/.test(limpio)) return limpio.slice(0, Math.max(maxDigits, 5));
+  return val.replace(/[^0-9*]/g, '').slice(0, maxDigits);
 };
 
 export const formatDecimal = (val: string, maxEnteros: number, maxDecimales: number): string => {
+  const limpio = val.trim();
+  if (/^\*+$/.test(limpio)) return limpio.slice(0, Math.max(maxEnteros, 5));
   let v = val.replace(/[^0-9.]/g, '');
   // Evitar multiples puntos
   const dotParts = v.split('.');
@@ -71,6 +77,8 @@ export const formatMes = (val: string): string => {
 };
 
 export const formatAnio = (val: string): string => {
+  const limpio = val.trim();
+  if (/^\*+$/.test(limpio)) return limpio.slice(0, 5);
   const v = val.replace(/[^0-9]/g, '').slice(0, 4);
   if (v.length === 4) {
     const num = parseInt(v, 10);

@@ -15,11 +15,14 @@ import { useFaregasDashboardData, type DashboardTabId } from './hooks/useFaregas
 export const FaregasDashboardView: React.FC = () => {
   const context = useOutletContext<MainLayoutContext>();
   const user = context?.user;
-  const permisos = context?.permisos || [];
+  const perfilId = user?.perfilId || (user as any)?.perfil_id;
+  const permisos = (context?.permisos && context.permisos.length > 0)
+    ? context.permisos
+    : ((user as any)?.permisos || []);
   const plantaActiva = context?.plantaSeleccionada;
   const plantasDisponibles = context?.plantasDisponibles || [];
 
-  const { puedeVerGlobal, puedeExportar } = resolverPermisosDashboard(permisos, user?.perfilId);
+  const { puedeVerGlobal, puedeExportar } = resolverPermisosDashboard(permisos, perfilId);
   const [tabActiva, setTabActiva] = useState<DashboardTabId>('resumen');
   const [exportando, setExportando] = useState(false);
   const [filtros, setFiltros] = useState<FiltrosDashboard>(() => {

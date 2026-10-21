@@ -39,8 +39,9 @@ export const validarFormularioFormatoDinamico = (
     }
 
     const valor = String(valores[campo.key] ?? '').trim();
+    const esOpcional = !campo.requerido || campo.key === 'taller.telefono' || campo.key === 'inspeccion.observaciones';
 
-    if (campo.requerido && !valor) {
+    if (!esOpcional && !valor) {
       errores.push(`Complete ${campo.label.toLocaleLowerCase('es-PE')}.`);
       continue;
     }
@@ -223,6 +224,11 @@ export const validarExpedienteTecnico = ({
 
 export type ErroresCampo = Record<string, string>;
 
+export const esAsteriscos = (valor: unknown): boolean => {
+  const str = String(valor ?? '').trim();
+  return str.length > 0 && /^\*+$/.test(str);
+};
+
 type FormatoNumerico = 'entero' | 'decimal';
 
 /** Devuelve el número, o null si está vacío, o NaN si no es numérico. */
@@ -299,6 +305,7 @@ const errorDeCampo = (
   regla: ReglaCampo
 ): string | undefined => {
   if (vacio(valor)) return `Complete ${regla.etiqueta}.`;
+  if (esAsteriscos(valor)) return undefined;
   if (regla.formato === 'entero' && !esEnteroPositivo(valor)) {
     return mensajeFormato(regla.etiqueta, 'entero');
   }
@@ -337,6 +344,7 @@ export const validarIdentificacionVehiculo = (vehiculo: Record<string, any>): Er
  * fabricación. Se marca el año modelo, que es el dato que se corregiría.
  */
 export const validarAniosVehiculo = (vehiculo: Record<string, any>): ErroresCampo => {
+  if (esAsteriscos(vehiculo.anioModelo) || esAsteriscos(vehiculo.anioFabricacion)) return {};
   const modelo = leerNumero(vehiculo.anioModelo);
   const fabricacion = leerNumero(vehiculo.anioFabricacion);
   if (modelo === null || fabricacion === null) return {};
@@ -475,7 +483,8 @@ export const validarDatosEspecificos = ({
       if (mensaje) marcar(errores, `conformidad.${regla.campo}`, mensaje);
     }
     const usoOriginal = String(conformidad.usoOriginalVehiculo || '').trim().toUpperCase();
-    if (usoOriginal && !['PERSONAS', 'MERCANCÍAS'].includes(usoOriginal)) {
+    const usoNormalizado = usoOriginal === 'MERCANCIAS' ? 'MERCANCÍAS' : usoOriginal;
+    if (usoNormalizado && !['PERSONAS', 'MERCANCÍAS'].includes(usoNormalizado)) {
       marcar(
         errores,
         'conformidad.usoOriginalVehiculo',
@@ -487,10 +496,10 @@ export const validarDatosEspecificos = ({
   return errores;
 };
 
-const PATRON_TEXTO_TECNICO = /^[\p{L}\p{N} ./-]+$/u;
-const PATRON_MOTOR_TECNICO = /^[\p{L}\p{N}/-]+$/u;
-const PATRON_POTENCIA_TECNICA = /^[\p{L}\p{N}\s@/.,-]+$/u;
-const PATRON_CILINDRADA_DECIMAL = /^\d{1,7}(?:\.\d{1,3})?$/;
+const PATRON_TEXTO_TECNICO = /^[\p{L}\p{N} ./*-]+$/u;
+const PATRON_MOTOR_TECNICO = /^[\p{L}\p{N}/*-]+$/u;
+const PATRON_POTENCIA_TECNICA = /^[\p{L}\p{N}\s@/.,*-]+$/u;
+const PATRON_CILINDRADA_DECIMAL = /^(?:\d{1,7}(?:\.\d{1,3})?|\*+)$/;
 const PATRON_VIN_CONFORMIDAD = /^[A-HJ-NPR-Za-hj-npr-z0-9*]+$/;
 
 /**
@@ -505,7 +514,7 @@ export const validarCaracteresTecnicosConformidad = (
   const errores: ErroresCampo = {};
   const validar = (campo: string, patron: RegExp, mensaje: string) => {
     const valor = String(vehiculo[campo] ?? '');
-    if (valor && !patron.test(valor)) marcar(errores, campo, mensaje);
+    if (valor && !esAsteriscos(valor) && !patron.test(valor)) marcar(errores, campo, mensaje);
   };
 
   validar('modelo', PATRON_TEXTO_TECNICO, 'El modelo sólo admite letras, números, espacios, punto, / y -.');

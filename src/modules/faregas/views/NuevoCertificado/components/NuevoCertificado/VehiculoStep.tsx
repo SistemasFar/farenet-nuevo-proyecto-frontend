@@ -263,34 +263,40 @@ export function VehiculoStep({
           ? finalValue.slice(0, 30)
           : formatAlfanumericoConEspacios(finalValue, 30);
         break;
-      case 'formulaRodante': finalValue = formatFormulaRodante(finalValue); break;
+      case 'formulaRodante':
+        finalValue = /^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 7) : formatFormulaRodante(finalValue);
+        break;
       case 'numeroCilindros':
       case 'numeroEjes':
       case 'numeroRuedas':
       case 'numeroAsientos':
       case 'numeroPasajeros':
-        finalValue = normalizarEnteroCertificado(finalValue, 4); break;
+        finalValue = /^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 5) : normalizarEnteroCertificado(finalValue, 4);
+        break;
       case 'anioFabricacion':
       case 'anioModelo':
-        finalValue = formatAnio(finalValue); break;
+        finalValue = /^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 5) : formatAnio(finalValue);
+        break;
       case 'cilindrada':
         finalValue = tipoCertificado === 'CONFORMIDAD'
           ? finalValue.slice(0, 11)
-          : normalizarEnteroCertificado(finalValue, 5);
+          : (/^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 5) : normalizarEnteroCertificado(finalValue, 5));
         break;
       case 'pesoNeto':
       case 'pesoBruto':
       case 'cargaUtil':
-        finalValue = normalizarEnteroCertificado(finalValue, 6); break;
+        finalValue = /^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 6) : normalizarEnteroCertificado(finalValue, 6);
+        break;
       case 'potencia':
         finalValue = tipoCertificado === 'CONFORMIDAD'
           ? finalValue.slice(0, 100)
-          : formatDecimal(finalValue, 6, 2);
+          : (/^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 10) : formatDecimal(finalValue, 6, 2));
         break;
       case 'longitud':
       case 'ancho':
       case 'alto':
-        finalValue = formatDecimal(finalValue, 2, 2); break;
+        finalValue = /^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 6) : formatDecimal(finalValue, 2, 2);
+        break;
     }
     setFormVehiculo((prev: any) => ({ ...prev, [name]: finalValue }));
   };
@@ -300,7 +306,7 @@ export function VehiculoStep({
     let finalValue = value.toUpperCase();
     limpiar(name);
     if (['pesoNetoPosterior', 'cargaUtilPosterior'].includes(name)) {
-      finalValue = normalizarEnteroCertificado(finalValue, 6);
+      finalValue = /^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 6) : normalizarEnteroCertificado(finalValue, 6);
     }
     setFormGlp((prev: any) => ({ ...prev, [name]: finalValue }));
   };
@@ -312,18 +318,23 @@ export function VehiculoStep({
     if (name === 'numeroChip') {
       finalValue = formatAlfanumerico(finalValue, 15);
     } else if (name === 'pesoNetoPosterior') {
-      finalValue = normalizarEnteroCertificado(finalValue, 6);
+      finalValue = /^\*+$/.test(finalValue.trim()) ? finalValue.trim().slice(0, 6) : normalizarEnteroCertificado(finalValue, 6);
     }
     setFormGnv((prev: any) => ({ ...prev, [name]: finalValue }));
   };
 
   const handleConformidad = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    let finalValue = value.toUpperCase();
     limpiar(`conformidad.${name}`);
+    if (name === 'usoOriginalVehiculo') {
+      const normalizado = value === 'MERCANCIAS' ? 'MERCANCÍAS' : value;
+      setFormConformidad((prev: any) => ({ ...prev, [name]: normalizado }));
+      return;
+    }
+    let finalValue = value.toUpperCase();
     if (name === 'caracteristicaRegistrable') {
        finalValue = value.slice(0, 300);
-    } else if (['motivo', 'usoOriginalVehiculo'].includes(name)) {
+    } else if (name === 'motivo') {
        finalValue = formatAlfanumericoConEspacios(finalValue, 100);
     } else if (name === 'descripcion') {
        finalValue = formatAlfanumericoConEspacios(finalValue, 500);

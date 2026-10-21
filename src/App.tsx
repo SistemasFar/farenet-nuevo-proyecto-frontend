@@ -61,7 +61,13 @@ const leerPlantasFaregas = () => {
 
 const leerUsuarioFaregas = (): FaregasUserSession | null => {
   try {
-    return JSON.parse(sessionStorage.getItem('faregasUser') || 'null') as FaregasUserSession | null;
+    const raw = JSON.parse(sessionStorage.getItem('faregasUser') || 'null');
+    if (!raw) return null;
+    return {
+      ...raw,
+      perfilId: raw.perfilId || raw.perfil_id || '',
+      perfil_id: raw.perfil_id || raw.perfilId || ''
+    } as FaregasUserSession;
   } catch {
     return null;
   }

@@ -84,13 +84,21 @@ export function MainLayout({
 
   if (isCertificadoWizard) activeMenu = 'nuevo_certificado';
 
+  const normalizedUser = user
+    ? {
+        ...user,
+        perfilId: user.perfilId || (user as any).perfil_id || '',
+        perfil_id: (user as any).perfil_id || user.perfilId || ''
+      }
+    : null;
+
   const contextValue: MainLayoutContext = {
-    user,
-    permisos,
+    user: normalizedUser,
+    permisos: (permisos && permisos.length > 0) ? permisos : ((user as any)?.permisos || []),
     plantaSeleccionada,
     plantaKey,
-    plantaNombre
-    , plantasDisponibles
+    plantaNombre,
+    plantasDisponibles
   };
 
 

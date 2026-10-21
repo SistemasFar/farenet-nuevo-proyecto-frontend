@@ -665,7 +665,7 @@ export function NuevoCertificadoView() {
                 caracteristicaRegistrable: conformidad.caracteristica_registrable || '',
                 motivo: conformidad.motivo || '',
                 descripcion: conformidad.descripcion || '',
-                usoOriginalVehiculo: conformidad.uso_original_vehiculo || '',
+                usoOriginalVehiculo: (conformidad.uso_original_vehiculo === 'MERCANCIAS' ? 'MERCANCÍAS' : (conformidad.uso_original_vehiculo || '')),
               });
             }
           }
@@ -885,18 +885,20 @@ export function NuevoCertificadoView() {
 
         if (response.data.conformidadFaregas) {
           const conformidad = response.data.conformidadFaregas;
-          const tieneValor = (value) =>
+          const tieneValor = (value: unknown) =>
             value !== null &&
             value !== undefined &&
             (typeof value !== 'string' || value.trim() !== '');
 
-          setFormConformidad((prev) => ({
+          setFormConformidad((prev: any) => ({
             ...prev,
             tipoConformidad: tieneValor(conformidad.tipo_conformidad) ? conformidad.tipo_conformidad : prev.tipoConformidad,
             tipoTramite: tieneValor(conformidad.tipo_tramite) ? conformidad.tipo_tramite : prev.tipoTramite,
             caracteristicaRegistrable: tieneValor(conformidad.caracteristica_registrable) ? conformidad.caracteristica_registrable : prev.caracteristicaRegistrable,
             motivo: tieneValor(conformidad.motivo) ? conformidad.motivo : prev.motivo,
-            usoOriginalVehiculo: tieneValor(conformidad.uso_original_vehiculo) ? conformidad.uso_original_vehiculo : prev.usoOriginalVehiculo,
+            usoOriginalVehiculo: tieneValor(conformidad.uso_original_vehiculo)
+              ? (conformidad.uso_original_vehiculo === 'MERCANCIAS' ? 'MERCANCÍAS' : conformidad.uso_original_vehiculo)
+              : prev.usoOriginalVehiculo,
             descripcion: tieneValor(conformidad.descripcion) ? conformidad.descripcion : prev.descripcion,
           }));
         }

@@ -74,10 +74,11 @@ export function CamposVehiculoCertificado({
               const valorCrudo = String(formVehiculo[sub.campo] ?? '');
               const esCilindradaDecimal = permitirCilindradaDecimal && sub.campo === 'cilindrada';
               const esEntero = esCampoEnteroCertificado(sub.campo) && !esCilindradaDecimal;
+              const tieneAsteriscos = valorCrudo.includes('*');
               const valorEntero = esEntero
                 ? normalizarEnteroCertificado(valorCrudo)
                 : valorCrudo;
-              const valorSub = sub.formato === 'dos-digitos'
+              const valorSub = sub.formato === 'dos-digitos' && !tieneAsteriscos
                 ? formatearConteoDosDigitos(valorEntero)
                 : valorEntero;
               return (
@@ -93,8 +94,8 @@ export function CamposVehiculoCertificado({
                       value={valorSub}
                       onChange={onChange}
                       placeholder={sub.placeholder || sub.campo}
-                      inputMode={esEntero ? 'numeric' : esCilindradaDecimal ? 'decimal' : undefined}
-                      maxLength={sub.formato === 'dos-digitos' ? 2 : undefined}
+                      inputMode={esEntero && !tieneAsteriscos ? 'numeric' : esCilindradaDecimal && !tieneAsteriscos ? 'decimal' : undefined}
+                      maxLength={sub.formato === 'dos-digitos' && !tieneAsteriscos ? 2 : undefined}
                       data-tipo-dato={esEntero ? 'entero' : esCilindradaDecimal ? 'decimal' : 'texto'}
                       {...propsCampo(sub.campo, erroresCampo, CLASE_CAMPO)}
                     />
@@ -195,20 +196,23 @@ export function CamposVehiculoCertificado({
 
     const esCilindradaDecimal = permitirCilindradaDecimal && campo.campo === 'cilindrada';
     const esEntero = esCampoEnteroCertificado(campo.campo) && !esCilindradaDecimal;
+    const valorCampoCrudo = String(valor(campo));
+    const tieneAsteriscos = valorCampoCrudo.includes('*');
 
     return (
       <div key={campo.campo} data-campo-certificado={campo.campo} data-columna-certificado={campo.columnaCertificado}>
         {etiqueta}
         <input
           name={campo.campo}
-          value={campo.formato === 'dos-digitos'
-            ? formatearConteoDosDigitos(String(valor(campo)))
+          value={campo.formato === 'dos-digitos' && !tieneAsteriscos
+            ? formatearConteoDosDigitos(valorCampoCrudo)
             : esEntero
-              ? normalizarEnteroCertificado(String(valor(campo)))
-              : String(valor(campo))}
+              ? normalizarEnteroCertificado(valorCampoCrudo)
+              : valorCampoCrudo}
           onChange={onChange}
-          inputMode={esEntero ? 'numeric' : esCilindradaDecimal ? 'decimal' : undefined}
-          maxLength={campo.formato === 'dos-digitos' ? 2 : undefined}
+          inputMode={esEntero && !tieneAsteriscos ? 'numeric' : esCilindradaDecimal && !tieneAsteriscos ? 'decimal' : undefined}
+          maxLength={campo.formato === 'dos-digitos' && !tieneAsteriscos ? 2 : undefined}
+
           data-tipo-dato={esEntero ? 'entero' : esCilindradaDecimal ? 'decimal' : 'texto'}
           {...propsCampo(campo.campo, erroresCampo, CLASE_CAMPO)}
         />

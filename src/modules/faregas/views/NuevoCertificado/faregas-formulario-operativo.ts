@@ -34,13 +34,18 @@ export const esCampoEnteroCertificado = (campo: string): boolean =>
  * "111.00" queda en "111" y nunca se transforma silenciosamente en "11100".
  */
 export const normalizarEnteroCertificado = (valor: string, maximoDigitos = 8): string => {
-  const coincidencia = String(valor ?? '').match(/^\d+/);
+  const texto = String(valor ?? '').trim();
+  if (/^\*+$/.test(texto)) {
+    return texto.slice(0, Math.max(maximoDigitos, 5));
+  }
+  const coincidencia = texto.match(/^\d+/);
   return (coincidencia?.[0] || '').slice(0, maximoDigitos);
 };
 
 /** Presenta conteos técnicos con la nomenclatura de dos dígitos del certificado. */
 export const formatearConteoDosDigitos = (valor: string): string => {
   const entero = normalizarEnteroCertificado(valor);
+  if (/^\*+$/.test(entero)) return entero;
   return entero ? entero.padStart(2, '0') : '';
 };
 
