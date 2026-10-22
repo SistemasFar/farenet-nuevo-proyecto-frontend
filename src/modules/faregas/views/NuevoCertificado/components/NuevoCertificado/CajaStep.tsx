@@ -43,7 +43,7 @@ const contieneBusqueda = (
 ) => {
   const termino = normalizarBusqueda(busqueda);
   if (!termino) return true;
-  return normalizarBusqueda(`${servicio.nombre} ${servicio.codigoServicio || servicio.codigo} ${categoria.nombre}`).includes(termino);
+  return normalizarBusqueda(`${servicio.nombre} ${servicio.codigo} ${categoria.nombre}`).includes(termino);
 };
 
 export function CajaStep({
@@ -105,18 +105,24 @@ export function CajaStep({
     .flatMap((categoria) => categoria.servicios.map((servicio) => ({ categoria, servicio })))
     .find(({ servicio }) => servicio.tarifa.codigo === formCaja.tarifaCodigo),
   [catalogo, formCaja.tarifaCodigo]);
+  const esInspeccionTaller = seleccion?.servicio.tipo_flujo === 'TALLER_INSPECCION';
 
   const seleccionarServicio = (servicio: ServicioCatalogoFaregas) => {
     onInvalidarConsulta();
-    setFormCaja((actual) => ({
-      ...actual,
-      servicioCodigo: servicio.codigo,
-      tarifaCodigo: servicio.tarifa.codigo,
-      tipoCertificado: servicio.tipo_certificado_clave,
-      modalidadCertificado: servicio.modalidad ?? '',
-      tipo_flujo: servicio.tipo_flujo ?? 'VEHICULAR_EXISTENTE',
-      requiere_certificado: servicio.requiere_certificado ?? true,
-    }));
+    setFormCaja((actual) => {
+      const siguienteFlujo = servicio.tipo_flujo ?? 'VEHICULAR_EXISTENTE';
+      return {
+        ...actual,
+        servicioCodigo: servicio.codigo,
+        tarifaCodigo: servicio.tarifa.codigo,
+        tipoCertificado: servicio.tipo_certificado_clave,
+        modalidadCertificado: servicio.modalidad ?? '',
+        tipo_flujo: siguienteFlujo,
+        requiere_certificado: servicio.requiere_certificado ?? true,
+        placa: siguienteFlujo === 'TALLER_INSPECCION' ? '' : actual.placa,
+        tallerNombre: siguienteFlujo === 'TALLER_INSPECCION' ? actual.tallerNombre : '',
+      };
+    });
   };
 
   return (
@@ -196,7 +202,7 @@ export function CajaStep({
                     </div>
                   )}
                   <div className="mt-2 flex items-end justify-between gap-2">
-                    <span className="text-[10px] font-semibold text-slate-400">{servicio.codigoServicio || servicio.codigo}</span>
+                    <span className="text-[10px] font-semibold text-slate-400">{servicio.codigo}</span>
                     <div className="text-right">
                       <span className="block text-lg font-black text-[#052a79] leading-none">S/ {servicio.tarifa.importeTotal.toFixed(2)}</span>
                       {servicio.tarifa.requiereChip && <span className="mt-1 block text-[10px] font-black capitalize text-emerald-700 leading-none">Incluye chip</span>}
@@ -211,11 +217,17 @@ export function CajaStep({
 
       {seleccion && (
         <section className="space-y-4 border-t border-slate-100 pt-5">
-          {seleccion.servicio.requiere_vehiculo && (
+          {(seleccion.servicio.requiere_vehiculo || esInspeccionTaller) && (
             <h4 className="text-sm font-bold capitalize tracking-wider text-slate-700">2. Datos Básicos</h4>
           )}
           <div className="flex flex-col sm:flex-row items-end justify-between gap-4">
-            {seleccion.servicio.requiere_vehiculo ? (
+            {esInspeccionTaller ? (
+              <div className="w-full sm:max-w-lg space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Nombre del Taller <span className="text-red-500">*</span></label>
+                <input type="text" className={claseConError(CLASE_CAMPO, esError('tallerNombre'))} data-campo-error={esError('tallerNombre') ? true : undefined} aria-invalid={esError('tallerNombre') ? true : undefined} aria-describedby={esError('tallerNombre') ? 'error-tallerNombre' : undefined} placeholder="Ej.: CHARING S.A.C." value={formCaja.tallerNombre} onChange={(event) => { onCorregirCampo?.('tallerNombre'); onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, tallerNombre: event.target.value.toUpperCase() })); }} maxLength={200} />
+                <MensajeError campo="tallerNombre" errores={erroresCampo} />
+              </div>
+            ) : seleccion.servicio.requiere_vehiculo ? (
               <div className="w-full sm:max-w-xs space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Placa de Rodaje <span className="text-red-500">*</span></label>
                 <input type="text" className={claseConError(CLASE_CAMPO, esError('placa'))} data-campo-error={esError('placa') ? true : undefined} aria-invalid={esError('placa') ? true : undefined} aria-describedby={esError('placa') ? 'error-placa' : undefined} placeholder="EJ: ABC-123" value={formCaja.placa} onChange={(event) => { onCorregirCampo?.('placa'); onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, placa: event.target.value.trim().toUpperCase() })); }} maxLength={7} />
@@ -226,7 +238,7 @@ export function CajaStep({
             <button
               type="button"
               onClick={() => void onConsultar()}
-              disabled={consultando || (seleccion.servicio.requiere_vehiculo && (!formCaja.placa))}
+              disabled={consultando || (esInspeccionTaller ? !formCaja.tallerNombre.trim() : (seleccion.servicio.requiere_vehiculo && !formCaja.placa))}
               className="flex w-full sm:w-auto min-w-[180px] items-center justify-center gap-2 rounded-xl bg-[#052a79] px-6 h-[42px] text-xs font-black text-white shadow-sm transition hover:bg-[#041d54] disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               <Search className="h-4 w-4" />

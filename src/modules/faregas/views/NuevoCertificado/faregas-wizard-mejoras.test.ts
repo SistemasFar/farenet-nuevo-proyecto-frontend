@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   validarDatosFacturacionCampos,
+  validarDatosInicialesCampos,
   validarDatosEspecificos,
   validarFormularioVehiculoVisible,
   obtenerFechaHoyPeru,
@@ -12,6 +13,34 @@ import {
 } from './faregas-wizard-errores';
 
 describe('FAREGAS — MEJORAS WIZARD NUEVO CERTIFICADO', () => {
+  describe('Identificación estructurada de inspecciones de taller', () => {
+    it('solicita nombre del taller y no placa cuando el flujo es TALLER_INSPECCION', () => {
+      const errores = validarDatosInicialesCampos({
+        tarifaCodigo: 'SURCO-0422',
+        tipo_flujo: 'TALLER_INSPECCION',
+        tipoCertificado: 'GLP_ANUAL',
+        modalidadCertificado: 'ANUAL',
+        tallerNombre: '',
+        placa: '',
+      });
+      expect(errores.tallerNombre).toBeDefined();
+      expect(errores.placa).toBeUndefined();
+    });
+
+    it('mantiene la placa obligatoria para una certificación vehicular normal', () => {
+      const errores = validarDatosInicialesCampos({
+        tarifaCodigo: 'SURCO-0122',
+        tipo_flujo: 'CERTIFICACION',
+        tipoCertificado: 'GLP_ANUAL',
+        modalidadCertificado: 'ANUAL',
+        tallerNombre: '',
+        placa: '',
+      });
+      expect(errores.placa).toBeDefined();
+      expect(errores.tallerNombre).toBeUndefined();
+    });
+  });
+
   describe('CAMBIO 1: Correo electrónico opcional', () => {
     const facturacionBase = {
       tipoDocFac: 'BOLETA',

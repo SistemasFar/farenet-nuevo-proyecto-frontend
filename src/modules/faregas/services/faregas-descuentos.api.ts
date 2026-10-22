@@ -33,6 +33,7 @@ export interface DescuentoAdmin {
   total_servicios: number;
   total_codigos: number;
   usos_realizados: number;
+  protegido?: boolean;
 }
 
 export interface CodigoDescuentoAdmin {

@@ -37,6 +37,7 @@ import { normalizarCombustibleGnvAnual } from './faregas-certificado-campos';
 export interface FormCajaState {
   tipoPlaca: string;
   placa: string;
+  tallerNombre: string;
   concepto: string;
   categoria: string;
   tipoInspeccion: string;
@@ -236,6 +237,7 @@ export function NuevoCertificadoView() {
   const [formCaja, setFormCaja] = useState<FormCajaState>({
     tipoPlaca: '',
     placa: '',
+    tallerNombre: '',
     concepto: '',
     categoria: '',
     tipoInspeccion: '',
@@ -409,6 +411,9 @@ export function NuevoCertificadoView() {
         tarifaCodigo: '',
         tipoCertificado: '',
         modalidadCertificado: '',
+        tipo_flujo: '',
+        placa: '',
+        tallerNombre: '',
       }));
       setPrecioSubtotal(0);
       setPrecioTotal(0);
@@ -521,6 +526,7 @@ export function NuevoCertificadoView() {
               modalidadCertificado: res.data.servicio?.modalidad || prev.modalidadCertificado,
               tipo_flujo: res.data.servicio?.tipoFlujo || prev.tipo_flujo,
               placa: res.data.vehiculo?.placa || prev.placa,
+              tallerNombre: res.data.formatoDatosSnapshot?.taller?.nombre || prev.tallerNombre,
               categoria: res.data.vehiculo?.categoria || prev.categoria,
             }));
           }
@@ -787,6 +793,7 @@ export function NuevoCertificadoView() {
 
 
   const consultarVehiculoFarenet = async (excludeCertificadoId?: number | null) => {
+    if (formCaja.tipo_flujo === 'TALLER_INSPECCION') return;
     if (!formCaja.placa.trim()) return;
     try {
       const response = await faregasCertificadosApi.obtenerVehiculo(formCaja.placa.trim(), excludeCertificadoId, formCaja.tipoCertificado);
@@ -935,6 +942,7 @@ export function NuevoCertificadoView() {
           tarifaCodigo: formCaja.tarifaCodigo,
           placa: formCaja.placa,
           categoria: formCaja.categoria,
+          tallerNombre: formCaja.tallerNombre,
           observaciones: '',
         });
         idBorrador = Number(response?.data?.id);
@@ -943,10 +951,14 @@ export function NuevoCertificadoView() {
         navigate(`/faregas/certificados/${idBorrador}/continuar`, { replace: true });
       } else {
         await faregasCertificadosApi.actualizarBorrador(idBorrador, { tarifaCodigo: formCaja.tarifaCodigo });
-        await faregasCertificadosApi.guardarVehiculoBorrador(idBorrador, {
-          placa: formCaja.placa,
-          categoria: formCaja.categoria,
-        });
+        if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
+          await faregasCertificadosApi.guardarTaller(idBorrador, { valores: { 'taller.nombre': formCaja.tallerNombre.trim() } });
+        } else {
+          await faregasCertificadosApi.guardarVehiculoBorrador(idBorrador, {
+            placa: formCaja.placa,
+            categoria: formCaja.categoria,
+          });
+        }
       }
 
       await consultarVehiculoFarenet(idBorrador);
@@ -1415,6 +1427,7 @@ export function NuevoCertificadoView() {
             tarifaCodigo: formCaja.tarifaCodigo,
             placa: formCaja.placa,
             categoria: formCaja.categoria,
+            tallerNombre: formCaja.tallerNombre,
             observaciones: ''
           });
           idBorrador = Number(res?.data?.id);
@@ -1422,10 +1435,14 @@ export function NuevoCertificadoView() {
           setCertificadoId(idBorrador);
         } else {
           await faregasCertificadosApi.actualizarBorrador(idBorrador, { tarifaCodigo: formCaja.tarifaCodigo });
-          await faregasCertificadosApi.guardarVehiculoBorrador(idBorrador, {
-            placa: formCaja.placa,
-            categoria: formCaja.categoria,
-          });
+          if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
+            await faregasCertificadosApi.guardarTaller(idBorrador, { valores: { 'taller.nombre': formCaja.tallerNombre.trim() } });
+          } else {
+            await faregasCertificadosApi.guardarVehiculoBorrador(idBorrador, {
+              placa: formCaja.placa,
+              categoria: formCaja.categoria,
+            });
+          }
         }
         if (formCaja.tipoCertificado === 'GLP_ANUAL') {
           setFormGlp((prev: any) => ({ ...prev, modalidad: formCaja.modalidadCertificado }));
@@ -1778,7 +1795,11 @@ export function NuevoCertificadoView() {
       await autosaveQueueRef.current.catch(() => undefined);
       if (currentStepIndex === indicePaso('DATOS_INICIALES')) {
         await faregasCertificadosApi.actualizarBorrador(certificadoId, { tarifaCodigo: formCaja.tarifaCodigo });
-        await faregasCertificadosApi.guardarVehiculoBorrador(certificadoId, { placa: formCaja.placa, categoria: formCaja.categoria });
+        if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
+          await faregasCertificadosApi.guardarTaller(certificadoId, { valores: { 'taller.nombre': formCaja.tallerNombre.trim() } });
+        } else {
+          await faregasCertificadosApi.guardarVehiculoBorrador(certificadoId, { placa: formCaja.placa, categoria: formCaja.categoria });
+        }
       } else if (currentStepIndex === indicePaso('PAGO') && precioTotal > 0) {
         await guardarPasoPagoCompleto(certificadoId);
       } else if (currentStepIndex === indicePaso('VEHICULO')) {

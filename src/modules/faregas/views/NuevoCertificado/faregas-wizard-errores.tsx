@@ -20,6 +20,7 @@ export const ETIQUETAS_CAMPOS_WIZARD: Record<string, { etiqueta: string; seccion
   tarifaCodigo: { etiqueta: 'Servicio', seccion: 'Datos Iniciales' },
   servicioCodigo: { etiqueta: 'Servicio', seccion: 'Datos Iniciales' },
   placa: { etiqueta: 'Placa del vehículo', seccion: 'Datos Iniciales' },
+  tallerNombre: { etiqueta: 'Nombre del taller', seccion: 'Datos Iniciales' },
   categoria: { etiqueta: 'Categoría vehicular', seccion: 'Datos Iniciales' },
   modalidadCertificado: { etiqueta: 'Modalidad del certificado', seccion: 'Datos Iniciales' },
 

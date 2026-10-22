@@ -357,7 +357,6 @@ export const validarAniosVehiculo = (vehiculo: Record<string, any>): ErroresCamp
 
 const CAMPOS_DATOS_INICIALES: ReglaCampo[] = [
   { campo: 'tarifaCodigo', etiqueta: 'el servicio' },
-  { campo: 'placa', etiqueta: 'la placa' },
 ];
 
 export const validarDatosInicialesCampos = (caja: Record<string, any>): ErroresCampo => {
@@ -366,6 +365,12 @@ export const validarDatosInicialesCampos = (caja: Record<string, any>): ErroresC
     const mensaje = errorDeCampo(caja[regla.campo], regla);
     if (mensaje) marcar(errores, regla.campo, mensaje);
   }
+  const esTaller = String(caja.tipo_flujo || '').toUpperCase() === 'TALLER_INSPECCION';
+  const identificador = esTaller
+    ? { campo: 'tallerNombre', etiqueta: 'el nombre del taller' }
+    : { campo: 'placa', etiqueta: 'la placa' };
+  const mensajeIdentificador = errorDeCampo(caja[identificador.campo], identificador);
+  if (mensajeIdentificador) marcar(errores, identificador.campo, mensajeIdentificador);
   if (caja.tipoCertificado !== 'CONFORMIDAD' && vacio(caja.modalidadCertificado)) {
     marcar(errores, 'modalidadCertificado', 'Seleccione si el certificado es inicial o anual.');
   }

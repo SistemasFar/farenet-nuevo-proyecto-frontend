@@ -45,6 +45,7 @@ export interface CrearBorradorFaregasRequest {
   tarifaCodigo?: string;
   placa?: NullableText;
   categoria?: NullableText;
+  tallerNombre?: NullableText;
 }
 
 export type PasoBorradorFaregas = 'DATOS_INICIALES' | 'PAGO' | 'VEHICULO' | 'FACTURACION' | 'PREVISUALIZACION' | 'VERIFICACION_EMISION';
