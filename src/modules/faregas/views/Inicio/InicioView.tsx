@@ -7,8 +7,7 @@ import type { FacturacionFaregas } from '../../types/faregas-api';
 import Swal from 'sweetalert2';
 import { FileText, FileEdit, Eye, Ban, RefreshCw } from 'lucide-react';
 import { nombreTipoCertificadoPanel } from './tipo-certificado-panel';
-import { faregasFetchBlob } from '../../services/faregas-http-client';
-import { abrirComprobanteFaregas } from '../../services/faregas-comprobante-visor.service';
+import { abrirPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
@@ -22,6 +21,12 @@ interface BorradorPanel {
   placa?: string;
   clienteDocumento?: string;
   clienteNombre?: string;
+  propietarioTipoDocumento?: string | null;
+  propietarioDocumento?: string | null;
+  propietarioNombre?: string | null;
+  facturacionTipoDocumento?: string | null;
+  facturacionDocumento?: string | null;
+  facturacionNombre?: string | null;
   tipoCertificadoClave?: string;
   modalidad?: string | null;
   conceptoVehicular?: string;
@@ -44,6 +49,13 @@ interface BorradorPanel {
 const normalizarTexto = (valor?: string | null): string => {
   if (!valor || valor.trim() === '') return '-';
   return valor.trim();
+};
+
+const formatearDocumento = (tipo?: string | null, numero?: string | null): string => {
+  const documento = normalizarTexto(numero);
+  if (documento === '-') return documento;
+  const tipoDocumento = normalizarTexto(tipo);
+  return tipoDocumento === '-' ? documento : `${tipoDocumento}: ${documento}`;
 };
 
 const obtenerClaseBadge = (valor?: string | null): string => {
@@ -322,11 +334,11 @@ export function InicioView() {
   ): Promise<FacturacionFaregas | null> => {
     const facturacion = await obtenerFacturacion(certificadoId);
 
-    if (!facturacion?.enlacePdfFaregas && !facturacion?.enlacePdf) {
+    if (!facturacion?.enlacePdf) {
       await Swal.fire({
         icon: 'info',
         title: 'Comprobante no disponible',
-        text: 'Todavía no existe una representación impresa para este comprobante.',
+        text: 'Todavía no está disponible el PDF oficial de NubeFact para este comprobante.',
         confirmButtonColor: '#052A79',
       });
       return null;
@@ -353,10 +365,7 @@ export function InicioView() {
       setAccionEnProceso(certificadoId);
       const facturacion = await comprobarComprobanteDisponible(certificadoId);
       if (!facturacion) return;
-      await abrirComprobanteFaregas(certificadoId, {
-        facturacion,
-        onRegenerado: () => cargarBorradores(),
-      });
+      await abrirPdfNubefact(certificadoId);
     } catch (err) {
       await Swal.fire('No se pudo consultar', err instanceof Error ? err.message : 'No se pudo obtener el comprobante.', 'error');
     } finally {
@@ -502,7 +511,7 @@ export function InicioView() {
             type="text"
             value={filtros.busqueda}
             onChange={(e) => handleFiltroChange('busqueda', e.target.value)}
-            placeholder="Buscar por placa, DNI, RUC o nombre del cliente"
+            placeholder="Buscar por placa, propietario o cliente facturado"
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#052A79] md:col-span-2"
           />
           <label className="flex flex-col gap-1">
@@ -648,10 +657,10 @@ export function InicioView() {
                   Placa
                 </th>
                 <th className="px-4 py-3 text-left">
-                  DNI / RUC
+                  Propietario
                 </th>
                 <th className="px-4 py-3 text-left">
-                  Nombres / Razón Social
+                  Facturado a
                 </th>
                 <th className="px-4 py-3 text-left">
                   Tipo de Certificado
@@ -672,7 +681,7 @@ export function InicioView() {
               {loading && (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={9}
                     className="px-4 py-8 text-center text-slate-500 font-medium"
                   >
                     Cargando borradores...
@@ -683,7 +692,7 @@ export function InicioView() {
               {!loading && borradores.length === 0 && (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={9}
                     className="px-4 py-8 text-center text-slate-400"
                   >
                     No hay borradores activos o pendientes para esta sede.
@@ -702,7 +711,7 @@ export function InicioView() {
                   // Los controles permanecen visibles aunque el resumen todavía no se haya
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
                   // de abrir/enviar algo, por lo que no debilita la validación tributaria.
-                  const puedeVerComprobante = comprobantePotencial;
+                  const puedeVerComprobante = Boolean(ins.enlacePdf);
                   const puedeAnular = (comprobanteAceptado || comprobantePotencial) && ins.anulacionEnPlazo === true && Number(ins.anulacionHastaMs) > ahoraMs && !accionesCongeladas;
                   const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
 
@@ -736,11 +745,21 @@ export function InicioView() {
                       <td className="px-4 py-3 font-bold whitespace-nowrap">
                         {normalizarTexto(ins.placa)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {normalizarTexto(ins.clienteDocumento)}
+                      <td className="px-4 py-3 min-w-[220px]">
+                        <span className="block font-semibold text-slate-800">
+                          {normalizarTexto(ins.propietarioNombre || ins.clienteNombre)}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          {formatearDocumento(ins.propietarioTipoDocumento, ins.propietarioDocumento || ins.clienteDocumento)}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 min-w-[220px] capitalize">
-                        {normalizarTexto(ins.clienteNombre)?.toLowerCase()}
+                      <td className="px-4 py-3 min-w-[240px]">
+                        <span className="block font-semibold text-slate-800">
+                          {normalizarTexto(ins.facturacionNombre)}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          {formatearDocumento(ins.facturacionTipoDocumento, ins.facturacionDocumento)}
+                        </span>
                       </td>
                       <td className="px-4 py-3 min-w-[180px]">
                         {nombreTipoCertificadoPanel(ins)}
@@ -831,7 +850,7 @@ export function InicioView() {
               const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
               const comprobanteAceptado = esResumenComprobanteOperable(ins);
               const comprobantePotencial = tieneEtapaTributaria(ins);
-              const puedeVerComprobante = comprobantePotencial;
+              const puedeVerComprobante = Boolean(ins.enlacePdf);
               const puedeAnular = (comprobanteAceptado || comprobantePotencial) && ins.anulacionEnPlazo === true && Number(ins.anulacionHastaMs) > ahoraMs && !accionesCongeladas;
               const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
               return (
@@ -876,9 +895,15 @@ export function InicioView() {
                       <span className="block text-[10px] font-semibold text-slate-500 capitalize">Estado</span>
                       <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-[10px] font-bold tracking-wide text-amber-700">{etapa}</span>
                     </div>
-                    <div className="col-span-2">
-                      <span className="block text-[10px] font-semibold text-slate-500 capitalize">Cliente</span>
-                      <span className="text-slate-700 text-xs">{normalizarTexto(ins.clienteNombre)}</span>
+                    <div className="col-span-2 rounded-md bg-slate-50 p-2">
+                      <span className="block text-[10px] font-semibold text-slate-500">Propietario</span>
+                      <span className="block text-xs font-semibold text-slate-800">{normalizarTexto(ins.propietarioNombre || ins.clienteNombre)}</span>
+                      <span className="block text-[11px] text-slate-600">{formatearDocumento(ins.propietarioTipoDocumento, ins.propietarioDocumento || ins.clienteDocumento)}</span>
+                    </div>
+                    <div className="col-span-2 rounded-md bg-blue-50 p-2">
+                      <span className="block text-[10px] font-semibold text-blue-700">Facturado a</span>
+                      <span className="block text-xs font-semibold text-slate-800">{normalizarTexto(ins.facturacionNombre)}</span>
+                      <span className="block text-[11px] text-slate-600">{formatearDocumento(ins.facturacionTipoDocumento, ins.facturacionDocumento)}</span>
                     </div>
                   </div>
 

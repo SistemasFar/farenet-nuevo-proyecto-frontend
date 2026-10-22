@@ -5,8 +5,7 @@ import { faregasCertificadosApi } from '../../../../services/faregas-certificado
 import type { FacturacionContextoFaregas, FacturacionFaregas, ResumenTributarioFaregas } from '../../../../types/faregas-api';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import { DocumentosElectronicosPanel } from './DocumentosElectronicosPanel';
-import { faregasFetchBlob } from '../../../../services/faregas-http-client';
-import { abrirComprobanteFaregas } from '../../../../services/faregas-comprobante-visor.service';
+import { abrirPdfNubefact } from '../../../../services/faregas-comprobante-visor.service';
 
 const mensajeError = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message ? error.message : fallback;
@@ -385,16 +384,10 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
 }, ref) {
   const [isLoading, setIsLoading] = useState(Boolean(certificadoId));
 
-  const abrirPdfFaregas = useCallback(async () => {
+  const abrirComprobanteOficial = useCallback(async () => {
     if (!certificadoId) return;
-    await abrirComprobanteFaregas(certificadoId, {
-      facturacion,
-      onRegenerado: async () => {
-        const resp = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
-        if (resp?.data?.facturacion) onFacturacionChange(resp.data.facturacion);
-      },
-    });
-  }, [certificadoId, facturacion, onFacturacionChange]);
+    await abrirPdfNubefact(certificadoId);
+  }, [certificadoId]);
   const [isSaving, setIsSaving] = useState(false);
   const [isEmitting, setIsEmitting] = useState(false);
   const [integracion, setIntegracion] = useState<{ enabled: boolean; configured: boolean; simulationEnabled?: boolean; correlativosV2Enabled?: boolean } | null>(null);
@@ -669,17 +662,10 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
           <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${estadoColor}`}>
             <div className="flex items-center gap-2 font-black"><CheckCircle2 className="h-5 w-5" /> ESTADO: {facturacion.estado}</div>
             <div className="font-bold">{facturacion.nroComprobante || 'SIN NUMERO RESERVADO'}</div>
-            {Boolean(facturacion.enlacePdfFaregas || facturacion.enlacePdf) && (
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => void abrirPdfFaregas()} className="font-bold underline text-blue-700">
-                  VER COMPROBANTE
-                </button>
-                {facturacion.enlacePdf && (
-                  <a href={facturacion.enlacePdf} target="_blank" rel="noreferrer" className="text-xs text-slate-500 underline" title="PDF oficial NubeFact de auditoría">
-                    VER PDF NUBEFACT
-                  </a>
-                )}
-              </div>
+            {Boolean(facturacion.enlacePdf) && (
+              <button type="button" onClick={() => void abrirComprobanteOficial()} className="font-bold underline text-blue-700">
+                VER COMPROBANTE
+              </button>
             )}
           </div>
         )}

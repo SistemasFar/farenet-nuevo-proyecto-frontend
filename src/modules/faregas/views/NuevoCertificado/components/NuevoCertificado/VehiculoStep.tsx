@@ -1452,7 +1452,6 @@ export function VehiculoStep({
                       maxLength={300}
                       className={claseConError(CLASE_CAMPO, esError('conformidad.caracteristicaRegistrable'))}
                       data-campo-error={esError('conformidad.caracteristicaRegistrable') ? true : undefined}
-                      placeholder="Ej. RECTIFICACIÓN DE COLOR / MODELO"
                     />
                     <MensajeError campo="conformidad.caracteristicaRegistrable" errores={erroresCampo} />
                     <p className="mt-1 text-xs text-slate-500">

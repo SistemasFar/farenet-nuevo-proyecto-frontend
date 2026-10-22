@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { abrirComprobanteFaregas, descargarCertificadoFaregas, descargarComprobanteFaregas, descargarPdfNubefact } from './faregas-comprobante-visor.service';
+import {
+  abrirPdfNubefact,
+  descargarCertificadoFaregas,
+  descargarPdfNubefact,
+  mostrarCargaComprobanteNubefact,
+} from './faregas-comprobante-visor.service';
 import * as httpClient from './faregas-http-client';
-import { faregasCertificadosApi } from './faregas-certificados.api';
 import Swal from 'sweetalert2';
 
 vi.mock('sweetalert2', () => ({
@@ -19,10 +23,36 @@ describe('faregas-comprobante-visor.service', () => {
     vi.clearAllMocks();
     globalThis.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/test-blob');
     globalThis.URL.revokeObjectURL = vi.fn();
-    (Swal.fire as any).mockResolvedValue({ isConfirmed: false });
+    vi.mocked(Swal.fire).mockResolvedValue({
+      isConfirmed: false,
+      isDenied: false,
+      isDismissed: false,
+    });
   });
 
-  it('abre la representacion impresa FAREGAS y nunca nubefact de forma automatica', async () => {
+  it('muestra una espera visible en la pestaña mientras se genera el comprobante', () => {
+    const documento = {
+      open: vi.fn(),
+      write: vi.fn(),
+      close: vi.fn(),
+    };
+    const ventana = {
+      closed: false,
+      document: documento,
+    } as unknown as Window;
+
+    mostrarCargaComprobanteNubefact(ventana);
+
+    expect(documento.open).toHaveBeenCalledOnce();
+    expect(documento.write).toHaveBeenCalledWith(expect.stringContaining('Generando comprobante'));
+    expect(documento.write).toHaveBeenCalledWith(expect.stringContaining('No cierre esta página'));
+    expect(documento.write).toHaveBeenCalledWith(expect.stringContaining('class="carrito"'));
+    expect(documento.write).toHaveBeenCalledWith(expect.stringContaining('fill="#0b57d0"'));
+    expect(documento.write).not.toHaveBeenCalledWith(expect.stringContaining('🚗'));
+    expect(documento.close).toHaveBeenCalledOnce();
+  });
+
+  it('abre exclusivamente el PDF oficial de NubeFact', async () => {
     const mockBlob = new Blob(['%PDF-1.4 test'], { type: 'application/pdf' });
     const spyFetchBlob = vi.spyOn(httpClient, 'faregasFetchBlob').mockResolvedValue(mockBlob);
 
@@ -33,22 +63,17 @@ describe('faregas-comprobante-visor.service', () => {
       close: vi.fn(),
     } as unknown as Window;
 
-    const res = await abrirComprobanteFaregas(123, {
+    const res = await abrirPdfNubefact(123, {
       ventanaPrevia: mockVentana,
-      facturacion: {
-        enlacePdf: 'https://nubefact.com/cpe/original.pdf',
-        enlacePdfFaregas: '/uploads/faregas-123.pdf',
-      } as any,
     });
 
-    expect(spyFetchBlob).toHaveBeenCalledWith('/certificados/borradores/123/facturacion/pdf');
+    expect(spyFetchBlob).toHaveBeenCalledWith('/certificados/borradores/123/facturacion/pdf-nubefact');
     expect(mockVentana.location.href).toBe('blob:http://localhost/test-blob');
-    expect(mockVentana.location.href).not.toContain('nubefact.com');
     expect(res).toBe(true);
   });
 
-  it('no hace fallback silencioso a NubeFact si la representacion FAREGAS falla', async () => {
-    vi.spyOn(httpClient, 'faregasFetchBlob').mockRejectedValue(new Error('PDF_NOT_FOUND'));
+  it('cierra la ventana e informa si el PDF de NubeFact no está disponible', async () => {
+    vi.spyOn(httpClient, 'faregasFetchBlob').mockRejectedValue(new Error('PDF_NUBEFACT_NO_DISPONIBLE'));
 
     const mockVentana = {
       location: { href: '' },
@@ -57,75 +82,21 @@ describe('faregas-comprobante-visor.service', () => {
       close: vi.fn(),
     } as unknown as Window;
 
-    (Swal.fire as any).mockResolvedValue({ isConfirmed: false, isDenied: true });
-
-    const res = await abrirComprobanteFaregas(456, {
+    const res = await abrirPdfNubefact(456, {
       ventanaPrevia: mockVentana,
-      facturacion: {
-        enlacePdf: 'https://nubefact.com/cpe/backup.pdf',
-      } as any,
     });
 
     expect(res).toBe(false);
     expect(mockVentana.close).toHaveBeenCalled();
-    expect(mockVentana.location.href).toBe(''); // Never set to Nubefact!
+    expect(mockVentana.location.href).toBe('');
     expect(Swal.fire).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Representación FAREGAS no disponible',
-        confirmButtonText: 'REGENERAR REPRESENTACIÓN',
-        cancelButtonText: 'VER PDF NUBEFACT',
-      })
+      'No se pudo abrir',
+      'PDF_NUBEFACT_NO_DISPONIBLE',
+      'error',
     );
   });
 
-  it('permite regenerar la representacion FAREGAS si el usuario lo confirma', async () => {
-    const mockBlob = new Blob(['%PDF-1.4 regenerated'], { type: 'application/pdf' });
-    vi.spyOn(httpClient, 'faregasFetchBlob')
-      .mockRejectedValueOnce(new Error('NOT_READY_YET'))
-      .mockResolvedValueOnce(mockBlob);
-
-    const spyRegenerar = vi.spyOn(faregasCertificadosApi, 'regenerarPdfFaregas').mockResolvedValue({ ok: true } as any);
-
-    const mockVentana = {
-      location: { href: '' },
-      closed: false,
-      opener: null,
-      close: vi.fn(),
-    } as unknown as Window;
-
-    (Swal.fire as any).mockImplementation((opts: any) => {
-      if (opts?.title === 'Representación FAREGAS no disponible') {
-        return Promise.resolve({ isConfirmed: true });
-      }
-      return Promise.resolve(undefined);
-    });
-
-    const mockVentanaRetry = {
-      location: { href: '' },
-      closed: false,
-      opener: null,
-      close: vi.fn(),
-    } as unknown as Window;
-
-    (globalThis as any).window = {
-      open: vi.fn().mockReturnValue(mockVentanaRetry),
-    };
-
-    const onRegenerado = vi.fn();
-    const res = await abrirComprobanteFaregas(789, {
-      ventanaPrevia: mockVentana,
-      facturacion: { enlacePdf: 'https://nubefact.com/cpe/789.pdf' } as any,
-      onRegenerado,
-    });
-
-    expect(spyRegenerar).toHaveBeenCalledWith(789);
-    expect(onRegenerado).toHaveBeenCalled();
-    expect(mockVentanaRetry.location.href).toBe('blob:http://localhost/test-blob');
-    expect(res).toBe(true);
-  });
-
   it.each([
-    ['comprobante FAREGAS', descargarComprobanteFaregas, '/certificados/borradores/91/facturacion/pdf', 'COMPROBANTE-FAREGAS-91.pdf'],
     ['PDF NubeFact', descargarPdfNubefact, '/certificados/borradores/91/facturacion/pdf-nubefact', 'COMPROBANTE-NUBEFACT-91.pdf'],
     ['certificado', descargarCertificadoFaregas, '/certificados/borradores/91/certificado/pdf', 'CERTIFICADO-FAREGAS-91.pdf'],
   ])('descarga automáticamente %s', async (_nombre, descargar, endpoint, filename) => {
@@ -133,10 +104,13 @@ describe('faregas-comprobante-visor.service', () => {
     const spyFetchBlob = vi.spyOn(httpClient, 'faregasFetchBlob').mockResolvedValue(mockBlob);
     const click = vi.fn();
     const remove = vi.fn();
+    const enlacesCreados: HTMLAnchorElement[] = [];
     const createElementOriginal = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
       if (tagName.toLowerCase() === 'a') {
-        return { href: '', download: '', style: {}, click, remove } as unknown as HTMLAnchorElement;
+        const enlaceCreado = { href: '', download: '', style: {}, click, remove } as unknown as HTMLAnchorElement;
+        enlacesCreados.push(enlaceCreado);
+        return enlaceCreado;
       }
       return createElementOriginal(tagName);
     }) as typeof document.createElement);
@@ -148,8 +122,8 @@ describe('faregas-comprobante-visor.service', () => {
     expect(document.createElement).toHaveBeenCalledWith('a');
     expect(click).toHaveBeenCalledOnce();
     expect(remove).toHaveBeenCalledOnce();
-    const enlace = (document.createElement as any).mock.results[0].value as HTMLAnchorElement;
-    expect(enlace.download).toBe(filename);
+    expect(enlacesCreados).toHaveLength(1);
+    expect(enlacesCreados[0]?.download).toBe(filename);
     expect(resultado).toBe(true);
   });
 });

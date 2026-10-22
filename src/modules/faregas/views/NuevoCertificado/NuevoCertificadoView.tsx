@@ -27,7 +27,7 @@ import { useErroresPaso, PanelResumenErroresWizard, estructurarErroresPaso } fro
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual as indicePaso, puedeRetrocederWizard } from './faregas-emision';
 import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './faregas-formulario-operativo';
-import { descargarComprobanteFaregas, descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
+import { descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { normalizarCombustibleGnvAnual } from './faregas-certificado-campos';
 
 
@@ -174,12 +174,7 @@ export function NuevoCertificadoView() {
   const { id } = useParams<{ id?: string }>();
   const [certificadoId, setCertificadoId] = useState<number | undefined>(id ? parseInt(id, 10) : undefined);
 
-  const descargarPdfFaregas = async () => {
-    if (!certificadoId) return;
-    await descargarComprobanteFaregas(certificadoId);
-  };
-
-  const descargarPdfOficialNubefact = async () => {
+  const descargarComprobanteOficial = async () => {
     if (!certificadoId) return;
     await descargarPdfNubefact(certificadoId);
   };
@@ -2195,33 +2190,21 @@ export function NuevoCertificadoView() {
         <div className="flex flex-col items-end gap-1.5">
           {soloLectura ? (
             <div className="flex items-center gap-3">
-              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && (facturacion?.enlacePdfFaregas || facturacion?.enlacePdf) && (
-                <>
-                  <button type="button" onClick={() => void descargarPdfFaregas()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
-                    VER / DESCARGAR COMPROBANTE
-                  </button>
-                  {facturacion?.enlacePdf && (
-                    <button type="button" onClick={() => void descargarPdfOficialNubefact()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="Descargar PDF oficial de NubeFact">
-                      VER PDF NUBEFACT
-                    </button>
-                  )}
-                </>
+              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && facturacion?.enlacePdf && (
+                <button type="button" onClick={() => void descargarComprobanteOficial()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50" title="Descargar PDF oficial de NubeFact">
+                  VER / DESCARGAR COMPROBANTE
+                </button>
               )}
               <button type="button" onClick={salirAlInicio} className="rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">
                 {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 ? 'IR A INICIO' : 'VOLVER AL INICIO'}
               </button>
             </div>
           ) : currentStepIndex === STEPS.length - 1 ? (
-            (isEmitido || facturacion?.enlacePdf || facturacion?.enlacePdfFaregas) ? (
+            (isEmitido || facturacion?.enlacePdf) ? (
               <div className="flex items-center gap-3">
-                {(facturacion?.enlacePdfFaregas || facturacion?.enlacePdf) && (
-                  <button type="button" onClick={() => void descargarPdfFaregas()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50">
-                    VER / DESCARGAR COMPROBANTE
-                  </button>
-                )}
                 {facturacion?.enlacePdf && (
-                  <button type="button" onClick={() => void descargarPdfOficialNubefact()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50" title="Descargar PDF oficial de NubeFact">
-                    VER PDF NUBEFACT
+                  <button type="button" onClick={() => void descargarComprobanteOficial()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50" title="Descargar PDF oficial de NubeFact">
+                    VER / DESCARGAR COMPROBANTE
                   </button>
                 )}
                 {isEmitido && (

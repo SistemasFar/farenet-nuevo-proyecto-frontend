@@ -5,7 +5,7 @@ import Swal from 'sweetalert2';
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import type { FacturacionFaregas } from '../../../../types/faregas-api';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
-import { abrirComprobanteFaregas } from '../../../../services/faregas-comprobante-visor.service';
+import { abrirPdfNubefact, mostrarCargaComprobanteNubefact } from '../../../../services/faregas-comprobante-visor.service';
 import type { PagoAgregado, FormFacturacionState } from '../../NuevoCertificadoView';
 import {
   ejecutarEmisionCertificado,
@@ -134,6 +134,7 @@ export function FacturacionEmisionStep({
       // Abrir la ventana inmediatamente tras la confirmación para evitar bloqueo de popups por el navegador
       const ventanaPdf = window.open('', '_blank');
       if (ventanaPdf) ventanaPdf.opener = null;
+      mostrarCargaComprobanteNubefact(ventanaPdf);
 
       try {
         const resultado = await ejecutarEmisionCombinada(certificadoId, facturacion, {
@@ -204,14 +205,9 @@ export function FacturacionEmisionStep({
         onEmisionExitosa?.();
         setErrorEmision('');
 
-        // Apertura inmediata del PDF FAREGAS (prioridad 1)
-        await abrirComprobanteFaregas(certificadoId, {
+        // Apertura inmediata del comprobante oficial de NubeFact.
+        await abrirPdfNubefact(certificadoId, {
           ventanaPrevia: ventanaPdf,
-          facturacion: facturacionDefinitiva,
-          onRegenerado: async () => {
-            const resp = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
-            if (resp?.data?.facturacion) onFacturacionChange(resp.data.facturacion);
-          },
         });
 
         await Swal.fire(
