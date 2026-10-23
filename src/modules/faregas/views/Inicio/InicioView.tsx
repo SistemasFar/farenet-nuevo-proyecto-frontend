@@ -1,18 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import type { FacturacionFaregas } from '../../types/faregas-api';
 import Swal from 'sweetalert2';
-import { FileText, FileEdit, Eye, Ban, RefreshCw } from 'lucide-react';
+import { FileText, FileEdit, Eye, Ban, RefreshCw, ClipboardX } from 'lucide-react';
 import { nombreTipoCertificadoPanel } from './tipo-certificado-panel';
 import { abrirPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
+import { SolicitudOperacionModal } from './SolicitudOperacionModal';
+import {
+  estadoCertificadoPanel,
+  estadoComprobantePanel,
+  MOTIVOS_NOTA_CREDITO,
+} from '../../utils/documentos-electronicos';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
-interface BorradorPanel {
+export interface BorradorPanel {
   id: number;
   fechaCreacion?: string;
   fechaActualizacion?: string;
@@ -42,8 +48,9 @@ interface BorradorPanel {
   anulacionId?: number | null;
   estadoAnulacion?: string | null;
   descripcionAnulacion?: string | null;
-  anulacionEnPlazo?: boolean;
-  anulacionHastaMs?: string | number | null;
+  notaCreditoId?: number | null;
+  estadoNotaCredito?: string | null;
+  nroNotaCredito?: string | null;
 }
 
 const normalizarTexto = (valor?: string | null): string => {
@@ -160,25 +167,20 @@ const esAnulacionAceptada = (item: BorradorPanel) => (
   String(item.estadoAnulacion || '').trim().toUpperCase() === 'ACEPTADO'
 );
 
-const resultadoVisible = (item: BorradorPanel) => {
-  const estado = String(item.estadoAnulacion || '').trim().toUpperCase();
-  if (estado === 'BORRADOR' || estado === 'PENDIENTE') return 'Pendiente de revisión';
-  if (estado === 'ACEPTADO') return 'Anulación aceptada';
-  if (estado === 'RECHAZADO') return 'Anulación rechazada';
-  if (estado === 'ERROR') return 'Error de anulación';
-  return 'Pendiente';
+
+export const tieneCertificadoDefinitivo = (item: BorradorPanel) => {
+  const estadoTecnico = String(item.estado || '').trim().toUpperCase();
+  const tieneNumeroValido = Boolean(String(item.numeroCertificado || '').trim());
+  return (estadoTecnico === 'EMITIDO' || estadoTecnico === 'ANULADO') && tieneNumeroValido;
 };
 
-const certificadoEmitidoVisible = (item: BorradorPanel) => (
+export const certificadoEmitidoVisible = (item: BorradorPanel) => (
   String(item.estado || '').trim().toUpperCase() === 'EMITIDO'
   && Boolean(String(item.numeroCertificado || '').trim())
 );
 
-const estadoCertificadoVisible = (item: BorradorPanel) => {
-  if (esAnulacionPendiente(item)) return 'Pendiente de anulación';
-  if (esAnulacionAceptada(item)) return 'Anulado';
-  return item.estado;
-};
+export const puedeCrearSolicitudAnulacion = (permisos: string[]) =>
+  permisos.includes('FAREGAS_SOLICITUD_CREAR');
 
 export function InicioView() {
   const navigate = useNavigate();
@@ -186,12 +188,14 @@ export function InicioView() {
   // La visibilidad depende del permiso asignado al perfil, nunca del nombre
   // del perfil: así el acceso se puede restringir luego desde Configuración.
   const tienePermisoNotaCredito = permisos.includes('FAREGAS_NOTA_CREDITO');
+  const puedeCrearSolicitud = puedeCrearSolicitudAnulacion(permisos);
+  const puedeVerSolicitudes = permisos.includes('FAREGAS_SOLICITUD_VER') || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
   const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
-  const [ahoraMs, setAhoraMs] = useState(Date.now);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
   const [mostrarDuplicado, setMostrarDuplicado] = useState(false);
+  const [certificadoSolicitudId, setCertificadoSolicitudId] = useState<number | null>(null);
 
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -231,7 +235,6 @@ export function InicioView() {
         filtrosRef.current.estado
       );
       setBorradores(response.data || []);
-      setAhoraMs(Date.now());
       setTotal(Number(response.total || 0));
       setPage(Number(response.page || _paginaConsulta));
       setPageSize(pageSizeConsulta);
@@ -253,15 +256,6 @@ export function InicioView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantaSeleccionada]);
 
-  useEffect(() => {
-    const siguienteVencimiento = borradores
-      .map((item) => Number(item.anulacionHastaMs))
-      .filter((valor) => Number.isFinite(valor) && valor > ahoraMs)
-      .sort((a, b) => a - b)[0];
-    if (!siguienteVencimiento) return;
-    const timer = window.setTimeout(() => setAhoraMs(Date.now()), Math.max(0, siguienteVencimiento - Date.now() + 1));
-    return () => window.clearTimeout(timer);
-  }, [borradores, ahoraMs]);
   const handleFiltroChange = (
     field: keyof FiltrosPanel,
     value: string
@@ -378,39 +372,6 @@ export function InicioView() {
     navigate(`/faregas/certificados/${ins.id}/continuar${editable ? '' : '?vista=consulta'}`);
   };
 
-  const anularComprobante = async (certificadoId: number) => {
-    try {
-      setAccionEnProceso(certificadoId);
-      const facturacion = await comprobarComprobanteOperable(certificadoId);
-      if (!facturacion) return;
-      const confirmacion = await Swal.fire({
-        icon: 'warning',
-        title: `🚫 Anular ${facturacion.nroComprobante || 'comprobante'}`,
-        input: 'text',
-        inputLabel: 'Motivo de la anulación',
-        inputPlaceholder: 'Ingrese el motivo',
-        showCancelButton: true,
-        confirmButtonText: 'SOLICITAR ANULACIÓN',
-        cancelButtonText: 'CANCELAR',
-        confirmButtonColor: '#dc2626',
-        inputValidator: value => !value.trim()
-          ? 'El motivo es obligatorio.'
-          : value.trim().length > 100 ? 'El motivo admite como máximo 100 caracteres.' : undefined,
-      });
-      if (!confirmacion.isConfirmed) return;
-      await faregasCertificadosApi.generarAnulacionElectronica(certificadoId, {
-        tipoDocumento: 'FACTURACION',
-        motivo: String(confirmacion.value).trim(),
-      });
-      await Swal.fire('Solicitud registrada', 'La anulación fue enviada. Su aceptación debe consultarse posteriormente.', 'success');
-      await cargarInspecciones(page, pageSize);
-    } catch (err) {
-      await Swal.fire('No se pudo anular', err instanceof Error ? err.message : 'La solicitud de anulación falló.', 'error');
-    } finally {
-      setAccionEnProceso(null);
-    }
-  };
-
   const consultarAnulacion = async (certificadoId: number, anulacionId: number) => {
     try {
       setAccionEnProceso(certificadoId);
@@ -435,25 +396,19 @@ export function InicioView() {
       const facturacion = await comprobarComprobanteOperable(certificadoId);
       if (!facturacion) return;
       const totalOriginal = Number(facturacion.importeTotal);
+      const opcionesMotivo = MOTIVOS_NOTA_CREDITO
+        .map((motivo) => `<option value="${motivo.codigo}">${motivo.codigo} — ${motivo.descripcion}</option>`)
+        .join('');
       const formulario = await Swal.fire({
         icon: 'warning',
         title: `📝 Nota de crédito para ${facturacion.nroComprobante || 'comprobante'}`,
         html: `
           <label for="nota-motivo" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:8px 0 4px">MOTIVO</label>
           <select id="nota-motivo" class="swal2-input" style="width:100%;margin:0">
-            <option value="1">1 — Anulación de la operación</option>
-            <option value="2">2 — Anulación por error en el RUC</option>
-            <option value="3">3 — Corrección por error en la descripción</option>
-            <option value="4">4 — Descuento global</option>
-            <option value="5">5 — Descuento por ítem</option>
-            <option value="6">6 — Devolución total</option>
-            <option value="7">7 — Devolución por ítem</option>
-            <option value="8">8 — Bonificación</option>
-            <option value="9">9 — Disminución en el valor</option>
-            <option value="10">10 — Otros conceptos</option>
+            ${opcionesMotivo}
           </select>
-          <label for="nota-importe" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">IMPORTE TOTAL</label>
-          <input id="nota-importe" class="swal2-input" type="number" min="0.01" max="${totalOriginal.toFixed(2)}" step="0.01" value="${totalOriginal.toFixed(2)}" style="width:100%;margin:0" />
+          <label for="nota-importe" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">IMPORTE TOTAL DEL COMPROBANTE</label>
+          <input id="nota-importe" class="swal2-input" type="text" value="S/ ${totalOriginal.toFixed(2)}" readonly style="width:100%;margin:0;background:#f1f5f9;color:#475569" />
           <label for="nota-sustento" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">SUSTENTO</label>
           <textarea id="nota-sustento" class="swal2-textarea" maxlength="250" placeholder="Explique el motivo de la nota" style="width:100%;margin:0"></textarea>
         `,
@@ -464,10 +419,10 @@ export function InicioView() {
         focusConfirm: false,
         preConfirm: () => {
           const motivoCodigo = (document.getElementById('nota-motivo') as HTMLSelectElement | null)?.value || '';
-          const importeTotal = Number((document.getElementById('nota-importe') as HTMLInputElement | null)?.value);
+          const importeTotal = totalOriginal;
           const sustento = (document.getElementById('nota-sustento') as HTMLTextAreaElement | null)?.value.trim() || '';
-          if (!Number.isFinite(importeTotal) || importeTotal <= 0 || importeTotal > totalOriginal) {
-            Swal.showValidationMessage(`El importe debe ser mayor a cero y no superar S/ ${totalOriginal.toFixed(2)}.`);
+          if (!Number.isFinite(importeTotal) || importeTotal <= 0) {
+            Swal.showValidationMessage('El comprobante no tiene un importe total válido.');
             return false;
           }
           if (!sustento) {
@@ -479,9 +434,8 @@ export function InicioView() {
       });
       if (!formulario.isConfirmed || !formulario.value) return;
       const importeTotal = Number(formulario.value.importeTotal);
-      const proporcion = importeTotal / totalOriginal;
-      const baseImponible = Math.round(Number(facturacion.baseImponible) * proporcion * 100) / 100;
-      const igv = Math.round((importeTotal - baseImponible) * 100) / 100;
+      const baseImponible = Number(facturacion.baseImponible);
+      const igv = Number(facturacion.igv);
       await faregasCertificadosApi.emitirNotaElectronica(certificadoId, {
         tipo: 'CREDITO',
         motivoCodigo: formulario.value.motivoCodigo,
@@ -626,6 +580,15 @@ export function InicioView() {
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
           <span className="font-semibold text-gray-700">Operaciones recientes</span>
           <div className="flex flex-wrap justify-end gap-2">
+            {puedeVerSolicitudes && (
+              <button
+                type="button"
+                onClick={() => navigate('/faregas/auditoria/solicitudes')}
+                className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-100"
+              >
+                Solicitudes de anulación
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setMostrarDuplicado(true)}
@@ -666,7 +629,7 @@ export function InicioView() {
                   Tipo de Certificado
                 </th>
                 <th className="px-4 py-3 text-left">
-                  Comprobante
+                  Estado comprobante
                 </th>
                 <th className="px-4 py-3 text-left">
                   Estado certificado
@@ -712,7 +675,6 @@ export function InicioView() {
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
                   // de abrir/enviar algo, por lo que no debilita la validación tributaria.
                   const puedeVerComprobante = Boolean(ins.enlacePdf);
-                  const puedeAnular = (comprobanteAceptado || comprobantePotencial) && ins.anulacionEnPlazo === true && Number(ins.anulacionHastaMs) > ahoraMs && !accionesCongeladas;
                   const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
 
                   return (
@@ -730,7 +692,7 @@ export function InicioView() {
                       aria-label={certificadoEditable ? `Continuar borrador ${ins.id}` : `Consultar registro ${ins.id} en solo lectura`}
                     >
                       <td className={`px-4 py-3 font-semibold whitespace-nowrap text-blue-700`}>
-                        {certificadoEmitidoVisible(ins) ? (
+                        {tieneCertificadoDefinitivo(ins) ? (
                           ins.numeroCertificado
                         ) : (
                           <>
@@ -766,10 +728,10 @@ export function InicioView() {
                       </td>
 
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <BadgeEstado value={resultadoVisible(ins)} />
+                        <BadgeEstado value={estadoComprobantePanel(ins)} />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <BadgeEstado value={estadoCertificadoVisible(ins)} />
+                        <BadgeEstado value={estadoCertificadoPanel(ins)} />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center align-middle" onClick={(event) => event.stopPropagation()}>
                         <div className="flex h-full flex-wrap items-center justify-center gap-1.5">
@@ -799,15 +761,6 @@ export function InicioView() {
                               className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
                             ><Ban size={16} /></button>
                           )}
-                          {puedeAnular && (
-                            <button
-                              type="button"
-                              disabled={accionEnProceso === ins.id}
-                              onClick={() => void anularComprobante(ins.id)}
-                              title="Anular comprobante"
-                              className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-red-600 hover:bg-red-100 disabled:opacity-50"
-                            ><Ban size={16} /></button>
-                          )}
                           {puedeCrearNotaCredito && (
                             <button
                               type="button"
@@ -816,6 +769,14 @@ export function InicioView() {
                               title="Crear nota de crédito"
                               className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[#052A79] hover:bg-violet-100 disabled:opacity-50"
                             ><FileEdit size={16} /></button>
+                          )}
+                          {puedeCrearSolicitud && certificadoEmitidoVisible(ins) && (
+                            <button
+                              type="button"
+                              onClick={() => setCertificadoSolicitudId(ins.id)}
+                              title="Solicitar anulación total — requiere autorización de Sistemas"
+                              className="rounded-md border border-red-300 bg-red-50 px-2.5 py-1.5 text-red-700 hover:bg-red-100"
+                            ><ClipboardX size={16} /></button>
                           )}
                           {accionesCongeladas && tienePermisoNotaCredito && (
                             <button
@@ -851,7 +812,6 @@ export function InicioView() {
               const comprobanteAceptado = esResumenComprobanteOperable(ins);
               const comprobantePotencial = tieneEtapaTributaria(ins);
               const puedeVerComprobante = Boolean(ins.enlacePdf);
-              const puedeAnular = (comprobanteAceptado || comprobantePotencial) && ins.anulacionEnPlazo === true && Number(ins.anulacionHastaMs) > ahoraMs && !accionesCongeladas;
               const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
               return (
                 <div
@@ -869,15 +829,15 @@ export function InicioView() {
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      {certificadoEmitidoVisible(ins) ? (
+                      {tieneCertificadoDefinitivo(ins) ? (
                          <div className="font-bold text-blue-700">{ins.numeroCertificado}</div>
                        ) : (
                          <div className="font-bold text-blue-700">Borrador #{ins.id}</div>
                        )}
-                      {!certificadoEmitidoVisible(ins) && ins.numeroCertificado && <div className="text-xs text-slate-600">{ins.numeroCertificado}</div>}
+                      {!tieneCertificadoDefinitivo(ins) && ins.numeroCertificado && <div className="text-xs text-slate-600">{ins.numeroCertificado}</div>}
                       <div className="text-xs text-slate-500">{ins.estado === 'EMITIDO' && ins.fechaEmision ? ins.fechaEmision : formatearFecha(ins.fechaCreacion)}</div>
                     </div>
-                    <BadgeEstado value={estadoCertificadoVisible(ins)} />
+                    <BadgeEstado value={estadoCertificadoPanel(ins)} />
                   </div>
 
                   {anulacionPendiente && (
@@ -892,8 +852,12 @@ export function InicioView() {
                       <span className="font-bold text-slate-800">{normalizarTexto(ins.placa)}</span>
                     </div>
                     <div>
-                      <span className="block text-[10px] font-semibold text-slate-500 capitalize">Estado</span>
+                      <span className="block text-[10px] font-semibold text-slate-500 capitalize">Etapa</span>
                       <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-[10px] font-bold tracking-wide text-amber-700">{etapa}</span>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-between rounded-md bg-slate-50 p-2">
+                      <span className="text-[10px] font-semibold text-slate-500">Estado del comprobante</span>
+                      <BadgeEstado value={estadoComprobantePanel(ins)} />
                     </div>
                     <div className="col-span-2 rounded-md bg-slate-50 p-2">
                       <span className="block text-[10px] font-semibold text-slate-500">Propietario</span>
@@ -928,7 +892,7 @@ export function InicioView() {
                       )}
                     </div>
                   )}
-                  {(puedeAnular || puedeCrearNotaCredito || accionesCongeladas) && (
+                  {(puedeCrearNotaCredito || accionesCongeladas || (puedeCrearSolicitud && certificadoEmitidoVisible(ins))) && (
                     <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       {anulacionPendiente && ins.anulacionId && (
                         <button
@@ -938,14 +902,6 @@ export function InicioView() {
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
                         ><RefreshCw size={16} className={accionEnProceso === ins.id ? 'animate-spin' : ''} /> Consultar anulación</button>
                       )}
-                      {puedeAnular && (
-                        <button
-                          type="button"
-                          disabled={accionEnProceso === ins.id}
-                          onClick={() => void anularComprobante(ins.id)}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
-                        ><Ban size={16} /> Anular</button>
-                      )}
                       {puedeCrearNotaCredito && (
                         <button
                           type="button"
@@ -953,6 +909,14 @@ export function InicioView() {
                           onClick={() => void crearNotaCredito(ins.id)}
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                         ><FileEdit size={16} /> Nota de Crédito</button>
+                      )}
+                      {puedeCrearSolicitud && certificadoEmitidoVisible(ins) && (
+                        <button
+                          type="button"
+                          onClick={() => setCertificadoSolicitudId(ins.id)}
+                          title="Solicitar anulación total — requiere autorización de Sistemas"
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                        ><ClipboardX size={16} /> Solicitar anulación total</button>
                       )}
                       {accionesCongeladas && (
                         <button type="button" disabled className="flex-1 rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-400">
@@ -1011,6 +975,11 @@ export function InicioView() {
       </div>
 
       {mostrarDuplicado && <DuplicadoCertificadoModal onClose={() => setMostrarDuplicado(false)} />}
+      <SolicitudOperacionModal
+        abierto={certificadoSolicitudId !== null}
+        certificadoId={certificadoSolicitudId}
+        onCerrar={() => setCertificadoSolicitudId(null)}
+      />
     </div>
   );
 }

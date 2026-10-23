@@ -390,12 +390,23 @@ export const validarTitulares = (
   titulares.forEach((titular, indice) => {
     const numero = indice + 1;
     const reglas: ReglaCampo[] = [
+      { campo: 'tipoDocumento', etiqueta: `el tipo de documento del titular ${numero}` },
+      { campo: 'nroDocumento', etiqueta: `el número de documento del titular ${numero}` },
       { campo: 'nombreRazonSocial', etiqueta: `el nombre del titular ${numero}` },
     ];
     for (const regla of reglas) {
       if (vacio(titular[regla.campo])) {
         marcar(errores, `titular.${indice}.${regla.campo}`, `Complete ${regla.etiqueta}.`);
       }
+    }
+    const tipoDocumento = String(titular.tipoDocumento || '').trim().toUpperCase();
+    const nroDocumento = String(titular.nroDocumento || '').trim();
+    if (tipoDocumento && !['DNI', 'RUC'].includes(tipoDocumento)) {
+      marcar(errores, `titular.${indice}.tipoDocumento`, 'Seleccione DNI o RUC para el titular.');
+    } else if (tipoDocumento === 'DNI' && nroDocumento && !/^\d{8}$/.test(nroDocumento)) {
+      marcar(errores, `titular.${indice}.nroDocumento`, 'El DNI del titular debe contener 8 dígitos.');
+    } else if (tipoDocumento === 'RUC' && nroDocumento && !/^\d{11}$/.test(nroDocumento)) {
+      marcar(errores, `titular.${indice}.nroDocumento`, 'El RUC del titular debe contener 11 dígitos.');
     }
   });
   return errores;
@@ -732,9 +743,6 @@ export const validarDatosFacturacionCampos = (
   if (vacio(facturacion.razonSocialFac)) {
     errores.razonSocialFac = 'Complete el nombre o razón social de facturación.';
   }
-  if (vacio(facturacion.direccionFac)) {
-    errores.direccionFac = 'Complete la dirección fiscal.';
-  }
   if (vacio(facturacion.telefonoFac)) {
     errores.telefonoFac = 'Complete el teléfono de facturación.';
   }
@@ -800,7 +808,7 @@ export const CAMPOS_VISIBLES_TITULAR = [
 
 /** Datos de facturación, que se capturan en el mismo paso. */
 export const CAMPOS_VISIBLES_FACTURACION = [
-  'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac',
+  'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'telefonoFac',
 ] as const;
 
 /**
@@ -1041,7 +1049,7 @@ export const validarFormularioVehiculoVisible = ({
   // niveles para que la ruta se pueda recorrer segmento a segmento.
   titulares.forEach((titular, indice) => {
     if (tipoCertificado !== 'GLP_ANUAL' && tipoCertificado !== 'CONFORMIDAD') return;
-    const camposTitular = ['nombreRazonSocial'];
+    const camposTitular = ['tipoDocumento', 'nroDocumento', 'nombreRazonSocial'];
     marcarVacias(
       errores,
       { titular: { [indice]: titular } },

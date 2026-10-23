@@ -435,7 +435,7 @@ describe('Validacion frontend de campos visibles y obligatorios', () => {
 
   it('Facturación permanece en todos los certificados', () => {
     expect(CAMPOS_VISIBLES_FACTURACION).toEqual([
-      'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac', 'telefonoFac'
+      'tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'telefonoFac'
     ]);
   });
 

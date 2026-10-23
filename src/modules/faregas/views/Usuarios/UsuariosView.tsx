@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { Edit, Trash2 } from 'lucide-react';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 import type { MaestroUsuario } from '../../types/faregas-api';
@@ -24,12 +24,18 @@ import {
   type ErroresUsuario,
 } from './usuariosValidacion';
 
+interface PermisoPerfil {
+  clave: string;
+  nombre: string;
+  modulo?: string;
+}
+
 export function UsuariosView() {
   const [activeTab, setActiveTab] = useState<'usuarios' | 'perfiles'>('usuarios');
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [perfiles, setPerfiles] = useState<any[]>([]);
   const [plantas, setPlantas] = useState<any[]>([]);
-  const [permisos, setPermisos] = useState<any[]>([]);
+  const [permisos, setPermisos] = useState<PermisoPerfil[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   // Errores por campo. Cada input inválido se marca en rojo y muestra su mensaje
@@ -341,7 +347,35 @@ export function UsuariosView() {
   ] as const;
   const PERMISO_CONFIGURACION = 'MENU_CONFIGURACION';
 
+  const SUBMODULOS_INICIO = [
+    'FAREGAS_SOLICITUD_CREAR',
+    'FAREGAS_SOLICITUD_VER',
+    'FAREGAS_SOLICITUD_APROBAR',
+    'FAREGAS_SOLICITUD_RECHAZAR',
+    'FAREGAS_SOLICITUD_ADMINISTRAR',
+    'FAREGAS_CERTIFICADO_ANULAR_EJECUTAR',
+    'FAREGAS_NOTA_CREDITO',
+    'FAREGAS_ANULAR_COMPROBANTE'
+  ] as const;
+  const PERMISO_INICIO = 'MENU_INICIO';
+  const PERMISOS_INICIO_SENSIBLES = new Set<string>([
+    'FAREGAS_CERTIFICADO_ANULAR_EJECUTAR',
+    'FAREGAS_NOTA_CREDITO',
+    'FAREGAS_ANULAR_COMPROBANTE'
+  ]);
+  const NOMBRES_PERMISOS_INICIO: Record<string, string> = {
+    FAREGAS_SOLICITUD_CREAR: 'Solicitar anulación total',
+    FAREGAS_SOLICITUD_VER: 'Consultar solicitudes',
+    FAREGAS_SOLICITUD_APROBAR: 'Aprobar anulaciones',
+    FAREGAS_SOLICITUD_RECHAZAR: 'Rechazar anulaciones',
+    FAREGAS_SOLICITUD_ADMINISTRAR: 'Administrar solicitudes',
+    FAREGAS_CERTIFICADO_ANULAR_EJECUTAR: 'Ejecutar anulación autorizada',
+    FAREGAS_NOTA_CREDITO: 'Emitir nota de crédito',
+    FAREGAS_ANULAR_COMPROBANTE: 'Anular comprobante electrónico'
+  };
+
   const MODULOS_CON_SUBMODULOS = [
+    { padre: PERMISO_INICIO, hijos: SUBMODULOS_INICIO as readonly string[] },
     { padre: PERMISO_CHIPS, hijos: SUBMODULOS_CHIPS as readonly string[] },
     { padre: PERMISO_FACTURACION, hijos: SUBMODULOS_FACTURACION as readonly string[] },
     { padre: PERMISO_CONFIGURACION, hijos: SUBMODULOS_CONFIGURACION as readonly string[] }
@@ -1052,29 +1086,32 @@ export function UsuariosView() {
                         <div className="border-t pt-4 mt-4">
                             <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Módulos / Menú</label>
                             {(() => {
-                                const isSistemas = formData.clave === 'SISTEMAS';
                                 const marcados = formData.permisos || [];
                                 const esSubmodulo = (clave: string) =>
                                     MODULOS_CON_SUBMODULOS.some((m) => m.hijos.includes(clave));
                                 // Los submódulos no se listan sueltos: se anidan bajo su padre.
-                                const lista = permisos.filter((p: any) => !esSubmodulo(p.clave));
-                                const otros = lista.filter((p: any) =>
-                                    !MODULOS_CON_SUBMODULOS.some((m) => m.padre === p.clave) && p.clave !== 'MENU_CONFIGURACION_TARIFAS');
+                                const lista = permisos.filter((p) => !esSubmodulo(p.clave));
+                                const otros = lista.filter((p) =>
+                                    !MODULOS_CON_SUBMODULOS.some((m) => m.padre === p.clave)
+                                    && p.clave !== 'MENU_CONFIGURACION_TARIFAS');
 
-                                const casilla = (p: any, hijo: boolean, padreActivo: boolean) => {
-                                    const activo = isSistemas || marcados.includes(p.clave);
-                                    const bloqueado = isSistemas || (hijo && !padreActivo);
+                                const casilla = (p: PermisoPerfil, hijo: boolean, padreActivo: boolean) => {
+                                    const activo = marcados.includes(p.clave);
+                                    const bloqueado = hijo && !padreActivo;
                                     const clavePadre = MODULOS_CON_SUBMODULOS.find(
                                         (o) => o.hijos.includes(p.clave))?.padre;
                                     const etiquetaPadre = clavePadre === PERMISO_FACTURACION
                                         ? 'Facturación'
                                         : clavePadre === PERMISO_CONFIGURACION
                                             ? 'Configuración'
-                                            : 'Inventario';
+                                            : clavePadre === PERMISO_INICIO
+                                                ? 'Inicio'
+                                                : 'Inventario';
+                                    const permisoSensible = PERMISOS_INICIO_SENSIBLES.has(p.clave);
                                     return (
                                         <label key={p.clave}
-                                            className={`flex items-center gap-2 text-sm p-2 rounded border ${hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
-                                            title={hijo && !padreActivo && !isSistemas ? `Active primero ${etiquetaPadre}` : undefined}>
+                                            className={`flex items-center gap-2 text-sm p-2 rounded border ${permisoSensible ? 'border-red-200 bg-red-50/60' : hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
+                                            title={hijo && !padreActivo ? `Active primero ${etiquetaPadre}` : undefined}>
                                             <input type="checkbox"
                                                 className="h-4 w-4 text-[#052a79]"
                                                 checked={activo}
@@ -1082,8 +1119,9 @@ export function UsuariosView() {
                                                 disabled={bloqueado}
                                             />
                                             <span className={`font-medium ${hijo ? 'text-slate-600 text-xs' : 'text-slate-700'}`}>
-                                                {NOMBRES_MENU_INVENTARIO[p.clave] || p.nombre}
+                                                {NOMBRES_PERMISOS_INICIO[p.clave] || NOMBRES_MENU_INVENTARIO[p.clave] || p.nombre}
                                             </span>
+                                            {permisoSensible && <span className="ml-auto rounded-full border border-red-200 bg-white px-2 py-0.5 text-[10px] font-bold text-red-700">Sensible</span>}
                                         </label>
                                     );
                                 };
@@ -1092,19 +1130,21 @@ export function UsuariosView() {
                                 // propio bloque de ancho completo, para que sus hijos
                                 // queden debajo y no se mezclen con otros módulos.
                                 const bloqueModulo = (modulo: { padre: string; hijos: readonly string[] }) => {
-                                    const padre = lista.find((p: any) => p.clave === modulo.padre);
-                                    if (!padre) return null;
-                                    const hijos = permisos.filter((p: any) => modulo.hijos.includes(p.clave));
-                                    const padreActivo = isSistemas || marcados.includes(modulo.padre);
+                                    const padre = lista.find((p) => p.clave === modulo.padre);
+                                    const hijos = permisos.filter((p) => modulo.hijos.includes(p.clave));
+                                    if (!padre && modulo.padre !== PERMISO_INICIO) return null;
+                                    const padreActivo = padre ? marcados.includes(modulo.padre) : true;
                                     return (
                                         <div key={modulo.padre} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {casilla(padre, false, padreActivo)}
-                                            </div>
+                                            {padre ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    {casilla(padre, false, padreActivo)}
+                                                </div>
+                                            ) : <p className="text-sm font-bold text-slate-700">Inicio</p>}
                                             {/* La línea vertical es la guía visual de la
                                                 jerarquía: los hijos cuelgan del padre. */}
                                             <div className="mt-2 ml-3 space-y-1.5 border-l-2 border-slate-300 pl-3">
-                                                {hijos.map((h: any) => casilla(h, true, padreActivo))}
+                                                {hijos.map((h) => casilla(h, true, padreActivo))}
                                             </div>
                                         </div>
                                     );
@@ -1114,7 +1154,7 @@ export function UsuariosView() {
                                     <div className="space-y-3">
                                         {MODULOS_CON_SUBMODULOS.map(bloqueModulo)}
                                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                            {otros.map((p: any) => casilla(p, false, true))}
+                                            {otros.map((p) => casilla(p, false, true))}
                                         </div>
                                     </div>
                                 );

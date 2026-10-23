@@ -296,7 +296,7 @@ export function NuevoCertificadoView() {
   const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
     tipoDocFac: '', tipoDocumentoFac: 'DNI', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
-    emailFac: '', telefonoFac: '', usarTitularPrincipalFac: false,
+    emailFac: '', telefonoFac: '', usarTitularPrincipalFac: true,
     condicionPagoFac: 'CONTADO', fechaInicioCreditoFac: fechaLocalIso(), fechaVencimientoFac: '',
     medioPagoFac: '', cuotasFac: []
   });
@@ -570,6 +570,13 @@ export function NuevoCertificadoView() {
             const facturacionRes = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
             const fac = facturacionRes.data?.facturacion;
             if (fac) {
+              const titularPrincipalCargado = [...titularesCargados].sort((a, b) => a.orden - b.orden)[0];
+              const documentoFacturacion = String(fac.nroDocumento || '').trim();
+              const mismoTitularPrincipal = Boolean(
+                titularPrincipalCargado
+                && documentoFacturacion
+                && documentoFacturacion === String(titularPrincipalCargado.nroDocumento || '').trim()
+              );
               setFormFacturacion(prev => ({
                 ...prev,
                 tipoDocFac: fac.tipoComprobante || 'BOLETA',
@@ -579,9 +586,11 @@ export function NuevoCertificadoView() {
                 direccionFac: fac.direccion || '',
                 emailFac: fac.email || '',
                 telefonoFac: fac.telefono || '',
-                // Es una decisión persistida del operador; nunca se infiere
-                // comparando documento o nombre con el titular.
-                usarTitularPrincipalFac: fac.facturarAlDuenoPrincipal === true,
+                // Los borradores anteriores guardaban `false` aunque sus datos
+                // correspondieran al propietario. Se reconoce esa coincidencia
+                // para aplicar el nuevo valor predeterminado sin convertir en
+                // titular a un cliente alterno con otro documento.
+                usarTitularPrincipalFac: fac.facturarAlDuenoPrincipal === true || mismoTitularPrincipal,
                 condicionPagoFac: fac.tipoComprobante === 'BOLETA' ? 'CONTADO' : (fac.condicionPago || 'CONTADO'),
                 fechaInicioCreditoFac: String(fac.fechaInicioCredito || prev.fechaInicioCreditoFac || fechaLocalIso()).slice(0, 10),
                 fechaVencimientoFac: fac.tipoComprobante === 'BOLETA' ? '' : String(fac.fechaVencimiento || '').slice(0, 10),
@@ -1015,8 +1024,14 @@ export function NuevoCertificadoView() {
   };
 
   const guardarTitularesBorrador = async (idBorrador: number) => {
-    const incompleto = titulares.find(t => !t.nombreRazonSocial.trim());
-    if (incompleto) throw new Error(`Complete el nombre o razón social del titular de orden ${incompleto.orden}.`);
+    const incompleto = titulares.find(t => (
+      !t.tipoDocumento.trim()
+      || !t.nroDocumento.trim()
+      || !t.nombreRazonSocial.trim()
+    ));
+    if (incompleto) {
+      throw new Error(`Complete el tipo, número de documento y nombre o razón social del titular de orden ${incompleto.orden}.`);
+    }
 
     let huboCambios = false;
     const guardados: TitularState[] = [];

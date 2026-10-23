@@ -419,7 +419,10 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
             direccionFac: guardada.direccion,
             emailFac: guardada.email || '',
             telefonoFac: guardada.telefono || '',
-            usarTitularPrincipalFac: guardada.facturarAlDuenoPrincipal === true,
+            // Conserva la inferencia hecha al cargar borradores antiguos cuyos
+            // datos fiscales ya coinciden con el dueño, aunque el flag haya
+            // quedado guardado en false antes de que fuera predeterminado.
+            usarTitularPrincipalFac: guardada.facturarAlDuenoPrincipal === true || prev.usarTitularPrincipalFac,
             condicionPagoFac: guardada.condicionPago || 'CONTADO',
             fechaInicioCreditoFac: String(guardada.fechaInicioCredito || prev.fechaInicioCreditoFac || '').slice(0, 10),
             fechaVencimientoFac: String(guardada.fechaVencimiento || '').slice(0, 10),

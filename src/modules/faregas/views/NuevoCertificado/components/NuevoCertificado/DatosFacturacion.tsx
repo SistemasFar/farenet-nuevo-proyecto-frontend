@@ -148,28 +148,6 @@ export function DatosFacturacion({
     }));
   };
 
-  const handleFacturarAlTitularChange = (checked: boolean) => {
-    const titularPrincipal = [...titulares].sort((a, b) => a.orden - b.orden)[0];
-    if (!checked || !titularPrincipal) {
-      handleFacturacionChange('usarTitularPrincipalFac', checked);
-      return;
-    }
-    const tipoDocumentoFac = normalizarTipoDocumento(titularPrincipal.tipoDocumento || 'DNI');
-    setErrorDocumentoConsulta(null);
-    setFormFacturacion((prev) => ({
-      ...prev,
-      usarTitularPrincipalFac: true,
-      tipoDocFac: tipoDocumentoFac === 'RUC' ? 'FACTURA' : 'BOLETA',
-      tipoDocumentoFac,
-      nroDocFac: titularPrincipal.nroDocumento,
-      razonSocialFac: titularPrincipal.nombreRazonSocial,
-      direccionFac: titularPrincipal.direccion,
-      condicionPagoFac: tipoDocumentoFac === 'RUC' ? prev.condicionPagoFac : 'CONTADO',
-      fechaVencimientoFac: tipoDocumentoFac === 'RUC' ? prev.fechaVencimientoFac : '',
-      cuotasFac: tipoDocumentoFac === 'RUC' ? prev.cuotasFac : [],
-    }));
-  };
-
   const buscarClienteFacturacion = async () => {
     if (buscando) return;
     const tipoDocumento = tipoDocumentoSeleccionado;
@@ -306,17 +284,6 @@ export function DatosFacturacion({
             </p>
           </div>
         </div>
-        {titulares.length > 0 && (
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
-            <input
-              type="checkbox"
-              checked={formFacturacion.usarTitularPrincipalFac}
-              onChange={(event) => handleFacturarAlTitularChange(event.target.checked)}
-              className="h-4 w-4 accent-[#052a79]"
-            />
-            FACTURAR AL DUEÑO PRINCIPAL
-          </label>
-        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-4">
@@ -432,7 +399,7 @@ export function DatosFacturacion({
         </div>
 
         <div className="md:col-span-4">
-          <label className="mb-1 block text-xs font-bold text-slate-500">DIRECCIÓN FISCAL</label>
+          <label className="mb-1 block text-xs font-bold text-slate-500">DIRECCIÓN FISCAL (OPCIONAL)</label>
           <input
             value={formFacturacion.direccionFac}
             readOnly={facturarAlTitular}
@@ -489,7 +456,7 @@ export function DatosFacturacion({
 
         <div className="rounded-lg border border-blue-100 bg-white px-4 py-3 text-xs font-medium text-slate-600 md:col-span-4">
           {facturarAlTitular
-            ? 'El documento, nombre y dirección se mantienen sincronizados con el dueño principal.'
+            ? 'El documento y el nombre se mantienen sincronizados con el dueño principal. La dirección fiscal es opcional.'
             : 'La boleta o factura se emitirá a una persona o empresa diferente del dueño del vehículo.'}
         </div>
       </div>

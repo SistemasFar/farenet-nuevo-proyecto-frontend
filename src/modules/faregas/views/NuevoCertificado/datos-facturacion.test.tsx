@@ -607,13 +607,13 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       await act(async () => root.unmount());
     });
 
-    it('CASO 8 y 9: Checkbox "FACTURAR AL DUEÑO PRINCIPAL" y facturación a tercero', async () => {
+    it('CASO 8 y 9: Datos de facturación no duplica el selector que ahora pertenece al dueño principal', async () => {
       const contenedor = document.createElement('div');
       document.body.appendChild(contenedor);
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = {
+      const estadoActual = {
         ...baseFacturacion,
         tipoDocumentoFac: 'RUC',
         nroDocFac: '20123456789',
@@ -621,7 +621,6 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       };
       const Caso = () => {
         const [facturacion, setFacturacion] = useState(estadoActual);
-        estadoActual = facturacion;
         return (
           <DatosFacturacion
             titulares={titularesMock}
@@ -634,25 +633,9 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       await act(async () => root.render(<Caso />));
 
       const checkbox = contenedor.querySelector<HTMLInputElement>('input[type="checkbox"]');
-      expect(checkbox?.checked).toBe(false);
-
-      await act(async () => checkbox?.click());
-      expect(checkbox?.checked).toBe(true);
-      expect(estadoActual.tipoDocumentoFac).toBe('DNI');
-      expect(estadoActual.nroDocFac).toBe('74045612');
-
-      // Cuando está marcado, tipo y número se sincronizan y son de sólo lectura.
-      const inputDoc = contenedor.querySelector<HTMLInputElement>('input[value="74045612"]');
-      expect(inputDoc?.readOnly).toBe(true);
-      expect(contenedor.querySelector<HTMLSelectElement>('select[aria-label="Tipo de documento de facturación"]')?.disabled).toBe(true);
-
-      const botonLupa = contenedor.querySelector<HTMLButtonElement>('button[aria-label="Buscar cliente"]');
-      expect(botonLupa).not.toBeNull();
-      expect(botonLupa?.disabled).toBe(false);
-
-      // Al desmarcar (facturar a tercero), el input se vuelve editable
-      await act(async () => checkbox?.click());
-      expect(checkbox?.checked).toBe(false);
+      expect(checkbox).toBeNull();
+      expect(contenedor.textContent).toContain('DIRECCIÓN FISCAL (OPCIONAL)');
+      expect(contenedor.querySelector<HTMLInputElement>('input[value="20123456789"]')?.readOnly).toBe(false);
 
       await act(async () => root.unmount());
     });
@@ -798,7 +781,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
         modalidad: 'ANUAL',
         caja: { categoria: 'M1', placa: 'ABC123', tarifaCodigo: 'GLP01' },
         vehiculo: vehiculoCompleto,
-        titulares: [{ nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
+        titulares: [{ tipoDocumento: 'DNI', nroDocumento: '74045612', nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
         glp: glpCompleto,
         gnv: {},
         conformidad: {},
@@ -822,7 +805,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
         modalidad: 'ANUAL',
         caja: { categoria: 'M1', placa: 'ABC123', tarifaCodigo: 'GLP01' },
         vehiculo: vehiculoIncompleto,
-        titulares: [{ nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
+        titulares: [{ tipoDocumento: 'DNI', nroDocumento: '74045612', nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
         glp: {
           fechaVigencia: '2027-10-14',
           verificaciones: Array.from({ length: 7 }, (_, i) => ({ codigo: String(i + 1), cumple: true })),
@@ -855,7 +838,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
         modalidad: 'ANUAL',
         caja: { categoria: 'M1', placa: 'ABC123', tarifaCodigo: 'GLP01' },
         vehiculo: { ...vehiculoIncompleto, marca: 'TOYOTA' },
-        titulares: [{ nombreRazonSocial: 'JUAN PEREZ' }],
+        titulares: [{ tipoDocumento: 'DNI', nroDocumento: '74045612', nombreRazonSocial: 'JUAN PEREZ' }],
         glp: {
           fechaVigencia: '2027-10-14',
           verificaciones: Array.from({ length: 7 }, (_, i) => ({ codigo: String(i + 1), cumple: true })),
@@ -902,7 +885,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
           longitud: '4.2', ancho: '1.7', alto: '1.5', pesoNeto: '1100', pesoBruto: '1500', cargaUtil: '400',
           color: 'ROJO',
         },
-        titulares: [{ nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
+        titulares: [{ tipoDocumento: 'DNI', nroDocumento: '74045612', nombreRazonSocial: 'PROPIETARIO REGISTRADO' }],
         glp: glpSinTaller,
         gnv: {},
         conformidad: {},

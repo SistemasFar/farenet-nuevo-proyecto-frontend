@@ -1355,5 +1355,18 @@ export const authFaregasApi = {
       throw new Error(error);
     }
     return response.json();
+  },
+  refrescarSesionAsync: async (token: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/faregas/auth/sesion/refrescar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!response.ok) {
+      const error = await getErrorMessage(response, 'La sesión FAREGAS expiró o ya no es válida');
+      throw new Error(error);
+    }
+    return response.json();
   }
 };

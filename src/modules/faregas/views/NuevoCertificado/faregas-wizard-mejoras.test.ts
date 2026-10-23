@@ -4,6 +4,7 @@ import {
   validarDatosInicialesCampos,
   validarDatosEspecificos,
   validarFormularioVehiculoVisible,
+  validarTitulares,
   obtenerFechaHoyPeru,
   CAMPOS_VISIBLES_FACTURACION,
 } from './faregas-wizard.validation';
@@ -13,6 +14,28 @@ import {
 } from './faregas-wizard-errores';
 
 describe('FAREGAS — MEJORAS WIZARD NUEVO CERTIFICADO', () => {
+  describe('Titular obligatorio antes de facturar', () => {
+    it('bloquea un titular GLP con nombre pero sin número de documento', () => {
+      const errores = validarTitulares([{
+        tipoDocumento: 'DNI',
+        nroDocumento: '',
+        nombreRazonSocial: 'HYDRANSA E.I.R.L.',
+      }], 'GLP_ANUAL');
+
+      expect(errores['titular.0.nroDocumento']).toContain('número de documento');
+    });
+
+    it('acepta el titular GLP cuando tipo, documento y razón social están completos', () => {
+      const errores = validarTitulares([{
+        tipoDocumento: 'RUC',
+        nroDocumento: '20612146072',
+        nombreRazonSocial: 'HYDRANSA E.I.R.L.',
+      }], 'GLP_ANUAL');
+
+      expect(errores).toEqual({});
+    });
+  });
+
   describe('Identificación estructurada de inspecciones de taller', () => {
     it('solicita nombre del taller y no placa cuando el flujo es TALLER_INSPECCION', () => {
       const errores = validarDatosInicialesCampos({
@@ -111,6 +134,17 @@ describe('FAREGAS — MEJORAS WIZARD NUEVO CERTIFICADO', () => {
       });
       expect(errores.emailFac).toBeUndefined();
       expect(errores.nroDocFac).toBeUndefined();
+    });
+
+    it('7. Dirección fiscal vacía es permitida y no forma parte de los campos obligatorios', () => {
+      const errores = validarDatosFacturacionCampos({
+        ...facturacionBase,
+        direccionFac: '',
+        emailFac: '',
+      });
+
+      expect(errores.direccionFac).toBeUndefined();
+      expect(CAMPOS_VISIBLES_FACTURACION).not.toContain('direccionFac');
     });
   });
 

@@ -21,6 +21,7 @@ import { InicioView as FaregasInicioView } from './modules/faregas/views/Inicio/
 import { NuevoCertificadoView as FaregasNuevoCertificadoView } from './modules/faregas/views/NuevoCertificado/NuevoCertificadoView';
 import { UsuariosView as FaregasUsuariosView } from './modules/faregas/views/Usuarios/UsuariosView';
 import { AuditoriaView as FaregasAuditoriaView } from './modules/faregas/views/Auditoria/AuditoriaView';
+import { SolicitudesOperacionView as FaregasSolicitudesOperacionView } from './modules/faregas/views/SolicitudesOperacion/SolicitudesOperacionView';
 import { FaregasConfiguracionView } from './modules/faregas/views/Configuracion/FaregasConfiguracionView';
 import { FaregasFacturacionView } from './modules/faregas/views/Facturacion/FaregasFacturacionView';
 import { DescuentosView as FaregasDescuentosView } from './modules/faregas/views/Descuentos/DescuentosView';
@@ -137,10 +138,29 @@ export default function App() {
   useEffect(() => {
     const restaurarSesion = async () => {
       const fToken = sessionStorage.getItem('faregasAccessToken');
-      if(fToken) {
-        setFaregasAccessToken(fToken);
-        setFaregasUser(JSON.parse(sessionStorage.getItem('faregasUser') || 'null'));
-        setFaregasPlanta(JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null'));
+      if (fToken) {
+        try {
+          const sesionFaregas = await authFaregasApi.refrescarSesionAsync(fToken);
+          const usuarioActualizado = sesionFaregas.user as FaregasUserSession;
+          const plantaActualizada = sesionFaregas.plantaSeleccionada as PlantaAsignada;
+          const plantasActualizadas = Array.isArray(sesionFaregas.plantas)
+            ? sesionFaregas.plantas as PlantaAsignada[]
+            : leerPlantasFaregas();
+
+          setFaregasAccessToken(sesionFaregas.accessToken);
+          setFaregasUser(usuarioActualizado);
+          setFaregasPlanta(plantaActualizada);
+          setFaregasPlantasDisponibles(plantasActualizadas);
+          sessionStorage.setItem('faregasAccessToken', sesionFaregas.accessToken);
+          sessionStorage.setItem('faregasUser', JSON.stringify(usuarioActualizado));
+          sessionStorage.setItem('faregasPlanta', JSON.stringify(plantaActualizada));
+          sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(plantasActualizadas));
+        } catch (error) {
+          console.error('Sesión FAREGAS expirada o inválida:', error);
+          limpiarSesionFrontend();
+          setIsInitializing(false);
+          return;
+        }
       }
       const token = sessionStorage.getItem('accessToken');
       const userRaw = sessionStorage.getItem('user');
@@ -614,6 +634,20 @@ export default function App() {
                     const userPerms = fUser?.permisos || [];
                     return userPerms.includes('MENU_AUDITORIA') ? (
                       <FaregasAuditoriaView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                }
+              />
+              <Route
+                path="auditoria/solicitudes"
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    return userPerms.includes('FAREGAS_SOLICITUD_VER') || userPerms.includes('FAREGAS_SOLICITUD_ADMINISTRAR') ? (
+                      <FaregasSolicitudesOperacionView />
                     ) : (
                       <ForbiddenView />
                     );

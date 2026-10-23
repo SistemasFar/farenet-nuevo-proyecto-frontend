@@ -1,7 +1,6 @@
 import { DatosFacturacion } from './DatosFacturacion';
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
 import Swal from 'sweetalert2';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import { MensajeError, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
@@ -48,8 +47,33 @@ export function TitularesList({
   integrarPropietarioGlpAnual = false,
 }: TitularesListProps) {
   const facturarAlTitular = Boolean(titulares.length > 0 && formFacturacion.usarTitularPrincipalFac);
+  const titularPrincipal = [...titulares].sort((a, b) => a.orden - b.orden)[0] || null;
   const errorTitular = (indice: number, campo: string) => erroresCampo[`titular.${indice}.${campo}`];
   const limpiarTitular = (indice: number, campo: string) => onCorregirCampo?.(`titular.${indice}.${campo}`);
+
+  const handleFacturarAlTitularChange = (checked: boolean) => {
+    if (!checked || !titularPrincipal) {
+      setFormFacturacion((prev) => ({ ...prev, usarTitularPrincipalFac: false }));
+      return;
+    }
+
+    const tipoDocumentoFac = String(titularPrincipal.tipoDocumento || 'DNI').trim().toUpperCase();
+    const tipoDocFac = tipoDocumentoFac === 'RUC' ? 'FACTURA' : 'BOLETA';
+    ['tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac']
+      .forEach((campo) => onCorregirCampo?.(campo));
+    setFormFacturacion((prev) => ({
+      ...prev,
+      usarTitularPrincipalFac: true,
+      tipoDocFac,
+      tipoDocumentoFac,
+      nroDocFac: titularPrincipal.nroDocumento,
+      razonSocialFac: titularPrincipal.nombreRazonSocial,
+      direccionFac: titularPrincipal.direccion,
+      condicionPagoFac: tipoDocFac === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
+      fechaVencimientoFac: tipoDocFac === 'BOLETA' ? '' : prev.fechaVencimientoFac,
+      cuotasFac: tipoDocFac === 'BOLETA' ? [] : prev.cuotasFac,
+    }));
+  };
   
   const handleAdd = () => {
     const nextOrden = titulares.length > 0 ? Math.max(...titulares.map(t => t.orden)) + 1 : 1;
@@ -135,8 +159,55 @@ export function TitularesList({
           </div>
           
           <h5 className="font-bold text-slate-700 mb-3 text-sm">DUEÑO {index + 1} {index === 0 && '(PRINCIPAL)'}</h5>
+
+          {index === 0 && (
+            <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-[#052a79]">
+              <input
+                type="checkbox"
+                checked={facturarAlTitular}
+                onChange={(event) => handleFacturarAlTitularChange(event.target.checked)}
+                className="h-4 w-4 accent-[#052a79]"
+              />
+              FACTURAR AL DUEÑO PRINCIPAL
+            </label>
+          )}
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-1">
+              <label className="block text-xs font-bold text-slate-500 mb-1">TIPO DE DOCUMENTO</label>
+              <select
+                value={t.tipoDocumento}
+                onChange={(e) => {
+                  limpiarTitular(index, 'tipoDocumento');
+                  limpiarTitular(index, 'nroDocumento');
+                  handleChange(t._uuid, 'tipoDocumento', e.target.value);
+                }}
+                className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'tipoDocumento')))}
+                data-campo-error={errorTitular(index, 'tipoDocumento') ? true : undefined}
+              >
+                <option value="DNI">DNI</option>
+                <option value="RUC">RUC</option>
+              </select>
+              <MensajeError campo={`titular.${index}.tipoDocumento`} errores={erroresCampo} />
+            </div>
+            <div className="md:col-span-3">
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                {t.tipoDocumento === 'RUC' ? 'NÚMERO DE RUC' : 'NÚMERO DE DNI'}
+              </label>
+              <input
+                value={t.nroDocumento}
+                inputMode="numeric"
+                maxLength={t.tipoDocumento === 'RUC' ? 11 : 8}
+                placeholder={t.tipoDocumento === 'RUC' ? '11 dígitos' : '8 dígitos'}
+                onChange={(e) => {
+                  limpiarTitular(index, 'nroDocumento');
+                  handleChange(t._uuid, 'nroDocumento', e.target.value);
+                }}
+                className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'nroDocumento')))}
+                data-campo-error={errorTitular(index, 'nroDocumento') ? true : undefined}
+              />
+              <MensajeError campo={`titular.${index}.nroDocumento`} errores={erroresCampo} />
+            </div>
             <div className="md:col-span-4">
               <label className="block text-xs font-bold text-slate-500 mb-1">NOMBRE / RAZÓN SOCIAL</label>
               <input value={t.nombreRazonSocial} onChange={(e) => { limpiarTitular(index, 'nombreRazonSocial'); handleChange(t._uuid, 'nombreRazonSocial', e.target.value); }} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'nombreRazonSocial')))} data-campo-error={errorTitular(index, 'nombreRazonSocial') ? true : undefined} />
