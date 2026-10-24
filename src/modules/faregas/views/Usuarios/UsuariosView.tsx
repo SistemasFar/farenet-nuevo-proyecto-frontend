@@ -359,15 +359,24 @@ export function UsuariosView() {
   ] as const;
   const PERMISO_INICIO = 'MENU_INICIO';
   const PERMISOS_INICIO_SENSIBLES = new Set<string>([
+    'FAREGAS_SOLICITUD_APROBAR',
+    'FAREGAS_SOLICITUD_RECHAZAR',
+    'FAREGAS_SOLICITUD_ADMINISTRAR',
     'FAREGAS_CERTIFICADO_ANULAR_EJECUTAR',
     'FAREGAS_NOTA_CREDITO',
     'FAREGAS_ANULAR_COMPROBANTE'
   ]);
+  const PERMISOS_EXCLUSIVOS_SISTEMAS = new Set<string>([
+    'FAREGAS_SOLICITUD_APROBAR',
+    'FAREGAS_SOLICITUD_RECHAZAR',
+    'FAREGAS_SOLICITUD_ADMINISTRAR',
+    'FAREGAS_CERTIFICADO_ANULAR_EJECUTAR'
+  ]);
   const NOMBRES_PERMISOS_INICIO: Record<string, string> = {
     FAREGAS_SOLICITUD_CREAR: 'Solicitar anulación total',
-    FAREGAS_SOLICITUD_VER: 'Consultar solicitudes',
-    FAREGAS_SOLICITUD_APROBAR: 'Aprobar anulaciones',
-    FAREGAS_SOLICITUD_RECHAZAR: 'Rechazar anulaciones',
+    FAREGAS_SOLICITUD_VER: 'Consultar solicitudes de anulación',
+    FAREGAS_SOLICITUD_APROBAR: 'Aprobar solicitudes',
+    FAREGAS_SOLICITUD_RECHAZAR: 'Rechazar solicitudes',
     FAREGAS_SOLICITUD_ADMINISTRAR: 'Administrar solicitudes',
     FAREGAS_CERTIFICADO_ANULAR_EJECUTAR: 'Ejecutar anulación autorizada',
     FAREGAS_NOTA_CREDITO: 'Emitir nota de crédito',
@@ -1096,8 +1105,10 @@ export function UsuariosView() {
                                     && p.clave !== 'MENU_CONFIGURACION_TARIFAS');
 
                                 const casilla = (p: PermisoPerfil, hijo: boolean, padreActivo: boolean) => {
-                                    const activo = marcados.includes(p.clave);
-                                    const bloqueado = hijo && !padreActivo;
+                                    const esPerfilSistemas = formData.clave === 'SISTEMAS';
+                                    const bloqueadoPorPerfil = !esPerfilSistemas && PERMISOS_EXCLUSIVOS_SISTEMAS.has(p.clave);
+                                    const activo = bloqueadoPorPerfil ? false : marcados.includes(p.clave);
+                                    const bloqueado = (hijo && !padreActivo) || bloqueadoPorPerfil;
                                     const clavePadre = MODULOS_CON_SUBMODULOS.find(
                                         (o) => o.hijos.includes(p.clave))?.padre;
                                     const etiquetaPadre = clavePadre === PERMISO_FACTURACION
@@ -1111,7 +1122,7 @@ export function UsuariosView() {
                                     return (
                                         <label key={p.clave}
                                             className={`flex items-center gap-2 text-sm p-2 rounded border ${permisoSensible ? 'border-red-200 bg-red-50/60' : hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
-                                            title={hijo && !padreActivo ? `Active primero ${etiquetaPadre}` : undefined}>
+                                            title={bloqueadoPorPerfil ? 'Exclusivo para perfil SISTEMAS' : (hijo && !padreActivo ? `Active primero ${etiquetaPadre}` : undefined)}>
                                             <input type="checkbox"
                                                 className="h-4 w-4 text-[#052a79]"
                                                 checked={activo}
@@ -1131,7 +1142,9 @@ export function UsuariosView() {
                                 // queden debajo y no se mezclen con otros módulos.
                                 const bloqueModulo = (modulo: { padre: string; hijos: readonly string[] }) => {
                                     const padre = lista.find((p) => p.clave === modulo.padre);
-                                    const hijos = permisos.filter((p) => modulo.hijos.includes(p.clave));
+                                    const hijos = modulo.hijos
+                                        .map((clave) => permisos.find((p) => p.clave === clave))
+                                        .filter((p): p is PermisoPerfil => Boolean(p));
                                     if (!padre && modulo.padre !== PERMISO_INICIO) return null;
                                     const padreActivo = padre ? marcados.includes(modulo.padre) : true;
                                     return (

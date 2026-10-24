@@ -48,6 +48,10 @@ export interface BorradorPanel {
   anulacionId?: number | null;
   estadoAnulacion?: string | null;
   descripcionAnulacion?: string | null;
+  solicitudOperacionId?: number | null;
+  solicitudOperacionEstado?: string | null;
+  solicitudOperacionTipo?: string | null;
+  solicitudOperacionMotivo?: string | null;
   notaCreditoId?: number | null;
   estadoNotaCredito?: string | null;
   nroNotaCredito?: string | null;
@@ -182,13 +186,59 @@ export const certificadoEmitidoVisible = (item: BorradorPanel) => (
 export const puedeCrearSolicitudAnulacion = (permisos: string[]) =>
   permisos.includes('FAREGAS_SOLICITUD_CREAR');
 
+export const ESTADOS_SOLICITUD_ANULACION_ACTIVOS = [
+  'PENDIENTE_APROBACION',
+  'APROBADA',
+  'EN_EJECUCION',
+  'REQUIERE_INTERVENCION',
+] as const;
+
+export const esSolicitudActivaAnulacion = (estado?: string | null): boolean => (
+  (ESTADOS_SOLICITUD_ANULACION_ACTIVOS as readonly string[]).includes(
+    String(estado || '').trim().toUpperCase()
+  )
+);
+
+export const esSolicitudCompletadaAnulacion = (estado?: string | null): boolean => (
+  String(estado || '').trim().toUpperCase() === 'COMPLETADA'
+);
+
+export const etiquetaSolicitudAnulacion = (estado?: string | null): string => {
+  switch (String(estado || '').trim().toUpperCase()) {
+    case 'PENDIENTE_APROBACION': return 'Pendiente de aprobación';
+    case 'APROBADA': return 'Anulación autorizada';
+    case 'EN_EJECUCION': return 'Procesando anulación';
+    case 'REQUIERE_INTERVENCION': return 'Requiere intervención';
+    case 'COMPLETADA': return 'Anulado';
+    case 'RECHAZADA': return 'Anulación rechazada';
+    case 'CANCELADA': return 'Solicitud cancelada';
+    case 'ERROR': return 'Error en anulación';
+    default: return 'Sin solicitud';
+  }
+};
+
+export const puedeSolicitarAnulacionCertificado = (item: BorradorPanel, permisos: string[]) => (
+  puedeCrearSolicitudAnulacion(permisos)
+  && certificadoEmitidoVisible(item)
+  && !esSolicitudActivaAnulacion(item.solicitudOperacionEstado)
+  && !esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)
+);
+
+export const puedeCrearNotaCreditoPanel = (item: BorradorPanel, permisos: string[]) => {
+  if (!permisos.includes('FAREGAS_NOTA_CREDITO')) return false;
+  if (esSolicitudActivaAnulacion(item.solicitudOperacionEstado) || esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)) return false;
+  if (esAnulacionPendiente(item) || esAnulacionAceptada(item)) return false;
+  const comprobanteAceptado = esResumenComprobanteOperable(item);
+  const comprobantePotencial = tieneEtapaTributaria(item);
+  return Boolean(comprobanteAceptado || comprobantePotencial);
+};
+
 export function InicioView() {
   const navigate = useNavigate();
   const { plantaKey: plantaSeleccionada, permisos } = useOutletContext<MainLayoutContext>();
   // La visibilidad depende del permiso asignado al perfil, nunca del nombre
   // del perfil: así el acceso se puede restringir luego desde Configuración.
   const tienePermisoNotaCredito = permisos.includes('FAREGAS_NOTA_CREDITO');
-  const puedeCrearSolicitud = puedeCrearSolicitudAnulacion(permisos);
   const puedeVerSolicitudes = permisos.includes('FAREGAS_SOLICITUD_VER') || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
   const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -196,6 +246,7 @@ export function InicioView() {
   const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
   const [mostrarDuplicado, setMostrarDuplicado] = useState(false);
   const [certificadoSolicitudId, setCertificadoSolicitudId] = useState<number | null>(null);
+  const [solicitudSolicitadaId, setSolicitudSolicitadaId] = useState<number | null>(null);
 
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -370,6 +421,17 @@ export function InicioView() {
   const abrirRegistro = (ins: BorradorPanel) => {
     const editable = ins.estado === 'BORRADOR' && !esAnulacionPendiente(ins) && !esAnulacionAceptada(ins);
     navigate(`/faregas/certificados/${ins.id}/continuar${editable ? '' : '?vista=consulta'}`);
+  };
+
+  const solicitarAnulacionTotal = (ins: BorradorPanel) => {
+    setCertificadoSolicitudId(ins.id);
+    setSolicitudSolicitadaId(null);
+  };
+
+  const abrirSolicitudExistente = (ins: BorradorPanel) => {
+    if (!ins.solicitudOperacionId) return;
+    setCertificadoSolicitudId(ins.id);
+    setSolicitudSolicitadaId(ins.solicitudOperacionId);
   };
 
   const consultarAnulacion = async (certificadoId: number, anulacionId: number) => {
@@ -667,15 +729,17 @@ export function InicioView() {
                 borradores.map((ins) => {
                   const anulacionPendiente = esAnulacionPendiente(ins);
                   const anulacionAceptada = esAnulacionAceptada(ins);
-                  const accionesCongeladas = anulacionPendiente || anulacionAceptada;
+                  const solicitudEstado = ins.solicitudOperacionEstado || null;
+                  const solicitudActiva = esSolicitudActivaAnulacion(solicitudEstado);
+                  const solicitudCompletada = esSolicitudCompletadaAnulacion(solicitudEstado);
+                  const accionesCongeladas = solicitudActiva || anulacionPendiente || anulacionAceptada;
                   const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
-                  const comprobanteAceptado = esResumenComprobanteOperable(ins);
-                  const comprobantePotencial = tieneEtapaTributaria(ins);
+                  const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos);
+                  const puedeCrearNota = puedeCrearNotaCreditoPanel(ins, permisos);
                   // Los controles permanecen visibles aunque el resumen todavía no se haya
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
                   // de abrir/enviar algo, por lo que no debilita la validación tributaria.
                   const puedeVerComprobante = Boolean(ins.enlacePdf);
-                  const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
 
                   return (
                     <tr
@@ -753,7 +817,7 @@ export function InicioView() {
                               className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
                             ><RefreshCw size={16} className={accionEnProceso === ins.id ? 'animate-spin' : ''} /></button>
                           )}
-                          {accionesCongeladas && (
+                          {accionesCongeladas && !solicitudActiva && !solicitudCompletada && (
                             <button
                               type="button"
                               disabled
@@ -761,7 +825,7 @@ export function InicioView() {
                               className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
                             ><Ban size={16} /></button>
                           )}
-                          {puedeCrearNotaCredito && (
+                          {puedeCrearNota && (
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
@@ -770,15 +834,27 @@ export function InicioView() {
                               className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[#052A79] hover:bg-violet-100 disabled:opacity-50"
                             ><FileEdit size={16} /></button>
                           )}
-                          {puedeCrearSolicitud && certificadoEmitidoVisible(ins) && (
+                          {puedeSolicitar && (
                             <button
                               type="button"
-                              onClick={() => setCertificadoSolicitudId(ins.id)}
+                              onClick={() => solicitarAnulacionTotal(ins)}
                               title="Solicitar anulación total — requiere autorización de Sistemas"
                               className="rounded-md border border-red-300 bg-red-50 px-2.5 py-1.5 text-red-700 hover:bg-red-100"
                             ><ClipboardX size={16} /></button>
                           )}
-                          {accionesCongeladas && tienePermisoNotaCredito && (
+                          {solicitudActiva && ins.solicitudOperacionId && (
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === ins.id}
+                              onClick={() => abrirSolicitudExistente(ins)}
+                              title="Abrir solicitud de anulación existente"
+                              className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              <ClipboardX size={16} />
+                              {etiquetaSolicitudAnulacion(solicitudEstado)}
+                            </button>
+                          )}
+                          {accionesCongeladas && !solicitudCompletada && tienePermisoNotaCredito && (
                             <button
                               type="button"
                               disabled
@@ -807,12 +883,14 @@ export function InicioView() {
               const etapa = PASO_PANEL[ins.pasoActual || ''] || 'Datos iniciales';
               const anulacionPendiente = esAnulacionPendiente(ins);
               const anulacionAceptada = esAnulacionAceptada(ins);
-              const accionesCongeladas = anulacionPendiente || anulacionAceptada;
+              const solicitudEstado = ins.solicitudOperacionEstado || null;
+              const solicitudActiva = esSolicitudActivaAnulacion(solicitudEstado);
+              const solicitudCompletada = esSolicitudCompletadaAnulacion(solicitudEstado);
+              const accionesCongeladas = solicitudActiva || anulacionPendiente || anulacionAceptada;
               const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
-              const comprobanteAceptado = esResumenComprobanteOperable(ins);
-              const comprobantePotencial = tieneEtapaTributaria(ins);
               const puedeVerComprobante = Boolean(ins.enlacePdf);
-              const puedeCrearNotaCredito = (comprobanteAceptado || comprobantePotencial) && !accionesCongeladas && tienePermisoNotaCredito;
+              const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos);
+              const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos);
               return (
                 <div
                   key={ins.id}
@@ -892,7 +970,7 @@ export function InicioView() {
                       )}
                     </div>
                   )}
-                  {(puedeCrearNotaCredito || accionesCongeladas || (puedeCrearSolicitud && certificadoEmitidoVisible(ins))) && (
+                  {(puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar) && (
                     <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       {anulacionPendiente && ins.anulacionId && (
                         <button
@@ -910,15 +988,25 @@ export function InicioView() {
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                         ><FileEdit size={16} /> Nota de Crédito</button>
                       )}
-                      {puedeCrearSolicitud && certificadoEmitidoVisible(ins) && (
+                      {puedeSolicitar && (
                         <button
                           type="button"
-                          onClick={() => setCertificadoSolicitudId(ins.id)}
+                          onClick={() => solicitarAnulacionTotal(ins)}
                           title="Solicitar anulación total — requiere autorización de Sistemas"
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
                         ><ClipboardX size={16} /> Solicitar anulación total</button>
                       )}
-                      {accionesCongeladas && (
+                      {solicitudActiva && ins.solicitudOperacionId && (
+                        <button
+                          type="button"
+                          disabled={accionEnProceso === ins.id}
+                          onClick={() => abrirSolicitudExistente(ins)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          <ClipboardX size={16} /> {etiquetaSolicitudAnulacion(solicitudEstado)}
+                        </button>
+                      )}
+                      {!solicitudActiva && accionesCongeladas && !solicitudCompletada && (
                         <button type="button" disabled className="flex-1 rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-400">
                           Acciones congeladas
                         </button>
@@ -978,7 +1066,9 @@ export function InicioView() {
       <SolicitudOperacionModal
         abierto={certificadoSolicitudId !== null}
         certificadoId={certificadoSolicitudId}
-        onCerrar={() => setCertificadoSolicitudId(null)}
+        solicitudId={solicitudSolicitadaId}
+        onCerrar={() => { setCertificadoSolicitudId(null); setSolicitudSolicitadaId(null); }}
+        onCreada={() => { void cargarInspecciones(page, pageSize); }}
       />
     </div>
   );

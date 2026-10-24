@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, ClipboardX, Loader2, X } from 'lucide-react';
 import {
   faregasSolicitudesOperacionApi,
+  etiquetaEstadoSolicitud,
+  etiquetaTipoSolicitud,
   type ContextoSolicitudOperacion,
   type SolicitudOperacion,
 } from '../../services/faregas-solicitudes-operacion.api';
@@ -11,6 +13,7 @@ interface Props {
   abierto: boolean;
   onCerrar: () => void;
   onCreada?: (solicitud: SolicitudOperacion) => void;
+  solicitudId?: number | null;
 }
 
 const crearIdempotencia = () => (
@@ -23,13 +26,26 @@ const crearIdempotencia = () => (
     })
 );
 
+const claseEstadoSolicitudDetalle = (estado: SolicitudOperacion['estado']) => (
+  estado === 'APROBADA'
+    ? 'border-blue-200 bg-blue-50 text-blue-800'
+    : estado === 'RECHAZADA' || estado === 'ERROR'
+      ? 'border-red-200 bg-red-50 text-red-700'
+      : estado === 'CANCELADA'
+        ? 'border-slate-200 bg-slate-100 text-slate-600'
+        : estado === 'COMPLETADA'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          : 'border-amber-200 bg-amber-50 text-amber-800'
+);
+
 const mostrar = (valor: unknown) => {
   if (valor === undefined || valor === null || String(valor).trim() === '') return '-';
   return String(valor);
 };
 
-export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCreada }: Props) {
+export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCreada, solicitudId }: Props) {
   const [contexto, setContexto] = useState<ContextoSolicitudOperacion | null>(null);
+  const [solicitud, setSolicitud] = useState<SolicitudOperacion | null>(null);
   const [motivo, setMotivo] = useState('');
   const [idempotencia, setIdempotencia] = useState(crearIdempotencia);
   const [cargando, setCargando] = useState(false);
@@ -38,9 +54,30 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
   const [resultado, setResultado] = useState<SolicitudOperacion | null>(null);
 
   useEffect(() => {
-    if (!abierto || !certificadoId) return;
-    setContexto(null);
-    setMotivo('');
+    if (!abierto) {
+      setContexto(null);
+      setSolicitud(null);
+      setMotivo('');
+      setResultado(null);
+      setError('');
+      setIdempotencia(crearIdempotencia());
+      setCargando(false);
+      return;
+    }
+    if (solicitudId) {
+      setContexto(null);
+      setSolicitud(null);
+      setResultado(null);
+      setError('');
+      setCargando(true);
+      faregasSolicitudesOperacionApi.obtener(solicitudId)
+        .then(setSolicitud)
+        .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar la solicitud.'))
+        .finally(() => setCargando(false));
+      return;
+    }
+    if (!certificadoId) return;
+    setSolicitud(null);
     setResultado(null);
     setError('');
     setIdempotencia(crearIdempotencia());
@@ -49,7 +86,7 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
       .then(setContexto)
       .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el certificado.'))
       .finally(() => setCargando(false));
-  }, [abierto, certificadoId]);
+  }, [abierto, certificadoId, solicitudId]);
 
   if (!abierto) return null;
 
@@ -81,7 +118,7 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
       <div className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div className="sticky top-0 z-10 flex items-start justify-between bg-[#052A79] px-5 py-4 text-white">
           <div>
-            <h2 id="solicitud-anulacion-total-titulo" className="text-lg font-bold">Solicitar anulación total</h2>
+            <h2 id="solicitud-anulacion-total-titulo" className="text-lg font-bold">{solicitud ? 'Detalle de la solicitud de anulación' : 'Solicitar anulación total'}</h2>
             <p className="text-xs text-blue-100">Requiere revisión y autorización de un usuario SISTEMAS distinto del solicitante.</p>
           </div>
           <button type="button" onClick={onCerrar} className="rounded p-1 hover:bg-white/10" aria-label="Cerrar"><X size={20} /></button>
@@ -99,7 +136,33 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
             </div>
           )}
 
-          {!cargando && contexto && !resultado && (
+          {!cargando && solicitud && !resultado && (
+            <div className="space-y-4">
+              <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm md:grid-cols-2">
+                <div><span className="block text-xs font-semibold text-slate-500">SOLICITANTE</span><strong>{solicitud.usuarioSolicitante}</strong></div>
+                <div><span className="block text-xs font-semibold text-slate-500">SEDE</span>{solicitud.plantaNombre || solicitud.plantaKey}</div>
+                <div><span className="block text-xs font-semibold text-slate-500">CERTIFICADO</span>{solicitud.numeroCertificado || '-'}</div>
+                <div><span className="block text-xs font-semibold text-slate-500">COMPROBANTE</span>{solicitud.nroComprobante || 'No aplica'}</div>
+                <div><span className="block text-xs font-semibold text-slate-500">OPERACIÓN</span>{etiquetaTipoSolicitud(solicitud.tipoOperacion)}</div>
+                <div><span className="block text-xs font-semibold text-slate-500">FECHA SOLICITUD</span>{new Date(solicitud.fechaSolicitud).toLocaleString('es-PE')}</div>
+                <div><span className="block text-xs font-semibold text-slate-500">ESTADO</span><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${claseEstadoSolicitudDetalle(solicitud.estado)}`}>{etiquetaEstadoSolicitud(solicitud.estado)}</span></div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                <h4 className="text-xs font-bold text-slate-500">MOTIVO</h4>
+                <p className="mt-1 text-sm text-slate-800">{solicitud.motivo}</p>
+                {solicitud.justificacionDecision && (
+                  <p className="mt-2 text-sm text-slate-600">Decisión de {solicitud.usuarioDecision}: {solicitud.justificacionDecision}</p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <button type="button" onClick={onCerrar} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cerrar</button>
+              </div>
+            </div>
+          )}
+
+          {!cargando && contexto && !resultado && !solicitud && (
             <>
               <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm md:grid-cols-2">
                 <div><span className="block text-xs font-semibold text-slate-500">NÚMERO DG</span><strong>{mostrar(contexto.certificado.numero)}</strong></div>

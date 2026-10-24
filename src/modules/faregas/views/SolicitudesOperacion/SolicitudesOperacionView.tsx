@@ -122,7 +122,7 @@ function DetalleSolicitud({
           {solicitud.diferencias && solicitud.diferencias.length > 0 && (
             <div className="rounded-xl border border-indigo-200 bg-white p-4">
               <h4 className="text-xs font-bold uppercase text-indigo-900 mb-2">
-                Diferencias autorizadas para rectificación (Antes y Después)
+                Diferencias registradas (Histórico)
               </h4>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -149,7 +149,7 @@ function DetalleSolicitud({
           <div className="grid gap-3 lg:grid-cols-3">
             <JsonResumen titulo="Datos originales del certificado" data={solicitud.datosOriginalesCertificado} />
             <JsonResumen titulo="Datos originales del comprobante" data={solicitud.datosOriginalesComprobante} />
-            <JsonResumen titulo="Datos propuestos" data={solicitud.datosPropuestos} />
+            {solicitud.datosPropuestos && <JsonResumen titulo="Datos propuestos (Histórico)" data={solicitud.datosPropuestos} />}
           </div>
           {solicitud.justificacionDecision && <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm"><strong>Decisión de {solicitud.usuarioDecision}:</strong> {solicitud.justificacionDecision}</div>}
 
@@ -206,7 +206,7 @@ export function SolicitudesOperacionView() {
   useEffect(() => { void cargar(1); }, [plantaKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const estados = useMemo<EstadoSolicitudOperacion[]>(() => ['PENDIENTE_APROBACION', 'APROBADA', 'RECHAZADA', 'CANCELADA', 'EN_EJECUCION', 'COMPLETADA', 'ERROR', 'REQUIERE_INTERVENCION'], []);
-  const tipos = useMemo<TipoSolicitudOperacion[]>(() => ['ANULAR_CERTIFICADO', 'ANULAR_COMPROBANTE', 'ANULAR_AMBOS', 'RECTIFICAR_CERTIFICADO', 'RECTIFICAR_COMPROBANTE', 'RECTIFICAR_AMBOS'], []);
+  const tipos = useMemo<TipoSolicitudOperacion[]>(() => ['ANULAR_AMBOS', 'ANULAR_CERTIFICADO', 'ANULAR_COMPROBANTE'], []);
 
   if (!puedeVer) return <div className="m-6 rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">No tiene permiso para consultar solicitudes administrativas.</div>;
 
@@ -214,7 +214,7 @@ export function SolicitudesOperacionView() {
     <div className="min-h-full bg-slate-50 p-4 md:p-6">
       <div className="mx-auto max-w-[1500px] space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><Link to="/faregas/auditoria" className="mb-2 inline-flex items-center gap-1 text-sm font-semibold text-blue-800"><ArrowLeft size={16} /> Auditoría</Link><h1 className="text-2xl font-bold text-slate-900">Solicitudes de Anulación</h1><p className="text-sm text-slate-500">Aprobación administrativa de anulaciones totales; no ejecuta operaciones técnicas ni fiscales.</p></div>
+          <div><Link to="/faregas" className="mb-2 inline-flex items-center gap-1 text-sm font-semibold text-blue-800"><ArrowLeft size={16} /> Volver a Inicio</Link><h1 className="text-2xl font-bold text-slate-900">Solicitudes de anulación</h1><p className="text-sm text-slate-500">Aprobación administrativa de anulaciones totales; no ejecuta operaciones técnicas ni fiscales.</p></div>
           <button type="button" onClick={() => void cargar()} className="flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold"><RefreshCw size={16} /> Actualizar</button>
         </div>
 

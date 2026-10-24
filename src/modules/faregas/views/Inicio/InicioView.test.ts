@@ -5,6 +5,11 @@ import {
   tieneCertificadoDefinitivo,
   certificadoEmitidoVisible,
   puedeCrearSolicitudAnulacion,
+  esSolicitudActivaAnulacion,
+  esSolicitudCompletadaAnulacion,
+  etiquetaSolicitudAnulacion,
+  puedeSolicitarAnulacionCertificado,
+  puedeCrearNotaCreditoPanel,
   type BorradorPanel,
 } from './InicioView';
 
@@ -134,5 +139,50 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     expect(usuariosCode).toContain("const PERMISO_INICIO = 'MENU_INICIO'");
     expect(usuariosCode).toContain('SUBMODULOS_INICIO');
     expect(usuariosCode).not.toContain('Autorizaciones sensibles');
+  });
+
+  it('11. Bloque A: estados de solicitud administrativa y etiquetas del panel', () => {
+    expect(esSolicitudActivaAnulacion('PENDIENTE_APROBACION')).toBe(true);
+    expect(esSolicitudActivaAnulacion('APROBADA')).toBe(true);
+    expect(esSolicitudActivaAnulacion('EN_EJECUCION')).toBe(true);
+    expect(esSolicitudActivaAnulacion('REQUIERE_INTERVENCION')).toBe(true);
+    expect(esSolicitudActivaAnulacion('COMPLETADA')).toBe(false);
+    expect(esSolicitudActivaAnulacion('RECHAZADA')).toBe(false);
+    expect(esSolicitudActivaAnulacion(null)).toBe(false);
+    expect(esSolicitudCompletadaAnulacion('COMPLETADA')).toBe(true);
+    expect(esSolicitudCompletadaAnulacion('PENDIENTE_APROBACION')).toBe(false);
+
+    expect(etiquetaSolicitudAnulacion('PENDIENTE_APROBACION')).toBe('Pendiente de aprobación');
+    expect(etiquetaSolicitudAnulacion('APROBADA')).toBe('Anulación autorizada');
+    expect(etiquetaSolicitudAnulacion('EN_EJECUCION')).toBe('Procesando anulación');
+    expect(etiquetaSolicitudAnulacion('REQUIERE_INTERVENCION')).toBe('Requiere intervención');
+    expect(etiquetaSolicitudAnulacion('COMPLETADA')).toBe('Anulado');
+  });
+
+  it('12. Bloque A: el botón de anulación solo aparece sin solicitud activa ni completada', () => {
+    const permisos = ['FAREGAS_SOLICITUD_CREAR'];
+
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001' } as BorradorPanel, permisos)).toBe(true);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'PENDIENTE_APROBACION' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'APROBADA' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'EN_EJECUCION' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'REQUIERE_INTERVENCION' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'COMPLETADA' } as BorradorPanel, permisos)).toBe(false);
+    // Una solicitud rechazada o cancelada permite reabrir la solicitud nueva.
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'RECHAZADA' } as BorradorPanel, permisos)).toBe(true);
+  });
+
+  it('13. Bloque A: notas de crédito congeladas durante una solicitud activa o completada', () => {
+    const permisos = ['FAREGAS_NOTA_CREDITO'];
+
+    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true } as BorradorPanel, permisos)).toBe(true);
+    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, solicitudOperacionEstado: 'PENDIENTE_APROBACION' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, solicitudOperacionEstado: 'COMPLETADA' } as BorradorPanel, permisos)).toBe(false);
+  });
+
+  it('14. Bloque A: el indicador abre la solicitud existente y no el formulario de creación', () => {
+    const modalCode = fs.readFileSync(path.resolve(__dirname, 'SolicitudOperacionModal.tsx'), 'utf8');
+    expect(modalCode).toContain('faregasSolicitudesOperacionApi.obtener(solicitudId)');
+    expect(modalCode).toContain('Detalle de la solicitud de anulación');
   });
 });
