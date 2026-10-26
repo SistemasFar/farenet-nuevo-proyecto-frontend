@@ -85,6 +85,10 @@ export interface SolicitudOperacion {
   fechaEmisionOriginal: string | null;
   resultadoTecnico: Record<string, unknown> | null;
   resultadoFiscal: Record<string, unknown> | null;
+  usuarioEjecucion?: string | null;
+  fechaEjecucion?: string | null;
+  autorizacionAutoejecucion?: boolean;
+  detalle?: DetalleSolicitudOperacion;
   version: number;
   numeroCertificado: string | null;
   tipoCertificado: string | null;
@@ -96,6 +100,89 @@ export interface SolicitudOperacion {
     valorPropuesto: unknown;
   }> | null;
   numeroVersion?: number;
+}
+
+export type ResultadoResolucionFiscal =
+  | 'BAJA_ELEGIBLE'
+  | 'NOTA_CREDITO_ELEGIBLE'
+  | 'PENDIENTE_VERIFICACION'
+  | 'NO_ELEGIBLE'
+  | 'YA_ANULADO';
+
+export interface ResolucionFiscalSolicitud {
+  resultado: ResultadoResolucionFiscal;
+  operacion: 'COMUNICACION_BAJA' | 'NOTA_CREDITO' | 'CONSULTAR' | 'NINGUNA';
+  motivo: string;
+  tipoComprobante: string | null;
+  tipoComprobanteApi: number | null;
+  requiereIntervencion: boolean;
+  resuelto: boolean;
+  siguientePaso?: string | null;
+  reintentarMismoRegistro?: boolean;
+  plazo: {
+    dias: number;
+    fechaBase: string | null;
+    venceEn: string | null;
+    vencido: boolean | null;
+    fuente: string | null;
+  } | null;
+  evidencia: Record<string, unknown>;
+}
+
+export interface EstadoFiscalActualSolicitud {
+  facturacionId: number;
+  comprobante: string | null;
+  tipoComprobante: string | null;
+  estado: string;
+  aceptadaSunat: boolean | null;
+  sunatDescripcion: string | null;
+  fechaEmision: string | null;
+  fechaAceptacion: string | null;
+  enlacePdf: string | null;
+  enlaceCdr: string | null;
+  entorno: string | null;
+  pendienteSunat: boolean;
+  anulaciones: Array<{
+    id: number;
+    tipo: string;
+    estado: string;
+    aceptadaSunat: boolean | null;
+    ticketSunat: string | null;
+    fechaCreacion: string | null;
+  }>;
+  notasCredito: Array<{
+    id: number;
+    tipo: string;
+    estado: string;
+    nroComprobante: string | null;
+    motivoCodigo: string | null;
+    importeTotal: number | null;
+    fechaCreacion: string | null;
+  }>;
+}
+
+export interface DetalleSolicitudOperacion {
+  estadoAdministrativo: EstadoSolicitudOperacion;
+  estadoFiscalActual: EstadoFiscalActualSolicitud | null;
+  resolucionFiscal: ResolucionFiscalSolicitud | null;
+  estadoTecnico: Record<string, unknown> | null;
+  ejecucion: {
+    puedeEjecutar: boolean;
+    esAutoejecucion: boolean;
+    permisosFaltantes: string[];
+    autoejecucionAutorizada: boolean;
+    motivoBloqueo: string | null;
+    requiereSincronizacionFiscal: boolean;
+  };
+}
+
+export interface ResultadoEjecucionAnulacionTotal {
+  data: SolicitudOperacion;
+  resultadoFiscal: Record<string, unknown> | null;
+  resultadoTecnico: Record<string, unknown> | null;
+  completada: boolean;
+  requiereIntervencion: boolean;
+  yaCompletada: boolean;
 }
 
 export interface EventoSolicitudOperacion {
@@ -188,6 +275,18 @@ export const faregasSolicitudesOperacionApi = {
     const respuesta = await faregasFetch(`/solicitudes-operacion/${id}/eventos`);
     return respuesta.data;
   },
+  ejecutarAnulacionTotal: async (
+    id: number,
+    payload: {
+      version: number;
+      justificacion?: string;
+      confirmarAutoejecucion?: boolean;
+      idempotenciaClave?: string;
+    },
+  ): Promise<ResultadoEjecucionAnulacionTotal> => faregasFetch(
+    `/solicitudes-operacion/${id}/ejecutar-anulacion-total`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  ),
 };
 
 export const etiquetaEstadoSolicitud = (estado: EstadoSolicitudOperacion) => ({
@@ -209,3 +308,42 @@ export const etiquetaTipoSolicitud = (tipo: TipoSolicitudOperacion) => ({
   RECTIFICAR_COMPROBANTE: 'Rectificar comprobante',
   RECTIFICAR_AMBOS: 'Rectificar certificado y comprobante',
 }[tipo] || tipo);
+
+export const etiquetaEstadoFiscal = (estado: string | null | undefined) => ({
+  ACEPTADO: 'Aceptado por SUNAT',
+  PENDIENTE: 'Pendiente de envío',
+  PENDIENTE_SUNAT: 'Pendiente de SUNAT',
+  EN_TRAMITE: 'En trámite',
+  RECHAZADO: 'Rechazado por SUNAT',
+  ANULADO: 'Anulado',
+  BORRADOR: 'Borrador (sin emisión)',
+  ERROR: 'Error',
+  ERROR_DEFINITIVO: 'Error definitivo',
+  NO_REQUERIDA: 'No requerida',
+  REGULARIZACION_INTERNA: 'Regularización interna',
+  REQUIERE_INTERVENCION: 'Requiere intervención',
+  ERROR_OPERACION_FISCAL_PREVIA: 'Operación fiscal previa con error',
+}[String(estado || '').trim().toUpperCase()] || String(estado || 'Sin información'));
+
+export const etiquetaEstadoTecnico = (estado: string | null | undefined) => ({
+  BLOQUEADO_NORMATIVA: 'Bloqueado por normativa',
+  BLOQUEADO_POR_FISCAL: 'Bloqueado hasta resolver lo fiscal',
+  ANULADO: 'Anulado técnicamente',
+  PENDIENTE: 'Pendiente',
+  RESUELTO: 'Resuelto',
+}[String(estado || '').trim().toUpperCase()] || String(estado || 'Sin información'));
+
+export const etiquetaResultadoFiscal = (resultado: string | null | undefined) => ({
+  BAJA_ELEGIBLE: 'Comunicación de baja elegible',
+  NOTA_CREDITO_ELEGIBLE: 'Nota de crédito total elegible',
+  PENDIENTE_VERIFICACION: 'Pendiente de verificación fiscal',
+  NO_ELEGIBLE: 'No elegible',
+  YA_ANULADO: 'Ya anulado',
+}[String(resultado || '').trim().toUpperCase()] || 'Sin resolución fiscal');
+
+export const etiquetaOperacionFiscal = (operacion: string | null | undefined) => ({
+  COMUNICACION_BAJA: 'Comunicación de baja',
+  NOTA_CREDITO: 'Nota de crédito total',
+  CONSULTAR: 'Consultar estado fiscal',
+  NINGUNA: 'Ninguna operación automática',
+}[String(operacion || '').trim().toUpperCase()] || String(operacion || 'Sin operación'));

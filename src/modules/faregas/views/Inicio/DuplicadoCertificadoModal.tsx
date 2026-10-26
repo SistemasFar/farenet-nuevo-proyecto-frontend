@@ -6,7 +6,6 @@ import { faregasPagosApi } from '../../services/faregas-pagos.api';
 import {
   faregasDuplicadosApi,
   type CandidatoDuplicado,
-  type ProcesarDuplicadoRequest,
   type SolicitudDuplicado,
   type TipoDuplicado,
 } from '../../services/faregas-duplicados.api';
@@ -167,19 +166,20 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
     return true;
   }, [solicitud, documento, nombre, direccion, tipoDocumento, tipoComprobante, pagoYaRegistrado, pagoCompleto]);
 
-  const buscar = async () => {
+  const buscar = async (opciones: { conservarError?: boolean } = {}) => {
     const placaNormalizada = placa.toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (placaNormalizada.length < 5) {
-      setError('Ingrese una placa válida.');
+      if (!opciones.conservarError) setError('Ingrese una placa válida.');
       return;
     }
     setBuscando(true);
-    setError('');
+    if (!opciones.conservarError) setError('');
     setResultados([]);
     try {
-      setResultados(await faregasDuplicadosApi.buscar(placaNormalizada, tipo));
+      const candidatos = await faregasDuplicadosApi.buscar(placaNormalizada, tipo);
+      setResultados(candidatos.filter((item) => item.duplicable));
     } catch (err) {
-      setError(mensajeError(err));
+      if (!opciones.conservarError) setError(mensajeError(err));
     } finally {
       setBuscando(false);
     }
@@ -264,7 +264,11 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
         setMontoPago('50.00');
       }
     } catch (err) {
+      const codigo = (err as { codigo?: string }).codigo;
       setError(mensajeError(err));
+      if (codigo === 'CERTIFICADO_NO_DISPONIBLE_PARA_DUPLICADO') {
+        await buscar({ conservarError: true });
+      }
     } finally {
       setProcesando(false);
     }
@@ -462,7 +466,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
             <Copy className="h-6 w-6" />
             <div>
               <h2 className="text-lg font-black">Duplicado de certificado</h2>
-              <p className="text-xs text-blue-100">Mismo certificado emitido, con marca DUPLICADO · S/ 50.00</p>
+              <p className="text-xs text-blue-100">Duplicado del mismo certificado emitido · S/ 50.00</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-2 hover:bg-white/10" aria-label="Cerrar"><X /></button>
@@ -515,9 +519,11 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                       )}
                       {!item.duplicable && <p className="mt-1 text-xs font-bold text-red-600">{item.motivoNoDisponible}</p>}
                     </div>
-                    <button type="button" disabled={!item.duplicable || procesando} onClick={() => void iniciarSolicitud(item)} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-black text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40">
-                      {Number(item.duplicadosEmitidosCount || 0) > 0 ? 'Solicitar nuevo duplicado' : 'Solicitar duplicado'}
-                    </button>
+                    {item.duplicable && (
+                      <button type="button" disabled={procesando} onClick={() => void iniciarSolicitud(item)} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-black text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40">
+                        {Number(item.duplicadosEmitidosCount || 0) > 0 ? 'Solicitar nuevo duplicado' : 'Solicitar duplicado'}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -882,14 +888,14 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                 </>
               )}
 
-              {solicitud.estado === 'DISPONIBLE' && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="font-black text-emerald-800">Duplicado disponible</p><p className="text-sm text-emerald-700">El PDF conserva el certificado original y agrega únicamente la marca de fondo “DUPLICADO”.</p></div>}
+              {solicitud.estado === 'DISPONIBLE' && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="font-black text-emerald-800">Duplicado disponible</p><p className="text-sm text-emerald-700">El PDF conserva exactamente el certificado original, sin marcas de agua.</p></div>}
 
               {solicitud.estado === 'DISPONIBLE' && (
                 <section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
                     <div>
                       <h3 className="font-black text-slate-800">Vista previa del duplicado</h3>
-                      <p className="text-xs text-slate-500">Revise el documento con la marca DUPLICADO antes de imprimirlo.</p>
+                      <p className="text-xs text-slate-500">Revise el documento antes de imprimirlo.</p>
                     </div>
                     <button type="button" onClick={() => void imprimirDuplicado()} disabled={!vistaHtml || cargandoVista} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#052a79] px-4 py-2 text-sm font-black text-white disabled:opacity-40">
                       <Printer className="h-4 w-4" /> Imprimir duplicado

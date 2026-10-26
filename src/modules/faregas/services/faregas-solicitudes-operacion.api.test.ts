@@ -1,6 +1,7 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   faregasSolicitudesOperacionApi,
+  etiquetaEstadoFiscal,
   etiquetaEstadoSolicitud,
   etiquetaTipoSolicitud,
 } from './faregas-solicitudes-operacion.api';
@@ -104,6 +105,39 @@ describe('faregas-solicitudes-operacion.api', () => {
   it('formatea etiquetas de rectificacion de certificado', () => {
     expect(etiquetaTipoSolicitud('RECTIFICAR_CERTIFICADO')).toBe('Rectificar certificado');
     expect(etiquetaTipoSolicitud('RECTIFICAR_COMPROBANTE')).toBe('Rectificar comprobante');
+  });
+
+  it('ejecuta la anulación total enviando la confirmación de autoejecución', async () => {
+    const spy = vi.spyOn(httpClient, 'faregasFetch').mockResolvedValue({
+      data: { id: 8, estado: 'REQUIERE_INTERVENCION' },
+      resultadoFiscal: { estado: 'ACEPTADO' },
+      resultadoTecnico: { estado: 'BLOQUEADO_NORMATIVA' },
+      completada: false,
+      requiereIntervencion: true,
+      yaCompletada: false,
+    });
+    const res = await faregasSolicitudesOperacionApi.ejecutarAnulacionTotal(8, {
+      version: 3,
+      justificacion: 'Autoejecución excepcional autorizada',
+      confirmarAutoejecucion: true,
+    });
+    expect(spy).toHaveBeenCalledWith('/solicitudes-operacion/8/ejecutar-anulacion-total', {
+      method: 'POST',
+      body: JSON.stringify({
+        version: 3,
+        justificacion: 'Autoejecución excepcional autorizada',
+        confirmarAutoejecucion: true,
+      }),
+    });
+    expect(res.requiereIntervencion).toBe(true);
+    expect(res.resultadoFiscal).toEqual({ estado: 'ACEPTADO' });
+  });
+
+  it('formatea el estado fiscal sin confundir una solicitud aprobada con una anulada', () => {
+    expect(etiquetaEstadoFiscal('PENDIENTE_SUNAT')).toBe('Pendiente de SUNAT');
+    expect(etiquetaEstadoFiscal('ACEPTADO')).toBe('Aceptado por SUNAT');
+    expect(etiquetaEstadoFiscal('ANULADO')).toBe('Anulado');
+    expect(etiquetaEstadoFiscal(null)).toBe('Sin información');
   });
 
   it('formatea etiquetas de estado y tipo de solicitud', () => {

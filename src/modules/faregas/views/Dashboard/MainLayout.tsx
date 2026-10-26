@@ -80,7 +80,7 @@ export function MainLayout({
 
   const isCertificadoWizard =
     path.startsWith('/faregas/nuevo-certificado') ||
-    /^\/faregas\/certificados\/[^/]+\/continuar\/?$/.test(path);
+    /^\/faregas\/certificados\/[^/]+\/(continuar|rectificar)\/?$/.test(path);
 
   if (isCertificadoWizard) activeMenu = 'nuevo_certificado';
 

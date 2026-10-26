@@ -22,6 +22,7 @@ export interface CandidatoDuplicado {
   fechaLimiteDuplicado: string;
   vigente: boolean;
   anulacionAceptada: boolean;
+  anulacionAdministrativaActiva?: boolean;
   duplicable: boolean;
   duplicadosEmitidosCount?: number;
   motivoNoDisponible: string | null;

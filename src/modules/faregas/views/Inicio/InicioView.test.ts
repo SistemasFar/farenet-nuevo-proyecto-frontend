@@ -153,7 +153,7 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     expect(esSolicitudCompletadaAnulacion('PENDIENTE_APROBACION')).toBe(false);
 
     expect(etiquetaSolicitudAnulacion('PENDIENTE_APROBACION')).toBe('Pendiente de aprobación');
-    expect(etiquetaSolicitudAnulacion('APROBADA')).toBe('Anulación autorizada');
+    expect(etiquetaSolicitudAnulacion('APROBADA')).toBe('Aprobada — pendiente de ejecución');
     expect(etiquetaSolicitudAnulacion('EN_EJECUCION')).toBe('Procesando anulación');
     expect(etiquetaSolicitudAnulacion('REQUIERE_INTERVENCION')).toBe('Requiere intervención');
     expect(etiquetaSolicitudAnulacion('COMPLETADA')).toBe('Anulado');
@@ -186,5 +186,14 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     const modalCode = fs.readFileSync(path.resolve(__dirname, 'SolicitudOperacionModal.tsx'), 'utf8');
     expect(modalCode).toContain('faregasSolicitudesOperacionApi.obtener(solicitudId)');
     expect(modalCode).toContain('Detalle de la solicitud de anulación');
+  });
+
+  it('15. El detalle del Panel permite ejecutar/autoejecutar y advierte el estado PENDIENTE_SUNAT', () => {
+    const modalCode = fs.readFileSync(path.resolve(__dirname, 'SolicitudOperacionModal.tsx'), 'utf8');
+    expect(modalCode).toContain('ejecutarAnulacionTotal');
+    expect(modalCode).toContain('Autoejecutar (excepcional)');
+    expect(modalCode).toContain('sincronizarEstadoFiscal');
+    expect(modalCode).toContain('PENDIENTE_SUNAT');
+    expect(modalCode).toContain('aún no se ejecutó');
   });
 });

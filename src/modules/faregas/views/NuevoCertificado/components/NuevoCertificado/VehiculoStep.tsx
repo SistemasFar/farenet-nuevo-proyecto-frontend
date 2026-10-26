@@ -55,6 +55,8 @@ interface VehiculoStepProps {
   servicioNombre?: string;
   numeroCertificadoOficial?: string | null;
   formVehiculo: any;
+  /** Placa de Datos Iniciales; es la fuente única mostrada en el certificado. */
+  placaRodaje?: string;
   setFormVehiculo: (data: any) => void;
   formPropietario: any;
   setFormPropietario: (data: any) => void;
@@ -88,6 +90,7 @@ export function VehiculoStep({
   servicioNombre,
   numeroCertificadoOficial = null,
   formVehiculo,
+  placaRodaje,
   setFormVehiculo,
   formPropietario: _formPropietario,
   setFormPropietario: _setFormPropietario,
@@ -580,6 +583,7 @@ export function VehiculoStep({
         <CamposVehiculoCertificado
           campos={camposVehiculoCertificado}
           formVehiculo={formVehiculo}
+          placaRodaje={placaRodaje}
           onChange={handleVehiculo}
           categoriaVehicular={categoriaVehicular}
           categoriasVehiculares={categoriasVehiculares}

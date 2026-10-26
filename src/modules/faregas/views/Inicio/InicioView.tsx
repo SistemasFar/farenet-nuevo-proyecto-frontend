@@ -200,7 +200,7 @@ export const esSolicitudCompletadaAnulacion = (estado?: string | null): boolean 
 export const etiquetaSolicitudAnulacion = (estado?: string | null): string => {
   switch (String(estado || '').trim().toUpperCase()) {
     case 'PENDIENTE_APROBACION': return 'Pendiente de aprobación';
-    case 'APROBADA': return 'Anulación autorizada';
+    case 'APROBADA': return 'Aprobada — pendiente de ejecución';
     case 'EN_EJECUCION': return 'Procesando anulación';
     case 'REQUIERE_INTERVENCION': return 'Requiere intervención';
     case 'COMPLETADA': return 'Anulado';

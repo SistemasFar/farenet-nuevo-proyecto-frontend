@@ -612,6 +612,7 @@ export default function App() {
               />
               <Route path="certificados/nuevo" element={<FaregasNuevoCertificadoView />} />
               <Route path="certificados/:id/continuar" element={<FaregasNuevoCertificadoView />} />
+              <Route path="certificados/:id/rectificar" element={<FaregasNuevoCertificadoView />} />
               <Route
                 path="usuarios"
                 element={

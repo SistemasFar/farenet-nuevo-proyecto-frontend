@@ -8,7 +8,7 @@ import { faregasClientesApi } from '../../services/faregas-clientes.api';
 import { faregasPagosApi } from '../../services/faregas-pagos.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
-import { CheckCircle2, FileText, CreditCard, ArrowLeft, Search, Loader2, Save, Eye } from 'lucide-react';
+import { CheckCircle2, FileText, CreditCard, ArrowLeft, Search, Loader2, Save, Eye, PencilLine, History, Send } from 'lucide-react';
 import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
@@ -18,6 +18,14 @@ import type { FormularioFormatoDinamicoFaregas, ResumenComercialFaregas } from '
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
 import { FacturacionEmisionStep } from './components/NuevoCertificado/FacturacionEmisionStep';
 import { PrevisualizacionCertificadoStep } from './components/NuevoCertificado/PrevisualizacionCertificadoStep';
+import { RectificacionConfirmacionStep } from './components/NuevoCertificado/RectificacionConfirmacionStep';
+import { construirPropuestaRectificacion } from './rectificacion-propuesta';
+import { obtenerPasoWizard, validarCargaRectificacion } from './rectificacion-inicializacion';
+import {
+  faregasRectificacionesApi,
+  type ContextoRectificacion,
+  type PrevisualizacionRectificacion
+} from '../../services/faregas-rectificaciones.api';
 import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
@@ -25,7 +33,7 @@ import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { resolverCuotasCredito, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { useErroresPaso, PanelResumenErroresWizard, estructurarErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
-import { indicePasoVisual as indicePaso, puedeRetrocederWizard } from './faregas-emision';
+import { indicePasoVisual, puedeRetrocederWizard } from './faregas-emision';
 import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './faregas-formulario-operativo';
 import { descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { normalizarCombustibleGnvAnual } from './faregas-certificado-campos';
@@ -98,6 +106,7 @@ export interface FormVerificacionState {
 }
 
 const textValue = (value: unknown) => value === null || value === undefined ? '' : String(value);
+const normalizarPlacaWizard = (value: unknown) => textValue(value).trim().toUpperCase();
 const fechaLocalIso = (fecha = new Date()) => {
   const anio = fecha.getFullYear();
   const mes = String(fecha.getMonth() + 1).padStart(2, '0');
@@ -108,7 +117,7 @@ const enteroValue = (value: unknown, maximoDigitos: number) =>
   normalizarEnteroCertificado(textValue(value), maximoDigitos);
 
 const mapVehiculoBorrador = (vehiculo: any): Partial<FormVehiculoState> => ({
-  placaNueva: textValue(vehiculo.placa),
+  placaNueva: normalizarPlacaWizard(vehiculo.placa),
   clase: textValue(vehiculo.clase),
   marca: textValue(vehiculo.marca),
   modelo: textValue(vehiculo.modelo),
@@ -169,6 +178,11 @@ const mapVerificacionBorrador = (verificacion: any) => ({
 });
 
 export function NuevoCertificadoView() {
+  const location = useLocation();
+  return <NuevoCertificadoWizard key={location.pathname} />;
+}
+
+function NuevoCertificadoWizard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { plantaKey: plantaSeleccionada, plantaNombre } = useOutletContext<MainLayoutContext>();
@@ -185,7 +199,23 @@ export function NuevoCertificadoView() {
   const [minimumEditableStepIndex, setMinimumEditableStepIndex] = useState(0);
   const [certificadoEstado, setCertificadoEstado] = useState(id ? 'CARGANDO' : 'BORRADOR');
   const [numeroCertificadoOficial, setNumeroCertificadoOficial] = useState<string | null>(null);
-  const soloLectura = new URLSearchParams(location.search).get('vista') === 'consulta' || certificadoEstado !== 'BORRADOR';
+  const modoRectificacion = /\/rectificar\/?$/.test(location.pathname);
+  const indicePaso = React.useCallback((paso?: string) => {
+    if (!modoRectificacion) return indicePasoVisual(paso);
+    const pasoNormalizado = String(paso || '').trim().toUpperCase();
+    if (pasoNormalizado === 'DATOS_INICIALES') return 0;
+    if (pasoNormalizado === 'VEHICULO') return 1;
+    if (pasoNormalizado === 'PREVISUALIZACION') return 2;
+    return 3;
+  }, [modoRectificacion]);
+  const soloLectura = !modoRectificacion
+    && (new URLSearchParams(location.search).get('vista') === 'consulta' || certificadoEstado !== 'BORRADOR');
+  const [contextoRectificacion, setContextoRectificacion] = useState<ContextoRectificacion | null>(null);
+  const [previewRectificacion, setPreviewRectificacion] = useState<PrevisualizacionRectificacion | null>(null);
+  const [motivoRectificacion, setMotivoRectificacion] = useState('');
+  const [observacionesRectificacion, setObservacionesRectificacion] = useState('');
+  const [enviandoRectificacion, setEnviandoRectificacion] = useState(false);
+  const idempotenciaRectificacionRef = React.useRef<string | null>(null);
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState('');
@@ -193,6 +223,9 @@ export function NuevoCertificadoView() {
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
   const [maestrosVehiculo, setMaestrosVehiculo] = useState<MaestrosVehiculoResponse['data'] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingRegistro, setLoadingRegistro] = useState(Boolean(id));
+  const [loadingContextoRectificacion, setLoadingContextoRectificacion] = useState(modoRectificacion && Boolean(id));
+  const [errorContextoRectificacion, setErrorContextoRectificacion] = useState('');
   const [error, setError] = useState('');
 
   const [isConsultado, setIsConsultado] = useState(false);
@@ -249,6 +282,9 @@ export function NuevoCertificadoView() {
     tipoAutorizacion: '',
     tarifaCodigo: ''
   });
+  // La placa de Datos Iniciales es la fuente única del wizard. Este ref
+  // permite descartar respuestas asíncronas que llegan después de un cambio.
+  const placaActualRef = React.useRef(normalizarPlacaWizard(formCaja.placa));
 
   // Pago State
   const [maestrosPago, setMaestrosPago] = useState<MaestrosPagoResponse['data'] | null>(null);
@@ -422,6 +458,14 @@ export function NuevoCertificadoView() {
   }, [plantaSeleccionada]);
 
   const STEPS = React.useMemo(() => {
+    if (modoRectificacion) {
+      return [
+        { id: 'datos_iniciales', label: 'Certificado Original', icon: FileText },
+        { id: 'vehiculo', label: formCaja.tipo_flujo === 'TALLER_INSPECCION' ? 'Datos a Rectificar' : 'Vehículo y Datos Técnicos', icon: PencilLine },
+        { id: 'previsualizacion', label: 'Previsualización Corregida', icon: Eye },
+        { id: 'rectificacion', label: 'Confirmar Rectificación', icon: CheckCircle2 }
+      ];
+    }
     return [
       { id: 'datos_iniciales', label: 'Datos Iniciales', icon: FileText },
       { id: 'vehiculo', label: formCaja.tipo_flujo === 'TALLER_INSPECCION' ? 'Datos del Taller' : 'Vehículo y Datos Técnicos', icon: Search },
@@ -429,7 +473,19 @@ export function NuevoCertificadoView() {
       { id: 'pago', label: 'Pago', icon: CreditCard },
       { id: 'facturacion', label: 'Facturación y Emisión', icon: CheckCircle2 }
     ];
-  }, [formCaja.tipo_flujo]);
+  }, [formCaja.tipo_flujo, modoRectificacion]);
+  const pasoActual = obtenerPasoWizard(STEPS, currentStepIndex);
+
+  useEffect(() => {
+    if (pasoActual) return;
+    // Al cambiar desde la consulta emitida (paso 4) a rectificación (pasos
+    // 0-3), React puede conservar el estado de la instancia durante un render.
+    // Restablecer el índice evita que un paso del flujo anterior gobierne el
+    // nuevo wizard mientras se recupera el certificado original.
+    setCurrentStepIndex(0);
+    setFurthestStepIndex(0);
+    setMinimumEditableStepIndex(0);
+  }, [modoRectificacion, pasoActual]);
 
   const persistirPaso = async (idBorrador: number, paso: PasoBorradorFaregas) => {
     await faregasCertificadosApi.actualizarPasoBorrador(idBorrador, paso);
@@ -503,14 +559,30 @@ export function NuevoCertificadoView() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentStepIndex]);
 
-
+  // Mantiene el espejo técnico de la placa alineado con Datos Iniciales.
+  // El paso 2 lee `placaRodaje` directamente, pero este espejo sigue siendo
+  // necesario para guardados y compatibilidad con borradores anteriores.
+  useEffect(() => {
+    const placa = normalizarPlacaWizard(formCaja.placa);
+    placaActualRef.current = placa;
+    setFormVehiculo((prev) => prev.placaNueva === placa ? prev : { ...prev, placaNueva: placa });
+  }, [formCaja.placa]);
 
   useEffect(() => {
     const cargarBorrador = async () => {
       if (!certificadoId) return;
       try {
         setLoading(true);
+        setLoadingRegistro(true);
+        setError('');
         const res = await faregasCertificadosApi.obtenerBorradorCompleto(certificadoId);
+        if (!res?.data) {
+          throw new Error('El servidor no devolvió los datos del certificado solicitado.');
+        }
+        if (modoRectificacion) {
+          const errorInicializacion = validarCargaRectificacion(res.data);
+          if (errorInicializacion) throw new Error(errorInicializacion);
+        }
         if (res?.data) {
           // Hidratar estado del borrador
           setCertificadoEstado(res.data.estado || 'BORRADOR');
@@ -525,10 +597,21 @@ export function NuevoCertificadoView() {
               concepto: res.data.servicio?.nombre || prev.concepto,
               modalidadCertificado: res.data.servicio?.modalidad || prev.modalidadCertificado,
               tipo_flujo: res.data.servicio?.tipoFlujo || prev.tipo_flujo,
-              placa: res.data.vehiculo?.placa || prev.placa,
               tallerNombre: res.data.formatoDatosSnapshot?.taller?.nombre || prev.tallerNombre,
               categoria: res.data.vehiculo?.categoria || prev.categoria,
             }));
+          }
+
+          // La placa se recupera aunque el borrador todavía no tenga datos
+          // técnicos (marca/clase/modelo/vin). Si el operador ya escribió una
+          // placa mientras cargaba, esa placa válida no se reemplaza.
+          const placaCargada = normalizarPlacaWizard(res.data.vehiculo?.placa);
+          if (placaCargada) {
+            setFormCaja(prev => (
+              normalizarPlacaWizard(prev.placa)
+                ? prev
+                : { ...prev, placa: placaCargada }
+            ));
           }
 
           if (res.data.formatoFormulario?.motor === 'HTML_DINAMICO') {
@@ -537,8 +620,15 @@ export function NuevoCertificadoView() {
             setFormatoFormularioError('');
           }
 
-          if (res.data.vehiculo && (res.data.vehiculo.marca || res.data.vehiculo.clase || res.data.vehiculo.modelo || res.data.vehiculo.vin)) {
-            setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(res.data.vehiculo) }));
+          if (res.data.vehiculo) {
+            setFormVehiculo(prev => {
+              const datos = mapVehiculoBorrador(res.data.vehiculo);
+              return {
+                ...prev,
+                ...datos,
+                placaNueva: normalizarPlacaWizard(prev.placaNueva) || datos.placaNueva || '',
+              };
+            });
             setVehiculoOrigen('BORRADOR');
           }
           const titularesCargados = res.data.titulares
@@ -681,8 +771,15 @@ export function NuevoCertificadoView() {
           }
 
           const pasoRecuperado = indicePaso(res.data.pasoActual);
-          setCurrentStepIndex(res.data.estado === 'BORRADOR' && new URLSearchParams(location.search).get('vista') !== 'consulta' ? pasoRecuperado : indicePaso('VERIFICACION_EMISION'));
-          setFurthestStepIndex(pasoRecuperado);
+          if (modoRectificacion) {
+            // La rectificación siempre inicia en el resumen del certificado
+            // original, aunque el registro esté emitido y tenga pasos guardados.
+            setCurrentStepIndex(0);
+            setFurthestStepIndex(0);
+          } else {
+            setCurrentStepIndex(res.data.estado === 'BORRADOR' && new URLSearchParams(location.search).get('vista') !== 'consulta' ? pasoRecuperado : indicePaso('VERIFICACION_EMISION'));
+            setFurthestStepIndex(pasoRecuperado);
+          }
           // Un borrador sigue siendo editable aunque haya llegado al último
           // paso. El bloqueo real se decide con los estados de emisión.
           setMinimumEditableStepIndex(0);
@@ -690,15 +787,49 @@ export function NuevoCertificadoView() {
           setLastSavedAt(res.data.fechaActualizacion ? new Date(res.data.fechaActualizacion) : new Date());
           setSaveError('');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error al cargar borrador FAREGAS:", error);
-        setError('No se pudo cargar el registro. Vuelva al inicio e inténtelo de nuevo.');
+        setError(modoRectificacion
+          ? `No se pudo iniciar la rectificación. ${error?.message || 'No fue posible recuperar los datos originales del certificado.'}`
+          : 'No se pudo cargar el registro. Vuelva al inicio e inténtelo de nuevo.');
       } finally {
+        setLoadingRegistro(false);
         setLoading(false);
       }
     };
     cargarBorrador();
-  }, [certificadoId, location.search]);
+  }, [certificadoId, location.search, modoRectificacion, indicePaso]);
+
+  useEffect(() => {
+    if (!certificadoId || (!modoRectificacion && !isEmitido)) return;
+    let vigente = true;
+    setLoadingContextoRectificacion(modoRectificacion);
+    setErrorContextoRectificacion('');
+    if (modoRectificacion) setContextoRectificacion(null);
+    void faregasRectificacionesApi.obtenerContexto(certificadoId)
+      .then((respuesta) => {
+        if (!vigente) return;
+        if (!respuesta?.data) {
+          throw new Error('El servidor no devolvió la autorización de rectificación.');
+        }
+        setContextoRectificacion(respuesta.data);
+      })
+      .catch((error: any) => {
+        if (!vigente) return;
+        setContextoRectificacion(null);
+        if (modoRectificacion) {
+          setErrorContextoRectificacion(
+            `No se pudo verificar la autorización de rectificación. ${error?.message || 'Intente nuevamente.'}`
+          );
+        }
+      })
+      .finally(() => {
+        if (vigente) setLoadingContextoRectificacion(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [certificadoId, modoRectificacion, isEmitido]);
 
   const cargarMaestros = async () => {
     try {
@@ -771,12 +902,12 @@ export function NuevoCertificadoView() {
     } else if (currentStepIndex === indicePaso('VEHICULO') && formCaja.tipo_flujo !== 'TALLER_INSPECCION' && !maestrosVehiculo) {
       cargarMaestrosVehiculo();
     }
-  }, [currentStepIndex, maestros, maestrosPago, maestrosVehiculo, formCaja.tipo_flujo]);
+  }, [currentStepIndex, maestros, maestrosPago, maestrosVehiculo, formCaja.tipo_flujo, indicePaso]);
 
   useEffect(() => {
     if (currentStepIndex !== indicePaso('VEHICULO') || formCaja.tipo_flujo !== 'TALLER_INSPECCION' || !certificadoId || formatoFormulario) return;
     void cargarFormularioFormato(certificadoId);
-  }, [currentStepIndex, formCaja.tipo_flujo, certificadoId, formatoFormulario]);
+  }, [currentStepIndex, formCaja.tipo_flujo, certificadoId, formatoFormulario, indicePaso]);
 
   // Sincronizar Marca con Marca Carrocería
   useEffect(() => {
@@ -803,11 +934,15 @@ export function NuevoCertificadoView() {
 
   const consultarVehiculoFarenet = async (excludeCertificadoId?: number | null) => {
     if (formCaja.tipo_flujo === 'TALLER_INSPECCION') return;
-    if (!formCaja.placa.trim()) return;
+    const placaSolicitada = normalizarPlacaWizard(formCaja.placa);
+    if (!placaSolicitada) return;
     try {
-      const response = await faregasCertificadosApi.obtenerVehiculo(formCaja.placa.trim(), excludeCertificadoId, formCaja.tipoCertificado);
+      const response = await faregasCertificadosApi.obtenerVehiculo(placaSolicitada, excludeCertificadoId, formCaja.tipoCertificado);
+      // Si el operador cambió la placa mientras la consulta estaba en vuelo,
+      // la respuesta pertenece a la placa anterior y no debe pisar la nueva.
+      if (placaActualRef.current !== placaSolicitada) return;
       if (response?.data) {
-        const placaEncontrada = textValue(response.data.placa) || formCaja.placa.trim().toUpperCase();
+        const placaEncontrada = normalizarPlacaWizard(response.data.placa) || placaSolicitada;
         const categoriaEncontrada = textValue(response.data.categoriaKey ?? response.data.categoria);
         setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(response.data), placaNueva: placaEncontrada }));
         setFormCaja((prev: any) => ({
@@ -927,6 +1062,7 @@ export function NuevoCertificadoView() {
         });
       }
     } catch (e: any) {
+      if (placaActualRef.current !== placaSolicitada) return;
       setVehiculoOrigen('MANUAL');
       if (e.status !== 404) {
         Swal.fire({
@@ -941,6 +1077,7 @@ export function NuevoCertificadoView() {
   const consultarDatosIniciales = async () => {
     if (bloquearPaso(validarDatosInicialesCampos(formCaja))) return;
 
+    const placaConsultada = normalizarPlacaWizard(formCaja.placa);
     setIsSavingStep(true);
     setSaveError('');
     try {
@@ -971,6 +1108,11 @@ export function NuevoCertificadoView() {
       }
 
       await consultarVehiculoFarenet(idBorrador);
+      if (placaActualRef.current !== placaConsultada) {
+        setIsConsultado(false);
+        setSaveError('La placa cambió durante la consulta. Presione Consultar nuevamente.');
+        return;
+      }
       const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
       aplicarResumenComercial(tarifaResponse.data);
       setCurrentStepIndex(indicePaso('DATOS_INICIALES'));
@@ -1291,7 +1433,7 @@ export function NuevoCertificadoView() {
 
   // Autosave por bloques, serializado y con debounce para no guardar por tecla.
   useEffect(() => {
-    if (!certificadoId || loading || soloLectura || currentStepIndex !== indicePaso('VEHICULO')) return;
+    if (!certificadoId || loading || soloLectura || modoRectificacion || currentStepIndex !== indicePaso('VEHICULO')) return;
     const timer = window.setTimeout(() => {
       if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
         if (!formatoFormulario) return;
@@ -1306,7 +1448,7 @@ export function NuevoCertificadoView() {
   }, [certificadoId, loading, soloLectura, currentStepIndex, formCaja.categoria, formVehiculo, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores, titulares]);
 
   useEffect(() => {
-    if (!certificadoId || loading || soloLectura || currentStepIndex !== indicePaso('PAGO') || precioTotal <= 0) return;
+    if (!certificadoId || loading || soloLectura || modoRectificacion || currentStepIndex !== indicePaso('PAGO') || precioTotal <= 0) return;
     if (formFacturacion.condicionPagoFac === 'CREDITO'
       && (!formFacturacion.fechaInicioCreditoFac
         || !formFacturacion.fechaVencimientoFac
@@ -1425,8 +1567,221 @@ export function NuevoCertificadoView() {
     return true;
   };
 
+  const propuestaRectificacion = React.useMemo(() => {
+    if (!modoRectificacion) return null;
+    return construirPropuestaRectificacion({
+      tipoCertificado: formCaja.tipoCertificado,
+      formCaja,
+      formVehiculo,
+      titulares,
+      formGnv,
+      formGlp,
+      formConformidad,
+      formatoValores,
+      esTallerInspeccion: formCaja.tipo_flujo === 'TALLER_INSPECCION'
+    });
+  }, [
+    modoRectificacion,
+    formCaja,
+    formVehiculo,
+    titulares,
+    formGnv,
+    formGlp,
+    formConformidad,
+    formatoValores
+  ]);
+
+  const verHistorialRectificacion = async () => {
+    if (!certificadoId) return;
+    try {
+      const respuesta = await faregasRectificacionesApi.obtenerHistorial(certificadoId);
+      const historial = respuesta?.data;
+      const escapar = (valor: unknown) => String(valor ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+      const versionesHtml = (historial?.versiones || []).map((version: any) => `
+        <tr style="border-bottom:1px solid #e2e8f0">
+          <td style="padding:7px 6px;font-weight:800">v${escapar(version.numeroVersion)}</td>
+          <td style="padding:7px 6px">${escapar(version.estadoVersion)}${version.esVigente ? ' · VIGENTE' : ''}</td>
+          <td style="padding:7px 6px;text-align:left">${escapar(version.fechaAplicacionOficial || version.fechaVersion || '—')}</td>
+          <td style="padding:7px 6px;text-align:left">${escapar(version.usuarioCreacion || '—')}</td>
+          <td style="padding:7px 6px">
+            ${version.enlacePdfVersion || version.enlacePdfOriginal
+              ? `<button type="button" data-version-pdf="${version.id}" data-version-numero="${version.numeroVersion}" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:7px;padding:4px 8px;font-weight:700;cursor:pointer">PDF</button>`
+              : '—'}
+          </td>
+        </tr>
+      `).join('');
+      const solicitudesHtml = (historial?.solicitudes || []).map((solicitud: any) => `
+        <tr style="border-bottom:1px solid #e2e8f0">
+          <td style="padding:7px 6px;font-weight:800">#${escapar(solicitud.id)}</td>
+          <td style="padding:7px 6px">${escapar(solicitud.estado)}</td>
+          <td style="padding:7px 6px;text-align:left">${escapar(solicitud.usuarioSolicitante)}</td>
+          <td style="padding:7px 6px;text-align:left">${escapar(solicitud.fechaSolicitud || '—')}</td>
+          <td style="padding:7px 6px;text-align:left">${Array.isArray(solicitud.resultadoTecnico?.diferencias) ? `${solicitud.resultadoTecnico.diferencias.length} cambio(s)` : '—'}</td>
+        </tr>
+      `).join('');
+
+      await Swal.fire({
+        title: 'Historial de rectificaciones',
+        width: 860,
+        html: `
+          <div style="text-align:left;font-size:12px;color:#334155">
+            <p style="font-weight:800;margin:0 0 6px">Certificado ${escapar(historial?.certificadoId || certificadoId)}</p>
+            <p style="margin:0 0 10px;color:#64748b">El número DG y la fecha original no cambian. La fecha de aplicación de cada versión sólo se registra en este historial.</p>
+            <p style="font-weight:900;margin:12px 0 5px">Versiones</p>
+            <table style="width:100%;border-collapse:collapse;font-size:11px">
+              <thead><tr style="background:#f1f5f9"><th style="padding:6px;text-align:left">Versión</th><th style="padding:6px;text-align:left">Estado</th><th style="padding:6px;text-align:left">Fecha aplicación</th><th style="padding:6px;text-align:left">Usuario</th><th style="padding:6px">PDF</th></tr></thead>
+              <tbody>${versionesHtml || '<tr><td colspan="5" style="padding:10px;text-align:center;color:#94a3b8">Sin versiones registradas.</td></tr>'}</tbody>
+            </table>
+            <p style="font-weight:900;margin:16px 0 5px">Operaciones registradas</p>
+            <table style="width:100%;border-collapse:collapse;font-size:11px">
+              <thead><tr style="background:#f1f5f9"><th style="padding:6px;text-align:left">Solicitud</th><th style="padding:6px;text-align:left">Estado</th><th style="padding:6px;text-align:left">Solicitante</th><th style="padding:6px;text-align:left">Fecha</th><th style="padding:6px;text-align:left">Cambios</th></tr></thead>
+              <tbody>${solicitudesHtml || '<tr><td colspan="5" style="padding:10px;text-align:center;color:#94a3b8">Sin operaciones registradas.</td></tr>'}</tbody>
+            </table>
+          </div>
+        `,
+        confirmButtonText: 'Cerrar',
+        confirmButtonColor: '#052a79',
+        didOpen: () => {
+          Swal.getPopup()?.querySelectorAll<HTMLButtonElement>('[data-version-pdf]').forEach((boton) => {
+            boton.addEventListener('click', () => {
+              const versionId = Number(boton.dataset.versionPdf);
+              const numeroVersion = Number(boton.dataset.versionNumero || versionId);
+              void faregasRectificacionesApi.descargarPdfVersion(
+                certificadoId,
+                versionId,
+                `CERTIFICADO-${contextoRectificacion?.certificado.numeroCertificado || certificadoId}-v${numeroVersion}.pdf`
+              ).catch((error: any) => {
+                void Swal.fire('No se pudo descargar', error?.message || 'El PDF histórico no está disponible.', 'error');
+              });
+            });
+          });
+        }
+      });
+    } catch (error: any) {
+      await Swal.fire('No se pudo obtener el historial', error?.message || 'Intente nuevamente.', 'error');
+    }
+  };
+
+  const guardarRectificacionDirecta = async () => {
+    if (!certificadoId || !propuestaRectificacion || enviandoRectificacion) return;
+    if (!contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente) {
+      await Swal.fire(
+        'Rectificación no disponible',
+        contextoRectificacion?.motivosBloqueo?.join(' · ')
+          || 'No cuenta con el permiso explícito para rectificar o el certificado ya no admite cambios.',
+        'warning'
+      );
+      return;
+    }
+    if (!motivoRectificacion.trim()) {
+      await Swal.fire('Motivo requerido', 'Describa el motivo de la rectificación antes de guardar los cambios.', 'warning');
+      return;
+    }
+    if (!previewRectificacion || previewRectificacion.diferencias.length === 0) {
+      await Swal.fire(
+        'Sin cambios detectados',
+        'Regrese al paso de datos técnicos y modifique al menos un campo antes de guardar la rectificación.',
+        'warning'
+      );
+      return;
+    }
+    if (!idempotenciaRectificacionRef.current) {
+      idempotenciaRectificacionRef.current = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (caracter) => {
+            const aleatorio = Math.floor(Math.random() * 16);
+            const valor = caracter === 'x' ? aleatorio : (aleatorio & 0x3) | 0x8;
+            return valor.toString(16);
+          });
+    }
+
+    const confirmacion = await Swal.fire({
+      title: '¿Guardar rectificación y emitir certificado?',
+      text: 'Se actualizarán únicamente los datos técnicos del certificado. El DG, la fecha original, el comprobante y los pagos no cambiarán.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'SÍ, GUARDAR Y EMITIR',
+      cancelButtonText: 'CANCELAR',
+      confirmButtonColor: '#dc2626'
+    });
+    if (!confirmacion.isConfirmed) return;
+
+    setEnviandoRectificacion(true);
+    try {
+      await faregasRectificacionesApi.ejecutarDirecta(certificadoId, {
+        motivo: motivoRectificacion.trim(),
+        observaciones: observacionesRectificacion.trim() || null,
+        datosPropuestos: propuestaRectificacion,
+        idempotenciaClave: idempotenciaRectificacionRef.current
+      });
+      await Swal.fire({
+        title: 'Certificado rectificado',
+        text: 'Se guardó la nueva versión. El número DG, la fecha original y el comprobante electrónico se conservaron.',
+        icon: 'success',
+        confirmButtonColor: '#052a79'
+      });
+      navigate(`/faregas/certificados/${certificadoId}/continuar?vista=consulta`, { replace: true });
+    } catch (error: any) {
+      await Swal.fire('No se pudo guardar la rectificación', error?.message || 'Intente nuevamente.', 'error');
+    } finally {
+      setEnviandoRectificacion(false);
+    }
+  };
+
   const irSiguientePaso = async () => {
     if (isSavingStep) return;
+    if (modoRectificacion) {
+      if (!contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente) {
+        await Swal.fire(
+          'Rectificación no disponible',
+          contextoRectificacion?.motivosBloqueo?.join(' · ')
+            || 'No se pudo verificar el permiso directo para rectificar este certificado.',
+          'warning'
+        );
+        return;
+      }
+      if (currentStepIndex === 0) {
+        const siguiente = 1;
+        setFurthestStepIndex((actual) => Math.max(actual, siguiente));
+        setCurrentStepIndex(siguiente);
+        return;
+      }
+      if (currentStepIndex === 1) {
+        if (!certificadoId) {
+          mostrarErroresPaso(['No se encontró el certificado a rectificar. Recargue la pantalla.']);
+          return;
+        }
+        if (exigirDatosTecnicosCompletos()) return;
+        const siguiente = 2;
+        setFurthestStepIndex((actual) => Math.max(actual, siguiente));
+        setCurrentStepIndex(siguiente);
+        return;
+      }
+      if (currentStepIndex === 2) {
+        if (!previewRectificacion) {
+          await Swal.fire('Previsualización pendiente', 'Espere a que se cargue la previsualización corregida antes de continuar.', 'info');
+          return;
+        }
+        if (previewRectificacion.diferencias.length === 0) {
+          await Swal.fire(
+            'Sin cambios detectados',
+            'Regrese al paso anterior y modifique al menos un dato técnico. El certificado original no debe reenviarse sin correcciones.',
+            'warning'
+          );
+          return;
+        }
+        const siguiente = 3;
+        setFurthestStepIndex((actual) => Math.max(actual, siguiente));
+        setCurrentStepIndex(siguiente);
+        return;
+      }
+      return;
+    }
     if (currentStepIndex === indicePaso('DATOS_INICIALES')) {
       if (!isConsultado) {
         Swal.fire('Consulta requerida', 'Primero presione Consultar para validar los datos iniciales.', 'info');
@@ -1577,6 +1932,10 @@ export function NuevoCertificadoView() {
 
   const irAtrasOStep = async (destino: number) => {
     if (isSavingStep || destino < minimumEditableStepIndex || destino >= currentStepIndex || destino > furthestStepIndex) return;
+    if (modoRectificacion) {
+      setCurrentStepIndex(destino);
+      return;
+    }
     if (STEPS[currentStepIndex].id === 'facturacion' && retrocesoBloqueadoPorEmision) {
       await Swal.fire(
         'Edición bloqueada',
@@ -1641,6 +2000,13 @@ export function NuevoCertificadoView() {
       setCurrentStepIndex((actual) => Math.max(0, Math.min(STEPS.length - 1, actual + (direccion === 'SIGUIENTE' ? 1 : -1))));
       return;
     }
+    if (modoRectificacion) {
+      setCurrentStepIndex((actual) => Math.max(
+        0,
+        Math.min(furthestStepIndex, STEPS.length - 1, actual + (direccion === 'SIGUIENTE' ? 1 : -1))
+      ));
+      return;
+    }
     if (direccion === 'SIGUIENTE') {
       void irSiguientePaso();
     } else {
@@ -1703,7 +2069,7 @@ export function NuevoCertificadoView() {
     if (precioTotal === 0 && pagosAgregados.length > 0) {
       setPagosAgregados([]);
     }
-  }, [currentStepIndex, formCaja.descuentoObj, maestrosPago, precioTotal, montoPendiente, pagosAgregados.length]);
+  }, [currentStepIndex, formCaja.descuentoObj, maestrosPago, precioTotal, montoPendiente, pagosAgregados.length, indicePaso]);
 
   const handleAgregarPago = async () => {
     if (!formPago.importe || isNaN(parseFloat(formPago.importe)) || parseFloat(formPago.importe) <= 0) {
@@ -1804,6 +2170,10 @@ export function NuevoCertificadoView() {
       navigate('/faregas/inicio');
       return;
     }
+    if (modoRectificacion) {
+      navigate(`/faregas/certificados/${certificadoId}/continuar?vista=consulta`);
+      return;
+    }
     setIsSavingStep(true);
     setSaveError('');
     try {
@@ -1871,12 +2241,46 @@ export function NuevoCertificadoView() {
     return () => window.removeEventListener('beforeunload', advertirSalida);
   }, [isSavingStep, saveError]);
 
+  if (modoRectificacion && (loadingRegistro || loadingContextoRectificacion)) {
+    return <div className="p-8 text-center text-slate-500">Cargando certificado original y autorización de rectificación…</div>;
+  }
+
+  const errorInicializacion = error || errorContextoRectificacion;
+  if (modoRectificacion && errorInicializacion) {
+    return (
+      <div className="mx-auto max-w-2xl rounded-2xl border border-red-200 bg-red-50 p-8 text-center shadow-sm">
+        <h2 className="text-lg font-black text-red-800">No se pudo iniciar la rectificación</h2>
+        <p className="mt-3 text-sm font-semibold text-red-700">{errorInicializacion}</p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-lg border border-red-300 bg-white px-5 py-2 text-xs font-black text-red-700"
+          >
+            REINTENTAR
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(certificadoId ? `/faregas/certificados/${certificadoId}/continuar?vista=consulta` : '/faregas/inicio')}
+            className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-black text-white"
+          >
+            VOLVER SIN GUARDAR
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading && currentStepIndex === indicePaso('DATOS_INICIALES')) {
     return <div className="p-8 text-center text-slate-500">Cargando opciones...</div>;
   }
 
   if (error) {
     return <div className="p-8 text-center text-red-500">{error}</div>;
+  }
+
+  if (!pasoActual) {
+    return <div className="p-8 text-center text-slate-500">Inicializando el paso de rectificación…</div>;
   }
 
   const pasoPosteriorADatosTecnicos = currentStepIndex >= indicePaso('PREVISUALIZACION');
@@ -1890,6 +2294,14 @@ export function NuevoCertificadoView() {
   const volverACorregirDatosTecnicos = () => {
     exigirDatosTecnicosCompletos(true);
   };
+
+  const puedeMostrarBotonRectificar = Boolean(
+    certificadoId
+    && certificadoEstado === 'EMITIDO'
+    && contextoRectificacion?.permiteRectificar
+    && contextoRectificacion?.permisos.rectificarDirectamente
+    && !contextoRectificacion?.rectificacionActiva
+  );
 
   return (
     <div className="faregas-certificate-wizard w-full bg-white rounded-2xl shadow-xl border-t-[4px] border-solid border-t-[#f59e0b] overflow-hidden flex flex-col" style={{ borderImage: "linear-gradient(to right, #fde047 0%, #f59e0b 50%, #b45309 100%) 1" }}>
@@ -1906,14 +2318,14 @@ export function NuevoCertificadoView() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h2 className="text-lg font-black text-slate-800 capitalize tracking-tight">
-            {soloLectura ? 'Consulta de Certificado' : 'Nuevo Certificado'}
+            {modoRectificacion ? 'Rectificar Certificado' : soloLectura ? 'Consulta de Certificado' : 'Nuevo Certificado'}
           </h2>
           {certificadoId && (
             <div className="ml-auto flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-sm">
-              {soloLectura ? <Eye className="h-3.5 w-3.5 text-[#052a79]" /> : isSavingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#052a79]" /> : <Save className={`h-3.5 w-3.5 ${saveError ? 'text-red-600' : 'text-green-600'}`} />}
-              <span>{soloLectura ? certificadoEstado : 'BORRADOR'} #{certificadoId}</span>
+              {modoRectificacion ? <PencilLine className="h-3.5 w-3.5 text-red-600" /> : soloLectura ? <Eye className="h-3.5 w-3.5 text-[#052a79]" /> : isSavingStep ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#052a79]" /> : <Save className={`h-3.5 w-3.5 ${saveError ? 'text-red-600' : 'text-green-600'}`} />}
+              <span>{modoRectificacion ? 'CERTIFICADO EMITIDO' : soloLectura ? certificadoEstado : 'BORRADOR'} #{certificadoId}</span>
               <span className="text-slate-300">|</span>
-              <span className={saveError ? 'text-red-600' : ''}>{soloLectura ? 'SOLO LECTURA' : isSavingStep ? 'GUARDANDO…' : saveError ? 'ERROR AL GUARDAR' : lastSavedAt ? `GUARDADO ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'CARGADO'}</span>
+              <span className={saveError ? 'text-red-600' : ''}>{modoRectificacion ? 'SIN CAMBIOS HASTA APROBAR' : soloLectura ? 'SOLO LECTURA' : isSavingStep ? 'GUARDANDO…' : saveError ? 'ERROR AL GUARDAR' : lastSavedAt ? `GUARDADO ${lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'CARGADO'}</span>
             </div>
           )}
         </div>
@@ -1960,6 +2372,15 @@ export function NuevoCertificadoView() {
       {/* Content Area */}
       <div className="p-5 sm:p-6 lg:p-8">
         {soloLectura && <p className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-800">Consulta de solo lectura. Puede recorrer todos los pasos sin modificar el registro.</p>}
+        {modoRectificacion && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+            <PencilLine className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
+            <p>
+              Modo rectificación directa. Los cambios se aplicarán únicamente al confirmar. No se emitirá ningún comprobante,
+              no se registrarán pagos y no se consumirá un correlativo DG.
+            </p>
+          </div>
+        )}
         <PanelResumenErroresWizard
           errores={estructurarErroresPaso(errores)}
           onEnfocarCampo={enfocarCampo}
@@ -1969,7 +2390,83 @@ export function NuevoCertificadoView() {
           onKeyDownCapture={manejarNavegacionFormulario}
           onClickCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}
           onSubmitCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}>
-        {STEPS[currentStepIndex].id === 'datos_iniciales' && (
+        {modoRectificacion && currentStepIndex === 0 && (
+          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4">
+            <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Certificado original</p>
+                <h3 className="mt-1 text-2xl font-black text-slate-900">
+                  {contextoRectificacion?.certificado.numeroCertificado || numeroCertificadoOficial || 'Cargando…'}
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  {contextoRectificacion?.certificado.tipoNombre || formCaja.tipoCertificado}
+                  {' · '}
+                  {contextoRectificacion?.certificado.plantaNombre || plantaNombre}
+                  {' · '}
+                  {contextoRectificacion?.certificado.empresaNombre || 'FAREGAS'}
+                </p>
+              </div>
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700">
+                {contextoRectificacion?.certificado.estado || certificadoEstado}
+              </span>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Fecha de emisión original</p>
+                <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.certificado.fechaEmision || '—'}</p>
+                <p className="mt-1 text-xs font-semibold text-emerald-700">Se conserva sin cambios</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Número DG</p>
+                <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.certificado.numeroCertificado || '—'}</p>
+                <p className="mt-1 text-xs font-semibold text-emerald-700">No se consume correlativo</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Comprobante asociado</p>
+                <p className="mt-1 text-sm font-black text-slate-900">
+                  {contextoRectificacion?.comprobanteAsociado
+                    ? `${(contextoRectificacion.comprobanteAsociado as any).tipo_comprobante || ''} ${(contextoRectificacion.comprobanteAsociado as any).nro_comprobante || ''}`.trim() || 'Asociado'
+                    : 'Sin comprobante'}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">No se anula ni se reemite</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Versiones registradas</p>
+                <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.versiones.length || 0}</p>
+                <button type="button" onClick={() => void verHistorialRectificacion()} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline">
+                  <History className="h-3.5 w-3.5" /> Ver historial
+                </button>
+              </div>
+            </div>
+
+            {contextoRectificacion && !contextoRectificacion.permiteRectificar && (
+              <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800">
+                <p className="flex items-center gap-2 font-black"><History className="h-4 w-4" /> Certificado no disponible para rectificación</p>
+                <p className="mt-1 font-semibold">{contextoRectificacion.motivosBloqueo.join(' · ')}</p>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+              <h4 className="text-sm font-black uppercase tracking-wider text-blue-900">Qué puede corregirse</h4>
+              <p className="mt-2 text-sm font-semibold text-blue-900">
+                Datos del vehículo, titular, marca, modelo, motor, VIN/serie, categoría, combustible, año, cilindrada,
+                datos técnicos GLP/GNV, componentes, verificaciones, taller y observaciones. Los datos comerciales, fiscales,
+                de pago y el comprobante electrónico no forman parte de esta rectificación.
+              </p>
+              <p className="mt-2 text-xs font-semibold text-blue-800">
+                La corrección se aplicará sobre la misma certificación. Si el dato ya fue comunicado a una entidad externa
+                (por ejemplo MTC o SUNARP), deberá tramitarse también por el canal oficial correspondiente.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-900">
+              <p className="font-black">Flujo obligatorio</p>
+              <p className="mt-1">Edición → previsualización → confirmación directa. La fecha real de rectificación se registra sólo en el historial; el PDF corregido conserva la fecha y el número originales.</p>
+            </div>
+          </div>
+        )}
+        {!modoRectificacion && pasoActual.id === 'datos_iniciales' && (
           <CajaStep
             key={plantaSeleccionada}
             plantaSeleccionada={plantaSeleccionada}
@@ -2013,10 +2510,10 @@ export function NuevoCertificadoView() {
             }}
           />
         )}
-        {STEPS[currentStepIndex].id === 'vehiculo' && (
+        {!modoRectificacion && pasoActual.id === 'vehiculo' && (
           <CertificateChipSection certificadoId={certificadoId} />
         )}
-        {STEPS[currentStepIndex].id === 'vehiculo' && (formCaja.tipo_flujo === 'CERTIFICACION' || formCaja.tipo_flujo === 'VEHICULAR_EXISTENTE') && (
+        {pasoActual.id === 'vehiculo' && (formCaja.tipo_flujo === 'CERTIFICACION' || formCaja.tipo_flujo === 'VEHICULAR_EXISTENTE') && (
           <>
             {expedienteError && (
               <div role="alert" className="mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
@@ -2031,6 +2528,7 @@ export function NuevoCertificadoView() {
               servicioNombre={formCaja.concepto}
               numeroCertificadoOficial={numeroCertificadoOficial}
               formVehiculo={formVehiculo}
+              placaRodaje={normalizarPlacaWizard(formCaja.placa)}
               setFormVehiculo={setFormVehiculo}
               formPropietario={formPropietario}
               setFormPropietario={setFormPropietario}
@@ -2044,7 +2542,15 @@ export function NuevoCertificadoView() {
               setTitulares={setTitulares}
               formFacturacion={formFacturacion}
               setFormFacturacion={setFormFacturacion}
-              onRemoveTitular={eliminarTitularBorrador}
+              onRemoveTitular={modoRectificacion
+                ? async () => {
+                    await Swal.fire(
+                      'Eliminación no disponible',
+                      'Los titulares guardados no se eliminan directamente en modo rectificación. Puede corregir sus datos sin borrar el registro original.',
+                      'info'
+                    );
+                  }
+                : eliminarTitularBorrador}
               catalogoVerificaciones={catalogoVerificaciones}
               vehiculoOrigen={vehiculoOrigen}
               maestrosVehiculo={maestrosVehiculo}
@@ -2060,7 +2566,7 @@ export function NuevoCertificadoView() {
           </>
         )}
 
-        {STEPS[currentStepIndex].id === 'vehiculo' && formCaja.tipo_flujo === 'TALLER_INSPECCION' && (
+        {pasoActual.id === 'vehiculo' && formCaja.tipo_flujo === 'TALLER_INSPECCION' && (
           <TallerStep
             formulario={formatoFormulario}
             valores={formatoValores}
@@ -2071,10 +2577,18 @@ export function NuevoCertificadoView() {
             setTitulares={setTitulares}
             formFacturacion={formFacturacion}
             setFormFacturacion={setFormFacturacion}
-            onRemoveTitular={eliminarTitularBorrador}
+            onRemoveTitular={modoRectificacion
+              ? async () => {
+                  await Swal.fire(
+                    'Eliminación no disponible',
+                    'Los titulares guardados no se eliminan directamente en modo rectificación. Puede corregir sus datos sin borrar el registro original.',
+                    'info'
+                  );
+                }
+              : eliminarTitularBorrador}
           />
         )}
-        {STEPS[currentStepIndex].id === 'pago' && (
+        {pasoActual.id === 'pago' && (
           <PagoStep
             pagoTab={pagoTab}
             setPagoTab={setPagoTab}
@@ -2137,10 +2651,10 @@ export function NuevoCertificadoView() {
             }}
           />
         )}
-        {STEPS[currentStepIndex].id === 'previsualizacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
+        {!modoRectificacion && pasoActual.id === 'previsualizacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no tiene un certificado emitido para previsualizar.</p>
         )}
-        {STEPS[currentStepIndex].id === 'previsualizacion' && datosTecnicosIncompletos && (
+        {pasoActual.id === 'previsualizacion' && datosTecnicosIncompletos && (
           <div role="alert" className="mx-auto max-w-2xl rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center shadow-sm">
             <h3 className="text-lg font-black text-amber-900">Faltan datos del vehículo o del expediente técnico</h3>
             <p className="mt-2 text-sm text-amber-800">
@@ -2151,14 +2665,29 @@ export function NuevoCertificadoView() {
             </button>
           </div>
         )}
-        {STEPS[currentStepIndex].id === 'previsualizacion' && !datosTecnicosIncompletos && (!soloLectura || certificadoEstado === 'EMITIDO') && (
-          <PrevisualizacionCertificadoStep certificadoId={certificadoId} />
+        {pasoActual.id === 'previsualizacion' && !datosTecnicosIncompletos && (!soloLectura || certificadoEstado === 'EMITIDO') && (
+          <PrevisualizacionCertificadoStep
+            certificadoId={certificadoId}
+            datosPropuestos={modoRectificacion ? propuestaRectificacion : null}
+            modoRectificacion={modoRectificacion}
+            onPreviewResult={modoRectificacion ? setPreviewRectificacion : undefined}
+          />
+        )}
+        {modoRectificacion && pasoActual.id === 'rectificacion' && (
+          <RectificacionConfirmacionStep
+            contexto={contextoRectificacion}
+            preview={previewRectificacion}
+            motivo={motivoRectificacion}
+            setMotivo={setMotivoRectificacion}
+            observaciones={observacionesRectificacion}
+            setObservaciones={setObservacionesRectificacion}
+          />
         )}
         </fieldset>
-        {STEPS[currentStepIndex].id === 'facturacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
+        {pasoActual.id === 'facturacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no llegó a emitirse.</p>
         )}
-        {STEPS[currentStepIndex].id === 'facturacion' && datosTecnicosIncompletos && (
+        {pasoActual.id === 'facturacion' && datosTecnicosIncompletos && (
           <div role="alert" className="mx-auto max-w-2xl rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center shadow-sm">
             <h3 className="text-lg font-black text-amber-900">La emisión está bloqueada por datos incompletos</h3>
             <p className="mt-2 text-sm text-amber-800">
@@ -2169,7 +2698,7 @@ export function NuevoCertificadoView() {
             </button>
           </div>
         )}
-        {STEPS[currentStepIndex].id === 'facturacion' && !datosTecnicosIncompletos && (!soloLectura || certificadoEstado === 'EMITIDO') && (
+        {pasoActual.id === 'facturacion' && !datosTecnicosIncompletos && (!soloLectura || certificadoEstado === 'EMITIDO') && (
           <FacturacionEmisionStep
             certificadoId={certificadoId}
             certificadoEstado={certificadoEstado}
@@ -2201,7 +2730,7 @@ export function NuevoCertificadoView() {
       {/* FOOTER ACTIONS */}
       <div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          {currentStepIndex > 0 && currentStepIndex !== STEPS.length - 1 && !isEmitido && !soloLectura && (
+          {currentStepIndex > 0 && (modoRectificacion || (currentStepIndex !== STEPS.length - 1 && !isEmitido && !soloLectura)) && (
             <button
               type="button"
               onClick={irPasoAnterior}
@@ -2224,8 +2753,54 @@ export function NuevoCertificadoView() {
         </div>
 
         <div className="flex flex-col items-end gap-1.5">
-          {soloLectura ? (
+          {modoRectificacion ? (
             <div className="flex items-center gap-3">
+              {currentStepIndex < STEPS.length - 1 ? (
+                <button
+                  type="button"
+                  onClick={() => void irSiguientePaso()}
+                  disabled={isSavingStep || !contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente}
+                  className="rounded-lg bg-gold-3d px-6 py-2.5 text-xs font-black transition shadow-sm hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
+                >
+                  {currentStepIndex === 0 ? 'REVISAR DATOS A RECTIFICAR' : currentStepIndex === 1 ? 'VER PREVISUALIZACIÓN CORREGIDA' : 'CONTINUAR A CONFIRMACIÓN'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void guardarRectificacionDirecta()}
+                  disabled={enviandoRectificacion || !contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente || !motivoRectificacion.trim() || !previewRectificacion || previewRectificacion.diferencias.length === 0}
+                  className={`inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm ${
+                    enviandoRectificacion || !contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente || !motivoRectificacion.trim() || !previewRectificacion || previewRectificacion.diferencias.length === 0
+                      ? 'cursor-not-allowed bg-slate-200 text-slate-500 shadow-none'
+                      : 'bg-red-600 text-white hover:-translate-y-0.5 hover:bg-red-700'
+                  }`}
+                >
+                  {enviandoRectificacion ? <><Loader2 className="h-4 w-4 animate-spin" /> GUARDANDO…</> : <><Send className="h-4 w-4" /> GUARDAR RECTIFICACIÓN Y EMITIR CERTIFICADO</>}
+                </button>
+              )}
+            </div>
+          ) : soloLectura ? (
+            <div className="flex items-center gap-3">
+              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && puedeMostrarBotonRectificar && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/faregas/certificados/${certificadoId}/rectificar`)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-red-700"
+                  title="Rectificar directamente el certificado sin reemitir el comprobante"
+                >
+                  <PencilLine className="h-4 w-4" /> RECTIFICAR CERTIFICADO
+                </button>
+              )}
+              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && contextoRectificacion?.rectificacionActiva && (
+                <button
+                  type="button"
+                  onClick={() => void verHistorialRectificacion()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-5 py-2.5 text-xs font-black text-amber-800"
+                  title="Ya existe una rectificación activa para este certificado"
+                >
+                  <History className="h-4 w-4" /> RECTIFICACIÓN EN CURSO
+                </button>
+              )}
               {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && facturacion?.enlacePdf && (
                 <button type="button" onClick={() => void descargarComprobanteOficial()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50" title="Descargar PDF oficial de NubeFact">
                   VER / DESCARGAR COMPROBANTE

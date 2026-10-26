@@ -13,6 +13,8 @@ type Props = {
   combustibles?: MaestroOption[];
   campos: CampoVehiculoCertificado[];
   formVehiculo: Record<string, unknown>;
+  /** Placa proveniente de Datos Iniciales. Tiene prioridad sobre el espejo técnico. */
+  placaRodaje?: string;
   onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   categoriaVehicular: string;
   categoriasVehiculares: MaestroOption[];
@@ -25,6 +27,7 @@ type Props = {
 export function CamposVehiculoCertificado({
   campos,
   formVehiculo,
+  placaRodaje,
   onChange,
   categoriaVehicular,
   categoriasVehiculares,
@@ -37,6 +40,9 @@ export function CamposVehiculoCertificado({
   permitirCilindradaDecimal = false,
 }: Props) {
   const valor = (campo: CampoVehiculoCertificado) => {
+    // La placa de Datos Iniciales tiene prioridad. Si aún no llegó, el valor
+    // técnico evita que el texto "PENDIENTE" tape una placa ya válida.
+    if (campo.campo === 'placaNueva' && placaRodaje?.trim()) return placaRodaje;
     if (campo.valorAutomatico) return campo.valorAutomatico;
     if (campo.grupo === 'vin-serie') return formVehiculo.vin || formVehiculo.serieChasis || '';
     return formVehiculo[campo.campo] ?? '';

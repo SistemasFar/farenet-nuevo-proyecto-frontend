@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, Eye, Loader2 } from 'lucide-react';
+import { AlertCircle, Eye, Loader2, PencilLine } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
+import {
+  faregasRectificacionesApi,
+  type DatosPropuestosRectificacion,
+  type PrevisualizacionRectificacion
+} from '../../../../services/faregas-rectificaciones.api';
 
 interface PrevisualizacionCertificadoStepProps {
   certificadoId?: number;
+  datosPropuestos?: DatosPropuestosRectificacion | null;
+  modoRectificacion?: boolean;
+  onPreviewResult?: (resultado: PrevisualizacionRectificacion | null) => void;
 }
 
 const obtenerMensajeError = (errorCapturado: unknown) => {
@@ -14,22 +22,36 @@ const obtenerMensajeError = (errorCapturado: unknown) => {
     : message || 'No se pudo obtener la previsualización.';
 };
 
-export function PrevisualizacionCertificadoStep({ certificadoId }: PrevisualizacionCertificadoStepProps) {
+export function PrevisualizacionCertificadoStep({
+  certificadoId,
+  datosPropuestos,
+  modoRectificacion = false,
+  onPreviewResult
+}: PrevisualizacionCertificadoStepProps) {
   const [isLoading, setIsLoading] = useState(Boolean(certificadoId));
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [resultado, setResultado] = useState<PrevisualizacionRectificacion | null>(null);
+  const datosSerializados = datosPropuestos ? JSON.stringify(datosPropuestos) : '';
 
   const cargarPrevisualizacion = async () => {
-    if (!certificadoId || isLoading) return;
+    if (!certificadoId) return;
     setIsLoading(true);
     setError('');
     try {
-      const response = await faregasCertificadosApi.obtenerPrevisualizacion(certificadoId);
-      setPreviewHtml(response?.data?.html || null);
+      const response = datosPropuestos
+        ? await faregasRectificacionesApi.previsualizar(certificadoId, datosPropuestos)
+        : await faregasCertificadosApi.obtenerPrevisualizacion(certificadoId);
+      const data = response?.data || null;
+      setPreviewHtml(data?.html || null);
+      setResultado(data);
+      onPreviewResult?.(data);
     } catch (errorCapturado: unknown) {
       const rawMessage = errorCapturado instanceof Error ? errorCapturado.message : '';
       const message = obtenerMensajeError(errorCapturado);
       setError(message);
+      setResultado(null);
+      onPreviewResult?.(null);
       if (rawMessage === 'FORMATO_PREVIEW_PENDIENTE' || rawMessage.includes('pendiente')) {
         Swal.fire({
           title: 'Formato Pendiente',
@@ -47,15 +69,30 @@ export function PrevisualizacionCertificadoStep({ certificadoId }: Previsualizac
     if (!certificadoId) return;
 
     let vigente = true;
-    void faregasCertificadosApi.obtenerPrevisualizacion(certificadoId)
+    // La carga inicial ya nace activa. En recargas posteriores se difiere la
+    // transición para no encadenar una actualización síncrona dentro del
+    // efecto y para que una respuesta obsoleta no cambie el estado visible.
+    queueMicrotask(() => {
+      if (vigente) setIsLoading(true);
+    });
+    const solicitud = datosPropuestos
+      ? faregasRectificacionesApi.previsualizar(certificadoId, datosPropuestos)
+      : faregasCertificadosApi.obtenerPrevisualizacion(certificadoId);
+
+    void solicitud
       .then((response) => {
         if (!vigente) return;
-        setPreviewHtml(response?.data?.html || null);
+        const data = response?.data || null;
+        setPreviewHtml(data?.html || null);
+        setResultado(data);
         setError('');
+        onPreviewResult?.(data);
       })
       .catch((errorCapturado: unknown) => {
         if (!vigente) return;
         setError(obtenerMensajeError(errorCapturado));
+        setResultado(null);
+        onPreviewResult?.(null);
       })
       .finally(() => {
         if (vigente) setIsLoading(false);
@@ -64,7 +101,10 @@ export function PrevisualizacionCertificadoStep({ certificadoId }: Previsualizac
     return () => {
       vigente = false;
     };
-  }, [certificadoId]);
+    // El payload se compara serializado para no repetir la llamada cuando el
+    // objeto se reconstruye con los mismos valores.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [certificadoId, datosSerializados, modoRectificacion]);
 
   if (!certificadoId) {
     return (
@@ -78,12 +118,20 @@ export function PrevisualizacionCertificadoStep({ certificadoId }: Previsualizac
     <div className="animate-in space-y-4 fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-amber-100 p-2.5">
-            <Eye className="h-6 w-6 text-amber-600" />
+          <div className={`rounded-xl p-2.5 ${modoRectificacion ? 'bg-red-100' : 'bg-amber-100'}`}>
+            {modoRectificacion
+              ? <PencilLine className="h-6 w-6 text-red-600" />
+              : <Eye className="h-6 w-6 text-amber-600" />}
           </div>
           <div>
-            <h3 className="text-xl font-bold text-slate-800">Previsualización del Certificado</h3>
-            <p className="text-sm text-slate-500">Revise el certificado completo antes de continuar con la facturación y emisión.</p>
+            <h3 className="text-xl font-bold text-slate-800">
+              {modoRectificacion ? 'Previsualización de la Rectificación' : 'Previsualización del Certificado'}
+            </h3>
+            <p className="text-sm text-slate-500">
+              {modoRectificacion
+                ? 'Revise la versión corregida. Conserva el número DG y la fecha de emisión originales.'
+                : 'Revise el certificado completo antes de continuar con la facturación y emisión.'}
+            </p>
           </div>
         </div>
         {error && (
@@ -117,7 +165,14 @@ export function PrevisualizacionCertificadoStep({ certificadoId }: Previsualizac
         <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
           <div className="flex items-center gap-2 bg-slate-900 px-6 py-4 text-white">
             <Eye className="h-5 w-5 text-amber-400" />
-            <h3 className="text-sm font-bold capitalize tracking-wider">Previsualización de Certificado (Borrador)</h3>
+            <h3 className="text-sm font-bold capitalize tracking-wider">
+              {modoRectificacion ? 'Versión rectificada (previsualización)' : 'Previsualización de Certificado'}
+            </h3>
+            {modoRectificacion && resultado?.numeroCertificado && (
+              <span className="ml-auto rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
+                {resultado.numeroCertificado}
+              </span>
+            )}
           </div>
           <div className="flex-1 overflow-hidden bg-slate-100 p-4">
             <iframe
@@ -127,9 +182,24 @@ export function PrevisualizacionCertificadoStep({ certificadoId }: Previsualizac
             />
           </div>
           <div className="border-t border-slate-200 bg-slate-50 p-4">
-            <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
-              ⚠️ Documento sin validez legal. El número definitivo se asigna únicamente al emitir.
-            </span>
+            {modoRectificacion ? (
+              <div className="space-y-2">
+                <span className="inline-block rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800">
+                  Esta vista previa no emite comprobantes ni modifica la fecha original. El cambio se aplicará sólo después de la aprobación y ejecución.
+                </span>
+                {resultado?.advertencias?.length ? (
+                  <ul className="list-disc space-y-1 pl-5 text-xs font-semibold text-amber-800">
+                    {resultado.advertencias.map((advertencia) => (
+                      <li key={advertencia}>{advertencia}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : (
+              <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">
+                Documento de trabajo. El número definitivo se asigna únicamente al emitir.
+              </span>
+            )}
           </div>
         </div>
       )}

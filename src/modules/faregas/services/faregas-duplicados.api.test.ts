@@ -46,16 +46,17 @@ describe('faregasDuplicadosApi', () => {
     expect(JSON.parse(options.body)).toEqual(payload);
   });
 
-  it('obtiene la vista autenticada del certificado con marca de duplicado', async () => {
+  it('obtiene la vista autenticada del certificado original sin marca de agua', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       ok: true,
-      data: { html: '<html>DUPLICADO</html>', numeroCertificado: 'DG-41-012488' },
+      data: { html: '<html><body>Certificado DG-41-012488</body></html>', numeroCertificado: 'DG-41-012488' },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
 
     const vista = await faregasDuplicadosApi.obtenerVista(9);
 
-    expect(vista.html).toContain('DUPLICADO');
+    expect(vista.html).toContain('Certificado DG-41-012488');
+    expect(vista.html).not.toContain('data-faregas-duplicado');
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/faregas/duplicados/9/vista'),
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer token-duplicados' }) }),
@@ -75,5 +76,19 @@ describe('faregasDuplicadosApi', () => {
       expect.stringContaining('/faregas/duplicados/historial?desde=2026-10-01&hasta=2026-10-20&pagina=2'),
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer token-duplicados' }) }),
     );
+  });
+
+  it('propaga el error de negocio cuando el certificado dejó de estar disponible', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ok: false,
+      codigo: 'CERTIFICADO_NO_DISPONIBLE_PARA_DUPLICADO',
+      message: 'El certificado tiene una anulación activa o confirmada y no está disponible para duplicado.',
+    }), { status: 409, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(faregasDuplicadosApi.crear(608)).rejects.toMatchObject({
+      codigo: 'CERTIFICADO_NO_DISPONIBLE_PARA_DUPLICADO',
+      message: 'El certificado tiene una anulación activa o confirmada y no está disponible para duplicado.',
+    });
   });
 });
