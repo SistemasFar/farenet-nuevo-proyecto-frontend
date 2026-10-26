@@ -45,6 +45,8 @@ export interface BorradorPanel {
   enlacePdf?: string | null;
   enlacePdfFaregas?: string | null;
   nroComprobante?: string | null;
+  anulacionEnPlazo?: boolean | null;
+  anulacionHastaMs?: number | string | null;
   anulacionId?: number | null;
   estadoAnulacion?: string | null;
   descripcionAnulacion?: string | null;
@@ -156,14 +158,6 @@ const esResumenComprobanteOperable = (item: BorradorPanel) => {
     || (entorno === 'DEMO' && estado === 'PENDIENTE_SUNAT' && Boolean(item.nroComprobante) && Boolean(item.enlacePdf));
 };
 
-const tieneEtapaTributaria = (item: BorradorPanel) => Boolean(
-  item.estadoFacturacion
-  || item.nroComprobante
-  || item.enlacePdfFaregas
-  || item.enlacePdf
-  || ['PREVISUALIZACION', 'VERIFICACION_EMISION'].includes(String(item.pasoActual || '').toUpperCase())
-);
-
 const esAnulacionPendiente = (item: BorradorPanel) => ['BORRADOR', 'PENDIENTE']
   .includes(String(item.estadoAnulacion || '').trim().toUpperCase());
 
@@ -220,17 +214,18 @@ export const etiquetaSolicitudAnulacion = (estado?: string | null): string => {
 export const puedeSolicitarAnulacionCertificado = (item: BorradorPanel, permisos: string[]) => (
   puedeCrearSolicitudAnulacion(permisos)
   && certificadoEmitidoVisible(item)
+  && item.anulacionEnPlazo === true
   && !esSolicitudActivaAnulacion(item.solicitudOperacionEstado)
   && !esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)
 );
 
 export const puedeCrearNotaCreditoPanel = (item: BorradorPanel, permisos: string[]) => {
   if (!permisos.includes('FAREGAS_NOTA_CREDITO')) return false;
+  if (item.anulacionEnPlazo !== false) return false;
   if (esSolicitudActivaAnulacion(item.solicitudOperacionEstado) || esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)) return false;
   if (esAnulacionPendiente(item) || esAnulacionAceptada(item)) return false;
   const comprobanteAceptado = esResumenComprobanteOperable(item);
-  const comprobantePotencial = tieneEtapaTributaria(item);
-  return Boolean(comprobanteAceptado || comprobantePotencial);
+  return comprobanteAceptado;
 };
 
 export function InicioView() {
@@ -808,7 +803,7 @@ export function InicioView() {
                               className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
                             ><FileText size={16} /></button>
                           )}
-                          {anulacionPendiente && ins.anulacionId && (
+                          {!solicitudCompletada && anulacionPendiente && ins.anulacionId && (
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
@@ -817,7 +812,7 @@ export function InicioView() {
                               className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
                             ><RefreshCw size={16} className={accionEnProceso === ins.id ? 'animate-spin' : ''} /></button>
                           )}
-                          {accionesCongeladas && !solicitudActiva && !solicitudCompletada && (
+                          {!solicitudCompletada && accionesCongeladas && !solicitudActiva && (
                             <button
                               type="button"
                               disabled
@@ -825,7 +820,7 @@ export function InicioView() {
                               className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
                             ><Ban size={16} /></button>
                           )}
-                          {puedeCrearNota && (
+                          {!solicitudCompletada && puedeCrearNota && (
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
@@ -834,7 +829,7 @@ export function InicioView() {
                               className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[#052A79] hover:bg-violet-100 disabled:opacity-50"
                             ><FileEdit size={16} /></button>
                           )}
-                          {puedeSolicitar && (
+                          {!solicitudCompletada && puedeSolicitar && (
                             <button
                               type="button"
                               onClick={() => solicitarAnulacionTotal(ins)}
@@ -842,7 +837,7 @@ export function InicioView() {
                               className="rounded-md border border-red-300 bg-red-50 px-2.5 py-1.5 text-red-700 hover:bg-red-100"
                             ><ClipboardX size={16} /></button>
                           )}
-                          {solicitudActiva && ins.solicitudOperacionId && (
+                          {!solicitudCompletada && solicitudActiva && ins.solicitudOperacionId && (
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
@@ -854,7 +849,7 @@ export function InicioView() {
                               {etiquetaSolicitudAnulacion(solicitudEstado)}
                             </button>
                           )}
-                          {accionesCongeladas && !solicitudCompletada && tienePermisoNotaCredito && (
+                          {!solicitudCompletada && accionesCongeladas && tienePermisoNotaCredito && (
                             <button
                               type="button"
                               disabled
@@ -949,9 +944,9 @@ export function InicioView() {
                     </div>
                   </div>
 
-                  {(!certificadoEditable || puedeVerComprobante) && (
+                  {((!certificadoEditable && !solicitudCompletada) || puedeVerComprobante) && (
                     <div className="pt-3 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
-                      {!certificadoEditable && (
+                      {!certificadoEditable && !solicitudCompletada && (
                         <button
                           type="button"
                           onClick={() => abrirRegistro(ins)}
@@ -970,7 +965,7 @@ export function InicioView() {
                       )}
                     </div>
                   )}
-                  {(puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar) && (
+                  {!solicitudCompletada && (puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar) && (
                     <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       {anulacionPendiente && ins.anulacionId && (
                         <button

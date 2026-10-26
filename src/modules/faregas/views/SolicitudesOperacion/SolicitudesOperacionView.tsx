@@ -61,6 +61,8 @@ function DetalleSolicitud({
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(false);
   const puedeAprobar = permisos.includes('FAREGAS_SOLICITUD_APROBAR') || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
+  const puedeAutoaprobar = permisos.includes('FAREGAS_SOLICITUD_APROBAR')
+    && permisos.includes('FAREGAS_SOLICITUD_AUTOAPROBAR');
   const puedeRechazar = permisos.includes('FAREGAS_SOLICITUD_RECHAZAR') || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
   const esPropia = solicitud.usuarioSolicitante === usuarioActual();
 
@@ -71,10 +73,15 @@ function DetalleSolicitud({
   }, [solicitud.id]);
 
   const decidir = async (accion: 'aprobar' | 'rechazar' | 'cancelar') => {
-    const requiereTexto = accion !== 'aprobar';
+    const esAutoaprobacion = accion === 'aprobar' && esPropia;
+    const requiereTexto = accion !== 'aprobar' || esAutoaprobacion;
     const resultado = await Swal.fire({
       title: accion === 'aprobar' ? '¿Aprobar solicitud?' : accion === 'rechazar' ? '¿Rechazar solicitud?' : '¿Cancelar solicitud?',
-      text: accion === 'aprobar' ? 'Quedará aprobada y pendiente de ejecución; no se modificará ningún documento.' : undefined,
+      text: accion === 'aprobar'
+        ? esAutoaprobacion
+          ? 'Esta excepción quedará auditada. La solicitud sólo quedará aprobada y pendiente de ejecución; no se modificará ningún documento.'
+          : 'Quedará aprobada y pendiente de ejecución; no se modificará ningún documento.'
+        : undefined,
       input: requiereTexto ? 'textarea' : undefined,
       inputLabel: requiereTexto ? 'Justificación obligatoria' : 'Justificación opcional',
       inputPlaceholder: 'Escriba el sustento de la decisión',
@@ -85,11 +92,28 @@ function DetalleSolicitud({
       inputValidator: requiereTexto ? (valor: string) => (!String(valor || '').trim() ? 'Ingrese una justificación.' : undefined) : undefined,
     });
     if (!resultado.isConfirmed) return;
+    if (esAutoaprobacion) {
+      const confirmacion = await Swal.fire({
+        icon: 'warning',
+        title: 'Confirmar autoaprobación excepcional',
+        text: 'Confirmo que soy el solicitante y que autorizo registrar esta excepción administrativa con el sustento ingresado.',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, confirmar autoaprobación',
+        cancelButtonText: 'Volver',
+        confirmButtonColor: '#b45309',
+      });
+      if (!confirmacion.isConfirmed) return;
+    }
     setProcesando(true);
     try {
       const texto = String(resultado.value || '').trim();
       const actualizada = accion === 'aprobar'
-        ? await faregasSolicitudesOperacionApi.aprobar(solicitud.id, solicitud.version, texto || undefined)
+        ? await faregasSolicitudesOperacionApi.aprobar(
+          solicitud.id,
+          solicitud.version,
+          texto || undefined,
+          esAutoaprobacion,
+        )
         : accion === 'rechazar'
           ? await faregasSolicitudesOperacionApi.rechazar(solicitud.id, solicitud.version, texto)
           : await faregasSolicitudesOperacionApi.cancelar(solicitud.id, solicitud.version, texto);
@@ -167,6 +191,7 @@ function DetalleSolicitud({
             {solicitud.tipoOperacion === 'ANULAR_AMBOS' && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && <button type="button" disabled={procesando} onClick={() => void decidir('cancelar')} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700">Cancelar mi solicitud</button>}
             {solicitud.tipoOperacion === 'ANULAR_AMBOS' && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeRechazar && <button type="button" disabled={procesando} onClick={() => void decidir('rechazar')} className="flex items-center gap-1 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white"><XCircle size={16} /> Rechazar</button>}
             {solicitud.tipoOperacion === 'ANULAR_AMBOS' && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeAprobar && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Aprobar solicitud</button>}
+            {solicitud.tipoOperacion === 'ANULAR_AMBOS' && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && puedeAutoaprobar && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Autoaprobar excepcionalmente</button>}
           </div>
         </div>
       </div>

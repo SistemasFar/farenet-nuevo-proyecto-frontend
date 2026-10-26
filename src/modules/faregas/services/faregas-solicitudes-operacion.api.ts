@@ -156,9 +156,19 @@ export const faregasSolicitudesOperacionApi = {
     const respuesta = await faregasFetch(`/solicitudes-operacion/${id}`);
     return respuesta.data;
   },
-  aprobar: async (id: number, version: number, justificacion?: string): Promise<SolicitudOperacion> => {
+  aprobar: async (
+    id: number,
+    version: number,
+    justificacion?: string,
+    confirmarAutoaprobacion = false,
+  ): Promise<SolicitudOperacion> => {
     const respuesta = await faregasFetch(`/solicitudes-operacion/${id}/aprobar`, {
-      method: 'POST', body: JSON.stringify({ version, justificacion }),
+      method: 'POST',
+      body: JSON.stringify({
+        version,
+        justificacion,
+        ...(confirmarAutoaprobacion ? { confirmarAutoaprobacion: true } : {}),
+      }),
     });
     return respuesta.data;
   },

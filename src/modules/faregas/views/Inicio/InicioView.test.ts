@@ -162,22 +162,24 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
   it('12. Bloque A: el botón de anulación solo aparece sin solicitud activa ni completada', () => {
     const permisos = ['FAREGAS_SOLICITUD_CREAR'];
 
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001' } as BorradorPanel, permisos)).toBe(true);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'PENDIENTE_APROBACION' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'APROBADA' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'EN_EJECUCION' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'REQUIERE_INTERVENCION' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'COMPLETADA' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true } as BorradorPanel, permisos)).toBe(true);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: false } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'PENDIENTE_APROBACION' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'APROBADA' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'EN_EJECUCION' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'REQUIERE_INTERVENCION' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'COMPLETADA' } as BorradorPanel, permisos)).toBe(false);
     // Una solicitud rechazada o cancelada permite reabrir la solicitud nueva.
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', solicitudOperacionEstado: 'RECHAZADA' } as BorradorPanel, permisos)).toBe(true);
+    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'RECHAZADA' } as BorradorPanel, permisos)).toBe(true);
   });
 
   it('13. Bloque A: notas de crédito congeladas durante una solicitud activa o completada', () => {
     const permisos = ['FAREGAS_NOTA_CREDITO'];
 
-    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true } as BorradorPanel, permisos)).toBe(true);
-    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, solicitudOperacionEstado: 'PENDIENTE_APROBACION' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, solicitudOperacionEstado: 'COMPLETADA' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, anulacionEnPlazo: false } as BorradorPanel, permisos)).toBe(true);
+    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, anulacionEnPlazo: true } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, anulacionEnPlazo: false, solicitudOperacionEstado: 'PENDIENTE_APROBACION' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, anulacionEnPlazo: false, solicitudOperacionEstado: 'COMPLETADA' } as BorradorPanel, permisos)).toBe(false);
   });
 
   it('14. Bloque A: el indicador abre la solicitud existente y no el formulario de creación', () => {

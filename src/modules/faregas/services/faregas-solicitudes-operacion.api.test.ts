@@ -63,6 +63,19 @@ describe('faregas-solicitudes-operacion.api', () => {
     expect(res.estado).toBe('APROBADA');
   });
 
+  it('autoaprueba enviando la confirmación explícita', async () => {
+    const spy = vi.spyOn(httpClient, 'faregasFetch').mockResolvedValue({ data: { id: 1, estado: 'APROBADA' } });
+    await faregasSolicitudesOperacionApi.aprobar(1, 1, 'Contingencia sustentada', true);
+    expect(spy).toHaveBeenCalledWith('/solicitudes-operacion/1/aprobar', {
+      method: 'POST',
+      body: JSON.stringify({
+        version: 1,
+        justificacion: 'Contingencia sustentada',
+        confirmarAutoaprobacion: true,
+      }),
+    });
+  });
+
   it('rechaza enviando version y justificacion obligatoria', async () => {
     const spy = vi.spyOn(httpClient, 'faregasFetch').mockResolvedValue({ data: { id: 1, estado: 'RECHAZADA' } });
     const res = await faregasSolicitudesOperacionApi.rechazar(1, 1, 'No procede por vencimiento');
