@@ -80,13 +80,6 @@ export interface ContextoRectificacion {
     usuarioSolicitante: string;
     fechaSolicitud: string;
   } | null;
-  permisos: {
-    solicitar: boolean;
-    aprobar: boolean;
-    ejecutar: boolean;
-    rectificarDirectamente: boolean;
-    verHistorial: boolean;
-  };
   versiones: VersionCertificadoRectificacion[];
   gestionExterna: {
     aplicaLocalmente: boolean;
@@ -160,6 +153,7 @@ export const faregasRectificacionesApi = {
     observaciones?: string | null;
     datosPropuestos: DatosPropuestosRectificacion;
     idempotenciaClave: string;
+    versionBase: number;
   }) => fetchWithToken(`/certificados/${certificadoId}/rectificacion/directa`, {
     method: 'POST',
     body: JSON.stringify(payload)

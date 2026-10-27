@@ -79,7 +79,12 @@ describe('inicialización del modo rectificación', () => {
     expect(fuenteWizard).toContain('faregasRectificacionesApi.ejecutarDirecta');
     expect(fuenteWizard).toContain('GUARDAR RECTIFICACIÓN Y EMITIR CERTIFICADO');
     expect(fuenteWizard).not.toContain('enviarSolicitudRectificacion');
+    expect(fuenteWizard).not.toContain('permisos.rectificarDirectamente');
+    expect(fuenteWizard).not.toContain('permiso explícito para rectificar');
+    expect(fuenteWizard).not.toContain('RECTIFICACIÓN EN CURSO');
     expect(fuenteApiRectificacion).toContain('/rectificacion/directa');
+    expect(fuenteApiRectificacion).toContain('versionBase: number');
+    expect(fuenteWizard).toContain('versionBase');
     expect(fuenteWizard).toContain("{ id: 'rectificacion', label: 'Confirmar Rectificación'");
   });
 });

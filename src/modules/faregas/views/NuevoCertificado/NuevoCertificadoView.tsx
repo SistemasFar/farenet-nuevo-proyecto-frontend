@@ -37,6 +37,7 @@ import { indicePasoVisual, puedeRetrocederWizard } from './faregas-emision';
 import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './faregas-formulario-operativo';
 import { descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { normalizarCombustibleGnvAnual } from './faregas-certificado-campos';
+import { ControlAutosave, crearSnapshotAutosave } from './autosave-control';
 
 
 
@@ -177,6 +178,146 @@ const mapVerificacionBorrador = (verificacion: any) => ({
   observacion: textValue(verificacion.observacion),
 });
 
+interface EstadoVehiculoPersistible {
+  formCaja: FormCajaState;
+  formVehiculo: FormVehiculoState;
+  titulares: TitularState[];
+  formGlp: any;
+  formGnv: any;
+  formConformidad: any;
+  formatoFormulario: FormularioFormatoDinamicoFaregas | null;
+  formatoValores: Record<string, string>;
+}
+
+const crearSnapshotVehiculo = (estado: EstadoVehiculoPersistible) => crearSnapshotAutosave({
+  tipoCertificado: estado.formCaja.tipoCertificado,
+  modalidadCertificado: estado.formCaja.modalidadCertificado,
+  categoria: estado.formCaja.categoria,
+  placa: normalizarPlacaWizard(estado.formCaja.placa),
+  formVehiculo: estado.formVehiculo,
+  titulares: estado.titulares,
+  formGlp: estado.formGlp,
+  formGnv: estado.formGnv,
+  formConformidad: estado.formConformidad,
+  formatoFormularioId: estado.formatoFormulario?.formatoId ?? null,
+  formatoVersionId: estado.formatoFormulario?.versionId ?? null,
+  formatoValores: estado.formatoValores,
+});
+
+const construirEstadoVehiculoRecuperado = (
+  data: any,
+  actual: EstadoVehiculoPersistible,
+  placaSolicitada: string
+): EstadoVehiculoPersistible => {
+  const placa = normalizarPlacaWizard(data.placa) || placaSolicitada;
+  const categoria = textValue(data.categoriaKey ?? data.categoria) || actual.formCaja.categoria;
+  const titularesRecuperados = Array.isArray(data.titularesFaregas) && data.titularesFaregas.length > 0
+    ? data.titularesFaregas.map((titular: any) => mapTitularBorrador({ ...titular, id: null }))
+    : actual.titulares;
+
+  let formGlp = actual.formGlp;
+  if (data.glpFaregas) {
+    const glp = data.glpFaregas;
+    formGlp = {
+      ...actual.formGlp,
+      tallerAutorizadoId: glp.taller_autorizado_id || actual.formGlp.tallerAutorizadoId,
+      fechaVigencia: textValue(glp.vigencia_hasta).slice(0, 10) || actual.formGlp.fechaVigencia,
+      expedienteTecnico: glp.expediente_tecnico || actual.formGlp.expedienteTecnico,
+      combustiblePosterior: glp.combustible_posterior || actual.formGlp.combustiblePosterior || '',
+      pesoNetoPosterior: glp.peso_neto_posterior == null
+        ? actual.formGlp.pesoNetoPosterior ?? ''
+        : enteroValue(glp.peso_neto_posterior, 6),
+      cargaUtilPosterior: glp.carga_util_posterior == null
+        ? actual.formGlp.cargaUtilPosterior ?? ''
+        : enteroValue(glp.carga_util_posterior, 6),
+      componentes: (glp.componentes || []).map((componente: any) => ({
+        orden: Number(componente.orden),
+        componente: componente.componente,
+        marca: componente.marca || '',
+        modelo: componente.modelo || '',
+        capacidadLitros: enteroValue(componente.capacidad_litros, 5),
+        mesFabricacion: textValue(componente.mes_fabricacion),
+        anioFabricacion: enteroValue(componente.anio_fabricacion, 4),
+        numeroSerie: componente.numero_serie || '',
+      })),
+      verificaciones: (glp.verificaciones || []).map(mapVerificacionBorrador),
+    };
+  }
+
+  let formGnv = actual.formGnv;
+  if (data.gnvFaregas) {
+    const gnv = data.gnvFaregas;
+    formGnv = {
+      ...actual.formGnv,
+      tallerAutorizadoId: gnv.taller_autorizado_id || actual.formGnv.tallerAutorizadoId,
+      fechaVigencia: textValue(gnv.vigencia_hasta).slice(0, 10) || actual.formGnv.fechaVigencia,
+      expedienteTecnico: gnv.expediente_tecnico || actual.formGnv.expedienteTecnico,
+      observaciones: gnv.observaciones || actual.formGnv.observaciones || '',
+      combustiblePosterior: gnv.combustible_posterior || actual.formGnv.combustiblePosterior || '',
+      pesoNetoPosterior: gnv.peso_neto_posterior == null
+        ? actual.formGnv.pesoNetoPosterior ?? ''
+        : enteroValue(gnv.peso_neto_posterior, 6),
+      componentes: (gnv.componentes || []).map((componente: any) => {
+        const capacidad = textValue(componente.capacidad_litros);
+        const noAplica = capacidad.trim().toUpperCase() === 'NO APLICA';
+        return {
+          orden: Number(componente.orden),
+          componente: componente.componente,
+          marca: componente.marca || '',
+          modelo: componente.modelo || '',
+          capacidadLitros: noAplica ? 'NO APLICA' : enteroValue(capacidad, 5),
+          modoCapacidad: noAplica ? 'NO_APLICA' : 'VALOR',
+          mesFabricacion: textValue(componente.mes_fabricacion),
+          anioFabricacion: enteroValue(componente.anio_fabricacion, 4),
+          numeroSerie: componente.numero_serie || '',
+        };
+      }),
+      cilindros: (gnv.cilindros || []).map((cilindro: any) => ({
+        orden: Number(cilindro.orden),
+        marca: cilindro.marca || '',
+        mesFabricacion: textValue(cilindro.mes_fabricacion),
+        anioFabricacion: enteroValue(cilindro.anio_fabricacion, 4),
+        numeroSerie: cilindro.numero_serie || '',
+        capacidadLitros: enteroValue(cilindro.capacidad_litros, 5),
+        pesoVacio: cilindro.peso_vacio || '',
+      })),
+      verificaciones: (gnv.verificaciones || []).map(mapVerificacionBorrador),
+    };
+  }
+
+  let formConformidad = actual.formConformidad;
+  if (data.conformidadFaregas) {
+    const conformidad = data.conformidadFaregas;
+    const valor = (nuevo: unknown, previo: unknown) => (
+      nuevo !== null && nuevo !== undefined && (typeof nuevo !== 'string' || nuevo.trim() !== '')
+        ? nuevo
+        : previo
+    );
+    formConformidad = {
+      ...actual.formConformidad,
+      tipoConformidad: valor(conformidad.tipo_conformidad, actual.formConformidad.tipoConformidad),
+      tipoTramite: valor(conformidad.tipo_tramite, actual.formConformidad.tipoTramite),
+      caracteristicaRegistrable: valor(conformidad.caracteristica_registrable, actual.formConformidad.caracteristicaRegistrable),
+      motivo: valor(conformidad.motivo, actual.formConformidad.motivo),
+      usoOriginalVehiculo: valor(
+        conformidad.uso_original_vehiculo === 'MERCANCIAS' ? 'MERCANCÍAS' : conformidad.uso_original_vehiculo,
+        actual.formConformidad.usoOriginalVehiculo
+      ),
+      descripcion: valor(conformidad.descripcion, actual.formConformidad.descripcion),
+    };
+  }
+
+  return {
+    ...actual,
+    formCaja: { ...actual.formCaja, placa, categoria },
+    formVehiculo: { ...actual.formVehiculo, ...mapVehiculoBorrador(data), placaNueva: placa },
+    titulares: titularesRecuperados,
+    formGlp,
+    formGnv,
+    formConformidad,
+  };
+};
+
 export function NuevoCertificadoView() {
   const location = useLocation();
   return <NuevoCertificadoWizard key={location.pathname} />;
@@ -220,6 +361,8 @@ function NuevoCertificadoWizard() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState('');
   const autosaveQueueRef = React.useRef<Promise<void>>(Promise.resolve());
+  const autosaveControlRef = React.useRef(new ControlAutosave());
+  const sembrarAutosaveTrasCargaRef = React.useRef(Boolean(id));
   const [maestros, setMaestros] = useState<MaestrosCajaResponse['data'] | null>(null);
   const [maestrosVehiculo, setMaestrosVehiculo] = useState<MaestrosVehiculoResponse['data'] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -358,6 +501,67 @@ function NuevoCertificadoWizard() {
     [titulares]
   );
 
+  const estadoVehiculoActual = React.useMemo<EstadoVehiculoPersistible>(() => ({
+    formCaja,
+    formVehiculo,
+    titulares,
+    formGlp,
+    formGnv,
+    formConformidad,
+    formatoFormulario,
+    formatoValores,
+  }), [formCaja, formVehiculo, titulares, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores]);
+  const snapshotVehiculoAutosave = React.useMemo(
+    () => crearSnapshotVehiculo(estadoVehiculoActual),
+    [estadoVehiculoActual]
+  );
+  const snapshotPagoAutosave = React.useMemo(() => crearSnapshotAutosave({
+    pagosAgregados,
+    precioTotal,
+    condicionPago: formFacturacion.condicionPagoFac,
+    fechaInicioCredito: formFacturacion.fechaInicioCreditoFac,
+    fechaVencimiento: formFacturacion.fechaVencimientoFac,
+    cuotas: cuotasCreditoResueltas,
+  }), [pagosAgregados, precioTotal, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac, cuotasCreditoResueltas]);
+
+  const snapshotsSeccionesVehiculo = (estado: EstadoVehiculoPersistible) => {
+    const { componentes: glpComponentes, verificaciones: glpVerificaciones, ...glpCabecera } = estado.formGlp || {};
+    const {
+      componentes: gnvComponentes,
+      verificaciones: gnvVerificaciones,
+      cilindros: _gnvCilindros,
+      ...gnvCabecera
+    } = estado.formGnv || {};
+    return ({
+      VEHICULO_BASE: crearSnapshotAutosave({
+      tipoCertificado: estado.formCaja.tipoCertificado,
+      modalidad: estado.formCaja.modalidadCertificado,
+      placa: normalizarPlacaWizard(estado.formCaja.placa),
+      categoria: estado.formCaja.categoria,
+      vehiculo: estado.formVehiculo,
+    }),
+    TITULARES: crearSnapshotAutosave(estado.titulares),
+    GLP_CABECERA: crearSnapshotAutosave({ modalidad: estado.formCaja.modalidadCertificado, ...glpCabecera }),
+    GLP_COMPONENTES: crearSnapshotAutosave(glpComponentes || []),
+    GLP_VERIFICACIONES: crearSnapshotAutosave(glpVerificaciones || []),
+    GNV_CABECERA: crearSnapshotAutosave({ modalidad: estado.formCaja.modalidadCertificado, ...gnvCabecera }),
+    GNV_COMPONENTES: crearSnapshotAutosave(gnvComponentes || []),
+    GNV_VERIFICACIONES: crearSnapshotAutosave(gnvVerificaciones || []),
+    CONFORMIDAD: crearSnapshotAutosave(estado.formConformidad),
+    TALLER: crearSnapshotAutosave({
+      formularioId: estado.formatoFormulario?.formatoId ?? null,
+      versionId: estado.formatoFormulario?.versionId ?? null,
+      valores: estado.formatoValores,
+    }),
+    });
+  };
+
+  const sembrarSeccionesVehiculo = (estado: EstadoVehiculoPersistible) => {
+    Object.entries(snapshotsSeccionesVehiculo(estado)).forEach(([bloque, snapshot]) => {
+      autosaveControlRef.current.sembrar(bloque, snapshot);
+    });
+  };
+
   useEffect(() => {
     if (!formFacturacion.usarTitularPrincipalFac || !titularPrincipal) return;
 
@@ -420,19 +624,19 @@ function NuevoCertificadoWizard() {
     const tipoComprobante = formFacturacion.tipoDocFac || 'BOLETA';
     const condicionPago = tipoComprobante === 'BOLETA' ? 'CONTADO' : formFacturacion.condicionPagoFac;
     return ({
-    tipoComprobante,
-    tipoDocumentoCliente: formFacturacion.tipoDocumentoFac || (formFacturacion.nroDocFac.length === 11 ? 'RUC' : 'DNI'),
-    nroDocumento: formFacturacion.nroDocFac,
-    nombreRazonSocial: formFacturacion.razonSocialFac,
-    direccion: formFacturacion.direccionFac,
-    email: formFacturacion.emailFac || null,
-    telefono: formFacturacion.telefonoFac || null,
-    condicionPago,
-    fechaInicioCredito: condicionPago === 'CREDITO' ? formFacturacion.fechaInicioCreditoFac : null,
-    fechaVencimiento: condicionPago === 'CREDITO' ? (formFacturacion.fechaVencimientoFac || null) : null,
-    medioPago: medioPagoCalculado || null,
-    cuotas: condicionPago === 'CREDITO' ? cuotas : [],
-    facturarAlDuenoPrincipal: formFacturacion.usarTitularPrincipalFac,
+      tipoComprobante,
+      tipoDocumentoCliente: formFacturacion.tipoDocumentoFac || (formFacturacion.nroDocFac.length === 11 ? 'RUC' : 'DNI'),
+      nroDocumento: formFacturacion.nroDocFac,
+      nombreRazonSocial: formFacturacion.razonSocialFac,
+      direccion: formFacturacion.direccionFac,
+      email: formFacturacion.emailFac || null,
+      telefono: formFacturacion.telefonoFac || null,
+      condicionPago,
+      fechaInicioCredito: condicionPago === 'CREDITO' ? formFacturacion.fechaInicioCreditoFac : null,
+      fechaVencimiento: condicionPago === 'CREDITO' ? (formFacturacion.fechaVencimientoFac || null) : null,
+      medioPago: medioPagoCalculado || null,
+      cuotas: condicionPago === 'CREDITO' ? cuotas : [],
+      facturarAlDuenoPrincipal: formFacturacion.usarTitularPrincipalFac,
     });
   };
 
@@ -810,7 +1014,7 @@ function NuevoCertificadoWizard() {
       .then((respuesta) => {
         if (!vigente) return;
         if (!respuesta?.data) {
-          throw new Error('El servidor no devolvió la autorización de rectificación.');
+          throw new Error('El servidor no devolvió los datos de rectificación.');
         }
         setContextoRectificacion(respuesta.data);
       })
@@ -819,7 +1023,7 @@ function NuevoCertificadoWizard() {
         setContextoRectificacion(null);
         if (modoRectificacion) {
           setErrorContextoRectificacion(
-            `No se pudo verificar la autorización de rectificación. ${error?.message || 'Intente nuevamente.'}`
+            `No se pudieron verificar los datos y condiciones de rectificación. ${error?.message || 'Intente nuevamente.'}`
           );
         }
       })
@@ -932,16 +1136,26 @@ function NuevoCertificadoWizard() {
 
 
 
-  const consultarVehiculoFarenet = async (excludeCertificadoId?: number | null) => {
-    if (formCaja.tipo_flujo === 'TALLER_INSPECCION') return;
+  const consultarVehiculoFarenet = async (excludeCertificadoId?: number | null): Promise<EstadoVehiculoPersistible | null> => {
+    if (formCaja.tipo_flujo === 'TALLER_INSPECCION') return null;
     const placaSolicitada = normalizarPlacaWizard(formCaja.placa);
-    if (!placaSolicitada) return;
+    if (!placaSolicitada) return null;
     try {
-      const response = await faregasCertificadosApi.obtenerVehiculo(placaSolicitada, excludeCertificadoId, formCaja.tipoCertificado);
+      const response = await faregasCertificadosApi.obtenerVehiculo(
+        placaSolicitada,
+        excludeCertificadoId,
+        formCaja.tipoCertificado,
+        formCaja.modalidadCertificado
+      );
       // Si el operador cambió la placa mientras la consulta estaba en vuelo,
       // la respuesta pertenece a la placa anterior y no debe pisar la nueva.
-      if (placaActualRef.current !== placaSolicitada) return;
+      if (placaActualRef.current !== placaSolicitada) return null;
       if (response?.data) {
+        const estadoRecuperado = construirEstadoVehiculoRecuperado(
+          response.data,
+          estadoVehiculoActual,
+          placaSolicitada
+        );
         const placaEncontrada = normalizarPlacaWizard(response.data.placa) || placaSolicitada;
         const categoriaEncontrada = textValue(response.data.categoriaKey ?? response.data.categoria);
         setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(response.data), placaNueva: placaEncontrada }));
@@ -1049,6 +1263,16 @@ function NuevoCertificadoWizard() {
           }));
         }
 
+        // Aplicar al final una única fotografía coherente. Las asignaciones
+        // anteriores mantienen compatibilidad con DTO históricos; esta última
+        // evita que una mezcla parcial deje fuera campos recuperados.
+        setFormCaja(estadoRecuperado.formCaja);
+        setFormVehiculo(estadoRecuperado.formVehiculo);
+        setTitulares(estadoRecuperado.titulares);
+        setFormGlp(estadoRecuperado.formGlp);
+        setFormGnv(estadoRecuperado.formGnv);
+        setFormConformidad(estadoRecuperado.formConformidad);
+
         Swal.fire({
           icon: 'success',
           title: 'Vehículo encontrado',
@@ -1060,9 +1284,10 @@ function NuevoCertificadoWizard() {
           timer: 1800,
           showConfirmButton: false,
         });
+        return estadoRecuperado;
       }
     } catch (e: any) {
-      if (placaActualRef.current !== placaSolicitada) return;
+      if (placaActualRef.current !== placaSolicitada) return null;
       setVehiculoOrigen('MANUAL');
       if (e.status !== 404) {
         Swal.fire({
@@ -1072,6 +1297,7 @@ function NuevoCertificadoWizard() {
         });
       }
     }
+    return null;
   };
 
   const consultarDatosIniciales = async () => {
@@ -1082,6 +1308,7 @@ function NuevoCertificadoWizard() {
     setSaveError('');
     try {
       let idBorrador = certificadoId;
+      let borradorCreado = false;
       if (!idBorrador) {
         const response = await faregasCertificadosApi.crearBorrador({
           tipoCertificadoClave: formCaja.tipoCertificado,
@@ -1093,8 +1320,8 @@ function NuevoCertificadoWizard() {
         });
         idBorrador = Number(response?.data?.id);
         if (!idBorrador) throw new Error('El servidor no devolvió el identificador del borrador.');
+        borradorCreado = true;
         setCertificadoId(idBorrador);
-        navigate(`/faregas/certificados/${idBorrador}/continuar`, { replace: true });
       } else {
         await faregasCertificadosApi.actualizarBorrador(idBorrador, { tarifaCodigo: formCaja.tarifaCodigo });
         if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
@@ -1107,11 +1334,17 @@ function NuevoCertificadoWizard() {
         }
       }
 
-      await consultarVehiculoFarenet(idBorrador);
+      const estadoRecuperado = await consultarVehiculoFarenet(idBorrador);
       if (placaActualRef.current !== placaConsultada) {
         setIsConsultado(false);
         setSaveError('La placa cambió durante la consulta. Presione Consultar nuevamente.');
         return;
+      }
+      // La ruta cambia al crear el borrador y el wizard se remonta. Persistir
+      // primero la recuperación evita que ese remonte deje sólo la placa y
+      // pierda vehículo, titulares y componentes históricos.
+      if (estadoRecuperado) {
+        await guardarPasoVehiculo(idBorrador, false, estadoRecuperado);
       }
       const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
       aplicarResumenComercial(tarifaResponse.data);
@@ -1119,6 +1352,9 @@ function NuevoCertificadoWizard() {
       setFurthestStepIndex((actual) => Math.max(actual, indicePaso('DATOS_INICIALES')));
       setIsConsultado(true);
       setLastSavedAt(new Date());
+      if (borradorCreado) {
+        navigate(`/faregas/certificados/${idBorrador}/continuar`, { replace: true });
+      }
     } catch (e: any) {
       setIsConsultado(false);
       setSaveError(e.message || 'No se pudieron consultar los datos iniciales.');
@@ -1165,8 +1401,12 @@ function NuevoCertificadoWizard() {
     }
   };
 
-  const guardarTitularesBorrador = async (idBorrador: number) => {
-    const incompleto = titulares.find(t => (
+  const guardarTitularesBorrador = async (idBorrador: number, titularesFuente = titulares) => {
+    const snapshotTitulares = crearSnapshotAutosave(titularesFuente);
+    if (autosaveControlRef.current.estaPersistido('TITULARES', snapshotTitulares)) {
+      return titularesFuente;
+    }
+    const incompleto = titularesFuente.find(t => (
       !t.tipoDocumento.trim()
       || !t.nroDocumento.trim()
       || !t.nombreRazonSocial.trim()
@@ -1177,8 +1417,8 @@ function NuevoCertificadoWizard() {
 
     let huboCambios = false;
     const guardados: TitularState[] = [];
-    
-    for (const titular of titulares) {
+
+    for (const titular of titularesFuente) {
       const clienteId = await asegurarClienteFaregas(titular);
       const data = {
         clienteId,
@@ -1203,7 +1443,7 @@ function NuevoCertificadoWizard() {
         huboCambios = true;
       }
     }
-    
+
     if (huboCambios) {
       setTitulares(guardados);
     }
@@ -1220,85 +1460,114 @@ function NuevoCertificadoWizard() {
         clienteId: principal.clienteId
       });
     }
+    autosaveControlRef.current.sembrar('TITULARES', crearSnapshotAutosave(guardados));
+    return guardados;
   };
 
-  const guardarExpedienteTecnico = async (idBorrador: number, confirmarMaestro = false) => {
+  const guardarExpedienteTecnico = async (
+    idBorrador: number,
+    confirmarMaestro = false,
+    estado = estadoVehiculoActual
+  ) => {
+    const caja = estado.formCaja;
+    const vehiculo = estado.formVehiculo;
     const guardarVehiculo = confirmarMaestro
       ? faregasCertificadosApi.confirmarVehiculoBorrador
       : faregasCertificadosApi.guardarVehiculoBorrador;
-    const esGnvAnual = formCaja.tipoCertificado === 'GNV_ANUAL'
-      && String(formCaja.modalidadCertificado || '').toUpperCase() === 'ANUAL';
-    const esConformidad = formCaja.tipoCertificado === 'CONFORMIDAD';
+    const esGnvAnual = caja.tipoCertificado === 'GNV_ANUAL'
+      && String(caja.modalidadCertificado || '').toUpperCase() === 'ANUAL';
+    const esConformidad = caja.tipoCertificado === 'CONFORMIDAD';
     const combustibleVehiculo = esGnvAnual
-      ? normalizarCombustibleGnvAnual(formVehiculo.combustible)
-      : formVehiculo.combustible || (formCaja.tipoCertificado === 'GLP_ANUAL'
-          && String(formCaja.modalidadCertificado || '').toUpperCase() === 'ANUAL'
+      ? normalizarCombustibleGnvAnual(vehiculo.combustible)
+      : vehiculo.combustible || (caja.tipoCertificado === 'GLP_ANUAL'
+        && String(caja.modalidadCertificado || '').toUpperCase() === 'ANUAL'
         ? 'BI COMBUSTIBLE GLP'
         : null);
-    await guardarVehiculo(idBorrador, {
-      placa: formCaja.placa || formVehiculo.placaNueva || null,
-      categoria: formCaja.categoria || null,
-      clase: formVehiculo.clase || null,
-      marca: formVehiculo.marca || null,
-      modelo: formVehiculo.modelo || null,
-      version: formVehiculo.version || null,
-      anioFabricacion: normalizarEnteroCertificado(formVehiculo.anioFabricacion, 4) || null,
-      anioModelo: normalizarEnteroCertificado(formVehiculo.anioModelo, 4) || null,
-      vin: formVehiculo.vin || formVehiculo.serieChasis || null,
-      serieChasis: formVehiculo.serieChasis || (formCaja.tipoCertificado !== 'CONFORMIDAD' ? formVehiculo.vin : null) || null,
-      numeroMotor: formVehiculo.numeroMotor || null,
+    const snapshotBase = snapshotsSeccionesVehiculo(estado).VEHICULO_BASE;
+    if (confirmarMaestro || !autosaveControlRef.current.estaPersistido('VEHICULO_BASE', snapshotBase)) {
+      await guardarVehiculo(idBorrador, {
+      placa: caja.placa || vehiculo.placaNueva || null,
+      categoria: caja.categoria || null,
+      clase: vehiculo.clase || null,
+      marca: vehiculo.marca || null,
+      modelo: vehiculo.modelo || null,
+      version: vehiculo.version || null,
+      anioFabricacion: normalizarEnteroCertificado(vehiculo.anioFabricacion, 4) || null,
+      anioModelo: normalizarEnteroCertificado(vehiculo.anioModelo, 4) || null,
+      vin: vehiculo.vin || vehiculo.serieChasis || null,
+      serieChasis: vehiculo.serieChasis || (caja.tipoCertificado !== 'CONFORMIDAD' ? vehiculo.vin : null) || null,
+      numeroMotor: vehiculo.numeroMotor || null,
       combustible: combustibleVehiculo,
-      color: formVehiculo.color || null,
-      carroceria: formVehiculo.carroceria || null,
-      numeroCilindros: normalizarEnteroCertificado(formVehiculo.numeroCilindros, 4) || null,
+      color: vehiculo.color || null,
+      carroceria: vehiculo.carroceria || null,
+      numeroCilindros: normalizarEnteroCertificado(vehiculo.numeroCilindros, 4) || null,
       cilindrada: esConformidad
-        ? (String(formVehiculo.cilindrada ?? '').trim() || null)
-        : (normalizarEnteroCertificado(formVehiculo.cilindrada, 5) || null),
-      numeroEjes: normalizarEnteroCertificado(formVehiculo.numeroEjes, 4) || null,
-      numeroRuedas: normalizarEnteroCertificado(formVehiculo.numeroRuedas, 4) || null,
-      numeroAsientos: normalizarEnteroCertificado(formVehiculo.numeroAsientos, 4) || null,
-      numeroPasajeros: normalizarEnteroCertificado(formVehiculo.numeroPasajeros, 4) || null,
-      longitud: formVehiculo.longitud || null,
-      ancho: formVehiculo.ancho || null,
-      alto: formVehiculo.alto || null,
-      pesoNeto: normalizarEnteroCertificado(formVehiculo.pesoNeto, 6) || null,
-      pesoBruto: normalizarEnteroCertificado(formVehiculo.pesoBruto, 6) || null,
-      cargaUtil: normalizarEnteroCertificado(formVehiculo.cargaUtil, 6) || null,
-      potencia: formVehiculo.potencia || null,
-      formulaRodante: formVehiculo.formulaRodante || null,
-    });
-    await guardarTitularesBorrador(idBorrador);
+        ? (String(vehiculo.cilindrada ?? '').trim() || null)
+        : (normalizarEnteroCertificado(vehiculo.cilindrada, 5) || null),
+      numeroEjes: normalizarEnteroCertificado(vehiculo.numeroEjes, 4) || null,
+      numeroRuedas: normalizarEnteroCertificado(vehiculo.numeroRuedas, 4) || null,
+      numeroAsientos: normalizarEnteroCertificado(vehiculo.numeroAsientos, 4) || null,
+      numeroPasajeros: normalizarEnteroCertificado(vehiculo.numeroPasajeros, 4) || null,
+      longitud: vehiculo.longitud || null,
+      ancho: vehiculo.ancho || null,
+      alto: vehiculo.alto || null,
+      pesoNeto: normalizarEnteroCertificado(vehiculo.pesoNeto, 6) || null,
+      pesoBruto: normalizarEnteroCertificado(vehiculo.pesoBruto, 6) || null,
+      cargaUtil: normalizarEnteroCertificado(vehiculo.cargaUtil, 6) || null,
+      potencia: vehiculo.potencia || null,
+        formulaRodante: vehiculo.formulaRodante || null,
+      });
+      autosaveControlRef.current.sembrar('VEHICULO_BASE', snapshotBase);
+    }
+    await guardarTitularesBorrador(idBorrador, estado.titulares);
   };
 
   const guardarPasoTaller = async (idBorrador: number) => {
     if (!formatoFormulario) throw new Error(formatoFormularioError || 'No se pudo cargar el formulario del formato.');
-    await faregasCertificadosApi.guardarTaller(idBorrador, { valores: formatoValores });
+    const snapshotTaller = snapshotsSeccionesVehiculo(estadoVehiculoActual).TALLER;
+    if (!autosaveControlRef.current.estaPersistido('TALLER', snapshotTaller)) {
+      await faregasCertificadosApi.guardarTaller(idBorrador, { valores: formatoValores });
+      autosaveControlRef.current.sembrar('TALLER', snapshotTaller);
+    }
     await guardarTitularesBorrador(idBorrador);
   };
 
-  const guardarPasoVehiculo = async (idBorrador: number, confirmarMaestro = false) => {
-    await guardarExpedienteTecnico(idBorrador, confirmarMaestro);
-    if (formCaja.tipoCertificado === 'GNV_ANUAL') {
-      await faregasCertificadosApi.guardarGnv(idBorrador, {
-        vigenciaHasta: formGnv.fechaVigencia || formGnv.vigencia_hasta || null,
-        modalidad: formCaja.modalidadCertificado || null,
-        numeroChip: formGnv.numeroChip || formGnv.numero_chip || null,
+  const guardarPasoVehiculo = async (
+    idBorrador: number,
+    confirmarMaestro = false,
+    estado = estadoVehiculoActual
+  ) => {
+    const caja = estado.formCaja;
+    const gnvEstado = estado.formGnv;
+    const glpEstado = estado.formGlp;
+    const conformidadEstado = estado.formConformidad;
+    const snapshots = snapshotsSeccionesVehiculo(estado);
+    await guardarExpedienteTecnico(idBorrador, confirmarMaestro, estado);
+    if (caja.tipoCertificado === 'GNV_ANUAL') {
+      if (!autosaveControlRef.current.estaPersistido('GNV_CABECERA', snapshots.GNV_CABECERA)) {
+        await faregasCertificadosApi.guardarGnv(idBorrador, {
+          vigenciaHasta: gnvEstado.fechaVigencia || gnvEstado.vigencia_hasta || null,
+          modalidad: caja.modalidadCertificado || null,
+          numeroChip: gnvEstado.numeroChip || gnvEstado.numero_chip || null,
         // Campo opcional del inspector. Viaja al backend para que quede
         // persistido; el backend es quien lo recorta y guarda como NULL si
         // viene vacío. Antes no se enviaba y por eso se perdía.
-        observaciones: formGnv.observaciones || null,
+          observaciones: gnvEstado.observaciones || null,
         // Características DESPUÉS de la conversión. Sólo existen y sólo se
         // envían en modalidad INICIAL: es la única donde el formulario pinta la
         // tabla "antes / después". En ANUAL no se envían, para no poner en NULL
         // valores que el inspector ya haya escrito.
-        ...(formCaja.modalidadCertificado === 'INICIAL' ? {
-          combustiblePosterior: formGnv.combustiblePosterior || 'BI - COMBUSTIBLE GNV',
-          pesoNetoPosterior: normalizarEnteroCertificado(String(formGnv.pesoNetoPosterior || ''), 6) || null,
-        } : {}),
-      });
-      if (formGnv.componentes?.length > 0) {
+          ...(caja.modalidadCertificado === 'INICIAL' ? {
+            combustiblePosterior: gnvEstado.combustiblePosterior || 'BI - COMBUSTIBLE GNV',
+            pesoNetoPosterior: normalizarEnteroCertificado(String(gnvEstado.pesoNetoPosterior || ''), 6) || null,
+          } : {}),
+        });
+        autosaveControlRef.current.sembrar('GNV_CABECERA', snapshots.GNV_CABECERA);
+      }
+      if (gnvEstado.componentes?.length > 0
+        && !autosaveControlRef.current.estaPersistido('GNV_COMPONENTES', snapshots.GNV_COMPONENTES)) {
         await faregasCertificadosApi.guardarComponentesGnv(idBorrador, {
-          componentes: formGnv.componentes.map((c: any, i: number) => {
+          componentes: gnvEstado.componentes.map((c: any, i: number) => {
             const modo = c.modoCapacidad || (c.capacidadLitros === 'NO APLICA' ? 'NO_APLICA' : 'VALOR');
             return {
               ...c,
@@ -1307,53 +1576,68 @@ function NuevoCertificadoWizard() {
             };
           })
         });
+        autosaveControlRef.current.sembrar('GNV_COMPONENTES', snapshots.GNV_COMPONENTES);
       }
-      if (formGnv.verificaciones?.length > 0) {
+      if (gnvEstado.verificaciones?.length > 0
+        && !autosaveControlRef.current.estaPersistido('GNV_VERIFICACIONES', snapshots.GNV_VERIFICACIONES)) {
         await faregasCertificadosApi.guardarVerificacionesGnv(idBorrador, {
-          verificaciones: formGnv.verificaciones,
+          verificaciones: gnvEstado.verificaciones,
         });
+        autosaveControlRef.current.sembrar('GNV_VERIFICACIONES', snapshots.GNV_VERIFICACIONES);
       }
-    } else if (formCaja.tipoCertificado === 'GLP_ANUAL') {
-      await faregasCertificadosApi.guardarGlp(idBorrador, {
-        tallerAutorizadoId: formGlp.tallerAutorizadoId || null,
-        vigenciaHasta: formGlp.fechaVigencia || formGlp.vigencia_hasta || null,
-        expedienteTecnico: formGlp.expedienteTecnico || null,
-        modalidad: formCaja.modalidadCertificado || null,
-        combustiblePosterior: formCaja.modalidadCertificado === 'INICIAL' ? 'BI-COMBUSTIBLE GLP' : null,
-        pesoNetoPosterior: formCaja.modalidadCertificado === 'INICIAL'
-          ? (normalizarEnteroCertificado(String(formGlp.pesoNetoPosterior || ''), 6) || null)
-          : null,
-        cargaUtilPosterior: formCaja.modalidadCertificado === 'INICIAL'
-          ? (normalizarEnteroCertificado(String(formGlp.cargaUtilPosterior || ''), 6) || null)
-          : null,
-      });
-      await faregasCertificadosApi.guardarComponentesGlp(idBorrador, {
-        componentes: (formGlp.componentes || []).map((componente: any, index: number) => ({
-          orden: componente.orden || index + 1,
-          componente: componente.componente,
-          marca: componente.marca || null,
-          modelo: componente.modelo || null,
-          capacidadLitros: normalizarEnteroCertificado(String(componente.capacidadLitros || ''), 5) || null,
-          mesFabricacion: componente.mesFabricacion || null,
-          anioFabricacion: normalizarEnteroCertificado(String(componente.anioFabricacion || ''), 4) || null,
-          numeroSerie: componente.numeroSerie || null,
-        })),
-      });
-      if (formGlp.verificaciones?.length > 0) {
+    } else if (caja.tipoCertificado === 'GLP_ANUAL') {
+      if (!autosaveControlRef.current.estaPersistido('GLP_CABECERA', snapshots.GLP_CABECERA)) {
+        await faregasCertificadosApi.guardarGlp(idBorrador, {
+          tallerAutorizadoId: glpEstado.tallerAutorizadoId || null,
+          vigenciaHasta: glpEstado.fechaVigencia || glpEstado.vigencia_hasta || null,
+          expedienteTecnico: glpEstado.expedienteTecnico || null,
+          modalidad: caja.modalidadCertificado || null,
+          combustiblePosterior: caja.modalidadCertificado === 'INICIAL' ? 'BI-COMBUSTIBLE GLP' : null,
+          pesoNetoPosterior: caja.modalidadCertificado === 'INICIAL'
+            ? (normalizarEnteroCertificado(String(glpEstado.pesoNetoPosterior || ''), 6) || null)
+            : null,
+          cargaUtilPosterior: caja.modalidadCertificado === 'INICIAL'
+            ? (normalizarEnteroCertificado(String(glpEstado.cargaUtilPosterior || ''), 6) || null)
+            : null,
+        });
+        autosaveControlRef.current.sembrar('GLP_CABECERA', snapshots.GLP_CABECERA);
+      }
+      if (!autosaveControlRef.current.estaPersistido('GLP_COMPONENTES', snapshots.GLP_COMPONENTES)) {
+        await faregasCertificadosApi.guardarComponentesGlp(idBorrador, {
+          componentes: (glpEstado.componentes || []).map((componente: any, index: number) => ({
+            orden: componente.orden || index + 1,
+            componente: componente.componente,
+            marca: componente.marca || null,
+            modelo: componente.modelo || null,
+            capacidadLitros: normalizarEnteroCertificado(String(componente.capacidadLitros || ''), 5) || null,
+            mesFabricacion: componente.mesFabricacion || null,
+            anioFabricacion: normalizarEnteroCertificado(String(componente.anioFabricacion || ''), 4) || null,
+            numeroSerie: componente.numeroSerie || null,
+          })),
+        });
+        autosaveControlRef.current.sembrar('GLP_COMPONENTES', snapshots.GLP_COMPONENTES);
+      }
+      if (glpEstado.verificaciones?.length > 0
+        && !autosaveControlRef.current.estaPersistido('GLP_VERIFICACIONES', snapshots.GLP_VERIFICACIONES)) {
         await faregasCertificadosApi.guardarVerificacionesGlp(idBorrador, {
-          verificaciones: formGlp.verificaciones,
+          verificaciones: glpEstado.verificaciones,
         });
+        autosaveControlRef.current.sembrar('GLP_VERIFICACIONES', snapshots.GLP_VERIFICACIONES);
       }
-    } else if (formCaja.tipoCertificado === 'CONFORMIDAD') {
-      await faregasCertificadosApi.guardarConformidad(idBorrador, {
-        tipoConformidad: formConformidad.tipoConformidad || null,
-        tipoTramite: formConformidad.tipoTramite || null,
-        caracteristicaRegistrable: formConformidad.caracteristicaRegistrable || null,
-        motivo: formConformidad.motivo || null,
-        descripcion: formConformidad.descripcion || null,
-        usoOriginalVehiculo: formConformidad.usoOriginalVehiculo || null,
-      });
+    } else if (caja.tipoCertificado === 'CONFORMIDAD') {
+      if (!autosaveControlRef.current.estaPersistido('CONFORMIDAD', snapshots.CONFORMIDAD)) {
+        await faregasCertificadosApi.guardarConformidad(idBorrador, {
+          tipoConformidad: conformidadEstado.tipoConformidad || null,
+          tipoTramite: conformidadEstado.tipoTramite || null,
+          caracteristicaRegistrable: conformidadEstado.caracteristicaRegistrable || null,
+          motivo: conformidadEstado.motivo || null,
+          descripcion: conformidadEstado.descripcion || null,
+          usoOriginalVehiculo: conformidadEstado.usoOriginalVehiculo || null,
+        });
+        autosaveControlRef.current.sembrar('CONFORMIDAD', snapshots.CONFORMIDAD);
+      }
     }
+    autosaveControlRef.current.sembrar('VEHICULO', crearSnapshotVehiculo(estado));
     setLastSavedAt(new Date());
   };
 
@@ -1412,7 +1696,14 @@ function NuevoCertificadoWizard() {
     return resumenPago;
   };
 
-  const encolarAutosave = (guardar: () => Promise<unknown>) => {
+  const encolarAutosave = (
+    bloque: 'VEHICULO' | 'PAGO',
+    snapshot: string,
+    guardar: () => Promise<unknown>
+  ) => {
+    if (!autosaveControlRef.current.preparar(bloque, snapshot)) {
+      return autosaveQueueRef.current;
+    }
     autosaveQueueRef.current = autosaveQueueRef.current
       .catch(() => undefined)
       .then(async () => {
@@ -1420,8 +1711,10 @@ function NuevoCertificadoWizard() {
         setSaveError('');
         try {
           await guardar();
+          autosaveControlRef.current.confirmar(bloque, snapshot);
           setLastSavedAt(new Date());
         } catch (e: any) {
+          autosaveControlRef.current.fallar(bloque, snapshot);
           setSaveError(e.message || 'No se pudieron sincronizar los cambios.');
           throw e;
         } finally {
@@ -1431,34 +1724,58 @@ function NuevoCertificadoWizard() {
     return autosaveQueueRef.current;
   };
 
+  // La hidratación es lectura: se registra como línea base y nunca dispara un
+  // PUT. Para un borrador nuevo, la recuperación histórica se persiste de
+  // forma explícita antes de cambiar la URL.
+  useEffect(() => {
+    if (!sembrarAutosaveTrasCargaRef.current
+      || !certificadoId
+      || loading
+      || loadingRegistro) return;
+    autosaveControlRef.current.sembrar('VEHICULO', snapshotVehiculoAutosave);
+    autosaveControlRef.current.sembrar('PAGO', snapshotPagoAutosave);
+    sembrarSeccionesVehiculo(estadoVehiculoActual);
+    sembrarAutosaveTrasCargaRef.current = false;
+    // La siembra se ejecuta una sola vez por hidratación; la referencia mutable
+    // evita convertirla en una escritura cada vez que se recrean los helpers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [certificadoId, loading, loadingRegistro, snapshotPagoAutosave, snapshotVehiculoAutosave, estadoVehiculoActual]);
+
   // Autosave por bloques, serializado y con debounce para no guardar por tecla.
   useEffect(() => {
-    if (!certificadoId || loading || soloLectura || modoRectificacion || currentStepIndex !== indicePaso('VEHICULO')) return;
+    if (!certificadoId || loading || loadingRegistro || soloLectura || modoRectificacion || currentStepIndex !== indicePaso('VEHICULO')) return;
+    if (autosaveControlRef.current.estaPersistido('VEHICULO', snapshotVehiculoAutosave)) return;
+    const estadoCapturado = estadoVehiculoActual;
     const timer = window.setTimeout(() => {
       if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
         if (!formatoFormulario) return;
-        void encolarAutosave(() => guardarPasoTaller(certificadoId)).catch(() => undefined);
+        void encolarAutosave('VEHICULO', snapshotVehiculoAutosave, () => guardarPasoTaller(certificadoId)).catch(() => undefined);
       } else {
-        void encolarAutosave(() => guardarPasoVehiculo(certificadoId)).catch(() => undefined);
+        void encolarAutosave(
+          'VEHICULO',
+          snapshotVehiculoAutosave,
+          () => guardarPasoVehiculo(certificadoId, false, estadoCapturado)
+        ).catch(() => undefined);
       }
     }, 1500);
     return () => window.clearTimeout(timer);
     // Los objetos representan el bloque completo que se está editando.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, soloLectura, currentStepIndex, formCaja.categoria, formVehiculo, formGlp, formGnv, formConformidad, formatoFormulario, formatoValores, titulares]);
+  }, [certificadoId, loading, loadingRegistro, soloLectura, modoRectificacion, currentStepIndex, snapshotVehiculoAutosave, estadoVehiculoActual, formCaja.tipo_flujo, formatoFormulario]);
 
   useEffect(() => {
-    if (!certificadoId || loading || soloLectura || modoRectificacion || currentStepIndex !== indicePaso('PAGO') || precioTotal <= 0) return;
+    if (!certificadoId || loading || loadingRegistro || soloLectura || modoRectificacion || currentStepIndex !== indicePaso('PAGO') || precioTotal <= 0) return;
+    if (autosaveControlRef.current.estaPersistido('PAGO', snapshotPagoAutosave)) return;
     if (formFacturacion.condicionPagoFac === 'CREDITO'
       && (!formFacturacion.fechaInicioCreditoFac
         || !formFacturacion.fechaVencimientoFac
         || formFacturacion.fechaVencimientoFac < formFacturacion.fechaInicioCreditoFac)) return;
     const timer = window.setTimeout(() => {
-      void encolarAutosave(() => guardarPasoPagoCompleto(certificadoId)).catch(() => undefined);
+      void encolarAutosave('PAGO', snapshotPagoAutosave, () => guardarPasoPagoCompleto(certificadoId)).catch(() => undefined);
     }, 1200);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, soloLectura, currentStepIndex, pagosAgregados, precioTotal, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac, cuotasCreditoResueltas]);
+  }, [certificadoId, loading, loadingRegistro, soloLectura, modoRectificacion, currentStepIndex, snapshotPagoAutosave, precioTotal, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac]);
 
   const eliminarTitularBorrador = async (titular: TitularState) => {
     if (!certificadoId || !titular.titularId) return;
@@ -1550,8 +1867,8 @@ function NuevoCertificadoWizard() {
         <div style="text-align: left; font-size: 13px;">
           <p style="font-weight: 700; color: #991b1b; margin-bottom: 8px;">
             ${regresarAlPasoTecnico
-              ? 'El borrador tiene datos incompletos. Regresamos a Vehículo y Datos Técnicos para que corrija los siguientes campos:'
-              : 'No puedes continuar. Corrige los siguientes campos:'}
+          ? 'El borrador tiene datos incompletos. Regresamos a Vehículo y Datos Técnicos para que corrija los siguientes campos:'
+          : 'No puedes continuar. Corrige los siguientes campos:'}
           </p>
           <ol style="padding-left: 20px; margin: 0; line-height: 1.6; color: #1e293b;">
             ${lista.map(item => `<li style="margin-bottom: 4px;"><strong>${item.etiqueta}:</strong> ${item.mensaje}</li>`).join('')}
@@ -1571,9 +1888,9 @@ function NuevoCertificadoWizard() {
     if (!modoRectificacion) return null;
     return construirPropuestaRectificacion({
       tipoCertificado: formCaja.tipoCertificado,
-      formCaja,
-      formVehiculo,
-      titulares,
+      formCaja: formCaja as unknown as Record<string, unknown>,
+      formVehiculo: formVehiculo as unknown as Record<string, unknown>,
+      titulares: titulares as unknown as Record<string, unknown>[],
       formGnv,
       formGlp,
       formConformidad,
@@ -1610,8 +1927,8 @@ function NuevoCertificadoWizard() {
           <td style="padding:7px 6px;text-align:left">${escapar(version.usuarioCreacion || '—')}</td>
           <td style="padding:7px 6px">
             ${version.enlacePdfVersion || version.enlacePdfOriginal
-              ? `<button type="button" data-version-pdf="${version.id}" data-version-numero="${version.numeroVersion}" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:7px;padding:4px 8px;font-weight:700;cursor:pointer">PDF</button>`
-              : '—'}
+          ? `<button type="button" data-version-pdf="${version.id}" data-version-numero="${version.numeroVersion}" style="border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:7px;padding:4px 8px;font-weight:700;cursor:pointer">PDF</button>`
+          : '—'}
           </td>
         </tr>
       `).join('');
@@ -1669,11 +1986,11 @@ function NuevoCertificadoWizard() {
 
   const guardarRectificacionDirecta = async () => {
     if (!certificadoId || !propuestaRectificacion || enviandoRectificacion) return;
-    if (!contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente) {
+    if (!contextoRectificacion?.permiteRectificar) {
       await Swal.fire(
         'Rectificación no disponible',
         contextoRectificacion?.motivosBloqueo?.join(' · ')
-          || 'No cuenta con el permiso explícito para rectificar o el certificado ya no admite cambios.',
+        || 'El certificado ya no admite cambios o existe una operación incompatible en curso.',
         'warning'
       );
       return;
@@ -1694,10 +2011,10 @@ function NuevoCertificadoWizard() {
       idempotenciaRectificacionRef.current = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
         : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (caracter) => {
-            const aleatorio = Math.floor(Math.random() * 16);
-            const valor = caracter === 'x' ? aleatorio : (aleatorio & 0x3) | 0x8;
-            return valor.toString(16);
-          });
+          const aleatorio = Math.floor(Math.random() * 16);
+          const valor = caracter === 'x' ? aleatorio : (aleatorio & 0x3) | 0x8;
+          return valor.toString(16);
+        });
     }
 
     const confirmacion = await Swal.fire({
@@ -1713,11 +2030,16 @@ function NuevoCertificadoWizard() {
 
     setEnviandoRectificacion(true);
     try {
+      const versionBase = contextoRectificacion.versiones.reduce(
+        (ultima, version) => Math.max(ultima, Number(version.numeroVersion || 0)),
+        1
+      );
       await faregasRectificacionesApi.ejecutarDirecta(certificadoId, {
         motivo: motivoRectificacion.trim(),
         observaciones: observacionesRectificacion.trim() || null,
         datosPropuestos: propuestaRectificacion,
-        idempotenciaClave: idempotenciaRectificacionRef.current
+        idempotenciaClave: idempotenciaRectificacionRef.current,
+        versionBase
       });
       await Swal.fire({
         title: 'Certificado rectificado',
@@ -1736,11 +2058,11 @@ function NuevoCertificadoWizard() {
   const irSiguientePaso = async () => {
     if (isSavingStep) return;
     if (modoRectificacion) {
-      if (!contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente) {
+      if (!contextoRectificacion?.permiteRectificar) {
         await Swal.fire(
           'Rectificación no disponible',
           contextoRectificacion?.motivosBloqueo?.join(' · ')
-            || 'No se pudo verificar el permiso directo para rectificar este certificado.',
+          || 'El certificado no está disponible para rectificación.',
           'warning'
         );
         return;
@@ -1856,6 +2178,7 @@ function NuevoCertificadoWizard() {
         if (exigirDatosTecnicosCompletos()) return;
         setIsSavingStep(true);
         try {
+          await autosaveQueueRef.current.catch(() => undefined);
           if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
           else await guardarPasoVehiculo(certificadoId, true);
           await persistirPaso(certificadoId, 'PREVISUALIZACION');
@@ -1947,6 +2270,7 @@ function NuevoCertificadoWizard() {
     if (STEPS[currentStepIndex].id === 'vehiculo' && certificadoId) {
       setIsSavingStep(true);
       try {
+        await autosaveQueueRef.current.catch(() => undefined);
         if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
         else await guardarPasoVehiculo(certificadoId);
       } catch (e: any) {
@@ -2242,7 +2566,7 @@ function NuevoCertificadoWizard() {
   }, [isSavingStep, saveError]);
 
   if (modoRectificacion && (loadingRegistro || loadingContextoRectificacion)) {
-    return <div className="p-8 text-center text-slate-500">Cargando certificado original y autorización de rectificación…</div>;
+    return <div className="p-8 text-center text-slate-500">Cargando certificado original y condiciones de rectificación…</div>;
   }
 
   const errorInicializacion = error || errorContextoRectificacion;
@@ -2298,9 +2622,7 @@ function NuevoCertificadoWizard() {
   const puedeMostrarBotonRectificar = Boolean(
     certificadoId
     && certificadoEstado === 'EMITIDO'
-    && contextoRectificacion?.permiteRectificar
-    && contextoRectificacion?.permisos.rectificarDirectamente
-    && !contextoRectificacion?.rectificacionActiva
+    && !modoRectificacion
   );
 
   return (
@@ -2390,299 +2712,299 @@ function NuevoCertificadoWizard() {
           onKeyDownCapture={manejarNavegacionFormulario}
           onClickCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}
           onSubmitCapture={soloLectura ? (event) => { event.preventDefault(); event.stopPropagation(); } : undefined}>
-        {modoRectificacion && currentStepIndex === 0 && (
-          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4">
-            <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Certificado original</p>
-                <h3 className="mt-1 text-2xl font-black text-slate-900">
-                  {contextoRectificacion?.certificado.numeroCertificado || numeroCertificadoOficial || 'Cargando…'}
-                </h3>
-                <p className="mt-1 text-sm font-semibold text-slate-600">
-                  {contextoRectificacion?.certificado.tipoNombre || formCaja.tipoCertificado}
-                  {' · '}
-                  {contextoRectificacion?.certificado.plantaNombre || plantaNombre}
-                  {' · '}
-                  {contextoRectificacion?.certificado.empresaNombre || 'FAREGAS'}
+          {modoRectificacion && currentStepIndex === 0 && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4">
+              <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">Certificado original</p>
+                  <h3 className="mt-1 text-2xl font-black text-slate-900">
+                    {contextoRectificacion?.certificado.numeroCertificado || numeroCertificadoOficial || 'Cargando…'}
+                  </h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">
+                    {contextoRectificacion?.certificado.tipoNombre || formCaja.tipoCertificado}
+                    {' · '}
+                    {contextoRectificacion?.certificado.plantaNombre || plantaNombre}
+                    {' · '}
+                    {contextoRectificacion?.certificado.empresaNombre || 'FAREGAS'}
+                  </p>
+                </div>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700">
+                  {contextoRectificacion?.certificado.estado || certificadoEstado}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Fecha de emisión original</p>
+                  <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.certificado.fechaEmision || '—'}</p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-700">Se conserva sin cambios</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Número DG</p>
+                  <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.certificado.numeroCertificado || '—'}</p>
+                  <p className="mt-1 text-xs font-semibold text-emerald-700">No se consume correlativo</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Comprobante asociado</p>
+                  <p className="mt-1 text-sm font-black text-slate-900">
+                    {contextoRectificacion?.comprobanteAsociado
+                      ? `${(contextoRectificacion.comprobanteAsociado as any).tipo_comprobante || ''} ${(contextoRectificacion.comprobanteAsociado as any).nro_comprobante || ''}`.trim() || 'Asociado'
+                      : 'Sin comprobante'}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">No se anula ni se reemite</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Versiones registradas</p>
+                  <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.versiones.length || 0}</p>
+                  <button type="button" onClick={() => void verHistorialRectificacion()} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline">
+                    <History className="h-3.5 w-3.5" /> Ver historial
+                  </button>
+                </div>
+              </div>
+
+              {contextoRectificacion && !contextoRectificacion.permiteRectificar && (
+                <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800">
+                  <p className="flex items-center gap-2 font-black"><History className="h-4 w-4" /> Certificado no disponible para rectificación</p>
+                  <p className="mt-1 font-semibold">{contextoRectificacion.motivosBloqueo.join(' · ')}</p>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                <h4 className="text-sm font-black uppercase tracking-wider text-blue-900">Qué puede corregirse</h4>
+                <p className="mt-2 text-sm font-semibold text-blue-900">
+                  Datos del vehículo, titular, marca, modelo, motor, VIN/serie, categoría, combustible, año, cilindrada,
+                  datos técnicos GLP/GNV, componentes, verificaciones, taller y observaciones. Los datos comerciales, fiscales,
+                  de pago y el comprobante electrónico no forman parte de esta rectificación.
+                </p>
+                <p className="mt-2 text-xs font-semibold text-blue-800">
+                  La corrección se aplicará sobre la misma certificación. Si el dato ya fue comunicado a una entidad externa
+                  (por ejemplo MTC o SUNARP), deberá tramitarse también por el canal oficial correspondiente.
                 </p>
               </div>
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700">
-                {contextoRectificacion?.certificado.estado || certificadoEstado}
-              </span>
-            </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Fecha de emisión original</p>
-                <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.certificado.fechaEmision || '—'}</p>
-                <p className="mt-1 text-xs font-semibold text-emerald-700">Se conserva sin cambios</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Número DG</p>
-                <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.certificado.numeroCertificado || '—'}</p>
-                <p className="mt-1 text-xs font-semibold text-emerald-700">No se consume correlativo</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Comprobante asociado</p>
-                <p className="mt-1 text-sm font-black text-slate-900">
-                  {contextoRectificacion?.comprobanteAsociado
-                    ? `${(contextoRectificacion.comprobanteAsociado as any).tipo_comprobante || ''} ${(contextoRectificacion.comprobanteAsociado as any).nro_comprobante || ''}`.trim() || 'Asociado'
-                    : 'Sin comprobante'}
-                </p>
-                <p className="mt-1 text-xs font-semibold text-slate-500">No se anula ni se reemite</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">Versiones registradas</p>
-                <p className="mt-1 text-lg font-black text-slate-900">{contextoRectificacion?.versiones.length || 0}</p>
-                <button type="button" onClick={() => void verHistorialRectificacion()} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline">
-                  <History className="h-3.5 w-3.5" /> Ver historial
-                </button>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-900">
+                <p className="font-black">Flujo obligatorio</p>
+                <p className="mt-1">Edición → previsualización → confirmación directa. La fecha real de rectificación se registra sólo en el historial; el PDF corregido conserva la fecha y el número originales.</p>
               </div>
             </div>
-
-            {contextoRectificacion && !contextoRectificacion.permiteRectificar && (
-              <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800">
-                <p className="flex items-center gap-2 font-black"><History className="h-4 w-4" /> Certificado no disponible para rectificación</p>
-                <p className="mt-1 font-semibold">{contextoRectificacion.motivosBloqueo.join(' · ')}</p>
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
-              <h4 className="text-sm font-black uppercase tracking-wider text-blue-900">Qué puede corregirse</h4>
-              <p className="mt-2 text-sm font-semibold text-blue-900">
-                Datos del vehículo, titular, marca, modelo, motor, VIN/serie, categoría, combustible, año, cilindrada,
-                datos técnicos GLP/GNV, componentes, verificaciones, taller y observaciones. Los datos comerciales, fiscales,
-                de pago y el comprobante electrónico no forman parte de esta rectificación.
-              </p>
-              <p className="mt-2 text-xs font-semibold text-blue-800">
-                La corrección se aplicará sobre la misma certificación. Si el dato ya fue comunicado a una entidad externa
-                (por ejemplo MTC o SUNARP), deberá tramitarse también por el canal oficial correspondiente.
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-semibold text-amber-900">
-              <p className="font-black">Flujo obligatorio</p>
-              <p className="mt-1">Edición → previsualización → confirmación directa. La fecha real de rectificación se registra sólo en el historial; el PDF corregido conserva la fecha y el número originales.</p>
-            </div>
-          </div>
-        )}
-        {!modoRectificacion && pasoActual.id === 'datos_iniciales' && (
-          <CajaStep
-            key={plantaSeleccionada}
-            plantaSeleccionada={plantaSeleccionada}
-            plantaNombre={plantaNombre}
-            formCaja={formCaja}
-            setFormCaja={setFormCaja}
-            certificadoId={certificadoId}
-            consultaRealizada={isConsultado}
-            consultando={isSavingStep}
-            erroresCampo={errores}
-            onCorregirCampo={limpiarErrorCampo}
-            onConsultar={consultarDatosIniciales}
-            onInvalidarConsulta={() => {
-              setIsConsultado(false);
-              setDescuento(0);
-              setPrecioTotal(precioSubtotal + Number(resumenComercial?.precioChip || 0));
-            }}
-            onDescuentoChange={(desc) => {
-              const precioChip = Number(resumenComercial?.precioChip || 0);
-              if (desc) {
-                setPrecioSubtotal(desc.tarifaOriginal);
-                setDescuento(desc.importeDescuento);
-                setPrecioTotal(desc.importeFinal + precioChip);
-                setResumenComercial((actual) => actual ? {
-                  ...actual,
-                  precioCertificado: desc.tarifaOriginal,
-                  descuentoCertificado: desc.importeDescuento,
-                  certificadoNeto: desc.importeFinal,
-                  importeTotal: desc.importeFinal + precioChip,
-                } : actual);
-              } else {
+          )}
+          {!modoRectificacion && pasoActual.id === 'datos_iniciales' && (
+            <CajaStep
+              key={plantaSeleccionada}
+              plantaSeleccionada={plantaSeleccionada}
+              plantaNombre={plantaNombre}
+              formCaja={formCaja}
+              setFormCaja={setFormCaja}
+              certificadoId={certificadoId}
+              consultaRealizada={isConsultado}
+              consultando={isSavingStep}
+              erroresCampo={errores}
+              onCorregirCampo={limpiarErrorCampo}
+              onConsultar={consultarDatosIniciales}
+              onInvalidarConsulta={() => {
+                setIsConsultado(false);
                 setDescuento(0);
-                setPrecioTotal(precioSubtotal + precioChip);
-                setResumenComercial((actual) => actual ? {
-                  ...actual,
-                  descuentoCertificado: 0,
-                  certificadoNeto: precioSubtotal,
-                  importeTotal: precioSubtotal + precioChip,
-                } : actual);
-              }
-            }}
-          />
-        )}
-        {!modoRectificacion && pasoActual.id === 'vehiculo' && (
-          <CertificateChipSection certificadoId={certificadoId} />
-        )}
-        {pasoActual.id === 'vehiculo' && (formCaja.tipo_flujo === 'CERTIFICACION' || formCaja.tipo_flujo === 'VEHICULAR_EXISTENTE') && (
-          <>
-            {expedienteError && (
-              <div role="alert" className="mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-                <span>{expedienteError}</span>
-                <button type="button" onClick={cargarMaestrosVehiculo} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-black text-white">REINTENTAR</button>
-              </div>
-            )}
-            <VehiculoStep
-              tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
-              modalidadCertificado={formCaja.modalidadCertificado}
-              servicioCodigo={formCaja.servicioCodigo}
-              servicioNombre={formCaja.concepto}
-              numeroCertificadoOficial={numeroCertificadoOficial}
-              formVehiculo={formVehiculo}
-              placaRodaje={normalizarPlacaWizard(formCaja.placa)}
-              setFormVehiculo={setFormVehiculo}
-              formPropietario={formPropietario}
-              setFormPropietario={setFormPropietario}
-              formGlp={formGlp}
-              setFormGlp={setFormGlp}
-              formGnv={formGnv}
-              setFormGnv={setFormGnv}
-              formConformidad={formConformidad}
-              setFormConformidad={setFormConformidad}
-              titulares={titulares}
-              setTitulares={setTitulares}
-              formFacturacion={formFacturacion}
-              setFormFacturacion={setFormFacturacion}
-              onRemoveTitular={modoRectificacion
-                ? async () => {
+                setPrecioTotal(precioSubtotal + Number(resumenComercial?.precioChip || 0));
+              }}
+              onDescuentoChange={(desc) => {
+                const precioChip = Number(resumenComercial?.precioChip || 0);
+                if (desc) {
+                  setPrecioSubtotal(desc.tarifaOriginal);
+                  setDescuento(desc.importeDescuento);
+                  setPrecioTotal(desc.importeFinal + precioChip);
+                  setResumenComercial((actual) => actual ? {
+                    ...actual,
+                    precioCertificado: desc.tarifaOriginal,
+                    descuentoCertificado: desc.importeDescuento,
+                    certificadoNeto: desc.importeFinal,
+                    importeTotal: desc.importeFinal + precioChip,
+                  } : actual);
+                } else {
+                  setDescuento(0);
+                  setPrecioTotal(precioSubtotal + precioChip);
+                  setResumenComercial((actual) => actual ? {
+                    ...actual,
+                    descuentoCertificado: 0,
+                    certificadoNeto: precioSubtotal,
+                    importeTotal: precioSubtotal + precioChip,
+                  } : actual);
+                }
+              }}
+            />
+          )}
+          {!modoRectificacion && pasoActual.id === 'vehiculo' && (
+            <CertificateChipSection certificadoId={certificadoId} />
+          )}
+          {pasoActual.id === 'vehiculo' && (formCaja.tipo_flujo === 'CERTIFICACION' || formCaja.tipo_flujo === 'VEHICULAR_EXISTENTE') && (
+            <>
+              {expedienteError && (
+                <div role="alert" className="mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                  <span>{expedienteError}</span>
+                  <button type="button" onClick={cargarMaestrosVehiculo} className="rounded-lg bg-red-700 px-3 py-2 text-xs font-black text-white">REINTENTAR</button>
+                </div>
+              )}
+              <VehiculoStep
+                tipoCertificado={formCaja.tipoCertificado as TipoCertificadoFaregas}
+                modalidadCertificado={formCaja.modalidadCertificado}
+                servicioCodigo={formCaja.servicioCodigo}
+                servicioNombre={formCaja.concepto}
+                numeroCertificadoOficial={numeroCertificadoOficial}
+                formVehiculo={formVehiculo}
+                placaRodaje={normalizarPlacaWizard(formCaja.placa)}
+                setFormVehiculo={setFormVehiculo}
+                formPropietario={formPropietario}
+                setFormPropietario={setFormPropietario}
+                formGlp={formGlp}
+                setFormGlp={setFormGlp}
+                formGnv={formGnv}
+                setFormGnv={setFormGnv}
+                formConformidad={formConformidad}
+                setFormConformidad={setFormConformidad}
+                titulares={titulares}
+                setTitulares={setTitulares}
+                formFacturacion={formFacturacion}
+                setFormFacturacion={setFormFacturacion}
+                onRemoveTitular={modoRectificacion
+                  ? async () => {
                     await Swal.fire(
                       'Eliminación no disponible',
                       'Los titulares guardados no se eliminan directamente en modo rectificación. Puede corregir sus datos sin borrar el registro original.',
                       'info'
                     );
                   }
-                : eliminarTitularBorrador}
-              catalogoVerificaciones={catalogoVerificaciones}
-              vehiculoOrigen={vehiculoOrigen}
-              maestrosVehiculo={maestrosVehiculo}
-              categoriaVehicular={formCaja.categoria}
-              categoriasVehiculares={maestros?.categorias || []}
-              erroresCampo={errores}
-              onCorregirCampo={limpiarErrorCampo}
-              onCategoriaVehicularChange={(categoria) => {
-                limpiarErrorCampo('categoria');
-                setFormCaja((prev) => ({ ...prev, categoria }));
-              }}
-            />
-          </>
-        )}
+                  : eliminarTitularBorrador}
+                catalogoVerificaciones={catalogoVerificaciones}
+                vehiculoOrigen={vehiculoOrigen}
+                maestrosVehiculo={maestrosVehiculo}
+                categoriaVehicular={formCaja.categoria}
+                categoriasVehiculares={maestros?.categorias || []}
+                erroresCampo={errores}
+                onCorregirCampo={limpiarErrorCampo}
+                onCategoriaVehicularChange={(categoria) => {
+                  limpiarErrorCampo('categoria');
+                  setFormCaja((prev) => ({ ...prev, categoria }));
+                }}
+              />
+            </>
+          )}
 
-        {pasoActual.id === 'vehiculo' && formCaja.tipo_flujo === 'TALLER_INSPECCION' && (
-          <TallerStep
-            formulario={formatoFormulario}
-            valores={formatoValores}
-            setValores={setFormatoValores}
-            cargando={formatoFormularioLoading}
-            error={formatoFormularioError}
-            titulares={titulares}
-            setTitulares={setTitulares}
-            formFacturacion={formFacturacion}
-            setFormFacturacion={setFormFacturacion}
-            onRemoveTitular={modoRectificacion
-              ? async () => {
+          {pasoActual.id === 'vehiculo' && formCaja.tipo_flujo === 'TALLER_INSPECCION' && (
+            <TallerStep
+              formulario={formatoFormulario}
+              valores={formatoValores}
+              setValores={setFormatoValores}
+              cargando={formatoFormularioLoading}
+              error={formatoFormularioError}
+              titulares={titulares}
+              setTitulares={setTitulares}
+              formFacturacion={formFacturacion}
+              setFormFacturacion={setFormFacturacion}
+              onRemoveTitular={modoRectificacion
+                ? async () => {
                   await Swal.fire(
                     'Eliminación no disponible',
                     'Los titulares guardados no se eliminan directamente en modo rectificación. Puede corregir sus datos sin borrar el registro original.',
                     'info'
                   );
                 }
-              : eliminarTitularBorrador}
-          />
-        )}
-        {pasoActual.id === 'pago' && (
-          <PagoStep
-            pagoTab={pagoTab}
-            setPagoTab={setPagoTab}
-            formPago={formPago}
-            setFormPago={setFormPago}
-            pagosAgregados={pagosAgregados}
-            handleAgregarPago={handleAgregarPago}
-            eliminarPago={eliminarPago}
-            totalPagar={precioTotal}
-            tarifaOriginal={precioSubtotal}
-            descuento={descuento}
-            resumenComercial={resumenComercial}
-            maestrosPago={maestrosPago}
-            tipoComprobante={formFacturacion.tipoDocFac}
-            condicionPago={formFacturacion.condicionPagoFac}
-            fechaInicioCredito={formFacturacion.fechaInicioCreditoFac}
-            fechaVencimientoCredito={formFacturacion.fechaVencimientoFac}
-            cuotasCredito={cuotasCreditoResueltas}
-            onCuotasCreditoChange={(nuevasCuotas) => {
-              limpiarErrorCampo('cuotas');
-              setFormFacturacion((prev) => ({
-                ...prev,
-                cuotasFac: nuevasCuotas.map((c) => ({
-                  numeroCuota: c.numeroCuota,
-                  fechaPago: c.fechaPago,
-                  importe: String(c.importe),
-                })),
-              }));
-            }}
-            erroresCampo={errores}
-            onCorregirCampo={limpiarErrorCampo}
-            onCondicionPagoChange={(condicionPago) => {
-              if (formFacturacion.tipoDocFac === 'BOLETA' && condicionPago === 'CREDITO') return;
-              limpiarErrorCampo('pagos');
-              limpiarErrorCampo('fechaInicioCredito');
-              limpiarErrorCampo('fechaVencimientoCredito');
-              limpiarErrorCampo('cuotas');
-              setFormFacturacion((prev) => ({
-                ...prev,
-                condicionPagoFac: condicionPago,
-                fechaInicioCreditoFac: prev.fechaInicioCreditoFac || fechaLocalIso(),
-                cuotasFac: condicionPago === 'CONTADO' ? [] : prev.cuotasFac,
-              }));
-            }}
-            onFechaInicioCreditoChange={(fecha) => {
-              limpiarErrorCampo('fechaInicioCredito');
-              limpiarErrorCampo('fechaVencimientoCredito');
-              limpiarErrorCampo('cuotas');
-              setFormFacturacion((prev) => ({ ...prev, fechaInicioCreditoFac: fecha }));
-            }}
-            onFechaVencimientoCreditoChange={(fecha) => {
-              limpiarErrorCampo('fechaVencimientoCredito');
-              limpiarErrorCampo('cuotas');
-              setFormFacturacion((prev) => {
-                const cuotasActualizadas = prev.cuotasFac.length <= 1
-                  ? prev.cuotasFac.map((c) => ({ ...c, fechaPago: fecha }))
-                  : prev.cuotasFac;
-                return { ...prev, fechaVencimientoFac: fecha, cuotasFac: cuotasActualizadas };
-              });
-            }}
-          />
-        )}
-        {!modoRectificacion && pasoActual.id === 'previsualizacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
-          <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no tiene un certificado emitido para previsualizar.</p>
-        )}
-        {pasoActual.id === 'previsualizacion' && datosTecnicosIncompletos && (
-          <div role="alert" className="mx-auto max-w-2xl rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center shadow-sm">
-            <h3 className="text-lg font-black text-amber-900">Faltan datos del vehículo o del expediente técnico</h3>
-            <p className="mt-2 text-sm text-amber-800">
-              No se puede mostrar una previsualización válida ni continuar a facturación hasta completar todos los campos obligatorios.
-            </p>
-            <button type="button" onClick={volverACorregirDatosTecnicos} className="mt-5 rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">
-              CORREGIR VEHÍCULO Y DATOS TÉCNICOS
-            </button>
-          </div>
-        )}
-        {pasoActual.id === 'previsualizacion' && !datosTecnicosIncompletos && (!soloLectura || certificadoEstado === 'EMITIDO') && (
-          <PrevisualizacionCertificadoStep
-            certificadoId={certificadoId}
-            datosPropuestos={modoRectificacion ? propuestaRectificacion : null}
-            modoRectificacion={modoRectificacion}
-            onPreviewResult={modoRectificacion ? setPreviewRectificacion : undefined}
-          />
-        )}
-        {modoRectificacion && pasoActual.id === 'rectificacion' && (
-          <RectificacionConfirmacionStep
-            contexto={contextoRectificacion}
-            preview={previewRectificacion}
-            motivo={motivoRectificacion}
-            setMotivo={setMotivoRectificacion}
-            observaciones={observacionesRectificacion}
-            setObservaciones={setObservacionesRectificacion}
-          />
-        )}
+                : eliminarTitularBorrador}
+            />
+          )}
+          {pasoActual.id === 'pago' && (
+            <PagoStep
+              pagoTab={pagoTab}
+              setPagoTab={setPagoTab}
+              formPago={formPago}
+              setFormPago={setFormPago}
+              pagosAgregados={pagosAgregados}
+              handleAgregarPago={handleAgregarPago}
+              eliminarPago={eliminarPago}
+              totalPagar={precioTotal}
+              tarifaOriginal={precioSubtotal}
+              descuento={descuento}
+              resumenComercial={resumenComercial}
+              maestrosPago={maestrosPago}
+              tipoComprobante={formFacturacion.tipoDocFac}
+              condicionPago={formFacturacion.condicionPagoFac}
+              fechaInicioCredito={formFacturacion.fechaInicioCreditoFac}
+              fechaVencimientoCredito={formFacturacion.fechaVencimientoFac}
+              cuotasCredito={cuotasCreditoResueltas}
+              onCuotasCreditoChange={(nuevasCuotas) => {
+                limpiarErrorCampo('cuotas');
+                setFormFacturacion((prev) => ({
+                  ...prev,
+                  cuotasFac: nuevasCuotas.map((c) => ({
+                    numeroCuota: c.numeroCuota,
+                    fechaPago: c.fechaPago,
+                    importe: String(c.importe),
+                  })),
+                }));
+              }}
+              erroresCampo={errores}
+              onCorregirCampo={limpiarErrorCampo}
+              onCondicionPagoChange={(condicionPago) => {
+                if (formFacturacion.tipoDocFac === 'BOLETA' && condicionPago === 'CREDITO') return;
+                limpiarErrorCampo('pagos');
+                limpiarErrorCampo('fechaInicioCredito');
+                limpiarErrorCampo('fechaVencimientoCredito');
+                limpiarErrorCampo('cuotas');
+                setFormFacturacion((prev) => ({
+                  ...prev,
+                  condicionPagoFac: condicionPago,
+                  fechaInicioCreditoFac: prev.fechaInicioCreditoFac || fechaLocalIso(),
+                  cuotasFac: condicionPago === 'CONTADO' ? [] : prev.cuotasFac,
+                }));
+              }}
+              onFechaInicioCreditoChange={(fecha) => {
+                limpiarErrorCampo('fechaInicioCredito');
+                limpiarErrorCampo('fechaVencimientoCredito');
+                limpiarErrorCampo('cuotas');
+                setFormFacturacion((prev) => ({ ...prev, fechaInicioCreditoFac: fecha }));
+              }}
+              onFechaVencimientoCreditoChange={(fecha) => {
+                limpiarErrorCampo('fechaVencimientoCredito');
+                limpiarErrorCampo('cuotas');
+                setFormFacturacion((prev) => {
+                  const cuotasActualizadas = prev.cuotasFac.length <= 1
+                    ? prev.cuotasFac.map((c) => ({ ...c, fechaPago: fecha }))
+                    : prev.cuotasFac;
+                  return { ...prev, fechaVencimientoFac: fecha, cuotasFac: cuotasActualizadas };
+                });
+              }}
+            />
+          )}
+          {!modoRectificacion && pasoActual.id === 'previsualizacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no tiene un certificado emitido para previsualizar.</p>
+          )}
+          {pasoActual.id === 'previsualizacion' && datosTecnicosIncompletos && (
+            <div role="alert" className="mx-auto max-w-2xl rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center shadow-sm">
+              <h3 className="text-lg font-black text-amber-900">Faltan datos del vehículo o del expediente técnico</h3>
+              <p className="mt-2 text-sm text-amber-800">
+                No se puede mostrar una previsualización válida ni continuar a facturación hasta completar todos los campos obligatorios.
+              </p>
+              <button type="button" onClick={volverACorregirDatosTecnicos} className="mt-5 rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">
+                CORREGIR VEHÍCULO Y DATOS TÉCNICOS
+              </button>
+            </div>
+          )}
+          {pasoActual.id === 'previsualizacion' && !datosTecnicosIncompletos && (!soloLectura || certificadoEstado === 'EMITIDO') && (
+            <PrevisualizacionCertificadoStep
+              certificadoId={certificadoId}
+              datosPropuestos={modoRectificacion ? propuestaRectificacion : null}
+              modoRectificacion={modoRectificacion}
+              onPreviewResult={modoRectificacion ? setPreviewRectificacion : undefined}
+            />
+          )}
+          {modoRectificacion && pasoActual.id === 'rectificacion' && (
+            <RectificacionConfirmacionStep
+              contexto={contextoRectificacion}
+              preview={previewRectificacion}
+              motivo={motivoRectificacion}
+              setMotivo={setMotivoRectificacion}
+              observaciones={observacionesRectificacion}
+              setObservaciones={setObservacionesRectificacion}
+            />
+          )}
         </fieldset>
         {pasoActual.id === 'facturacion' && soloLectura && certificadoEstado !== 'EMITIDO' && (
           <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-700">Este registro no llegó a emitirse.</p>
@@ -2759,7 +3081,7 @@ function NuevoCertificadoWizard() {
                 <button
                   type="button"
                   onClick={() => void irSiguientePaso()}
-                  disabled={isSavingStep || !contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente}
+                  disabled={isSavingStep || !contextoRectificacion?.permiteRectificar}
                   className="rounded-lg bg-gold-3d px-6 py-2.5 text-xs font-black transition shadow-sm hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none"
                 >
                   {currentStepIndex === 0 ? 'REVISAR DATOS A RECTIFICAR' : currentStepIndex === 1 ? 'VER PREVISUALIZACIÓN CORREGIDA' : 'CONTINUAR A CONFIRMACIÓN'}
@@ -2768,12 +3090,11 @@ function NuevoCertificadoWizard() {
                 <button
                   type="button"
                   onClick={() => void guardarRectificacionDirecta()}
-                  disabled={enviandoRectificacion || !contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente || !motivoRectificacion.trim() || !previewRectificacion || previewRectificacion.diferencias.length === 0}
-                  className={`inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm ${
-                    enviandoRectificacion || !contextoRectificacion?.permiteRectificar || !contextoRectificacion?.permisos.rectificarDirectamente || !motivoRectificacion.trim() || !previewRectificacion || previewRectificacion.diferencias.length === 0
+                  disabled={enviandoRectificacion || !contextoRectificacion?.permiteRectificar || !motivoRectificacion.trim() || !previewRectificacion || previewRectificacion.diferencias.length === 0}
+                  className={`inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-black transition shadow-sm ${enviandoRectificacion || !contextoRectificacion?.permiteRectificar || !motivoRectificacion.trim() || !previewRectificacion || previewRectificacion.diferencias.length === 0
                       ? 'cursor-not-allowed bg-slate-200 text-slate-500 shadow-none'
                       : 'bg-red-600 text-white hover:-translate-y-0.5 hover:bg-red-700'
-                  }`}
+                    }`}
                 >
                   {enviandoRectificacion ? <><Loader2 className="h-4 w-4 animate-spin" /> GUARDANDO…</> : <><Send className="h-4 w-4" /> GUARDAR RECTIFICACIÓN Y EMITIR CERTIFICADO</>}
                 </button>
@@ -2789,16 +3110,6 @@ function NuevoCertificadoWizard() {
                   title="Rectificar directamente el certificado sin reemitir el comprobante"
                 >
                   <PencilLine className="h-4 w-4" /> RECTIFICAR CERTIFICADO
-                </button>
-              )}
-              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && contextoRectificacion?.rectificacionActiva && (
-                <button
-                  type="button"
-                  onClick={() => void verHistorialRectificacion()}
-                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-5 py-2.5 text-xs font-black text-amber-800"
-                  title="Ya existe una rectificación activa para este certificado"
-                >
-                  <History className="h-4 w-4" /> RECTIFICACIÓN EN CURSO
                 </button>
               )}
               {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && facturacion?.enlacePdf && (
