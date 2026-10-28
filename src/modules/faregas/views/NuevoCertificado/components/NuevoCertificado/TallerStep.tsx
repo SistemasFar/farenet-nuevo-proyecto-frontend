@@ -16,11 +16,12 @@ interface TallerStepProps {
   formFacturacion: FormFacturacionState;
   setFormFacturacion: React.Dispatch<React.SetStateAction<FormFacturacionState>>;
   onRemoveTitular?: (titular: TitularState) => Promise<void>;
+  soloLectura?: boolean;
 }
 
 export const TallerStep: React.FC<TallerStepProps> = ({ 
   formulario, valores, setValores, cargando, error,
-  titulares, setTitulares, formFacturacion, setFormFacturacion, onRemoveTitular 
+  titulares, setTitulares, formFacturacion, setFormFacturacion, onRemoveTitular, soloLectura = false
 }) => {
   if (cargando) {
     return <div className="rounded-xl border border-slate-200 bg-white p-8 text-sm text-slate-500">Leyendo las variables del formato seleccionado...</div>;
@@ -153,6 +154,7 @@ export const TallerStep: React.FC<TallerStepProps> = ({
         formFacturacion={formFacturacion}
         setFormFacturacion={setFormFacturacion}
         onRemoveTitular={onRemoveTitular}
+        soloLectura={soloLectura}
       />
     </div>
   );

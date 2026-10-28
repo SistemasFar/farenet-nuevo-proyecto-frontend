@@ -30,6 +30,7 @@ export interface DatosFacturacionProps {
   onCorregirCampo?: (campo: string) => void;
   tituloSeccion?: string;
   dataSeccion?: string;
+  soloLectura?: boolean;
 }
 
 export function DatosFacturacion({
@@ -40,6 +41,7 @@ export function DatosFacturacion({
   onCorregirCampo,
   tituloSeccion,
   dataSeccion,
+  soloLectura = false,
 }: DatosFacturacionProps) {
   const [buscando, setBuscando] = useState(false);
   const [errorDocumentoConsulta, setErrorDocumentoConsulta] = useState<string | null>(null);
@@ -297,7 +299,7 @@ export function DatosFacturacion({
           <label className="mb-1 block text-xs font-bold text-slate-500">TIPO DE COMPROBANTE</label>
           <select
             value={formFacturacion.tipoDocFac}
-            disabled={facturarAlTitular}
+            disabled={facturarAlTitular || soloLectura}
             onChange={(event) => handleTipoComprobanteChange(event.target.value)}
             className={claseConError(
               'h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] disabled:bg-slate-100 disabled:text-slate-500',
@@ -321,7 +323,7 @@ export function DatosFacturacion({
           <select
             aria-label="Tipo de documento de facturación"
             value={tipoDocumentoSeleccionado}
-            disabled={facturarAlTitular}
+            disabled={facturarAlTitular || soloLectura}
             onChange={(event) => handleTipoDocumentoChange(event.target.value)}
             className={claseConError(
               'h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] disabled:bg-slate-100 disabled:text-slate-500',
@@ -344,7 +346,7 @@ export function DatosFacturacion({
             <input
               aria-label="Número de documento de facturación"
               value={formFacturacion.nroDocFac}
-              readOnly={facturarAlTitular}
+              readOnly={facturarAlTitular || soloLectura}
               onChange={(event) => handleFacturacionChange('nroDocFac', event.target.value)}
               onBlur={() => setErrorDocumentoConsulta(
                 formFacturacion.nroDocFac
@@ -364,7 +366,7 @@ export function DatosFacturacion({
             <button
               type="button"
               onClick={buscarClienteFacturacion}
-              disabled={buscando}
+              disabled={soloLectura || buscando}
               className="flex h-[42px] items-center justify-center rounded-lg bg-slate-200 px-3 transition-colors hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Buscar cliente en Faregas / Consulta externa"
               aria-label="Buscar cliente"
@@ -385,7 +387,7 @@ export function DatosFacturacion({
           <label className="mb-1 block text-xs font-bold text-slate-500">NOMBRE / RAZÓN SOCIAL</label>
           <input
             value={formFacturacion.razonSocialFac}
-            readOnly={facturarAlTitular}
+            readOnly={facturarAlTitular || soloLectura}
             onChange={(event) => handleFacturacionChange('razonSocialFac', event.target.value)}
             maxLength={100}
             className={claseConError(
@@ -402,7 +404,7 @@ export function DatosFacturacion({
           <label className="mb-1 block text-xs font-bold text-slate-500">DIRECCIÓN FISCAL (OPCIONAL)</label>
           <input
             value={formFacturacion.direccionFac}
-            readOnly={facturarAlTitular}
+            readOnly={facturarAlTitular || soloLectura}
             onChange={(event) => handleFacturacionChange('direccionFac', event.target.value)}
             maxLength={100}
             className={claseConError(
@@ -422,6 +424,7 @@ export function DatosFacturacion({
           <input
             type="email"
             value={formFacturacion.emailFac}
+            readOnly={soloLectura}
             onChange={(event) => handleFacturacionChange('emailFac', event.target.value)}
             className={claseConError(
               'h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b]',
@@ -442,6 +445,7 @@ export function DatosFacturacion({
             required
             aria-required="true"
             value={formFacturacion.telefonoFac}
+            readOnly={soloLectura}
             onChange={(event) => handleFacturacionChange('telefonoFac', event.target.value)}
             maxLength={9}
             className={claseConError(

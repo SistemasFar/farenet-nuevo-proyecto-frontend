@@ -32,6 +32,7 @@ interface TitularesListProps {
   mostrarFacturacion?: boolean;
   mostrarDireccionTitular?: boolean;
   integrarPropietarioGlpAnual?: boolean;
+  soloLectura?: boolean;
 }
 
 export function TitularesList({
@@ -46,6 +47,7 @@ export function TitularesList({
   mostrarFacturacion = true,
   mostrarDireccionTitular = false,
   integrarPropietarioGlpAnual = false,
+  soloLectura = false,
 }: TitularesListProps) {
   const [buscandoUuid, setBuscandoUuid] = useState<string | null>(null);
   const facturarAlTitular = Boolean(titulares.length > 0 && formFacturacion.usarTitularPrincipalFac);
@@ -252,7 +254,7 @@ export function TitularesList({
         <h4 className="text-sm font-bold text-[#052a79] capitalize tracking-wider">
           {integrarPropietarioGlpAnual ? '1. PROPIETARIO' : '1. Propietario / Dueño del Vehículo'}
         </h4>
-        <button type="button" onClick={handleAdd} className="flex items-center gap-1 text-xs font-bold text-white bg-[#052a79] hover:bg-[#041d54] px-3 py-1.5 rounded-lg transition-colors">
+        <button type="button" onClick={handleAdd} disabled={soloLectura} className="flex items-center gap-1 text-xs font-bold text-white bg-[#052a79] hover:bg-[#041d54] px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           <Plus className="w-4 h-4" /> Agregar Dueño
         </button>
       </div>
@@ -263,7 +265,7 @@ export function TitularesList({
             <span className="text-xs font-bold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-200 shadow-sm">
               {t.titularId ? 'GUARDADO' : 'NUEVO'} | ORDEN {t.orden}
             </span>
-            <button type="button" onClick={() => handleRemove(t)} className="text-red-500 hover:bg-red-100 p-1.5 rounded-lg transition-colors" title="Eliminar titular">
+            <button type="button" onClick={() => handleRemove(t)} disabled={soloLectura} className={`text-red-500 hover:bg-red-100 p-1.5 rounded-lg transition-colors ${soloLectura ? 'opacity-50 cursor-not-allowed' : ''}`} title="Eliminar titular">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -276,6 +278,7 @@ export function TitularesList({
                 type="checkbox"
                 checked={facturarAlTitular}
                 onChange={(event) => handleFacturarAlTitularChange(event.target.checked)}
+                disabled={soloLectura}
                 className="h-4 w-4 accent-[#052a79]"
               />
               FACTURAR AL DUEÑO PRINCIPAL
@@ -292,6 +295,7 @@ export function TitularesList({
                   limpiarTitular(index, 'nroDocumento');
                   handleChange(t._uuid, 'tipoDocumento', e.target.value);
                 }}
+                disabled={soloLectura}
                 className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'tipoDocumento')))}
                 data-campo-error={errorTitular(index, 'tipoDocumento') ? true : undefined}
               >
@@ -314,6 +318,7 @@ export function TitularesList({
                     limpiarTitular(index, 'nroDocumento');
                     handleChange(t._uuid, 'nroDocumento', e.target.value);
                   }}
+                  readOnly={soloLectura}
                   className={claseConError(
                     'h-[42px] min-w-0 flex-1 px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors',
                     Boolean(errorTitular(index, 'nroDocumento'))
@@ -323,8 +328,8 @@ export function TitularesList({
                 <button
                   type="button"
                   onClick={() => handleBuscarCliente(t, index)}
-                  disabled={Boolean(buscandoUuid)}
-                  className="flex h-[42px] items-center justify-center rounded-lg bg-slate-200 px-3 transition-colors hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={soloLectura || Boolean(buscandoUuid)}
+                  className="flex h-[42px] items-center justify-center rounded-lg bg-slate-200 px-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Buscar cliente en el sistema"
                   aria-label="Buscar cliente"
                 >
@@ -339,12 +344,12 @@ export function TitularesList({
             </div>
             <div className="md:col-span-4">
               <label className="block text-xs font-bold text-slate-500 mb-1">NOMBRE / RAZÓN SOCIAL</label>
-              <input value={t.nombreRazonSocial} onChange={(e) => { limpiarTitular(index, 'nombreRazonSocial'); handleChange(t._uuid, 'nombreRazonSocial', e.target.value); }} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'nombreRazonSocial')))} data-campo-error={errorTitular(index, 'nombreRazonSocial') ? true : undefined} />
+              <input value={t.nombreRazonSocial} onChange={(e) => { limpiarTitular(index, 'nombreRazonSocial'); handleChange(t._uuid, 'nombreRazonSocial', e.target.value); }} readOnly={soloLectura} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'nombreRazonSocial')))} data-campo-error={errorTitular(index, 'nombreRazonSocial') ? true : undefined} />
               <MensajeError campo={`titular.${index}.nombreRazonSocial`} errores={erroresCampo} />
             </div>
             {mostrarDireccionTitular && <div className="md:col-span-4">
               <label className="block text-xs font-bold text-slate-500 mb-1">DIRECCIÓN</label>
-              <input value={t.direccion} onChange={(e) => { limpiarTitular(index, 'direccion'); handleChange(t._uuid, 'direccion', e.target.value); }} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'direccion')))} data-campo-error={errorTitular(index, 'direccion') ? true : undefined} />
+              <input value={t.direccion} onChange={(e) => { limpiarTitular(index, 'direccion'); handleChange(t._uuid, 'direccion', e.target.value); }} readOnly={soloLectura} className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'direccion')))} data-campo-error={errorTitular(index, 'direccion') ? true : undefined} />
               <MensajeError campo={`titular.${index}.direccion`} errores={erroresCampo} />
             </div>}
           </div>

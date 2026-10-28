@@ -2880,6 +2880,7 @@ function NuevoCertificadoWizard() {
                 categoriasVehiculares={maestros?.categorias || []}
                 erroresCampo={errores}
                 onCorregirCampo={limpiarErrorCampo}
+                soloLectura={modoRectificacion}
                 onCategoriaVehicularChange={(categoria) => {
                   limpiarErrorCampo('categoria');
                   setFormCaja((prev) => ({ ...prev, categoria }));
@@ -2908,6 +2909,7 @@ function NuevoCertificadoWizard() {
                   );
                 }
                 : eliminarTitularBorrador}
+              soloLectura={modoRectificacion}
             />
           )}
           {pasoActual.id === 'pago' && (

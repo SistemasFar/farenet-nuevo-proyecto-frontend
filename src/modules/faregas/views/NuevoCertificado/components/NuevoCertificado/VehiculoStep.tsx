@@ -81,6 +81,8 @@ interface VehiculoStepProps {
   erroresCampo?: ErroresCampo;
   /** Limpia el error de un único campo cuando el usuario lo corrige. */
   onCorregirCampo?: (campo: string) => void;
+  /** Cuando true (modo rectificación), bloquea titulares y facturación. */
+  soloLectura?: boolean;
 }
 
 export function VehiculoStep({
@@ -112,7 +114,8 @@ export function VehiculoStep({
   categoriasVehiculares,
   onCategoriaVehicularChange,
   erroresCampo = {},
-  onCorregirCampo
+  onCorregirCampo,
+  soloLectura = false,
 }: VehiculoStepProps) {
 
   // El asterisco de cada etiqueta sale del mismo conjunto que usa la
@@ -503,6 +506,7 @@ export function VehiculoStep({
               onCorregirCampo={onCorregirCampo}
               mostrarTitulares={true}
               mostrarFacturacion={false}
+              soloLectura={soloLectura}
             />
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-seccion-conformidad="facturacion">
@@ -512,6 +516,7 @@ export function VehiculoStep({
               setFormFacturacion={setFormFacturacion}
               erroresCampo={erroresCampo}
               onCorregirCampo={onCorregirCampo}
+              soloLectura={soloLectura}
             />
           </div>
         </>
@@ -526,6 +531,7 @@ export function VehiculoStep({
             setFormFacturacion={setFormFacturacion}
             erroresCampo={erroresCampo}
             onCorregirCampo={onCorregirCampo}
+            soloLectura={soloLectura}
           />
         </div>
       )}
@@ -550,10 +556,11 @@ export function VehiculoStep({
                 onRemoveTitular={onRemoveTitular}
                 erroresCampo={erroresCampo}
                 onCorregirCampo={onCorregirCampo}
-                mostrarTitulares={true}
-                mostrarFacturacion={false}
-                integrarPropietarioGlpAnual={true}
-              />
+              mostrarTitulares={true}
+              mostrarFacturacion={false}
+              integrarPropietarioGlpAnual={true}
+              soloLectura={soloLectura}
+            />
             </div>
             <div
               className="mb-6"
@@ -564,9 +571,10 @@ export function VehiculoStep({
                 titulares={titulares}
                 formFacturacion={formFacturacion}
                 setFormFacturacion={setFormFacturacion}
-                erroresCampo={erroresCampo}
-                onCorregirCampo={onCorregirCampo}
-              />
+              erroresCampo={erroresCampo}
+              onCorregirCampo={onCorregirCampo}
+              soloLectura={soloLectura}
+            />
             </div>
           </>
         )}

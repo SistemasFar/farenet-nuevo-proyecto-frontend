@@ -62,7 +62,7 @@ export function CajaStep({
 }: CajaStepProps) {
   const esError = (campo: string) => Boolean(erroresCampo[campo]);
   const [catalogo, setCatalogo] = useState<CatalogoFaregas | null>(null);
-  const [categoriaActiva, setCategoriaActiva] = useState('');
+  const [categoriaActiva, setCategoriaActiva] = useState('TODOS');
   const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -97,7 +97,7 @@ export function CajaStep({
 
   const servicios = useMemo(() => (catalogo?.categorias.flatMap((categoria) =>
     categoria.servicios
-      .filter(() => categoriaActiva !== '' && categoria.codigo === categoriaActiva)
+      .filter(() => categoriaActiva === 'TODOS' || categoriaActiva === '' || categoria.codigo === categoriaActiva)
       .filter((servicio) => contieneBusqueda(servicio, categoria, busqueda))
       .map((servicio) => ({ servicio, categoria }))) ?? []), [busqueda, catalogo, categoriaActiva]);
 
