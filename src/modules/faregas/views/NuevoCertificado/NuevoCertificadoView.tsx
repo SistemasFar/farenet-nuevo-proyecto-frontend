@@ -1888,9 +1888,9 @@ function NuevoCertificadoWizard() {
     if (!modoRectificacion) return null;
     return construirPropuestaRectificacion({
       tipoCertificado: formCaja.tipoCertificado,
-      formCaja: formCaja as unknown as Record<string, unknown>,
-      formVehiculo: formVehiculo as unknown as Record<string, unknown>,
-      titulares: titulares as unknown as Record<string, unknown>[],
+      formCaja,
+      formVehiculo,
+      titulares,
       formGnv,
       formGlp,
       formConformidad,

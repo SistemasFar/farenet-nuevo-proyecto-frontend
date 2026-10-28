@@ -217,7 +217,7 @@ export function ConsolidacionLegacyPanel({
 
     setConsolidando(true);
     try {
-      const BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
+      const BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
       
       const token = sessionStorage.getItem('accessToken');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -253,7 +253,7 @@ export function ConsolidacionLegacyPanel({
 
   const guardarNuevaObservacion = async (nuevaObs: string) => {
     try {
-      const BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000/api';
+      const BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
       const token = sessionStorage.getItem('accessToken');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;

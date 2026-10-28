@@ -12,7 +12,7 @@ import type {
 
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
-  'http://127.0.0.1:3000/api';
+  '/api';
 
 console.log('API URL:', BASE_URL);
 

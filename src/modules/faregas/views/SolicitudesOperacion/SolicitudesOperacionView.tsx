@@ -7,14 +7,15 @@ import {
   faregasSolicitudesOperacionApi,
   etiquetaEstadoFiscal,
   etiquetaEstadoSolicitud,
+  etiquetaEstadoSolicitudDetallado,
   etiquetaEstadoTecnico,
   etiquetaTipoSolicitud,
   type EstadoSolicitudOperacion,
   type EventoSolicitudOperacion,
+  type ResultadoAprobarYEjecutar,
   type SolicitudOperacion,
   type TipoSolicitudOperacion,
 } from '../../services/faregas-solicitudes-operacion.api';
-import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 import { faregasRectificacionesApi } from '../../services/faregas-rectificaciones.api';
 
 const hoyLocal = () => {
@@ -64,17 +65,41 @@ function DetalleSolicitud({
   const [historial, setHistorial] = useState<EventoSolicitudOperacion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(false);
-  const puedeAprobar = permisos.includes('FAREGAS_SOLICITUD_APROBAR') || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
-  const puedeAutoaprobar = permisos.includes('FAREGAS_SOLICITUD_APROBAR')
-    && permisos.includes('FAREGAS_SOLICITUD_AUTOAPROBAR');
-  const puedeRechazar = permisos.includes('FAREGAS_SOLICITUD_RECHAZAR') || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
   const esPropia = solicitud.usuarioSolicitante === usuarioActual();
-  const [sincronizando, setSincronizando] = useState(false);
   const detalle = solicitud.detalle;
   const ejecucion = detalle?.ejecucion;
-  const estadoFiscalActual = detalle?.estadoFiscalActual || null;
-  const puedeEjecutar = ejecucion?.puedeEjecutar === true;
+  const esAutoaprobacion = detalle ? detalle.esAutoaprobacion === true : esPropia;
+  const puedeAprobarBase = permisos.includes('FAREGAS_SOLICITUD_APROBAR')
+    || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
+  const puedeAutoaprobar = permisos.includes('FAREGAS_SOLICITUD_APROBAR')
+    && permisos.includes('FAREGAS_SOLICITUD_AUTOAPROBAR');
+  const puedeRechazar = permisos.includes('FAREGAS_SOLICITUD_RECHAZAR')
+    || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
   const esRectificacion = solicitud.tipoOperacion === 'RECTIFICAR_CERTIFICADO';
+  const bloqueoImporte = !esRectificacion && (
+    solicitud.anulacionImporteCero === true
+    || solicitud.anulacionImporteNoDeterminable === true
+    || Boolean(detalle?.bloqueoImporte)
+  );
+  const motivoBloqueoImporte = detalle?.bloqueoImporte?.motivo
+    || (solicitud.anulacionImporteCero === true
+      ? 'Este certificado tiene un importe final de S/ 0.00 y no admite anulación.'
+      : 'No se pudo determinar el importe final del certificado; la anulación está bloqueada hasta regularizar el importe.');
+  // La elegibilidad definitiva la calcula el backend (permisos efectivos del
+  // perfil, alcance de sede y separación de funciones). El fallback por sesión
+  // sólo cubre el instante previo al detalle.
+  const puedeAprobarSolicitud = (detalle ? detalle.puedeAprobar === true : puedeAprobarBase)
+    && !bloqueoImporte;
+  const puedeAprobarYEjecutar = (detalle
+    ? detalle.puedeAprobarYEjecutar === true
+    : (puedeAprobarBase
+      && permisos.includes('FAREGAS_CERTIFICADO_ANULAR_EJECUTAR')
+      && (!esPropia || (puedeAutoaprobar && permisos.includes('FAREGAS_SOLICITUD_AUTOEJECUTAR')))))
+    && !bloqueoImporte;
+  const motivoBloqueoAprobacion = detalle?.motivoBloqueoAprobacion || null;
+  const [sincronizando, setSincronizando] = useState(false);
+  const estadoFiscalActual = detalle?.estadoFiscalActual || null;
+  const puedeEjecutar = ejecucion?.puedeEjecutar === true && !bloqueoImporte;
   const esAutoejecucion = !esRectificacion && (ejecucion?.esAutoejecucion ?? esPropia);
   const resultadoFiscal = solicitud.resultadoFiscal;
   const resultadoTecnico = (detalle?.estadoTecnico || solicitud.resultadoTecnico) as Record<string, unknown> | null;
@@ -84,30 +109,98 @@ function DetalleSolicitud({
     ? String(resultadoTecnico.estado) : null;
   const enlaceComprobante = estadoFiscalActual?.enlacePdf || null;
 
+  const cargarHistorial = useCallback(async () => {
+    try {
+      setHistorial(await faregasSolicitudesOperacionApi.historial(solicitud.id));
+    } catch { /* se conserva el historial disponible */ }
+  }, [solicitud.id]);
+
   const refrescar = useCallback(async () => {
     try {
       const actualizada = await faregasSolicitudesOperacionApi.obtener(solicitud.id);
       onActualizada(actualizada);
     } catch { /* se conserva la información disponible */ }
-  }, [solicitud.id, onActualizada]);
+    await cargarHistorial();
+  }, [solicitud.id, onActualizada, cargarHistorial]);
 
   useEffect(() => {
-    faregasSolicitudesOperacionApi.historial(solicitud.id)
-      .then(setHistorial)
-      .finally(() => setCargando(false));
-    void refrescar();
+    void refrescar().finally(() => setCargando(false));
   }, [solicitud.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sincronizarEstadoFiscal = async () => {
-    if (!solicitud.certificadoId) return;
+    if (!solicitud.certificadoId || solicitud.tipoOperacion !== 'ANULAR_AMBOS') return;
     setSincronizando(true);
     try {
-      await faregasCertificadosApi.consultarFacturacionElectronica(solicitud.certificadoId);
+      await faregasSolicitudesOperacionApi.sincronizarAnulacionTotal(solicitud.id, solicitud.version);
       await refrescar();
-      await Swal.fire('Estado fiscal actualizado', 'Se consultó el estado real del comprobante ante el proveedor fiscal.', 'success');
+      await Swal.fire('Estado de la baja actualizado', 'Se consultó la misma operación fiscal, sin generar una baja duplicada.', 'success');
     } catch (error) {
       await Swal.fire('No se pudo sincronizar', error instanceof Error ? error.message : 'Intente nuevamente.', 'error');
     } finally { setSincronizando(false); }
+  };
+
+  const aprobarYEjecutarAnulacion = async () => {
+    if (procesando) return;
+    const confirmacion = await Swal.fire({
+      icon: 'warning',
+      title: esAutoaprobacion ? '¿Autoaprobar y ejecutar anulación total?' : '¿Aprobar y ejecutar anulación total?',
+      html: `<div style="text-align:left;font-size:13px;line-height:1.55">
+        <p>Esta acción <strong>registrará la aprobación</strong> y <strong>ejecutará inmediatamente</strong> la anulación total, sin requerir un segundo paso manual.</p>
+        <p>Se consultará <strong>NubeFact</strong> para determinar el mecanismo fiscal aplicable. La anulación técnica del certificado se mantiene en su procedimiento independiente y el PDF original no se elimina.</p>
+        ${esAutoaprobacion ? '<p><strong>Autoaprobación y autoejecución excepcionales:</strong> usted es el solicitante; la operación quedará auditada con la justificación registrada.</p>' : ''}
+      </div>`,
+      input: esAutoaprobacion ? 'textarea' : undefined,
+      inputLabel: esAutoaprobacion ? 'Justificación obligatoria de la autoejecución' : undefined,
+      inputPlaceholder: esAutoaprobacion ? 'Sustento de la excepción autorizada' : undefined,
+      inputValidator: esAutoaprobacion
+        ? (valor: string) => (!String(valor || '').trim() ? 'La autoejecución exige una justificación.' : undefined)
+        : undefined,
+      showCancelButton: true,
+      confirmButtonText: esAutoaprobacion ? 'Sí, autoaprobar y ejecutar' : 'Sí, aprobar y ejecutar',
+      cancelButtonText: 'Volver',
+      confirmButtonColor: '#047857',
+    });
+    if (!confirmacion.isConfirmed) return;
+
+    setProcesando(true);
+    try {
+      const resultado: ResultadoAprobarYEjecutar = await faregasSolicitudesOperacionApi.aprobarYEjecutarAnulacionTotal(solicitud.id, {
+        version: solicitud.version,
+        justificacion: String(confirmacion.value || '').trim() || undefined,
+        ...(esAutoaprobacion ? { confirmarAutoaprobacion: true, confirmarAutoejecucion: true } : {}),
+      });
+      if (resultado.data) onActualizada(resultado.data);
+      await refrescar();
+      if (resultado.ejecucionFallida) {
+        await Swal.fire({
+          icon: 'info',
+          title: 'Aprobación registrada — ejecución pendiente',
+          html: `<div style="text-align:left;font-size:13px;line-height:1.6">
+            <p>La solicitud quedó <strong>aprobada</strong>, pero la ejecución no pudo completarse en este intento.</p>
+            ${resultado.codigoError ? `<p><strong>Código:</strong> ${String(resultado.codigoError)}</p>` : ''}
+            <p>La operación quedó registrada para recuperación controlada. Reintente la ejecución desde este detalle.</p>
+          </div>`,
+        });
+        return;
+      }
+      if (!resultado.ejecucionIniciada) {
+        await Swal.fire('Aprobación registrada', 'La solicitud fue aprobada, pero la ejecución no se inició. Revise el detalle para continuar.', 'info');
+        return;
+      }
+      const fiscal = resultado.resultadoFiscal;
+      const tecnico = resultado.resultadoTecnico;
+      await Swal.fire({
+        icon: resultado.completada ? 'success' : 'info',
+        title: resultado.completada ? 'Anulación total completada' : 'Aprobación y ejecución registradas',
+        html: `<div style="text-align:left;font-size:13px;line-height:1.6">
+          <p><strong>Fiscal:</strong> ${String(fiscal?.estado || 'Sin resultado')}${fiscal?.tipoOperacion ? ` · ${String(fiscal.tipoOperacion)}` : ''}</p>
+          <p><strong>Técnico:</strong> ${String(tecnico?.estado || 'Sin resultado')}</p>
+          ${resultado.requiereIntervencion ? '<p>La solicitud requiere intervención para completar el procedimiento fiscal o técnico pendiente. No se declaró una anulación que NubeFact/SUNAT no haya confirmado.</p>' : ''}
+        </div>`,
+      });
+    } catch (error) {
+      await Swal.fire('No se pudo procesar', error instanceof Error ? error.message : 'Intente nuevamente.', 'error');
+    } finally { setProcesando(false); }
   };
 
   const ejecutarAnulacion = async () => {
@@ -279,7 +372,7 @@ function DetalleSolicitud({
             <div><span className="block text-xs font-semibold text-slate-500">COMPROBANTE</span>{solicitud.nroComprobante || 'No aplica'}</div>
             <div className="md:col-span-2"><span className="block text-xs font-semibold text-slate-500">OPERACIÓN</span>{etiquetaTipoSolicitud(solicitud.tipoOperacion)}</div>
             <div><span className="block text-xs font-semibold text-slate-500">FECHA</span>{new Date(solicitud.fechaSolicitud).toLocaleString('es-PE')}</div>
-            <div><span className="block text-xs font-semibold text-slate-500">ESTADO</span><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${clasesEstado(solicitud.estado)}`}>{etiquetaEstadoSolicitud(solicitud.estado)}</span></div>
+            <div><span className="block text-xs font-semibold text-slate-500">ESTADO</span><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${clasesEstado(solicitud.estado)}`}>{etiquetaEstadoSolicitudDetallado(solicitud)}</span></div>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-lg border border-slate-200 p-3">
@@ -385,16 +478,31 @@ function DetalleSolicitud({
             )}
           </div>
 
+          {bloqueoImporte && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+              <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+              <span><strong>Anulación bloqueada:</strong> {motivoBloqueoImporte}</span>
+            </div>
+          )}
+
           <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
             <button type="button" onClick={onCerrar} className="rounded-lg border px-4 py-2 text-sm font-semibold">Cerrar</button>
             {enlaceComprobante && <a href={enlaceComprobante} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white"><FileText size={16} /> Ver comprobante</a>}
-            {!esRectificacion && solicitud.certificadoId && <button type="button" disabled={sincronizando} onClick={() => void sincronizarEstadoFiscal()} className="flex items-center gap-1 rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-800 disabled:opacity-50">{sincronizando ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Sincronizar estado fiscal</button>}
-            {puedeEjecutar && <button type="button" disabled={procesando} onClick={() => void (esRectificacion ? ejecutarRectificacion() : ejecutarAnulacion())} className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${esAutoejecucion ? 'bg-amber-700' : esRectificacion ? 'bg-red-700' : 'bg-[#052A79]'}`}>{esAutoejecucion ? <ShieldAlert size={16} /> : esRectificacion ? <FileText size={16} /> : <PlayCircle size={16} />} {esAutoejecucion ? 'Autoejecutar (excepcional)' : esRectificacion ? 'Ejecutar rectificación' : 'Ejecutar anulación total'}</button>}
+            {!esRectificacion && solicitud.certificadoId && ['EN_EJECUCION', 'REQUIERE_INTERVENCION', 'ERROR'].includes(solicitud.estado) && <button type="button" disabled={sincronizando} onClick={() => void sincronizarEstadoFiscal()} className="flex items-center gap-1 rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-800 disabled:opacity-50">{sincronizando ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Sincronizar estado fiscal</button>}
+            {puedeEjecutar && <button type="button" disabled={procesando} onClick={() => void (esRectificacion ? ejecutarRectificacion() : ejecutarAnulacion())} className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${esAutoejecucion ? 'bg-amber-700' : esRectificacion ? 'bg-red-700' : 'bg-[#052A79]'}`}>{esAutoejecucion ? <ShieldAlert size={16} /> : esRectificacion ? <FileText size={16} /> : <PlayCircle size={16} />} {esAutoejecucion ? 'Autoejecutar (excepcional)' : esRectificacion ? 'Ejecutar rectificación' : ['REQUIERE_INTERVENCION', 'ERROR'].includes(solicitud.estado) ? 'Reintentar ejecución' : 'Ejecutar anulación total'}</button>}
             {['ANULAR_AMBOS', 'RECTIFICAR_CERTIFICADO'].includes(solicitud.tipoOperacion) && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && <button type="button" disabled={procesando} onClick={() => void decidir('cancelar')} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700">Cancelar mi solicitud</button>}
             {['ANULAR_AMBOS', 'RECTIFICAR_CERTIFICADO'].includes(solicitud.tipoOperacion) && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeRechazar && <button type="button" disabled={procesando} onClick={() => void decidir('rechazar')} className="flex items-center gap-1 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white"><XCircle size={16} /> Rechazar</button>}
-            {['ANULAR_AMBOS', 'RECTIFICAR_CERTIFICADO'].includes(solicitud.tipoOperacion) && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeAprobar && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Aprobar solicitud</button>}
-            {['ANULAR_AMBOS', 'RECTIFICAR_CERTIFICADO'].includes(solicitud.tipoOperacion) && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && puedeAutoaprobar && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Autoaprobar excepcionalmente</button>}
+            {solicitud.tipoOperacion === 'ANULAR_AMBOS' && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeAprobarYEjecutar && <button type="button" id="btn-aprobar-y-ejecutar-anulacion-total" disabled={procesando} onClick={() => void aprobarYEjecutarAnulacion()} className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{procesando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Aprobar y ejecutar anulación total</button>}
+            {solicitud.tipoOperacion === 'RECTIFICAR_CERTIFICADO' && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeAprobarSolicitud && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Aprobar solicitud</button>}
+            {solicitud.tipoOperacion === 'ANULAR_AMBOS' && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && puedeAprobarYEjecutar && <button type="button" id="btn-autoaprobar-y-ejecutar-anulacion-total" disabled={procesando} onClick={() => void aprobarYEjecutarAnulacion()} className="flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{procesando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Autoaprobar y ejecutar anulación total</button>}
+            {solicitud.tipoOperacion === 'RECTIFICAR_CERTIFICADO' && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && puedeAprobarSolicitud && puedeAutoaprobar && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Autoaprobar excepcionalmente</button>}
           </div>
+          {solicitud.estado === 'PENDIENTE_APROBACION' && motivoBloqueoAprobacion && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+              <span><strong>Aprobación no disponible:</strong> {motivoBloqueoAprobacion}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -462,7 +570,7 @@ export function SolicitudesOperacionView() {
               <tbody className="divide-y">
                 {loading && <tr><td colSpan={7} className="p-10 text-center text-slate-500"><Loader2 className="mx-auto mb-2 animate-spin" /> Cargando...</td></tr>}
                 {!loading && solicitudes.length === 0 && <tr><td colSpan={7} className="p-10 text-center text-slate-400">No existen solicitudes para los filtros seleccionados.</td></tr>}
-                {!loading && solicitudes.map((solicitud) => <tr key={solicitud.id} className="hover:bg-slate-50"><td className="px-4 py-3 whitespace-nowrap">{new Date(solicitud.fechaSolicitud).toLocaleString('es-PE')}</td><td className="px-4 py-3"><strong className="block">{solicitud.usuarioSolicitante}</strong><span className="text-xs text-slate-500">{solicitud.plantaNombre || solicitud.plantaKey}</span></td><td className="px-4 py-3"><strong className="block text-blue-800">{solicitud.numeroCertificado || '-'}</strong><span className="text-xs text-slate-500">{solicitud.nroComprobante || 'Sin comprobante'}</span></td><td className="px-4 py-3">{etiquetaTipoSolicitud(solicitud.tipoOperacion)}</td><td className="max-w-xs truncate px-4 py-3" title={solicitud.motivo}>{solicitud.motivo}</td><td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${clasesEstado(solicitud.estado)}`}>{etiquetaEstadoSolicitud(solicitud.estado)}</span></td><td className="px-4 py-3 text-center"><button type="button" onClick={() => setSeleccionada(solicitud)} className="rounded-lg border border-blue-200 bg-blue-50 p-2 text-blue-800" aria-label={`Ver solicitud ${solicitud.id}`}><Eye size={17} /></button></td></tr>)}
+                {!loading && solicitudes.map((solicitud) => <tr key={solicitud.id} className="hover:bg-slate-50"><td className="px-4 py-3 whitespace-nowrap">{new Date(solicitud.fechaSolicitud).toLocaleString('es-PE')}</td><td className="px-4 py-3"><strong className="block">{solicitud.usuarioSolicitante}</strong><span className="text-xs text-slate-500">{solicitud.plantaNombre || solicitud.plantaKey}</span></td><td className="px-4 py-3"><strong className="block text-blue-800">{solicitud.numeroCertificado || '-'}</strong><span className="text-xs text-slate-500">{solicitud.nroComprobante || 'Sin comprobante'}</span></td><td className="px-4 py-3">{etiquetaTipoSolicitud(solicitud.tipoOperacion)}</td><td className="max-w-xs truncate px-4 py-3" title={solicitud.motivo}>{solicitud.motivo}</td><td className="px-4 py-3"><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${clasesEstado(solicitud.estado)}`}>{etiquetaEstadoSolicitudDetallado(solicitud)}</span></td><td className="px-4 py-3 text-center"><button type="button" onClick={() => setSeleccionada(solicitud)} className="rounded-lg border border-blue-200 bg-blue-50 p-2 text-blue-800" aria-label={`Ver solicitud ${solicitud.id}`}><Eye size={17} /></button></td></tr>)}
               </tbody>
             </table>
           </div>

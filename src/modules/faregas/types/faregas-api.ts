@@ -428,6 +428,10 @@ interface PerfilFaregasBaseRequest {
   nombre: string;
   visible: boolean | 'true' | 'false';
   sedes: string[];
+  /**
+   * Lista completa de permisos del perfil, incluidas las claves sensibles.
+   * El backend valida que el actor tenga MENU_USUARIOS y persiste el diff.
+   */
   permisos: string[];
 }
 

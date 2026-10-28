@@ -2,6 +2,11 @@
 import { Edit, Trash2 } from 'lucide-react';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 import type { MaestroUsuario } from '../../types/faregas-api';
+import {
+  esPermisoSensible,
+  filtrarPermisosDelCatalogo,
+  filtrarPermisosVigentes,
+} from './permisosSensibles';
 
 import {
   atributosDocumento,
@@ -46,7 +51,7 @@ export function UsuariosView() {
 
   // Marca un campo al vuelo. `soloSiHayError` evita ensuciar el formulario antes
   // de que el operador haya tocado el campo.
-  const registrarError = (campo: CampoUsuario, valor: string, soloSiHayError = true) => {
+  const registrarError = (campo: CampoUsuario, valor: string | null, soloSiHayError = true) => {
     setErroresCampo((actual) => {
       const siguiente = { ...actual };
       if (valor) siguiente[campo] = valor;
@@ -356,28 +361,11 @@ export function UsuariosView() {
     'FAREGAS_SOLICITUD_RECHAZAR',
     'FAREGAS_SOLICITUD_ADMINISTRAR',
     'FAREGAS_CERTIFICADO_ANULAR_EJECUTAR',
+    'FAREGAS_CERTIFICADO_RECTIFICAR_EJECUTAR',
     'FAREGAS_NOTA_CREDITO',
     'FAREGAS_ANULAR_COMPROBANTE'
   ] as const;
   const PERMISO_INICIO = 'MENU_INICIO';
-  const PERMISOS_INICIO_SENSIBLES = new Set<string>([
-    'FAREGAS_SOLICITUD_APROBAR',
-    'FAREGAS_SOLICITUD_AUTOAPROBAR',
-    'FAREGAS_SOLICITUD_AUTOEJECUTAR',
-    'FAREGAS_SOLICITUD_RECHAZAR',
-    'FAREGAS_SOLICITUD_ADMINISTRAR',
-    'FAREGAS_CERTIFICADO_ANULAR_EJECUTAR',
-    'FAREGAS_NOTA_CREDITO',
-    'FAREGAS_ANULAR_COMPROBANTE'
-  ]);
-  const PERMISOS_EXCLUSIVOS_SISTEMAS = new Set<string>([
-    'FAREGAS_SOLICITUD_APROBAR',
-    'FAREGAS_SOLICITUD_AUTOAPROBAR',
-    'FAREGAS_SOLICITUD_AUTOEJECUTAR',
-    'FAREGAS_SOLICITUD_RECHAZAR',
-    'FAREGAS_SOLICITUD_ADMINISTRAR',
-    'FAREGAS_CERTIFICADO_ANULAR_EJECUTAR'
-  ]);
   const NOMBRES_PERMISOS_INICIO: Record<string, string> = {
     FAREGAS_SOLICITUD_CREAR: 'Solicitar anulación total',
     FAREGAS_SOLICITUD_VER: 'Consultar solicitudes de anulación',
@@ -387,6 +375,7 @@ export function UsuariosView() {
     FAREGAS_SOLICITUD_RECHAZAR: 'Rechazar solicitudes',
     FAREGAS_SOLICITUD_ADMINISTRAR: 'Administrar solicitudes',
     FAREGAS_CERTIFICADO_ANULAR_EJECUTAR: 'Ejecutar anulación autorizada',
+    FAREGAS_CERTIFICADO_RECTIFICAR_EJECUTAR: 'Rectificar certificado directamente',
     FAREGAS_NOTA_CREDITO: 'Emitir nota de crédito',
     FAREGAS_ANULAR_COMPROBANTE: 'Anular comprobante electrónico'
   };
@@ -402,18 +391,20 @@ export function UsuariosView() {
     const current = formData.permisos || [];
     const modulo = MODULOS_CON_SUBMODULOS.find((m) => m.padre === clave);
 
-    // Desmarcar un módulo padre se lleva por delante sus submódulos.
+    // Desmarcar un módulo padre desmarca también sus submódulos, incluidos los
+    // sensibles: el editor siempre refleja exactamente lo que se guardará.
     if (modulo && current.includes(clave)) {
       setFormData({
         ...formData,
-        permisos: current.filter((p: string) => p !== clave && !modulo.hijos.includes(p))
+        permisos: current.filter((p: string) =>
+          p !== clave && !modulo.hijos.includes(p)
+        )
       });
       return;
     }
 
     // Marcar el padre habilita sus submódulos sin marcar ninguno: se deja que
-    // el administrador elija cuáles, y editar el perfil sin tocar nada más no
-    // le quita acceso a lo que ya tenía.
+    // el administrador elija cuáles.
     if (modulo) {
       setFormData({ ...formData, permisos: [...current, clave] });
       return;
@@ -664,7 +655,7 @@ export function UsuariosView() {
                             nombre: p.nombre,
                             visible: p.visible,
                             sedes: p.sedes || [],
-                            permisos: p.permisos || []
+                            permisos: filtrarPermisosVigentes(p.permisos || [])
                           });
                           setShowModal(true);
                         }} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors">
@@ -770,15 +761,40 @@ export function UsuariosView() {
                 <form id="main-form" onSubmit={activeTab === 'usuarios' ? handleSaveUsuario : async (e) => {
                 e.preventDefault();
                 try {
+                    setSaving(true);
+                    const payload = {
+                    ...formData,
+                    permisos: filtrarPermisosDelCatalogo(formData.permisos || [], permisos)
+                    };
                     if (modalMode === 'crear') {
-                    await faregasUsuariosApi.crearPerfil(formData);
+                    await faregasUsuariosApi.crearPerfil(payload);
                     } else {
-                    await faregasUsuariosApi.actualizarPerfil(formData.clave, formData);
+                    await faregasUsuariosApi.actualizarPerfil(payload.clave, payload);
                     }
                     setShowModal(false);
                     cargarDatos();
                 } catch (err: any) {
-                    setError(err.message || 'Error al guardar perfil');
+                    const mensajes: Record<string, string> = {
+                    PERFILES_NO_AUTORIZADO:
+                        'No tienes autorización para administrar perfiles.',
+                    PERMISOS_NO_DISPONIBLES:
+                        'No se pudo guardar el perfil porque uno o más permisos no están registrados o no están activos.',
+                    PERMISOS_SENSIBLES_NO_DISPONIBLES:
+                        'No se pudo guardar el perfil porque uno o más permisos sensibles no están registrados o no están activos.',
+                    PERMISOS_SENSIBLES_INVALIDOS:
+                        'No se pudo guardar el perfil porque la lista de permisos sensibles contiene claves inválidas.',
+                    PERMISOS_NO_GESTIONABLES:
+                        'No se pudo guardar el perfil porque uno o más permisos no se administran desde este editor.'
+                    };
+                    const clavesInvalidas = Array.isArray(err?.detalles?.claves)
+                        ? err.detalles.claves.filter((clave: unknown): clave is string => typeof clave === 'string')
+                        : [];
+                    const detalleClaves = clavesInvalidas.length > 0
+                        ? ` Permisos afectados: ${clavesInvalidas.join(', ')}.`
+                        : '';
+                    setError(`${mensajes[err?.codigo] || err.message || 'Error al guardar perfil'}${detalleClaves}`);
+                } finally {
+                    setSaving(false);
                 }
                 }} className="faregas-user-form space-y-6">
                 
@@ -1113,10 +1129,13 @@ export function UsuariosView() {
                                     && p.clave !== 'MENU_CONFIGURACION_TARIFAS');
 
                                 const casilla = (p: PermisoPerfil, hijo: boolean, padreActivo: boolean) => {
-                                    const esPerfilSistemas = formData.clave === 'SISTEMAS';
-                                    const bloqueadoPorPerfil = !esPerfilSistemas && PERMISOS_EXCLUSIVOS_SISTEMAS.has(p.clave);
-                                    const activo = bloqueadoPorPerfil ? false : marcados.includes(p.clave);
-                                    const bloqueado = (hijo && !padreActivo) || bloqueadoPorPerfil;
+                                    const permisoSensible = esPermisoSensible(p.clave);
+                                    const activo = marcados.includes(p.clave);
+                                    // Un submódulo sólo se bloquea para marcarlo si su
+                                    // módulo padre no está activo. Si ya estaba marcado,
+                                    // se permite desmarcarlo para poder revocar cualquier
+                                    // permiso, incluidos los sensibles.
+                                    const bloqueado = hijo && !padreActivo && !activo;
                                     const clavePadre = MODULOS_CON_SUBMODULOS.find(
                                         (o) => o.hijos.includes(p.clave))?.padre;
                                     const etiquetaPadre = clavePadre === PERMISO_FACTURACION
@@ -1126,11 +1145,10 @@ export function UsuariosView() {
                                             : clavePadre === PERMISO_INICIO
                                                 ? 'Inicio'
                                                 : 'Inventario';
-                                    const permisoSensible = PERMISOS_INICIO_SENSIBLES.has(p.clave);
                                     return (
                                         <label key={p.clave}
                                             className={`flex items-center gap-2 text-sm p-2 rounded border ${permisoSensible ? 'border-red-200 bg-red-50/60' : hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
-                                            title={bloqueadoPorPerfil ? 'Exclusivo para perfil SISTEMAS' : (hijo && !padreActivo ? `Active primero ${etiquetaPadre}` : undefined)}>
+                                            title={bloqueado ? `Active primero ${etiquetaPadre}` : undefined}>
                                             <input type="checkbox"
                                                 className="h-4 w-4 text-[#052a79]"
                                                 checked={activo}

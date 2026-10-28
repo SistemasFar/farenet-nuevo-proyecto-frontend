@@ -4,7 +4,7 @@ import { operacionApi } from '@/services/api';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace('/api', '')
-  : 'http://127.0.0.1:3000';
+  : window.location.origin;
 import type { InspeccionPanel } from '@/types/operacion';
 
 import { useNavigate, useOutletContext } from 'react-router-dom';

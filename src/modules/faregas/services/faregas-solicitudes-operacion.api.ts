@@ -26,7 +26,13 @@ export interface ContextoSolicitudOperacion {
     estado: string | null;
     fechaEmision: string | null;
     placa: string | null;
+    importeFinal: number | null;
+    monedaImporteFinal: string | null;
+    anulacionImporteCero: boolean;
+    anulacionImporteNoDeterminable: boolean;
   };
+  puedeSolicitarAnulacionTotal: boolean;
+  motivoBloqueoAnulacion: string | null;
   comprobante: {
     id: number;
     tipo: string;
@@ -94,6 +100,10 @@ export interface SolicitudOperacion {
   tipoCertificado: string | null;
   nroComprobante: string | null;
   placa: string | null;
+  importeFinal?: number | null;
+  monedaImporteFinal?: string | null;
+  anulacionImporteCero?: boolean;
+  anulacionImporteNoDeterminable?: boolean;
   diferencias?: Array<{
     campo: string;
     valorOriginal: unknown;
@@ -163,9 +173,18 @@ export interface EstadoFiscalActualSolicitud {
 
 export interface DetalleSolicitudOperacion {
   estadoAdministrativo: EstadoSolicitudOperacion;
+  bloqueoImporte?: {
+    codigo: 'CERTIFICADO_IMPORTE_CERO_NO_ANULABLE' | 'CERTIFICADO_IMPORTE_FINAL_NO_DETERMINABLE';
+    motivo: string;
+    importeFinal: number | null;
+  } | null;
   estadoFiscalActual: EstadoFiscalActualSolicitud | null;
   resolucionFiscal: ResolucionFiscalSolicitud | null;
   estadoTecnico: Record<string, unknown> | null;
+  puedeAprobar: boolean;
+  puedeAprobarYEjecutar: boolean;
+  esAutoaprobacion: boolean;
+  motivoBloqueoAprobacion: string | null;
   ejecucion: {
     puedeEjecutar: boolean;
     esAutoejecucion: boolean;
@@ -215,6 +234,21 @@ const queryString = (filtros: FiltrosSolicitudOperacion) => {
   });
   return params.toString();
 };
+
+export interface ResultadoAprobarYEjecutar {
+  ok: boolean;
+  data: SolicitudOperacion;
+  aprobada: boolean;
+  ejecucionIniciada: boolean;
+  ejecucionFallida: boolean;
+  codigoError: string | null;
+  mensajeError: string | null;
+  resultadoFiscal: Record<string, unknown> | null;
+  resultadoTecnico: Record<string, unknown> | null;
+  completada: boolean;
+  requiereIntervencion: boolean;
+  yaCompletada: boolean;
+}
 
 export const faregasSolicitudesOperacionApi = {
   contexto: async (certificadoId: number): Promise<ContextoSolicitudOperacion> => {
@@ -282,9 +316,30 @@ export const faregasSolicitudesOperacionApi = {
       justificacion?: string;
       confirmarAutoejecucion?: boolean;
       idempotenciaClave?: string;
+      soloSincronizar?: boolean;
     },
   ): Promise<ResultadoEjecucionAnulacionTotal> => faregasFetch(
     `/solicitudes-operacion/${id}/ejecutar-anulacion-total`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  ),
+  sincronizarAnulacionTotal: async (
+    id: number,
+    version: number,
+  ): Promise<ResultadoEjecucionAnulacionTotal> => faregasFetch(
+    `/solicitudes-operacion/${id}/ejecutar-anulacion-total`,
+    { method: 'POST', body: JSON.stringify({ version, soloSincronizar: true }) },
+  ),
+  aprobarYEjecutarAnulacionTotal: async (
+    id: number,
+    payload: {
+      version: number;
+      justificacion?: string;
+      confirmarAutoaprobacion?: boolean;
+      confirmarAutoejecucion?: boolean;
+      idempotenciaClave?: string;
+    },
+  ): Promise<ResultadoAprobarYEjecutar> => faregasFetch(
+    `/solicitudes-operacion/${id}/aprobar-y-ejecutar-anulacion-total`,
     { method: 'POST', body: JSON.stringify(payload) },
   ),
 };
@@ -300,6 +355,20 @@ export const etiquetaEstadoSolicitud = (estado: EstadoSolicitudOperacion) => ({
   REQUIERE_INTERVENCION: 'Requiere intervención',
 }[estado] || estado);
 
+export const etiquetaEstadoSolicitudDetallado = (solicitud: SolicitudOperacion) => {
+  const fiscal = String(solicitud.resultadoFiscal?.estado || '').trim().toUpperCase();
+  if (solicitud.tipoOperacion === 'ANULAR_AMBOS') {
+    if (solicitud.estado === 'EN_EJECUCION' && [
+      'PENDIENTE', 'PENDIENTE_SUNAT', 'EN_TRAMITE', 'BAJA_FISCAL_PENDIENTE',
+    ].includes(fiscal)) return 'Baja fiscal pendiente de confirmación';
+    if (solicitud.estado === 'ERROR' && ['RECHAZADO', 'BAJA_RECHAZADA'].includes(fiscal)) {
+      return 'Baja rechazada';
+    }
+    if (solicitud.estado === 'COMPLETADA') return 'Anulación completada';
+  }
+  return etiquetaEstadoSolicitud(solicitud.estado);
+};
+
 export const etiquetaTipoSolicitud = (tipo: TipoSolicitudOperacion) => ({
   ANULAR_CERTIFICADO: 'Anular certificado',
   ANULAR_COMPROBANTE: 'Anular comprobante',
@@ -311,6 +380,9 @@ export const etiquetaTipoSolicitud = (tipo: TipoSolicitudOperacion) => ({
 
 export const etiquetaEstadoFiscal = (estado: string | null | undefined) => ({
   ACEPTADO: 'Aceptado por SUNAT',
+  BAJA_ACEPTADA: 'Baja confirmada',
+  BAJA_FISCAL_PENDIENTE: 'Baja fiscal pendiente de confirmación',
+  BAJA_RECHAZADA: 'Baja rechazada',
   PENDIENTE: 'Pendiente de envío',
   PENDIENTE_SUNAT: 'Pendiente de SUNAT',
   EN_TRAMITE: 'En trámite',

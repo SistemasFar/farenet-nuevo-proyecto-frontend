@@ -1,9 +1,10 @@
 import { DatosFacturacion } from './DatosFacturacion';
-import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Trash2, Search, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import { MensajeError, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
+import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
 
 /** Clase original de los campos de titular; el error sólo cambia el color. */
 const CLASE_CAMPO = 'w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
@@ -46,6 +47,7 @@ export function TitularesList({
   mostrarDireccionTitular = false,
   integrarPropietarioGlpAnual = false,
 }: TitularesListProps) {
+  const [buscandoUuid, setBuscandoUuid] = useState<string | null>(null);
   const facturarAlTitular = Boolean(titulares.length > 0 && formFacturacion.usarTitularPrincipalFac);
   const titularPrincipal = [...titulares].sort((a, b) => a.orden - b.orden)[0] || null;
   const errorTitular = (indice: number, campo: string) => erroresCampo[`titular.${indice}.${campo}`];
@@ -108,11 +110,119 @@ export function TitularesList({
         }
       } else if (field === 'tipoDocumento') {
         // Reset doc number if type changes
-        return { ...t, [field]: finalValue, nroDocumento: '' };
+        return { ...t, [field]: finalValue, nroDocumento: '', clienteId: null };
       }
       
       return { ...t, [field]: finalValue };
     }));
+  };
+
+  const handleBuscarCliente = async (titular: TitularState, index: number) => {
+    if (buscandoUuid) return;
+
+    const tipo = String(titular.tipoDocumento || 'DNI').trim().toUpperCase();
+    const numero = String(titular.nroDocumento || '').trim().toUpperCase();
+
+    if (!numero) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Documento requerido',
+        text: 'Ingrese el número de documento a consultar.',
+      });
+      return;
+    }
+
+    if (tipo === 'DNI' && !/^\d{8}$/.test(numero)) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Documento inválido',
+        text: 'El DNI debe tener 8 dígitos numéricos.',
+      });
+      return;
+    }
+
+    if (tipo === 'RUC' && !/^\d{11}$/.test(numero)) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Documento inválido',
+        text: 'El RUC debe tener 11 dígitos numéricos.',
+      });
+      return;
+    }
+
+    setBuscandoUuid(titular._uuid);
+    try {
+      const response = await faregasClientesApi.autocompletarPersona(tipo, numero);
+      const persona = response?.data;
+
+      let actualizado = false;
+      setTitulares((prev) => {
+        const titularActual = prev.find((t) => t._uuid === titular._uuid);
+        if (!titularActual) return prev;
+        if (
+          String(titularActual.tipoDocumento || '').trim().toUpperCase() !== tipo ||
+          String(titularActual.nroDocumento || '').trim().toUpperCase() !== numero
+        ) {
+          return prev;
+        }
+
+        actualizado = true;
+        limpiarTitular(index, 'nroDocumento');
+        limpiarTitular(index, 'nombreRazonSocial');
+        limpiarTitular(index, 'direccion');
+
+        return prev.map((t) => {
+          if (t._uuid !== titular._uuid) return t;
+          return {
+            ...t,
+            nombreRazonSocial: (persona?.nombreRazonSocial || t.nombreRazonSocial || '').toUpperCase(),
+            direccion: (persona?.direccion || t.direccion || '').toUpperCase(),
+            clienteId: (persona?.origen === 'FAREGAS' && persona?.id) ? Number(persona.id) : t.clienteId,
+          };
+        });
+      });
+
+      if (actualizado && persona && (persona.nombreRazonSocial || persona.direccion)) {
+        const origenTexto = persona.origen === 'FAREGAS'
+          ? 'Datos recuperados de clientes Faregas.'
+          : 'Datos recuperados de clientes Farenet.';
+        await Swal.fire({
+          icon: 'success',
+          title: 'Cliente encontrado',
+          text: origenTexto,
+          timer: 1800,
+          showConfirmButton: false,
+        });
+      } else if (!actualizado) {
+        // Documento modificado durante la espera
+      } else {
+        await Swal.fire({
+          icon: 'info',
+          title: 'Cliente no encontrado',
+          text: 'No se encontraron datos para este documento. Puede ingresar los datos manualmente.',
+          timer: 2500,
+          showConfirmButton: false,
+        });
+      }
+    } catch (err: any) {
+      if (err?.status === 404 || err?.message?.toLowerCase().includes('no encontrada') || err?.message?.toLowerCase().includes('no encontrado')) {
+        await Swal.fire({
+          icon: 'info',
+          title: 'Cliente no encontrado',
+          text: 'No se encontraron datos para este documento. Puede ingresar los datos manualmente.',
+          timer: 2500,
+          showConfirmButton: false,
+        });
+      } else {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Consulta no disponible',
+          text: err?.message || 'No fue posible consultar el cliente. Puede ingresar los datos manualmente.',
+        });
+      }
+    } finally {
+      setBuscandoUuid(null);
+    }
   };
 
   const handleRemove = (titular: TitularState) => {
@@ -194,18 +304,37 @@ export function TitularesList({
               <label className="block text-xs font-bold text-slate-500 mb-1">
                 {t.tipoDocumento === 'RUC' ? 'NÚMERO DE RUC' : 'NÚMERO DE DNI'}
               </label>
-              <input
-                value={t.nroDocumento}
-                inputMode="numeric"
-                maxLength={t.tipoDocumento === 'RUC' ? 11 : 8}
-                placeholder={t.tipoDocumento === 'RUC' ? '11 dígitos' : '8 dígitos'}
-                onChange={(e) => {
-                  limpiarTitular(index, 'nroDocumento');
-                  handleChange(t._uuid, 'nroDocumento', e.target.value);
-                }}
-                className={claseConError(CLASE_CAMPO, Boolean(errorTitular(index, 'nroDocumento')))}
-                data-campo-error={errorTitular(index, 'nroDocumento') ? true : undefined}
-              />
+              <div className="flex gap-2">
+                <input
+                  value={t.nroDocumento}
+                  inputMode="numeric"
+                  maxLength={t.tipoDocumento === 'RUC' ? 11 : 8}
+                  placeholder={t.tipoDocumento === 'RUC' ? '11 dígitos' : '8 dígitos'}
+                  onChange={(e) => {
+                    limpiarTitular(index, 'nroDocumento');
+                    handleChange(t._uuid, 'nroDocumento', e.target.value);
+                  }}
+                  className={claseConError(
+                    'h-[42px] min-w-0 flex-1 px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 uppercase transition-colors',
+                    Boolean(errorTitular(index, 'nroDocumento'))
+                  )}
+                  data-campo-error={errorTitular(index, 'nroDocumento') ? true : undefined}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleBuscarCliente(t, index)}
+                  disabled={Boolean(buscandoUuid)}
+                  className="flex h-[42px] items-center justify-center rounded-lg bg-slate-200 px-3 transition-colors hover:bg-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Buscar cliente en el sistema"
+                  aria-label="Buscar cliente"
+                >
+                  {buscandoUuid === t._uuid ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-600" />
+                  ) : (
+                    <Search className="h-5 w-5 text-slate-600" />
+                  )}
+                </button>
+              </div>
               <MensajeError campo={`titular.${index}.nroDocumento`} errores={erroresCampo} />
             </div>
             <div className="md:col-span-4">
@@ -241,4 +370,3 @@ export function TitularesList({
     </div>
   );
 }
-

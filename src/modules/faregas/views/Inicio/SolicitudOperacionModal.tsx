@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ClipboardX, Loader2, PlayCircle, RefreshCw, ShieldAlert, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardX, Loader2, PlayCircle, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import {
   faregasSolicitudesOperacionApi,
   etiquetaEstadoFiscal,
-  etiquetaEstadoSolicitud,
+  etiquetaEstadoSolicitudDetallado,
   etiquetaEstadoTecnico,
   etiquetaOperacionFiscal,
   etiquetaResultadoFiscal,
   etiquetaTipoSolicitud,
   type ContextoSolicitudOperacion,
+  type ResultadoAprobarYEjecutar,
   type SolicitudOperacion,
 } from '../../services/faregas-solicitudes-operacion.api';
-import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 
 interface Props {
   certificadoId: number | null;
@@ -103,20 +103,101 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
   const resolucionFiscal = detalle?.resolucionFiscal;
   const puedeEjecutar = ejecucion?.puedeEjecutar === true;
   const esAutoejecucion = ejecucion?.esAutoejecucion === true;
+  const puedeAprobar = detalle?.puedeAprobarYEjecutar === true;
+  const esAutoaprobacion = detalle?.esAutoaprobacion === true;
+  const esPendienteAnulacion = solicitud?.tipoOperacion === 'ANULAR_AMBOS' && solicitud?.estado === 'PENDIENTE_APROBACION';
   const ultimaAnulacion = estadoFiscal?.anulaciones?.[0];
   const ultimaNota = estadoFiscal?.notasCredito?.[0];
+  const bloqueoAnulacionContexto = Boolean(contexto && (
+    contexto.puedeSolicitarAnulacionTotal === false
+    || contexto.certificado.anulacionImporteCero === true
+    || contexto.certificado.anulacionImporteNoDeterminable === true
+  ));
+  const mensajeBloqueoAnulacion = contexto?.motivoBloqueoAnulacion
+    || (contexto?.certificado.anulacionImporteCero === true
+      ? 'Este certificado tiene un importe final de S/ 0.00 y no admite anulación.'
+      : 'No se pudo determinar el importe final del certificado; la anulación está bloqueada hasta regularizar el importe.');
 
   const sincronizarEstadoFiscal = async () => {
-    if (!solicitud?.certificadoId) return;
+    if (!solicitud?.certificadoId || solicitud.tipoOperacion !== 'ANULAR_AMBOS') return;
     setProcesando(true);
     try {
-      await faregasCertificadosApi.consultarFacturacionElectronica(solicitud.certificadoId);
+      await faregasSolicitudesOperacionApi.sincronizarAnulacionTotal(solicitud.id, solicitud.version);
       const actualizada = await faregasSolicitudesOperacionApi.obtener(solicitud.id);
       setSolicitud(actualizada);
       onCreada?.(actualizada);
-      await Swal.fire('Estado fiscal actualizado', 'Se consultó el estado real del comprobante ante NubeFact.', 'success');
+      await Swal.fire('Estado de la baja actualizado', 'Se consultó la misma operación fiscal, sin generar una baja duplicada.', 'success');
     } catch (err) {
       await Swal.fire('No se pudo sincronizar', err instanceof Error ? err.message : 'Intente nuevamente.', 'error');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const aprobarYEjecutarAnulacion = async () => {
+    if (!solicitud || procesando) return;
+    const confirmacion = await Swal.fire({
+      icon: 'warning',
+      title: esAutoaprobacion ? '¿Autoaprobar y ejecutar anulación total?' : '¿Aprobar y ejecutar anulación total?',
+      html: `<div style="text-align:left;font-size:13px;line-height:1.55">
+        <p>Esta acción <strong>registrará la aprobación</strong> y <strong>ejecutará inmediatamente</strong> la anulación total, sin requerir un segundo paso.</p>
+        <p>Se consultará <strong>NubeFact</strong> para determinar el mecanismo fiscal aplicable. La anulación técnica del certificado seguirá su procedimiento independiente.</p>
+        ${esAutoaprobacion ? '<p><strong>Autoaprobación y autoejecución excepcionales:</strong> usted es el solicitante; la operación quedará auditada con la justificación registrada.</p>' : ''}
+      </div>`,
+      input: esAutoaprobacion ? 'textarea' : undefined,
+      inputLabel: esAutoaprobacion ? 'Justificación obligatoria de la autoejecución' : undefined,
+      inputPlaceholder: esAutoaprobacion ? 'Sustento de la excepción autorizada' : undefined,
+      inputValidator: esAutoaprobacion
+        ? (valor: string) => (!String(valor || '').trim() ? 'La autoejecución exige una justificación.' : undefined)
+        : undefined,
+      showCancelButton: true,
+      confirmButtonText: esAutoaprobacion ? 'Sí, autoaprobar y ejecutar' : 'Sí, aprobar y ejecutar',
+      cancelButtonText: 'Volver',
+      confirmButtonColor: '#047857',
+    });
+    if (!confirmacion.isConfirmed) return;
+    setProcesando(true);
+    try {
+      const resultado: ResultadoAprobarYEjecutar = await faregasSolicitudesOperacionApi.aprobarYEjecutarAnulacionTotal(
+        solicitud.id,
+        {
+          version: solicitud.version,
+          justificacion: String(confirmacion.value || '').trim() || undefined,
+          ...(esAutoaprobacion ? { confirmarAutoaprobacion: true, confirmarAutoejecucion: true } : {}),
+        }
+      );
+      const actualizada = await faregasSolicitudesOperacionApi.obtener(solicitud.id);
+      setSolicitud(actualizada);
+      onCreada?.(actualizada);
+      if (resultado.ejecucionFallida) {
+        await Swal.fire({
+          icon: 'info',
+          title: 'Aprobación registrada — ejecución pendiente',
+          html: `<div style="text-align:left;font-size:13px;line-height:1.6">
+            <p>La solicitud quedó <strong>aprobada</strong>, pero la ejecución no pudo completarse en este intento.</p>
+            ${resultado.codigoError ? `<p><strong>Código:</strong> ${String(resultado.codigoError)}</p>` : ''}
+            <p>La operación quedó registrada para recuperación controlada. Puede reintentar la ejecución desde este detalle o desde la vista de solicitudes.</p>
+          </div>`,
+        });
+        return;
+      }
+      if (!resultado.ejecucionIniciada) {
+        await Swal.fire('Aprobación registrada', 'La solicitud fue aprobada, pero la ejecución no se inició. Revise el detalle para continuar.', 'info');
+        return;
+      }
+      const fiscal = resultado.resultadoFiscal as Record<string, unknown> | null;
+      const tecnico = resultado.resultadoTecnico as Record<string, unknown> | null;
+      await Swal.fire({
+        icon: resultado.completada ? 'success' : 'info',
+        title: resultado.completada ? 'Anulación total completada' : 'Aprobación y ejecución registradas',
+        html: `<div style="text-align:left;font-size:13px;line-height:1.6">
+          <p><strong>Fiscal:</strong> ${String(fiscal?.estado || 'Sin resultado')}${fiscal?.tipoOperacion ? ` · ${String(fiscal.tipoOperacion)}` : ''}</p>
+          <p><strong>Técnico:</strong> ${String(tecnico?.estado || 'Sin resultado')}</p>
+          ${resultado.requiereIntervencion ? '<p>La solicitud requiere intervención para completar el procedimiento fiscal o técnico pendiente. No se declaró una anulación que NubeFact/SUNAT no haya confirmado.</p>' : ''}
+        </div>`,
+      });
+    } catch (err) {
+      await Swal.fire('No se pudo procesar', err instanceof Error ? err.message : 'Intente nuevamente.', 'error');
     } finally {
       setProcesando(false);
     }
@@ -190,6 +271,10 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
   };
 
   const enviar = async () => {
+    if (bloqueoAnulacionContexto) {
+      setError(mensajeBloqueoAnulacion);
+      return;
+    }
     if (!certificadoId || !motivo.trim()) {
       setError('Ingrese el motivo obligatorio de la anulación total.');
       return;
@@ -218,7 +303,7 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
         <div className="sticky top-0 z-10 flex items-start justify-between bg-[#052A79] px-5 py-4 text-white">
           <div>
             <h2 id="solicitud-anulacion-total-titulo" className="text-lg font-bold">{solicitud ? 'Detalle de la solicitud de anulación' : 'Solicitar anulación total'}</h2>
-            <p className="text-xs text-blue-100">{solicitud ? 'La aprobación no ejecuta la anulación. Si tienes permisos efectivos, ejecuta aquí; la autoejecución exige confirmación y justificación.' : 'Registra la solicitud; no se anulará ni modificará ningún documento hasta su aprobación y ejecución.'}</p>
+            <p className="text-xs text-blue-100">{solicitud ? 'Aprobación y ejecución en un solo paso para usuarios autorizados. La ejecución fiscal conserva confirmación, trazabilidad y recuperación controlada.' : 'Registra la solicitud; no se anulará ni modificará ningún documento hasta su aprobación y ejecución.'}</p>
           </div>
           <button type="button" onClick={onCerrar} className="rounded p-1 hover:bg-white/10" aria-label="Cerrar"><X size={20} /></button>
         </div>
@@ -244,8 +329,15 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 <div><span className="block text-xs font-semibold text-slate-500">COMPROBANTE</span>{solicitud.nroComprobante || 'No aplica'}</div>
                 <div><span className="block text-xs font-semibold text-slate-500">OPERACIÓN</span>{etiquetaTipoSolicitud(solicitud.tipoOperacion)}</div>
                 <div><span className="block text-xs font-semibold text-slate-500">FECHA SOLICITUD</span>{new Date(solicitud.fechaSolicitud).toLocaleString('es-PE')}</div>
-                <div><span className="block text-xs font-semibold text-slate-500">ESTADO</span><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${claseEstadoSolicitudDetalle(solicitud.estado)}`}>{etiquetaEstadoSolicitud(solicitud.estado)}</span></div>
+                <div><span className="block text-xs font-semibold text-slate-500">ESTADO</span><span className={`inline-flex rounded-full border px-2 py-1 text-xs font-bold ${claseEstadoSolicitudDetalle(solicitud.estado)}`}>{etiquetaEstadoSolicitudDetallado(solicitud)}</span></div>
+                <div><span className="block text-xs font-semibold text-slate-500">IMPORTE FINAL</span>{solicitud.importeFinal === null || solicitud.importeFinal === undefined ? '-' : `${solicitud.monedaImporteFinal || 'PEN'} ${Number(solicitud.importeFinal).toFixed(2)}`}</div>
               </div>
+
+              {detalle?.bloqueoImporte && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-800">
+                  <strong>Anulación bloqueada:</strong> {detalle.bloqueoImporte.motivo}
+                </div>
+              )}
 
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
                 <h4 className="mb-2 text-xs font-bold uppercase text-slate-600">Estado de ejecución</h4>
@@ -263,7 +355,7 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 </div>
                 {solicitud.estado === 'APROBADA' && !solicitud.usuarioEjecucion && (
                   <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-amber-900">
-                    La solicitud está aprobada pero <strong>aún no se ejecutó</strong>. No se ha enviado ninguna baja ni nota a NubeFact.
+                    La solicitud está aprobada pero <strong>aún no se ejecutó</strong>. No se ha enviado ninguna baja ni nota a NubeFact. Puede reintentar la ejecución con el botón inferior.
                   </p>
                 )}
                 {resolucionFiscal?.resultado === 'PENDIENTE_VERIFICACION' && (
@@ -310,7 +402,12 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
 
               <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
                 <button type="button" onClick={onCerrar} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cerrar</button>
-                {solicitud.certificadoId && (
+                {esPendienteAnulacion && puedeAprobar && (
+                  <button type="button" id="btn-modal-aprobar-y-ejecutar-anulacion-total" disabled={procesando} onClick={() => void aprobarYEjecutarAnulacion()} className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${esAutoaprobacion ? 'bg-amber-700' : 'bg-emerald-700'}`}>
+                    {procesando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} {esAutoaprobacion ? 'Autoaprobar y ejecutar anulación total' : 'Aprobar y ejecutar anulación total'}
+                  </button>
+                )}
+                {solicitud.certificadoId && ['EN_EJECUCION', 'REQUIERE_INTERVENCION', 'ERROR'].includes(solicitud.estado) && (
                   <button type="button" disabled={procesando} onClick={() => void sincronizarEstadoFiscal()} className="flex items-center gap-1 rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-800 disabled:opacity-50">
                     {procesando ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Sincronizar estado fiscal
                   </button>
@@ -318,7 +415,11 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 {puedeEjecutar && (
                   <button type="button" disabled={procesando} onClick={() => void ejecutarAnulacion()} className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${esAutoejecucion ? 'bg-amber-700' : 'bg-[#052A79]'}`}>
                     {esAutoejecucion ? <ShieldAlert size={16} /> : <PlayCircle size={16} />}
-                    {esAutoejecucion ? 'Autoejecutar (excepcional)' : 'Ejecutar anulación total'}
+                    {esAutoejecucion
+                      ? 'Autoejecutar (excepcional)'
+                      : ['REQUIERE_INTERVENCION', 'ERROR'].includes(solicitud.estado)
+                        ? 'Reintentar ejecución'
+                        : 'Ejecutar anulación total'}
                   </button>
                 )}
               </div>
@@ -334,7 +435,17 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 <div><span className="block text-xs font-semibold text-slate-500">PLACA</span>{mostrar(contexto.certificado.placa)}</div>
                 <div><span className="block text-xs font-semibold text-slate-500">EMPRESA</span>{mostrar(contexto.empresa.nombre)}</div>
                 <div><span className="block text-xs font-semibold text-slate-500">SEDE</span>{mostrar(contexto.planta.nombre)}</div>
+                <div><span className="block text-xs font-semibold text-slate-500">IMPORTE FINAL</span>{contexto.certificado.importeFinal === null || contexto.certificado.importeFinal === undefined ? '-' : `${contexto.certificado.monedaImporteFinal || 'PEN'} ${Number(contexto.certificado.importeFinal).toFixed(2)}`}</div>
               </div>
+
+              {bloqueoAnulacionContexto && (
+                <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-900">
+                  <div className="flex gap-2">
+                    <AlertTriangle size={18} className="shrink-0 text-red-700" />
+                    <span>{mensajeBloqueoAnulacion}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                 <h3 className="mb-3 text-sm font-bold text-blue-950">Comprobante electrónico asociado</h3>
@@ -371,7 +482,8 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                   onChange={(event) => setMotivo(event.target.value)}
                   maxLength={500}
                   rows={4}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal"
+                  disabled={bloqueoAnulacionContexto}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal disabled:bg-slate-100 disabled:text-slate-500"
                   placeholder="Explique por qué deben anularse el certificado y el comprobante asociado"
                 />
               </label>
@@ -380,7 +492,7 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 <button type="button" onClick={onCerrar} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancelar</button>
                 <button
                   type="button"
-                  disabled={guardando || !motivo.trim()}
+                  disabled={guardando || !motivo.trim() || bloqueoAnulacionContexto}
                   onClick={() => void enviar()}
                   className="flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
                 >

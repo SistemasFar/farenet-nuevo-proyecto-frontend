@@ -1,4 +1,5 @@
-const BASE_URL = 'http://127.0.0.1:3000/api/linea';
+const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+const BASE_URL = `${API_URL}/linea`;
 
 export const lineaApi = {
   getInspeccion: async (nroInspeccion: string) => {

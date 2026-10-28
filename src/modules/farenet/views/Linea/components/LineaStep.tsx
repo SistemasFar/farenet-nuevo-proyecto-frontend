@@ -131,7 +131,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
       formData.append('tipoFoto', currentChangeTipo);
       
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/linea/foto/${nroInspeccion}/cambiar`, {
+      const res = await fetch(`/api/linea/foto/${nroInspeccion}/cambiar`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -157,7 +157,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/linea/foto/${nroInspeccion}/reiniciar`, {
+      const res = await fetch(`/api/linea/foto/${nroInspeccion}/reiniciar`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ tipoFoto: tipo })
@@ -182,7 +182,7 @@ export function LineaStep({ nroInspeccion, estadoLinea, onRefresh }: LineaStepPr
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:3000/api/linea/prueba/${nroInspeccion}/reiniciar`, {
+      const res = await fetch(`/api/linea/prueba/${nroInspeccion}/reiniciar`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

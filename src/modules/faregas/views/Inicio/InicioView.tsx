@@ -13,6 +13,7 @@ import { SolicitudOperacionModal } from './SolicitudOperacionModal';
 import {
   estadoCertificadoPanel,
   estadoComprobantePanel,
+  esMotivoAnulacionNotaCredito,
   MOTIVOS_NOTA_CREDITO,
 } from '../../utils/documentos-electronicos';
 
@@ -45,6 +46,9 @@ export interface BorradorPanel {
   enlacePdf?: string | null;
   enlacePdfFaregas?: string | null;
   nroComprobante?: string | null;
+  importeFinal?: number | string | null;
+  anulacionImporteCero?: boolean | null;
+  anulacionImporteNoDeterminable?: boolean | null;
   anulacionEnPlazo?: boolean | null;
   anulacionHastaMs?: number | string | null;
   anulacionId?: number | null;
@@ -201,7 +205,7 @@ export const etiquetaSolicitudAnulacion = (estado?: string | null): string => {
   switch (String(estado || '').trim().toUpperCase()) {
     case 'PENDIENTE_APROBACION': return 'Pendiente de aprobación';
     case 'APROBADA': return 'Aprobada — pendiente de ejecución';
-    case 'EN_EJECUCION': return 'Procesando anulación';
+    case 'EN_EJECUCION': return 'Baja fiscal pendiente de confirmación';
     case 'REQUIERE_INTERVENCION': return 'Requiere intervención';
     case 'COMPLETADA': return 'Anulado';
     case 'RECHAZADA': return 'Anulación rechazada';
@@ -211,10 +215,30 @@ export const etiquetaSolicitudAnulacion = (estado?: string | null): string => {
   }
 };
 
+export const certificadoImporteFinalCero = (item: Pick<BorradorPanel, 'anulacionImporteCero' | 'importeFinal'>): boolean => {
+  if (item.anulacionImporteCero === true) return true;
+  if (item.importeFinal === null || item.importeFinal === undefined || item.importeFinal === '') return false;
+  const importe = Number(item.importeFinal);
+  return Number.isFinite(importe) && Math.abs(importe) < 0.005;
+};
+
+export const certificadoAnulacionBloqueadaPorImporte = (
+  item: Pick<BorradorPanel, 'anulacionImporteCero' | 'anulacionImporteNoDeterminable' | 'importeFinal'>
+): boolean => (
+  certificadoImporteFinalCero(item) || item.anulacionImporteNoDeterminable === true
+);
+
+export const mensajeBloqueoAnulacionCertificado = (item: Pick<BorradorPanel, 'anulacionImporteNoDeterminable'>): string => (
+  item.anulacionImporteNoDeterminable === true
+    ? 'No se pudo determinar el importe final del certificado; la anulación está bloqueada hasta regularizar el importe.'
+    : 'Este certificado tiene un importe final de S/ 0.00 y no admite anulación.'
+);
+
 export const puedeSolicitarAnulacionCertificado = (item: BorradorPanel, permisos: string[]) => (
   puedeCrearSolicitudAnulacion(permisos)
   && certificadoEmitidoVisible(item)
   && item.anulacionEnPlazo === true
+  && !certificadoAnulacionBloqueadaPorImporte(item)
   && !esSolicitudActivaAnulacion(item.solicitudOperacionEstado)
   && !esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)
 );
@@ -447,13 +471,22 @@ export function InicioView() {
     }
   };
 
-  const crearNotaCredito = async (certificadoId: number) => {
+  const crearNotaCredito = async (
+    certificadoId: number,
+    permitirMotivosAnulacion = true,
+    motivoBloqueoNota?: string
+  ) => {
     try {
       setAccionEnProceso(certificadoId);
       const facturacion = await comprobarComprobanteOperable(certificadoId);
       if (!facturacion) return;
       const totalOriginal = Number(facturacion.importeTotal);
-      const opcionesMotivo = MOTIVOS_NOTA_CREDITO
+      const mensajeNota = motivoBloqueoNota
+        || 'Este certificado tiene un importe final de S/ 0.00: no se permiten notas de crédito por anulación. Solo está disponible la corrección por error en la descripción.';
+      const motivosDisponibles = permitirMotivosAnulacion
+        ? MOTIVOS_NOTA_CREDITO
+        : MOTIVOS_NOTA_CREDITO.filter((motivo) => !esMotivoAnulacionNotaCredito(motivo.codigo));
+      const opcionesMotivo = motivosDisponibles
         .map((motivo) => `<option value="${motivo.codigo}">${motivo.codigo} — ${motivo.descripcion}</option>`)
         .join('');
       const formulario = await Swal.fire({
@@ -464,6 +497,7 @@ export function InicioView() {
           <select id="nota-motivo" class="swal2-input" style="width:100%;margin:0">
             ${opcionesMotivo}
           </select>
+          ${!permitirMotivosAnulacion ? `<p style="text-align:left;font-size:12px;color:#991b1b;margin:8px 0 0">${mensajeNota}</p>` : ''}
           <label for="nota-importe" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">IMPORTE TOTAL DEL COMPROBANTE</label>
           <input id="nota-importe" class="swal2-input" type="text" value="S/ ${totalOriginal.toFixed(2)}" readonly style="width:100%;margin:0;background:#f1f5f9;color:#475569" />
           <label for="nota-sustento" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">SUSTENTO</label>
@@ -478,6 +512,10 @@ export function InicioView() {
           const motivoCodigo = (document.getElementById('nota-motivo') as HTMLSelectElement | null)?.value || '';
           const importeTotal = totalOriginal;
           const sustento = (document.getElementById('nota-sustento') as HTMLTextAreaElement | null)?.value.trim() || '';
+          if (!permitirMotivosAnulacion && esMotivoAnulacionNotaCredito(motivoCodigo)) {
+            Swal.showValidationMessage(mensajeNota);
+            return false;
+          }
           if (!Number.isFinite(importeTotal) || importeTotal <= 0) {
             Swal.showValidationMessage('El comprobante no tiene un importe total válido.');
             return false;
@@ -730,6 +768,9 @@ export function InicioView() {
                   const accionesCongeladas = solicitudActiva || anulacionPendiente || anulacionAceptada;
                   const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
                   const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos);
+                  const anulacionBloqueadaPorImporte = certificadoAnulacionBloqueadaPorImporte(ins)
+                    && certificadoEmitidoVisible(ins)
+                    && puedeCrearSolicitudAnulacion(permisos);
                   const puedeCrearNota = puedeCrearNotaCreditoPanel(ins, permisos);
                   // Los controles permanecen visibles aunque el resumen todavía no se haya
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
@@ -824,16 +865,34 @@ export function InicioView() {
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
-                              onClick={() => void crearNotaCredito(ins.id)}
-                              title="Crear nota de crédito"
+                              onClick={() => void crearNotaCredito(
+                                ins.id,
+                                !certificadoAnulacionBloqueadaPorImporte(ins),
+                                certificadoAnulacionBloqueadaPorImporte(ins)
+                                  ? mensajeBloqueoAnulacionCertificado(ins)
+                                  : undefined
+                              )}
+                              title={certificadoAnulacionBloqueadaPorImporte(ins)
+                                ? (ins.anulacionImporteNoDeterminable === true
+                                  ? 'Solo corrección: no se pudo determinar el importe final del certificado'
+                                  : 'Solo corrección: el importe final es S/ 0.00 y no admite notas de anulación')
+                                : 'Crear nota de crédito'}
                               className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[#052A79] hover:bg-violet-100 disabled:opacity-50"
                             ><FileEdit size={16} /></button>
+                          )}
+                          {!solicitudCompletada && !solicitudActiva && anulacionBloqueadaPorImporte && (
+                            <button
+                              type="button"
+                              disabled
+                              title={mensajeBloqueoAnulacionCertificado(ins)}
+                              className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
+                            ><Ban size={16} /></button>
                           )}
                           {!solicitudCompletada && puedeSolicitar && (
                             <button
                               type="button"
                               onClick={() => solicitarAnulacionTotal(ins)}
-                              title="Solicitar anulación total — requiere autorización de Sistemas"
+                              title="Solicitar anulación total — requiere autorización de un usuario con permiso para aprobar"
                               className="rounded-md border border-red-300 bg-red-50 px-2.5 py-1.5 text-red-700 hover:bg-red-100"
                             ><ClipboardX size={16} /></button>
                           )}
@@ -886,6 +945,9 @@ export function InicioView() {
               const puedeVerComprobante = Boolean(ins.enlacePdf);
               const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos);
               const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos);
+              const anulacionBloqueadaPorImporte = certificadoAnulacionBloqueadaPorImporte(ins)
+                && certificadoEmitidoVisible(ins)
+                && puedeCrearSolicitudAnulacion(permisos);
               return (
                 <div
                   key={ins.id}
@@ -979,15 +1041,29 @@ export function InicioView() {
                         <button
                           type="button"
                           disabled={accionEnProceso === ins.id}
-                          onClick={() => void crearNotaCredito(ins.id)}
+                          onClick={() => void crearNotaCredito(
+                                ins.id,
+                                !certificadoAnulacionBloqueadaPorImporte(ins),
+                                certificadoAnulacionBloqueadaPorImporte(ins)
+                                  ? mensajeBloqueoAnulacionCertificado(ins)
+                                  : undefined
+                              )}
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                         ><FileEdit size={16} /> Nota de Crédito</button>
+                      )}
+                      {anulacionBloqueadaPorImporte && !solicitudActiva && (
+                        <button
+                          type="button"
+                          disabled
+                          title={mensajeBloqueoAnulacionCertificado(ins)}
+                          className="flex-1 rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-400"
+                        >{ins.anulacionImporteNoDeterminable === true ? 'Anulación no disponible' : 'Anulación no disponible · S/ 0.00'}</button>
                       )}
                       {puedeSolicitar && (
                         <button
                           type="button"
                           onClick={() => solicitarAnulacionTotal(ins)}
-                          title="Solicitar anulación total — requiere autorización de Sistemas"
+                          title="Solicitar anulación total — requiere autorización de un usuario con permiso para aprobar"
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
                         ><ClipboardX size={16} /> Solicitar anulación total</button>
                       )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, ChevronLeft, ChevronRight, Copy, Download, FileText, History, Loader2, PlusCircle, Printer, Search, ShieldAlert, Trash2, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Copy, Download, FileText, History, Loader2, PlusCircle, Printer, Search, ShieldAlert, Trash2, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import { faregasPagosApi } from '../../services/faregas-pagos.api';
@@ -75,9 +75,12 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
   const [cargandoHistorial, setCargandoHistorial] = useState(true);
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState('');
+  const [erroresCampos, setErroresCampos] = useState<Record<string, string>>({});
   const [vista, setVista] = useState<{ duplicadoId: number; html: string } | null>(null);
   const [vistaFallidaId, setVistaFallidaId] = useState<number | null>(null);
   const vistaRef = useRef<HTMLIFrameElement>(null);
+  const agregandoPagoRef = useRef(false);
+  const procesandoRef = useRef(false);
 
   const [tipoComprobante, setTipoComprobante] = useState<'BOLETA' | 'FACTURA'>('BOLETA');
   const [tipoDocumento, setTipoDocumento] = useState<'DNI' | 'RUC' | 'CARNETEXTRANJERIA'>('DNI');
@@ -122,6 +125,23 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
   const vistaHtml = vista?.duplicadoId === duplicadoDisponibleId ? vista.html : '';
   const cargandoVista = duplicadoDisponibleId !== null && !vistaHtml && vistaFallidaId !== duplicadoDisponibleId;
 
+  const limpiarError = (campo: string) => {
+    setErroresCampos((prev) => {
+      if (!prev[campo]) return prev;
+      const nuevo = { ...prev };
+      delete nuevo[campo];
+      return nuevo;
+    });
+  };
+
+  const inputClase = (campo: string, claseExtra = '') => {
+    const tieneError = Boolean(erroresCampos[campo]);
+    const base = tieneError
+      ? 'border-2 border-red-500 bg-red-50/20 text-red-900 focus:border-red-600 focus:ring-red-500'
+      : 'border border-slate-300 focus:border-[#052a79] focus:ring-0';
+    return `${base} w-full rounded-lg p-2.5 text-sm transition-colors ${claseExtra}`;
+  };
+
   useEffect(() => {
     void Promise.all([
       faregasDuplicadosApi.listarTipos(),
@@ -156,15 +176,6 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
       });
     return () => { activa = false; };
   }, [duplicadoDisponibleId]);
-
-  const puedeProcesar = useMemo(() => {
-    if (!solicitud || !documento.trim() || !nombre.trim() || !direccion.trim()) return false;
-    if (tipoDocumento === 'DNI' && !/^\d{8}$/.test(documento)) return false;
-    if (tipoDocumento === 'RUC' && !/^\d{11}$/.test(documento)) return false;
-    if (tipoComprobante === 'FACTURA' && tipoDocumento !== 'RUC') return false;
-    if (!pagoYaRegistrado && !pagoCompleto) return false;
-    return true;
-  }, [solicitud, documento, nombre, direccion, tipoDocumento, tipoComprobante, pagoYaRegistrado, pagoCompleto]);
 
   const buscar = async (opciones: { conservarError?: boolean } = {}) => {
     const placaNormalizada = placa.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -225,6 +236,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
 
     setProcesando(true);
     setError('');
+    setErroresCampos({});
     try {
       const creada = await faregasDuplicadosApi.crear(candidato.certificadoId);
       const cliente = candidato.cliente;
@@ -275,77 +287,106 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
   };
 
   const handleAgregarPago = () => {
-    setError('');
-    setAvisoPagoConfirmado('');
-    const montoNum = parseFloat(montoPago);
-    if (!montoPago || isNaN(montoNum) || montoNum <= 0) {
-      setError('Ingrese un importe válido mayor a S/ 0.00.');
-      return;
-    }
-    if (montoNum - saldoPendiente > 0.009) {
-      setError(`El importe ingresado (S/ ${montoNum.toFixed(2)}) excede el saldo pendiente (S/ ${saldoPendiente.toFixed(2)}).`);
-      return;
-    }
+    if (agregandoPagoRef.current) return;
+    agregandoPagoRef.current = true;
 
-    if (pagoTab === 'TARJETA') {
-      if (!tarjetaKey) {
-        setError('Seleccione la marca o medio de tarjeta.');
-        return;
-      }
-      if (!esBilletera && !modalidadTarjeta) {
-        setError('Seleccione la modalidad de la tarjeta (Débito o Crédito).');
-        return;
-      }
-      if (!nroOperacion.trim()) {
-        setError('Ingrese el N.° de operación o referencia de la tarjeta.');
-        return;
-      }
-      if (esCuponidad && nroOperacion.trim().length !== 10) {
-        setError('El código de Cuponidad debe tener exactamente 10 caracteres.');
-        return;
-      }
-      if (esYapePlin && (nroOperacion.trim().length < 4 || nroOperacion.trim().length > 10)) {
-        setError('El N.° de operación de Yape/Plin debe tener entre 4 y 10 dígitos.');
-        return;
-      }
-    }
+    try {
+      setError('');
+      setAvisoPagoConfirmado('');
+      const nuevosErrores: Record<string, string> = {};
 
-    if (pagoTab === 'BANCO') {
+      const montoNum = parseFloat(montoPago);
+      if (!montoPago || !montoPago.trim()) {
+        nuevosErrores.montoPago = 'Ingrese el importe a pagar.';
+      } else if (isNaN(montoNum) || montoNum <= 0) {
+        nuevosErrores.montoPago = 'Ingrese un importe válido mayor a S/ 0.00.';
+      } else if (montoNum - saldoPendiente > 0.009) {
+        nuevosErrores.montoPago = `El importe ingresado (S/ ${montoNum.toFixed(2)}) excede el saldo pendiente (S/ ${saldoPendiente.toFixed(2)}).`;
+      }
+
+      if (pagoTab === 'TARJETA') {
+        if (!tarjetaKey) {
+          nuevosErrores.tarjetaKey = 'Seleccione la marca o medio de tarjeta.';
+        }
+        if (!esBilletera && !modalidadTarjeta) {
+          nuevosErrores.modalidadTarjeta = 'Seleccione la modalidad de la tarjeta (Débito o Crédito).';
+        }
+        if (!nroOperacion.trim()) {
+          nuevosErrores.nroOperacion = 'Ingrese el N.° de operación o referencia de la tarjeta.';
+        } else if (esCuponidad && nroOperacion.trim().length !== 10) {
+          nuevosErrores.nroOperacion = 'El código de Cuponidad debe tener exactamente 10 caracteres.';
+        } else if (esYapePlin && (nroOperacion.trim().length < 4 || nroOperacion.trim().length > 10)) {
+          nuevosErrores.nroOperacion = 'El N.° de operación de Yape/Plin debe tener entre 4 y 10 dígitos.';
+        }
+      }
+
+      if (pagoTab === 'BANCO') {
       if (!cuentaFaregas) {
-        setError('La cuenta bancaria FAREGAS no está configurada.');
+          nuevosErrores.cuentaBancaria = 'La cuenta bancaria FAREGAS no está configurada.';
+        }
+        if (!nroOperacion.trim()) {
+          nuevosErrores.nroOperacion = 'Ingrese el N.° de operación bancaria.';
+        }
+        if (!fechaDeposito) {
+          nuevosErrores.fechaDeposito = 'Seleccione la fecha del depósito.';
+        } else if (fechaDeposito > fechaHoy()) {
+          nuevosErrores.fechaDeposito = 'La fecha de depósito no puede ser posterior a hoy.';
+        }
+      }
+
+      const listaErrores = Object.values(nuevosErrores);
+      if (listaErrores.length > 0) {
+        setErroresCampos((prev) => ({ ...prev, ...nuevosErrores }));
+        if (nuevosErrores.montoPago) {
+          document.getElementById('duplicado-monto-pago')?.focus();
+        } else if (nuevosErrores.tarjetaKey) {
+          document.getElementById('duplicado-tarjeta-key')?.focus();
+        } else if (nuevosErrores.modalidadTarjeta) {
+          document.getElementById('duplicado-modalidad-tarjeta')?.focus();
+        } else if (nuevosErrores.nroOperacion) {
+          document.getElementById('duplicado-nro-operacion')?.focus();
+        } else if (nuevosErrores.fechaDeposito) {
+          document.getElementById('duplicado-fecha-deposito')?.focus();
+        }
         return;
       }
-      if (!nroOperacion.trim()) {
-        setError('Ingrese el N.° de operación bancaria.');
-        return;
-      }
-      if (!fechaDeposito) {
-        setError('Seleccione la fecha del depósito.');
-        return;
-      }
+
+      // Si todo es válido, limpiar errores de pago y agregar
+      setErroresCampos((prev) => {
+        const clon = { ...prev };
+        delete clon.montoPago;
+        delete clon.tarjetaKey;
+        delete clon.modalidadTarjeta;
+        delete clon.nroOperacion;
+        delete clon.fechaDeposito;
+        delete clon.pagos;
+        return clon;
+      });
+
+      const tarjetaObj = maestros?.tarjetas?.find((item) => item.key === tarjetaKey);
+      const nuevoPago: PagoAgregado = {
+        tipo: pagoTab,
+        importe: montoNum.toFixed(2),
+        tarjetaKey: pagoTab === 'TARJETA' ? tarjetaKey : undefined,
+        tarjetaNombre: pagoTab === 'TARJETA' ? tarjetaObj?.nombre : undefined,
+        modalidadTarjeta: pagoTab === 'TARJETA' && !esBilletera ? modalidadTarjeta : undefined,
+        nroOperacion: pagoTab !== 'EFECTIVO' ? nroOperacion.trim() : undefined,
+        entidadFinancieraKey: pagoTab === 'BANCO' ? cuentaFaregas?.entidadfinanciera_key : undefined,
+        cuentaCorrienteKey: pagoTab === 'BANCO' ? cuentaFaregas?.key : undefined,
+        fechaDeposito: pagoTab === 'BANCO' ? fechaDeposito : undefined,
+      };
+
+      const nuevosPagos = [...pagosAgregados, nuevoPago];
+      setPagosAgregados(nuevosPagos);
+
+      const nuevoTotalPagado = nuevosPagos.reduce((sum, p) => sum + parseFloat(p.importe), 0);
+      const nuevoSaldo = Math.max(0, Math.round((totalDuplicado - nuevoTotalPagado + Number.EPSILON) * 100) / 100);
+      setMontoPago(nuevoSaldo > 0 ? nuevoSaldo.toFixed(2) : '');
+      setNroOperacion('');
+      setTarjetaKey('');
+    } finally {
+      agregandoPagoRef.current = false;
     }
-
-    const tarjetaObj = maestros?.tarjetas?.find((item) => item.key === tarjetaKey);
-    const nuevoPago: PagoAgregado = {
-      tipo: pagoTab,
-      importe: montoNum.toFixed(2),
-      tarjetaKey: pagoTab === 'TARJETA' ? tarjetaKey : undefined,
-      tarjetaNombre: pagoTab === 'TARJETA' ? tarjetaObj?.nombre : undefined,
-      modalidadTarjeta: pagoTab === 'TARJETA' && !esBilletera ? modalidadTarjeta : undefined,
-      nroOperacion: pagoTab !== 'EFECTIVO' ? nroOperacion.trim() : undefined,
-      entidadFinancieraKey: pagoTab === 'BANCO' ? cuentaFaregas?.entidadfinanciera_key : undefined,
-      cuentaCorrienteKey: pagoTab === 'BANCO' ? cuentaFaregas?.key : undefined,
-      fechaDeposito: pagoTab === 'BANCO' ? fechaDeposito : undefined,
-    };
-
-    const nuevosPagos = [...pagosAgregados, nuevoPago];
-    setPagosAgregados(nuevosPagos);
-
-    const nuevoTotalPagado = nuevosPagos.reduce((sum, p) => sum + parseFloat(p.importe), 0);
-    const nuevoSaldo = Math.max(0, Math.round((totalDuplicado - nuevoTotalPagado + Number.EPSILON) * 100) / 100);
-    setMontoPago(nuevoSaldo > 0 ? nuevoSaldo.toFixed(2) : '');
-    setNroOperacion('');
-    setTarjetaKey('');
   };
 
   const eliminarPago = (index: number) => {
@@ -364,12 +405,87 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
   };
 
   const procesar = async () => {
-    if (!solicitud || !puedeProcesar) {
-      setError('Complete los datos fiscales y el pago total.');
+    if (procesandoRef.current || procesando) return;
+
+    setError('');
+    const errores: Record<string, string> = {};
+
+    // 1. Validaciones de comprobante y documento
+    if (!tipoComprobante) {
+      errores.tipoComprobante = 'Seleccione el tipo de comprobante.';
+    }
+    if (!tipoDocumento) {
+      errores.tipoDocumento = 'Seleccione el tipo de documento.';
+    }
+
+    const docLimpio = documento.trim().toUpperCase();
+    if (!docLimpio) {
+      errores.documento = 'Ingrese el número de documento.';
+    } else if (tipoDocumento === 'DNI' && !/^\d{8}$/.test(docLimpio)) {
+      errores.documento = 'El DNI debe tener 8 dígitos numéricos.';
+    } else if (tipoDocumento === 'RUC' && !/^\d{11}$/.test(docLimpio)) {
+      errores.documento = 'El RUC debe tener 11 dígitos numéricos.';
+    } else if (tipoDocumento === 'CARNETEXTRANJERIA' && !/^[A-Z0-9]{1,20}$/.test(docLimpio)) {
+      errores.documento = 'El carnet de extranjería debe contener hasta 20 caracteres.';
+    } else if (tipoComprobante === 'FACTURA' && tipoDocumento !== 'RUC') {
+      errores.documento = 'Una factura requiere un número de RUC de 11 dígitos.';
+    }
+
+    // 2. Nombre o razón social
+    if (!nombre.trim()) {
+      errores.nombre = 'Ingrese el nombre o razón social.';
+    } else if (nombre.trim().length > 100) {
+      errores.nombre = 'El nombre o razón social admite hasta 100 caracteres.';
+    }
+
+    // 3. Dirección fiscal (opcional según reglas, pero validar longitud máxima si se ingresa)
+    if (direccion.trim().length > 100) {
+      errores.direccion = 'La dirección fiscal admite hasta 100 caracteres.';
+    }
+
+    // 4. Correo electrónico (opcional, validar formato sólo si se ingresó)
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errores.email = 'El correo electrónico no tiene un formato válido.';
+    }
+
+    // 5. Teléfono (opcional, validar longitud máxima)
+    if (telefono.trim().length > 30) {
+      errores.telefono = 'El teléfono admite hasta 30 caracteres.';
+    }
+
+    // 6. Validación de pago completo antes de emitir
+    if (!pagoYaRegistrado && !pagoCompleto) {
+      errores.pagos = `Falta registrar S/ ${saldoPendiente.toFixed(2)} para completar el total del duplicado.`;
+    }
+
+    const listaErrores = Object.values(errores);
+    if (listaErrores.length > 0) {
+      setErroresCampos(errores);
+
+      // Enfocar el primer campo inválido
+      if (errores.documento) {
+        document.getElementById('duplicado-documento')?.focus();
+      } else if (errores.nombre) {
+        document.getElementById('duplicado-nombre')?.focus();
+      } else if (errores.direccion) {
+        document.getElementById('duplicado-direccion')?.focus();
+      } else if (errores.email) {
+        document.getElementById('duplicado-email')?.focus();
+      } else if (errores.telefono) {
+        document.getElementById('duplicado-telefono')?.focus();
+      } else if (errores.pagos) {
+        document.getElementById('duplicado-monto-pago')?.focus();
+      }
       return;
     }
+
+    if (!solicitud) return;
+
+    procesandoRef.current = true;
     setProcesando(true);
+    setErroresCampos({});
     setError('');
+
     try {
       const actualizada = await faregasDuplicadosApi.procesar(solicitud.id, {
         pagos: pagosAgregados.map((p) => ({
@@ -385,7 +501,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
         facturacion: {
           tipoComprobante,
           tipoDocumentoCliente: tipoDocumento,
-          nroDocumento: documento.trim(),
+          nroDocumento: docLimpio,
           nombreRazonSocial: nombre.trim(),
           direccion: direccion.trim(),
           email: email.trim() || null,
@@ -411,6 +527,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
       }
       setError(mensajeError(err));
     } finally {
+      procesandoRef.current = false;
       setProcesando(false);
     }
   };
@@ -435,6 +552,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
     setSeleccionado(null);
     setSolicitud(item);
     setError('');
+    setErroresCampos({});
   };
 
   const imprimirDuplicado = async () => {
@@ -451,12 +569,15 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
     setSeleccionado(null);
     setSolicitud(null);
     setError('');
+    setErroresCampos({});
     setNroOperacion('');
     setTarjetaKey('');
     setPagosAgregados([]);
     setMontoPago('50.00');
     setAvisoPagoConfirmado('');
   };
+
+  const listaErroresCampos = Object.values(erroresCampos);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true" aria-label="Duplicado de certificado">
@@ -473,7 +594,29 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
         </div>
 
         <div className="overflow-y-auto p-5">
-          {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{error}</div>}
+          {error && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+              {error}
+            </div>
+          )}
+
+          {listaErroresCampos.length > 0 && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <div className="flex items-center gap-2 font-black text-red-900 mb-1">
+                <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+                <span>Por favor corrija los siguientes campos ({listaErroresCampos.length}):</span>
+              </div>
+              {listaErroresCampos.length === 1 ? (
+                <p className="font-semibold text-xs text-red-700 mt-1">{listaErroresCampos[0]}</p>
+              ) : (
+                <ul className="list-disc list-inside space-y-0.5 font-semibold text-xs text-red-700 mt-1">
+                  {listaErroresCampos.map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {!solicitud ? (
             <>
@@ -642,27 +785,141 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                   <section className="rounded-xl border border-slate-200 p-4">
                     <h3 className="font-black text-slate-800">Datos del comprobante</h3>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      <label className="text-xs font-bold text-slate-600">COMPROBANTE
-                        <select value={tipoComprobante} onChange={(event) => { const valor = event.target.value as 'BOLETA' | 'FACTURA'; setTipoComprobante(valor); if (valor === 'FACTURA') setTipoDocumento('RUC'); }} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm"><option value="BOLETA">Boleta</option><option value="FACTURA">Factura</option></select>
-                      </label>
-                      <label className="text-xs font-bold text-slate-600">TIPO DE DOCUMENTO
-                        <select value={tipoDocumento} disabled={tipoComprobante === 'FACTURA'} onChange={(event) => setTipoDocumento(event.target.value as typeof tipoDocumento)} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm disabled:bg-slate-100"><option value="DNI">DNI</option><option value="RUC">RUC</option><option value="CARNETEXTRANJERIA">Carnet de extranjería</option></select>
-                      </label>
-                      <label className="text-xs font-bold text-slate-600">NÚMERO DE DOCUMENTO
-                        <input value={documento} onChange={(event) => setDocumento(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-                      </label>
-                      <label className="text-xs font-bold text-slate-600">NOMBRE / RAZÓN SOCIAL
-                        <input value={nombre} maxLength={100} onChange={(event) => setNombre(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-                      </label>
-                      <label className="text-xs font-bold text-slate-600 md:col-span-2">DIRECCIÓN FISCAL
-                        <input value={direccion} maxLength={100} onChange={(event) => setDireccion(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-                      </label>
-                      <label className="text-xs font-bold text-slate-600">CORREO
-                        <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-                      </label>
-                      <label className="text-xs font-bold text-slate-600">TELÉFONO
-                        <input value={telefono} maxLength={30} onChange={(event) => setTelefono(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-                      </label>
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">COMPROBANTE</label>
+                        <select
+                          id="duplicado-tipo-comprobante"
+                          value={tipoComprobante}
+                          onChange={(event) => {
+                            const valor = event.target.value as 'BOLETA' | 'FACTURA';
+                            setTipoComprobante(valor);
+                            limpiarError('tipoComprobante');
+                            if (valor === 'FACTURA') {
+                              setTipoDocumento('RUC');
+                              limpiarError('tipoDocumento');
+                            }
+                          }}
+                          className={inputClase('tipoComprobante')}
+                        >
+                          <option value="BOLETA">Boleta</option>
+                          <option value="FACTURA">Factura</option>
+                        </select>
+                        {erroresCampos.tipoComprobante && (
+                          <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.tipoComprobante}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">TIPO DE DOCUMENTO</label>
+                        <select
+                          id="duplicado-tipo-documento"
+                          value={tipoDocumento}
+                          disabled={tipoComprobante === 'FACTURA'}
+                          onChange={(event) => {
+                            setTipoDocumento(event.target.value as typeof tipoDocumento);
+                            limpiarError('tipoDocumento');
+                            limpiarError('documento');
+                          }}
+                          className={inputClase('tipoDocumento', 'disabled:bg-slate-100')}
+                        >
+                          <option value="DNI">DNI</option>
+                          <option value="RUC">RUC</option>
+                          <option value="CARNETEXTRANJERIA">Carnet de extranjería</option>
+                        </select>
+                        {erroresCampos.tipoDocumento && (
+                          <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.tipoDocumento}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">NÚMERO DE DOCUMENTO</label>
+                        <input
+                          id="duplicado-documento"
+                          value={documento}
+                          maxLength={tipoDocumento === 'RUC' ? 11 : tipoDocumento === 'DNI' ? 8 : 20}
+                          placeholder={tipoDocumento === 'RUC' ? '11 dígitos' : tipoDocumento === 'DNI' ? '8 dígitos' : 'Número de documento'}
+                          onChange={(event) => {
+                            setDocumento(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+                            limpiarError('documento');
+                          }}
+                          className={inputClase('documento', 'font-semibold')}
+                        />
+                        {erroresCampos.documento && (
+                          <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.documento}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">NOMBRE / RAZÓN SOCIAL</label>
+                        <input
+                          id="duplicado-nombre"
+                          value={nombre}
+                          maxLength={100}
+                          placeholder="Nombre o razón social"
+                          onChange={(event) => {
+                            setNombre(event.target.value);
+                            limpiarError('nombre');
+                          }}
+                          className={inputClase('nombre', 'font-semibold')}
+                        />
+                        {erroresCampos.nombre && (
+                          <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.nombre}</p>
+                        )}
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-bold text-slate-600 block mb-1">DIRECCIÓN FISCAL</label>
+                        <input
+                          id="duplicado-direccion"
+                          value={direccion}
+                          maxLength={100}
+                          placeholder="Dirección fiscal"
+                          onChange={(event) => {
+                            setDireccion(event.target.value);
+                            limpiarError('direccion');
+                          }}
+                          className={inputClase('direccion')}
+                        />
+                        {erroresCampos.direccion && (
+                          <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.direccion}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">CORREO</label>
+                        <input
+                          id="duplicado-email"
+                          type="email"
+                          value={email}
+                          placeholder="correo@ejemplo.com (opcional)"
+                          onChange={(event) => {
+                            setEmail(event.target.value);
+                            limpiarError('email');
+                          }}
+                          className={inputClase('email')}
+                        />
+                        {erroresCampos.email && (
+                          <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.email}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-600 block mb-1">TELÉFONO</label>
+                        <input
+                          id="duplicado-telefono"
+                          value={telefono}
+                          maxLength={30}
+                          placeholder="Teléfono (opcional)"
+                          onChange={(event) => {
+                            setTelefono(event.target.value);
+                            limpiarError('telefono');
+                          }}
+                          className={inputClase('telefono')}
+                        />
+                        {erroresCampos.telefono && (
+                          <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.telefono}</p>
+                        )}
+                      </div>
                     </div>
                   </section>
 
@@ -707,6 +964,13 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                       </div>
                     )}
 
+                    {erroresCampos.pagos && (
+                      <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-bold text-red-800">
+                        <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                        <span>{erroresCampos.pagos}</span>
+                      </div>
+                    )}
+
                     {/* Formulario para agregar pago si queda saldo pendiente */}
                     {saldoPendiente > 0 && (
                       <div className="mt-4 rounded-xl border-2 border-slate-200 bg-white p-4 space-y-4">
@@ -721,6 +985,15 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                                 setPagoTab(medio);
                                 setNroOperacion('');
                                 setError('');
+                                setErroresCampos((prev) => {
+                                  const c = { ...prev };
+                                  delete c.tarjetaKey;
+                                  delete c.modalidadTarjeta;
+                                  delete c.nroOperacion;
+                                  delete c.fechaDeposito;
+                                  delete c.cuentaBancaria;
+                                  return c;
+                                });
                               }}
                               className={`rounded-lg border px-3 py-2 text-xs font-black transition-colors ${
                                 pagoTab === medio
@@ -737,27 +1010,42 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                           <div>
                             <label className="mb-1 block text-xs font-bold text-slate-600">MONTO (S/) *</label>
                             <input
+                              id="duplicado-monto-pago"
                               type="number"
                               step="0.01"
                               min="0.01"
                               max={saldoPendiente}
                               value={montoPago}
-                              onChange={(e) => setMontoPago(e.target.value)}
+                              onChange={(e) => {
+                                setMontoPago(e.target.value);
+                                limpiarError('montoPago');
+                                limpiarError('pagos');
+                              }}
                               placeholder="0.00"
-                              className="w-full rounded-lg border border-slate-300 p-2.5 text-sm font-bold"
+                              className={inputClase('montoPago', 'font-bold')}
                             />
+                            {erroresCampos.montoPago && (
+                              <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.montoPago}</p>
+                            )}
                           </div>
 
                           {pagoTab !== 'EFECTIVO' && (
                             <div>
                               <label className="mb-1 block text-xs font-bold text-slate-600">N.° OPERACIÓN / REFERENCIA *</label>
                               <input
+                                id="duplicado-nro-operacion"
                                 type="text"
                                 value={nroOperacion}
-                                onChange={(e) => setNroOperacion(e.target.value)}
+                                onChange={(e) => {
+                                  setNroOperacion(e.target.value);
+                                  limpiarError('nroOperacion');
+                                }}
                                 placeholder={pagoTab === 'TARJETA' ? 'Ej. 123456' : 'N.° de operación bancaria'}
-                                className="w-full rounded-lg border border-slate-300 p-2.5 text-sm font-bold"
+                                className={inputClase('nroOperacion', 'font-bold')}
                               />
+                              {erroresCampos.nroOperacion && (
+                                <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.nroOperacion}</p>
+                              )}
                             </div>
                           )}
                         </div>
@@ -767,30 +1055,42 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                             <div>
                               <label className="mb-1 block text-xs font-bold text-slate-600">MARCA / MEDIO *</label>
                               <select
+                                id="duplicado-tarjeta-key"
                                 value={tarjetaKey}
                                 onChange={(e) => {
                                   setTarjetaKey(e.target.value);
                                   setModalidadTarjeta('DEBITO');
+                                  limpiarError('tarjetaKey');
                                 }}
-                                className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
+                                className={inputClase('tarjetaKey')}
                               >
                                 <option value="">-- Seleccione tarjeta --</option>
                                 {maestros?.tarjetas.map((item) => (
                                   <option key={item.key} value={item.key}>{item.nombre}</option>
                                 ))}
                               </select>
+                              {erroresCampos.tarjetaKey && (
+                                <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.tarjetaKey}</p>
+                              )}
                             </div>
                             {!esBilletera && tarjetaKey && (
                               <div>
                                 <label className="mb-1 block text-xs font-bold text-slate-600">MODALIDAD *</label>
                                 <select
+                                  id="duplicado-modalidad-tarjeta"
                                   value={modalidadTarjeta}
-                                  onChange={(e) => setModalidadTarjeta(e.target.value as 'DEBITO' | 'CREDITO')}
-                                  className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
+                                  onChange={(e) => {
+                                    setModalidadTarjeta(e.target.value as 'DEBITO' | 'CREDITO');
+                                    limpiarError('modalidadTarjeta');
+                                  }}
+                                  className={inputClase('modalidadTarjeta')}
                                 >
                                   <option value="DEBITO">Débito</option>
                                   <option value="CREDITO">Crédito</option>
                                 </select>
+                                {erroresCampos.modalidadTarjeta && (
+                                  <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.modalidadTarjeta}</p>
+                                )}
                               </div>
                             )}
                           </div>
@@ -802,16 +1102,26 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                               <strong>{entidadFaregas?.nombre || maestros?.cuentaFaregas?.entidad || 'Cuenta FAREGAS'}</strong><br />
                               Cuenta: {maestros?.cuentaFaregas?.numeroCompleto || cuentaFaregas?.nombre || '-'}<br />
                               CCI: {maestros?.cuentaFaregas?.cci || '-'}
+                              {erroresCampos.cuentaBancaria && (
+                                <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.cuentaBancaria}</p>
+                              )}
                             </div>
                             <div>
                               <label className="mb-1 block text-xs font-bold text-slate-600">FECHA DEPÓSITO *</label>
                               <input
+                                id="duplicado-fecha-deposito"
                                 type="date"
                                 max={fechaHoy()}
                                 value={fechaDeposito}
-                                onChange={(e) => setFechaDeposito(e.target.value)}
-                                className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
+                                onChange={(e) => {
+                                  setFechaDeposito(e.target.value);
+                                  limpiarError('fechaDeposito');
+                                }}
+                                className={inputClase('fechaDeposito')}
                               />
+                              {erroresCampos.fechaDeposito && (
+                                <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.fechaDeposito}</p>
+                              )}
                             </div>
                           </div>
                         )}
@@ -913,11 +1223,21 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
 
               <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
                 <button type="button" onClick={volverBusqueda} disabled={procesando} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-600">{solicitud.estado === 'DISPONIBLE' ? 'Volver al historial' : 'Volver'}</button>
-                {solicitud.estado !== 'DISPONIBLE' && <button type="button" onClick={() => void procesar()} disabled={!puedeProcesar || procesando} className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-black text-white disabled:opacity-40">{procesando && <Loader2 className="h-4 w-4 animate-spin" />} {pagoYaRegistrado
-                  ? 'Confirmar comprobante y habilitar duplicado'
-                  : saldoPendiente > 0
-                    ? `Falta pagar S/ ${saldoPendiente.toFixed(2)}`
-                    : 'Pagar S/ 50.00 y emitir comprobante'}</button>}
+                {solicitud.estado !== 'DISPONIBLE' && (
+                  <button
+                    type="button"
+                    onClick={() => void procesar()}
+                    disabled={procesando}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-black text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                  >
+                    {procesando && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {pagoYaRegistrado
+                      ? 'Confirmar comprobante y habilitar duplicado'
+                      : saldoPendiente > 0
+                        ? `Falta pagar S/ ${saldoPendiente.toFixed(2)}`
+                        : 'Pagar S/ 50.00 y emitir comprobante'}
+                  </button>
+                )}
                 {solicitud.estado === 'DISPONIBLE' && <><button type="button" onClick={() => void descargar('COMPROBANTE')} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#052a79] px-4 py-2 text-sm font-black text-[#052a79]"><FileText className="h-4 w-4" /> Descargar comprobante</button><button type="button" onClick={() => void descargar('CERTIFICADO')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 px-5 py-2 text-sm font-black text-white"><Download className="h-4 w-4" /> Descargar duplicado</button></>}
               </div>
             </div>

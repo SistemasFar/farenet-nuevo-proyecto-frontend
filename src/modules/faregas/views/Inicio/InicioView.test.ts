@@ -10,8 +10,12 @@ import {
   etiquetaSolicitudAnulacion,
   puedeSolicitarAnulacionCertificado,
   puedeCrearNotaCreditoPanel,
+  certificadoImporteFinalCero,
+  certificadoAnulacionBloqueadaPorImporte,
+  mensajeBloqueoAnulacionCertificado,
   type BorradorPanel,
 } from './InicioView';
+import { esMotivoAnulacionNotaCredito } from '../../utils/documentos-electronicos';
 
 describe('InicioView - tieneCertificadoDefinitivo y visualización del número DG', () => {
   it('1. Retorna true cuando el certificado está EMITIDO y tiene un número DG válido', () => {
@@ -108,9 +112,10 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     expect(inicioViewCode).not.toContain('onClick={() => void anularComprobante(ins.id)}');
     expect(inicioViewCode).not.toContain('ClipboardSignature');
     expect(inicioViewCode).toContain('void verComprobante(ins.id)');
-    expect(inicioViewCode).toContain('void crearNotaCredito(ins.id)');
+    expect(inicioViewCode).toContain('crearNotaCredito(');
+    expect(inicioViewCode).toContain('mensajeBloqueoAnulacionCertificado(ins)');
     expect(inicioViewCode).toContain('<ClipboardX size={16} />');
-    expect(inicioViewCode.match(/Solicitar anulación total — requiere autorización de Sistemas/g)?.length).toBe(2);
+    expect(inicioViewCode.match(/Solicitar anulación total — requiere autorización de un usuario con permiso para aprobar/g)?.length).toBe(2);
 
     expect(modalCode).toContain('Solicitar anulación total');
     expect(modalCode).toContain("tipoOperacion: 'ANULAR_AMBOS'");
@@ -154,7 +159,7 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
 
     expect(etiquetaSolicitudAnulacion('PENDIENTE_APROBACION')).toBe('Pendiente de aprobación');
     expect(etiquetaSolicitudAnulacion('APROBADA')).toBe('Aprobada — pendiente de ejecución');
-    expect(etiquetaSolicitudAnulacion('EN_EJECUCION')).toBe('Procesando anulación');
+    expect(etiquetaSolicitudAnulacion('EN_EJECUCION')).toBe('Baja fiscal pendiente de confirmación');
     expect(etiquetaSolicitudAnulacion('REQUIERE_INTERVENCION')).toBe('Requiere intervención');
     expect(etiquetaSolicitudAnulacion('COMPLETADA')).toBe('Anulado');
   });
@@ -195,5 +200,47 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     expect(modalCode).toContain('sincronizarEstadoFiscal');
     expect(modalCode).toContain('PENDIENTE_SUNAT');
     expect(modalCode).toContain('aún no se ejecutó');
+  });
+
+  it('16. El importe final cero o no determinable bloquea la anulación y la nota de anulación', () => {
+    expect(certificadoImporteFinalCero({ importeFinal: 0 } as BorradorPanel)).toBe(true);
+    expect(certificadoImporteFinalCero({ importeFinal: '0.00' } as BorradorPanel)).toBe(true);
+    expect(certificadoImporteFinalCero({ importeFinal: 80 } as BorradorPanel)).toBe(false);
+    expect(certificadoImporteFinalCero({ importeFinal: null } as BorradorPanel)).toBe(false);
+    expect(certificadoAnulacionBloqueadaPorImporte({
+      importeFinal: null,
+      anulacionImporteNoDeterminable: true,
+    } as BorradorPanel)).toBe(true);
+    expect(mensajeBloqueoAnulacionCertificado({ anulacionImporteNoDeterminable: true } as BorradorPanel))
+      .toContain('No se pudo determinar el importe final');
+    expect(mensajeBloqueoAnulacionCertificado({} as BorradorPanel))
+      .toContain('S/ 0.00');
+
+    const permisos = ['FAREGAS_SOLICITUD_CREAR'];
+    expect(puedeSolicitarAnulacionCertificado({
+      id: 1,
+      estado: 'EMITIDO',
+      numeroCertificado: 'DG-41-0001',
+      anulacionEnPlazo: true,
+      importeFinal: 0,
+    } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({
+      id: 1,
+      estado: 'EMITIDO',
+      numeroCertificado: 'DG-41-0001',
+      anulacionEnPlazo: true,
+      importeFinal: null,
+      anulacionImporteNoDeterminable: true,
+    } as BorradorPanel, permisos)).toBe(false);
+
+    expect(esMotivoAnulacionNotaCredito('01')).toBe(true);
+    expect(esMotivoAnulacionNotaCredito('02')).toBe(true);
+    expect(esMotivoAnulacionNotaCredito('03')).toBe(false);
+
+    const inicioViewCode = fs.readFileSync(path.resolve(__dirname, 'InicioView.tsx'), 'utf8');
+    const modalCode = fs.readFileSync(path.resolve(__dirname, 'SolicitudOperacionModal.tsx'), 'utf8');
+    expect(inicioViewCode).toContain('certificadoAnulacionBloqueadaPorImporte');
+    expect(inicioViewCode).toContain('Anulación no disponible');
+    expect(modalCode).toContain('Anulación bloqueada');
   });
 });

@@ -10,7 +10,7 @@ interface BackendState {
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
-  'http://127.0.0.1:3000/api';
+  '/api';
 
 export function BackendStatusWidget() {
   const [backend, setBackend] = useState<BackendState>({
