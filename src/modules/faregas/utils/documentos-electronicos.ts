@@ -4,7 +4,7 @@ export const MOTIVOS_NOTA_CREDITO = [
   { codigo: '03', descripcion: 'Corrección por error en la descripción' },
 ] as const;
 
-export const MOTIVOS_NOTA_CREDITO_ANULACION = ['01', '1', '02', '2', '06', '6'] as const;
+export const MOTIVOS_NOTA_CREDITO_ANULACION = ['01', '1', '02', '2'] as const;
 
 export const esMotivoAnulacionNotaCredito = (codigo?: string | null): boolean => (
   (MOTIVOS_NOTA_CREDITO_ANULACION as readonly string[]).includes(String(codigo || '').trim())

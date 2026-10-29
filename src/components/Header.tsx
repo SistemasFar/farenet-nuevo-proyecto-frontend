@@ -5,6 +5,7 @@ import type {
 } from '@/types/auth';
 import { NetworkStatus } from './NetworkStatus';
 import { BackendStatus } from './BackendStatus';
+import { FaregasNotificationBell } from './FaregasNotificationBell';
 import { CambiarContrasenaModal } from './CambiarContrasenaModal';
 import { useEmpresa } from '@/context/EmpresaContext';
 
@@ -153,6 +154,7 @@ export function Header({
           <div className="hidden items-center gap-3 sm:flex">
             <NetworkStatus />
             <BackendStatus />
+            <FaregasNotificationBell user={user} plantaSeleccionada={plantaSeleccionada} />
           </div>
 
           <div className="relative" ref={dropdownRef}>

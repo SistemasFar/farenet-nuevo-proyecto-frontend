@@ -12,6 +12,7 @@ import type {
   GuardarGnvFaregasRequest,
   GuardarPagosFaregasRequest,
   GuardarVerificacionesFaregasRequest,
+  ContextoNotaCreditoFaregas,
   PasoBorradorFaregas,
   VehiculoBorradorFaregasRequest,
 } from '../types/faregas-api';
@@ -165,14 +166,17 @@ export const faregasCertificadosApi = {
     method: 'POST'
   }),
   obtenerDocumentosElectronicos: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/documentos`),
+  obtenerContextoNotaCredito: async (id: number): Promise<{ ok: true; data: ContextoNotaCreditoFaregas }> =>
+    fetchWithToken(`/certificados/borradores/${id}/facturacion/notas/contexto`),
   consultarFacturacionElectronica: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/consultar`, { method: 'POST' }),
   emitirNotaElectronica: (id: number, data: {
-    tipo: 'CREDITO' | 'DEBITO'; motivoCodigo: string; sustento: string;
-    baseImponible: number; igv: number; importeTotal: number;
+    tipo: 'CREDITO'; motivoCodigo: '01' | '02' | '03'; sustento: string;
+    solicitudId?: number; itemIndice?: number; descripcionCorregida?: string;
   }) => fetchWithToken(`/certificados/borradores/${id}/facturacion/notas`, {
     method: 'POST', body: JSON.stringify(data)
   }),
   reintentarNotaElectronica: (id: number, tipo: 'CREDITO' | 'DEBITO', notaId: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/notas/${tipo}/${notaId}/emitir`, { method: 'POST' }),
+  consultarNotaElectronica: (id: number, tipo: 'CREDITO' | 'DEBITO', notaId: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/notas/${tipo}/${notaId}/consultar`, { method: 'POST' }),
   generarAnulacionElectronica: (id: number, data: {
     tipoDocumento: 'FACTURACION' | 'CREDITO' | 'DEBITO'; documentoId?: number; motivo: string;
   }) => fetchWithToken(`/certificados/borradores/${id}/facturacion/anulaciones`, {

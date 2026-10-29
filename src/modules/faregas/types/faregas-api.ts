@@ -268,8 +268,78 @@ export interface NotaElectronicaFaregas {
   importeTotal: number;
   estado: 'BORRADOR' | 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'ERROR' | 'ANULADO';
   enlacePdf: NullableText;
+  enlaceXml?: NullableText;
+  enlaceCdr?: NullableText;
+  sunatDescription?: NullableText;
+  aceptadaSunat?: boolean | null;
+  intentos?: number;
+  fechaEmision?: NullableText;
+  usuarioEmisor?: NullableText;
   anulacionEnPlazo?: boolean;
   anulacionHastaMs?: number | null;
+}
+
+export interface ContextoNotaCreditoFaregas {
+  motivos: Array<{
+    codigo: '01' | '02' | '03';
+    descripcion: string;
+    requiereSolicitud: boolean;
+    modificaDescripcion: boolean;
+  }>;
+  comprobante: {
+    id: number;
+    tipo: 'BOLETA' | 'FACTURA';
+    serie: string;
+    numero: number;
+    nroComprobante: string;
+    fechaEmision: string;
+    cliente: {
+      tipoDocumentoCodigo: number;
+      tipoDocumento: string;
+      numeroDocumento: string;
+      nombreRazonSocial: string;
+      direccion: string;
+    };
+    monedaCodigo: number;
+    moneda: string;
+    totales: {
+      descuento: number;
+      gravada: number;
+      inafecta: number;
+      exonerada: number;
+      igv: number;
+      gratuita: number;
+      otrosCargos: number;
+      total: number;
+    };
+    enlaces: { pdf: NullableText; xml: NullableText; cdr: NullableText };
+  };
+  items: Array<{
+    indice: number;
+    codigo: string;
+    descripcion: string;
+    unidad: string;
+    cantidad: number;
+    valorUnitario: number;
+    precioUnitario: number;
+    descuento: number;
+    subtotal: number;
+    tipoIgv: number;
+    igv: number;
+    total: number;
+  }>;
+  autorizaciones: Array<{
+    id: number;
+    tipoOperacion: string;
+    estado: 'APROBADA' | 'EN_EJECUCION';
+    motivo: string;
+    observaciones: NullableText;
+    usuarioSolicitante: string;
+    usuarioDecision: NullableText;
+    fechaSolicitud: string;
+    fechaDecision: NullableText;
+    ejecutablePorUsuario: boolean;
+  }>;
 }
 
 export interface AnulacionElectronicaFaregas {

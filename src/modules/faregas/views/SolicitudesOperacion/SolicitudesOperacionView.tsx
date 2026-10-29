@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, FileText, Loader2, PlayCircle, RefreshCw, ShieldAlert, X, XCircle } from 'lucide-react';
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext, useParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import {
@@ -521,6 +521,8 @@ export function SolicitudesOperacionView() {
   const [total, setTotal] = useState(0);
   const [filtros, setFiltros] = useState({ fechaDesde: hoyLocal(), fechaHasta: hoyLocal(), estado: '', tipoOperacion: '', usuarioSolicitante: '', plantaKey: '' });
 
+  const { id: idParam } = useParams<{ id?: string }>();
+
   const cargar = useCallback(async (pagina = page) => {
     if (!puedeVer) return;
     setLoading(true); setError('');
@@ -539,6 +541,14 @@ export function SolicitudesOperacionView() {
   }, [filtros, page, puedeVer]);
 
   useEffect(() => { void cargar(1); }, [plantaKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!idParam || seleccionada) return;
+    const solicitud = solicitudes.find((s) => String(s.id) === idParam);
+    if (solicitud) {
+      setSeleccionada(solicitud);
+    }
+  }, [idParam, solicitudes, seleccionada]);
 
   const estados = useMemo<EstadoSolicitudOperacion[]>(() => ['PENDIENTE_APROBACION', 'APROBADA', 'RECHAZADA', 'CANCELADA', 'EN_EJECUCION', 'COMPLETADA', 'ERROR', 'REQUIERE_INTERVENCION'], []);
   const tipos = useMemo<TipoSolicitudOperacion[]>(() => ['ANULAR_AMBOS', 'ANULAR_CERTIFICADO', 'ANULAR_COMPROBANTE', 'RECTIFICAR_CERTIFICADO'], []);

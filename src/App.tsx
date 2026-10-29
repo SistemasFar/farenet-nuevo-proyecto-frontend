@@ -656,6 +656,20 @@ export default function App() {
                 }
               />
               <Route
+                path="solicitudes-operacion/:id"
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    return userPerms.includes('FAREGAS_SOLICITUD_VER') || userPerms.includes('FAREGAS_SOLICITUD_ADMINISTRAR') ? (
+                      <FaregasSolicitudesOperacionView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                }
+              />
+              <Route
                 path="descuentos"
                 element={
                   (() => {

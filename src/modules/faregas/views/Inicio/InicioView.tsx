@@ -10,11 +10,10 @@ import { nombreTipoCertificadoPanel } from './tipo-certificado-panel';
 import { abrirPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
 import { SolicitudOperacionModal } from './SolicitudOperacionModal';
+import { NotaCreditoModal } from './NotaCreditoModal';
 import {
   estadoCertificadoPanel,
   estadoComprobantePanel,
-  esMotivoAnulacionNotaCredito,
-  MOTIVOS_NOTA_CREDITO,
 } from '../../utils/documentos-electronicos';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
@@ -266,6 +265,11 @@ export function InicioView() {
   const [mostrarDuplicado, setMostrarDuplicado] = useState(false);
   const [certificadoSolicitudId, setCertificadoSolicitudId] = useState<number | null>(null);
   const [solicitudSolicitadaId, setSolicitudSolicitadaId] = useState<number | null>(null);
+  const [notaCreditoModal, setNotaCreditoModal] = useState<{
+    certificadoId: number;
+    permitirMotivosAnulacion: boolean;
+    motivoBloqueoNota?: string;
+  } | null>(null);
 
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -480,68 +484,13 @@ export function InicioView() {
       setAccionEnProceso(certificadoId);
       const facturacion = await comprobarComprobanteOperable(certificadoId);
       if (!facturacion) return;
-      const totalOriginal = Number(facturacion.importeTotal);
-      const mensajeNota = motivoBloqueoNota
-        || 'Este certificado tiene un importe final de S/ 0.00: no se permiten notas de crédito por anulación. Solo está disponible la corrección por error en la descripción.';
-      const motivosDisponibles = permitirMotivosAnulacion
-        ? MOTIVOS_NOTA_CREDITO
-        : MOTIVOS_NOTA_CREDITO.filter((motivo) => !esMotivoAnulacionNotaCredito(motivo.codigo));
-      const opcionesMotivo = motivosDisponibles
-        .map((motivo) => `<option value="${motivo.codigo}">${motivo.codigo} — ${motivo.descripcion}</option>`)
-        .join('');
-      const formulario = await Swal.fire({
-        icon: 'warning',
-        title: `📝 Nota de crédito para ${facturacion.nroComprobante || 'comprobante'}`,
-        html: `
-          <label for="nota-motivo" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:8px 0 4px">MOTIVO</label>
-          <select id="nota-motivo" class="swal2-input" style="width:100%;margin:0">
-            ${opcionesMotivo}
-          </select>
-          ${!permitirMotivosAnulacion ? `<p style="text-align:left;font-size:12px;color:#991b1b;margin:8px 0 0">${mensajeNota}</p>` : ''}
-          <label for="nota-importe" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">IMPORTE TOTAL DEL COMPROBANTE</label>
-          <input id="nota-importe" class="swal2-input" type="text" value="S/ ${totalOriginal.toFixed(2)}" readonly style="width:100%;margin:0;background:#f1f5f9;color:#475569" />
-          <label for="nota-sustento" style="display:block;text-align:left;font-size:12px;font-weight:700;margin:16px 0 4px">SUSTENTO</label>
-          <textarea id="nota-sustento" class="swal2-textarea" maxlength="250" placeholder="Explique el motivo de la nota" style="width:100%;margin:0"></textarea>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'CREAR NOTA DE CRÉDITO',
-        cancelButtonText: 'CANCELAR',
-        confirmButtonColor: '#052A79',
-        focusConfirm: false,
-        preConfirm: () => {
-          const motivoCodigo = (document.getElementById('nota-motivo') as HTMLSelectElement | null)?.value || '';
-          const importeTotal = totalOriginal;
-          const sustento = (document.getElementById('nota-sustento') as HTMLTextAreaElement | null)?.value.trim() || '';
-          if (!permitirMotivosAnulacion && esMotivoAnulacionNotaCredito(motivoCodigo)) {
-            Swal.showValidationMessage(mensajeNota);
-            return false;
-          }
-          if (!Number.isFinite(importeTotal) || importeTotal <= 0) {
-            Swal.showValidationMessage('El comprobante no tiene un importe total válido.');
-            return false;
-          }
-          if (!sustento) {
-            Swal.showValidationMessage('El sustento es obligatorio.');
-            return false;
-          }
-          return { motivoCodigo, importeTotal, sustento };
-        },
+      setNotaCreditoModal({
+        certificadoId,
+        permitirMotivosAnulacion,
+        motivoBloqueoNota,
       });
-      if (!formulario.isConfirmed || !formulario.value) return;
-      const importeTotal = Number(formulario.value.importeTotal);
-      const baseImponible = Number(facturacion.baseImponible);
-      const igv = Number(facturacion.igv);
-      await faregasCertificadosApi.emitirNotaElectronica(certificadoId, {
-        tipo: 'CREDITO',
-        motivoCodigo: formulario.value.motivoCodigo,
-        sustento: formulario.value.sustento,
-        baseImponible,
-        igv,
-        importeTotal,
-      });
-      await Swal.fire('Nota procesada', 'La nota de crédito fue registrada. Revise posteriormente su estado SUNAT.', 'success');
     } catch (err) {
-      await Swal.fire('No se pudo crear la nota', err instanceof Error ? err.message : 'La creación de la nota de crédito falló.', 'error');
+      await Swal.fire('No se pudo abrir la nota', err instanceof Error ? err.message : 'No se pudo cargar el comprobante.', 'error');
     } finally {
       setAccionEnProceso(null);
     }
@@ -1140,6 +1089,14 @@ export function InicioView() {
         solicitudId={solicitudSolicitadaId}
         onCerrar={() => { setCertificadoSolicitudId(null); setSolicitudSolicitadaId(null); }}
         onCreada={() => { void cargarInspecciones(page, pageSize); }}
+      />
+      <NotaCreditoModal
+        abierto={notaCreditoModal !== null}
+        certificadoId={notaCreditoModal?.certificadoId || null}
+        permitirMotivosAnulacion={notaCreditoModal?.permitirMotivosAnulacion}
+        motivoBloqueoAnulacion={notaCreditoModal?.motivoBloqueoNota}
+        onCerrar={() => setNotaCreditoModal(null)}
+        onProcesada={() => cargarInspecciones(page, pageSize)}
       />
     </div>
   );
