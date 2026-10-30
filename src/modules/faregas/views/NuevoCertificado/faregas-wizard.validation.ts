@@ -431,9 +431,7 @@ export const validarDatosEspecificos = ({
   if (tipo === 'GNV_ANUAL') {
     if (String(modalidad || '').toUpperCase() === 'ANUAL') {
       const hoyPeru = obtenerFechaHoyPeru();
-      if (vacio(gnv.fechaVigencia)) {
-        marcar(errores, 'gnv.fechaVigencia', 'Complete la vigencia del certificado GNV.');
-      } else if (String(gnv.fechaVigencia).slice(0, 10) < hoyPeru) {
+      if (!vacio(gnv.fechaVigencia) && String(gnv.fechaVigencia).slice(0, 10) < hoyPeru) {
         marcar(errores, 'gnv.fechaVigencia', 'La fecha de vigencia no puede ser anterior a la fecha actual.');
       }
       const verificaciones = gnv.verificaciones || [];
@@ -446,9 +444,7 @@ export const validarDatosEspecificos = ({
   if (tipo === 'GLP_ANUAL') {
     const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
     const hoyPeru = obtenerFechaHoyPeru();
-    if (vacio(glp.fechaVigencia)) {
-      marcar(errores, 'glp.fechaVigencia', 'Complete la vigencia del certificado GLP.');
-    } else if (String(glp.fechaVigencia).slice(0, 10) < hoyPeru) {
+    if (!vacio(glp.fechaVigencia) && String(glp.fechaVigencia).slice(0, 10) < hoyPeru) {
       marcar(errores, 'glp.fechaVigencia', 'La fecha de vigencia no puede ser anterior a la fecha actual.');
     }
 
@@ -782,15 +778,13 @@ export const MENSAJE_CAMPO_OBLIGATORIO = 'Este campo es obligatorio.';
  * "(Opcional)" y el backend tampoco lo exige. Marcarlo en rojo contradiría lo
  * que el propio formulario afirma al operador.
  */
-export const CAMPOS_VISIBLES_GNV = ['gnv.fechaVigencia'] as const;
+export const CAMPOS_VISIBLES_GNV = [] as const;
 export const CAMPOS_VISIBLES_GNV_INICIAL = [
   'gnv.combustiblePosterior', 'gnv.pesoNetoPosterior',
 ] as const;
 
 /** Bloque B, sección GLP (idem para INICIAL). */
-export const CAMPOS_VISIBLES_GLP = [
-  'glp.fechaVigencia',
-] as const;
+export const CAMPOS_VISIBLES_GLP = [] as const;
 export const CAMPOS_VISIBLES_GLP_INICIAL = [
   'glp.pesoNetoPosterior', 'glp.cargaUtilPosterior',
 ] as const;

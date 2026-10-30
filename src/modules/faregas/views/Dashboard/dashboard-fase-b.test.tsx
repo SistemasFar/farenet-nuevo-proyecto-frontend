@@ -142,6 +142,8 @@ describe('Dashboard FAREGAS — Fase B', () => {
     expect(resolverPermisosDashboard([], 'OPERADOR')).toEqual({ puedeVerGlobal: false, puedeExportar: false });
     expect(resolverPermisosDashboard(['DASHBOARD_GLOBAL'], 'OPERADOR')).toEqual({ puedeVerGlobal: true, puedeExportar: false });
     expect(resolverPermisosDashboard(['DASHBOARD_EXPORTAR'], 'OPERADOR')).toEqual({ puedeVerGlobal: false, puedeExportar: true });
-    expect(resolverPermisosDashboard([], 'SISTEMAS')).toEqual({ puedeVerGlobal: true, puedeExportar: true });
+    expect(resolverPermisosDashboard([], 'SISTEMAS')).toEqual({ puedeVerGlobal: false, puedeExportar: false });
+    expect(resolverPermisosDashboard(['DASHBOARD_GLOBAL', 'DASHBOARD_EXPORTAR'], 'SISTEMAS'))
+      .toEqual({ puedeVerGlobal: true, puedeExportar: true });
   });
 });

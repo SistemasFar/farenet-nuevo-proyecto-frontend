@@ -1040,7 +1040,7 @@ export function VehiculoStep({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-bold text-slate-500">
-                      VIGENCIA HASTA <span className="text-red-500">*</span>
+                      VIGENCIA HASTA
                     </label>
                     <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} min={obtenerFechaHoyPeru()}
                       className={claseConError(CLASE_CAMPO, esError('glp.fechaVigencia'))}
@@ -1078,7 +1078,7 @@ export function VehiculoStep({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">
-                      VIGENCIA HASTA <span className="text-red-500">*</span>
+                      VIGENCIA HASTA
                     </label>
                     <input type="date" name="fechaVigencia" value={formGlp.fechaVigencia || ''} onChange={handleGlp} min={obtenerFechaHoyPeru()}
                       className={claseConError(CLASE_CAMPO, esError('glp.fechaVigencia'))}
@@ -1415,7 +1415,7 @@ export function VehiculoStep({
                   <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4" data-seccion-gnv="vigencia">
                     <h5 className="mb-4 border-b border-slate-200 pb-2 font-bold text-[#052a79]">VIGENCIA</h5>
                     <div>
-                      <label className="mb-1 block text-xs font-bold text-slate-500">VIGENCIA HASTA <span className="text-red-500">*</span></label>
+                      <label className="mb-1 block text-xs font-bold text-slate-500">VIGENCIA HASTA</label>
                       <input type="date" name="fechaVigencia" value={formGnv.fechaVigencia || ''} onChange={handleGnv} min={obtenerFechaHoyPeru()}
                         className={claseConError(CLASE_CAMPO, esError('gnv.fechaVigencia'))}
                         data-campo-error={esError('gnv.fechaVigencia') ? true : undefined}

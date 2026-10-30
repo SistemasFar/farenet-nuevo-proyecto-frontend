@@ -20,6 +20,10 @@ interface Props {
   onCerrar: () => void;
   onCreada?: (solicitud: SolicitudOperacion) => void;
   solicitudId?: number | null;
+  tipoSolicitudInicial?: 'ANULAR_AMBOS' | 'EMITIR_NOTA_CREDITO';
+  motivoNotaCredito?: '01' | '02' | '03' | null;
+  motivoNotaCreditoItemIndice?: number | null;
+  motivoNotaCreditoDescripcion?: string;
 }
 
 const crearIdempotencia = () => (
@@ -49,7 +53,17 @@ const mostrar = (valor: unknown) => {
   return String(valor);
 };
 
-export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCreada, solicitudId }: Props) {
+export function SolicitudOperacionModal({
+  certificadoId,
+  abierto,
+  onCerrar,
+  onCreada,
+  solicitudId,
+  tipoSolicitudInicial = 'ANULAR_AMBOS',
+  motivoNotaCredito = null,
+  motivoNotaCreditoItemIndice = null,
+  motivoNotaCreditoDescripcion = '',
+}: Props) {
   const [contexto, setContexto] = useState<ContextoSolicitudOperacion | null>(null);
   const [solicitud, setSolicitud] = useState<SolicitudOperacion | null>(null);
   const [motivo, setMotivo] = useState('');
@@ -59,6 +73,9 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
   const [error, setError] = useState('');
   const [resultado, setResultado] = useState<SolicitudOperacion | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const esSolicitudNotaCreditoInicial = tipoSolicitudInicial === 'EMITIR_NOTA_CREDITO';
+  const esSolicitudNotaCredito = esSolicitudNotaCreditoInicial
+    || solicitud?.tipoOperacion === 'EMITIR_NOTA_CREDITO';
 
   useEffect(() => {
     if (!abierto) {
@@ -88,12 +105,15 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
     setResultado(null);
     setError('');
     setIdempotencia(crearIdempotencia());
+    setMotivo(esSolicitudNotaCreditoInicial && motivoNotaCredito
+      ? `${motivoNotaCredito} - Solicitud de autorización para emitir nota de crédito`
+      : '');
     setCargando(true);
     faregasSolicitudesOperacionApi.contexto(certificadoId)
       .then(setContexto)
       .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo cargar el certificado.'))
       .finally(() => setCargando(false));
-  }, [abierto, certificadoId, solicitudId]);
+  }, [abierto, certificadoId, solicitudId, esSolicitudNotaCreditoInicial, motivoNotaCredito]);
 
   if (!abierto) return null;
 
@@ -271,7 +291,7 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
   };
 
   const enviar = async () => {
-    if (bloqueoAnulacionContexto) {
+    if (!esSolicitudNotaCredito && bloqueoAnulacionContexto) {
       setError(mensajeBloqueoAnulacion);
       return;
     }
@@ -284,8 +304,17 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
     try {
       const respuesta = await faregasSolicitudesOperacionApi.crear({
         certificadoId,
-        tipoOperacion: 'ANULAR_AMBOS',
+        tipoOperacion: esSolicitudNotaCredito ? 'EMITIR_NOTA_CREDITO' : 'ANULAR_AMBOS',
         motivo: motivo.trim(),
+        datosPropuestos: esSolicitudNotaCredito && motivoNotaCredito
+          ? {
+              motivoCodigo: motivoNotaCredito,
+              ...(motivoNotaCredito === '03' ? {
+                itemIndice: motivoNotaCreditoItemIndice,
+                descripcionCorregida: motivoNotaCreditoDescripcion,
+              } : {}),
+            }
+          : undefined,
         idempotenciaClave: idempotencia,
       });
       setResultado(respuesta.data);
@@ -302,8 +331,16 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
       <div className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div className="sticky top-0 z-10 flex items-start justify-between bg-[#052A79] px-5 py-4 text-white">
           <div>
-            <h2 id="solicitud-anulacion-total-titulo" className="text-lg font-bold">{solicitud ? 'Detalle de la solicitud de anulación' : 'Solicitar anulación total'}</h2>
-            <p className="text-xs text-blue-100">{solicitud ? 'Aprobación y ejecución en un solo paso para usuarios autorizados. La ejecución fiscal conserva confirmación, trazabilidad y recuperación controlada.' : 'Registra la solicitud; no se anulará ni modificará ningún documento hasta su aprobación y ejecución.'}</p>
+            <h2 id="solicitud-anulacion-total-titulo" className="text-lg font-bold">{solicitud
+              ? 'Detalle de la solicitud'
+              : esSolicitudNotaCredito
+                ? 'Solicitar autorización para nota de crédito'
+                : 'Solicitar anulación total'}</h2>
+            <p className="text-xs text-blue-100">{solicitud
+              ? 'Detalle, aprobación y trazabilidad de la solicitud administrativa.'
+              : esSolicitudNotaCredito
+                ? 'La aprobación autoriza la emisión desde FAREGAS; no anula el certificado ni envía una baja.'
+                : 'Registra la solicitud; no se anulará ni modificará ningún documento hasta su aprobación y ejecución.'}</p>
           </div>
           <button type="button" onClick={onCerrar} className="rounded p-1 hover:bg-white/10" aria-label="Cerrar"><X size={20} /></button>
         </div>
@@ -355,7 +392,9 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 </div>
                 {solicitud.estado === 'APROBADA' && !solicitud.usuarioEjecucion && (
                   <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-amber-900">
-                    La solicitud está aprobada pero <strong>aún no se ejecutó</strong>. No se ha enviado ninguna baja ni nota a NubeFact. Puede reintentar la ejecución con el botón inferior.
+                    {esSolicitudNotaCredito
+                      ? <>La nota está autorizada. FAREGAS la procesará mediante la cola fiscal automática y mostrará aquí el resultado o la causa de bloqueo; no debe volver al formulario para emitirla.</>
+                      : <>La solicitud está aprobada pero <strong>aún no se ejecutó</strong>. No se ha enviado ninguna baja ni nota a NubeFact. Puede reintentar la ejecución con el botón inferior.</>}
                   </p>
                 )}
                 {resolucionFiscal?.resultado === 'PENDIENTE_VERIFICACION' && (
@@ -438,7 +477,7 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 <div><span className="block text-xs font-semibold text-slate-500">IMPORTE FINAL</span>{contexto.certificado.importeFinal === null || contexto.certificado.importeFinal === undefined ? '-' : `${contexto.certificado.monedaImporteFinal || 'PEN'} ${Number(contexto.certificado.importeFinal).toFixed(2)}`}</div>
               </div>
 
-              {bloqueoAnulacionContexto && (
+              {!esSolicitudNotaCredito && bloqueoAnulacionContexto && (
                 <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-900">
                   <div className="flex gap-2">
                     <AlertTriangle size={18} className="shrink-0 text-red-700" />
@@ -468,23 +507,27 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 </div>
               )}
 
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
+              <div className={`rounded-lg border p-3 text-sm ${esSolicitudNotaCredito ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-red-200 bg-red-50 text-red-900'}`}>
                 <div className="flex gap-2">
-                  <AlertTriangle size={18} className="shrink-0 text-red-700" />
-                  <span>Esta solicitud comprende el <strong>certificado y el comprobante electrónico asociado</strong>. La aprobación no anula documentos; la ejecución fiscal se realiza desde este detalle con confirmación y conserva las protecciones técnicas vigentes.</span>
+                  <AlertTriangle size={18} className={`shrink-0 ${esSolicitudNotaCredito ? 'text-blue-700' : 'text-red-700'}`} />
+                  <span>{esSolicitudNotaCredito
+                     ? <>Se solicitará autorización para el motivo SUNAT <strong>{motivoNotaCredito}</strong>. Una vez aprobada, FAREGAS creará el trabajo fiscal y lo procesará automáticamente; no deberá pulsar Emitir nuevamente.</>
+                    : <>Esta solicitud comprende el <strong>certificado y el comprobante electrónico asociado</strong>. La aprobación no anula documentos; la ejecución fiscal se realiza desde este detalle con confirmación y conserva las protecciones técnicas vigentes.</>}</span>
                 </div>
               </div>
 
               <label className="block text-sm font-semibold text-slate-700">
-                Motivo de la anulación total *
+                {esSolicitudNotaCredito ? 'Sustento de la solicitud *' : 'Motivo de la anulación total *'}
                 <textarea
                   value={motivo}
                   onChange={(event) => setMotivo(event.target.value)}
                   maxLength={500}
                   rows={4}
-                  disabled={bloqueoAnulacionContexto}
+                  disabled={!esSolicitudNotaCredito && bloqueoAnulacionContexto}
                   className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal disabled:bg-slate-100 disabled:text-slate-500"
-                  placeholder="Explique por qué deben anularse el certificado y el comprobante asociado"
+                  placeholder={esSolicitudNotaCredito
+                    ? 'Explique por qué debe emitirse la nota de crédito'
+                    : 'Explique por qué deben anularse el certificado y el comprobante asociado'}
                 />
               </label>
 
@@ -492,9 +535,9 @@ export function SolicitudOperacionModal({ certificadoId, abierto, onCerrar, onCr
                 <button type="button" onClick={onCerrar} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancelar</button>
                 <button
                   type="button"
-                  disabled={guardando || !motivo.trim() || bloqueoAnulacionContexto}
+                  disabled={guardando || !motivo.trim() || (!esSolicitudNotaCredito && bloqueoAnulacionContexto)}
                   onClick={() => void enviar()}
-                  className="flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${esSolicitudNotaCredito ? 'bg-[#052A79] hover:bg-blue-900' : 'bg-red-700 hover:bg-red-800'}`}
                 >
                   {guardando ? <Loader2 size={16} className="animate-spin" /> : <ClipboardX size={16} />} Enviar solicitud
                 </button>

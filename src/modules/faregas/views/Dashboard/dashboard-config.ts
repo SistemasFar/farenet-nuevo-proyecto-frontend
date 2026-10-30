@@ -7,12 +7,10 @@ export const DASHBOARD_TAB_CONFIG: ReadonlyArray<{ id: DashboardTabId; label: st
   { id: 'cobranza', label: 'Cobranza y Facturación', descripcion: 'Pagos, saldos y comprobantes' }
 ];
 
-export function resolverPermisosDashboard(permisos: string[] = [], perfilId?: string | null) {
-  const p = String(perfilId || '').trim().toUpperCase();
-  const esSistemas = p === 'SISTEMAS' || p === 'AMINISTRADOR' || p === 'ADMINISTRADOR';
-  const esSupervisor = p === 'SUPERVISOR';
+export function resolverPermisosDashboard(permisos: string[] = [], _perfilId?: string | null) {
+  void _perfilId;
   return {
-    puedeVerGlobal: (permisos || []).includes('DASHBOARD_GLOBAL') || esSistemas || esSupervisor,
-    puedeExportar: (permisos || []).includes('DASHBOARD_EXPORTAR') || esSistemas || esSupervisor
+    puedeVerGlobal: (permisos || []).includes('DASHBOARD_GLOBAL'),
+    puedeExportar: (permisos || []).includes('DASHBOARD_EXPORTAR')
   };
 }

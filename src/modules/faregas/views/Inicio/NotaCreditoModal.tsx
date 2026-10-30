@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ExternalLink, FileMinus2, Loader2, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ExternalLink,
+  FileMinus2,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  X,
+  HelpCircle
+} from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 import type { ContextoNotaCreditoFaregas, NotaElectronicaFaregas } from '../../types/faregas-api';
 
-type MotivoNota = '01' | '02' | '03';
+type MotivoNota = '01' | '02' | '03' | '04' | '05' | '06' | '07' | '08' | '09' | '10' | '11' | '12' | '13';
 
 export interface FormularioNotaCredito {
   motivoCodigo: MotivoNota;
@@ -12,6 +21,17 @@ export interface FormularioNotaCredito {
   solicitudId: number | null;
   itemIndice: number | null;
   descripcionCorregida: string;
+  descuentoGlobal?: number;
+  descuentoPorItemIndice?: number | null;
+  descuentoPorItemMonto?: number;
+  devolucionTotal?: boolean;
+  devolucionPorItemIndice?: number | null;
+  bonificacion?: boolean;
+  disminucionValorMonto?: number;
+  otrosConceptos?: string;
+  ajustesIVAP?: string;
+  ajustesExportacion?: string;
+  ajustesMontosFechas?: string;
 }
 
 export interface SolicitudEmisionNotaCredito {
@@ -21,9 +41,49 @@ export interface SolicitudEmisionNotaCredito {
   solicitudId?: number;
   itemIndice?: number;
   descripcionCorregida?: string;
+  descuentoGlobal?: number;
+  descuentoPorItemIndice?: number;
+  descuentoPorItemMonto?: number;
+  devolucionTotal?: boolean;
+  devolucionPorItemIndice?: number;
+  bonificacion?: boolean;
+  disminucionValorMonto?: number;
+  otrosConceptos?: string;
+  ajustesIVAP?: string;
+  ajustesExportacion?: string;
+  ajustesMontosFechas?: string;
 }
 
-export const motivoRequiereSolicitud = (codigo: MotivoNota) => codigo === '01' || codigo === '02';
+const MOTIVOS_NOTA_CREDITO: Record<MotivoNota, {
+  codigo: MotivoNota;
+  descripcion: string;
+  requiereSolicitud: boolean;
+  modificaDescripcion: boolean;
+  implementado: boolean;
+  camposAdicionales?: string[];
+}> = {
+  '01': { codigo: '01', descripcion: 'Anulaci\u00f3n de la operaci\u00f3n', requiereSolicitud: true, modificaDescripcion: false, implementado: true },
+  '02': { codigo: '02', descripcion: 'Anulaci\u00f3n por error en el RUC', requiereSolicitud: true, modificaDescripcion: false, implementado: true },
+  '03': { codigo: '03', descripcion: 'Correcci\u00f3n por error en la descripci\u00f3n', requiereSolicitud: false, modificaDescripcion: true, implementado: true },
+  '04': { codigo: '04', descripcion: 'Descuento global', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '05': { codigo: '05', descripcion: 'Descuento por \u00edtem', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '06': { codigo: '06', descripcion: 'Devoluci\u00f3n total', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '07': { codigo: '07', descripcion: 'Devoluci\u00f3n por \u00edtem', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '08': { codigo: '08', descripcion: 'Bonificaci\u00f3n', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '09': { codigo: '09', descripcion: 'Disminuci\u00f3n en el valor', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '10': { codigo: '10', descripcion: 'Otros conceptos', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '11': { codigo: '11', descripcion: 'Ajustes afectos al IVAP', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '12': { codigo: '12', descripcion: 'Ajustes de operaciones de exportaci\u00f3n', requiereSolicitud: false, modificaDescripcion: false, implementado: false },
+  '13': { codigo: '13', descripcion: 'Ajustes de montos y/o fechas de pago', requiereSolicitud: false, modificaDescripcion: false, implementado: false }
+};
+
+export const motivoRequiereSolicitud = (codigo: MotivoNota) => codigo === '01' || codigo === '02' || codigo === '03';
+export const motivoModificaDescripcion = (codigo: MotivoNota) => codigo === '03';
+export const motivoImplementado = (codigo: MotivoNota) => MOTIVOS_NOTA_CREDITO[codigo].implementado;
+
+export const contextoPermiteEmitirNota = (
+  contexto: Pick<ContextoNotaCreditoFaregas, 'puedeEmitir'> | null,
+) => contexto?.puedeEmitir === true;
 
 export const construirSolicitudNotaCredito = (
   formulario: FormularioNotaCredito,
@@ -37,6 +97,17 @@ export const construirSolicitudNotaCredito = (
     solicitudId: requiereSolicitud ? formulario.solicitudId || undefined : undefined,
     itemIndice: formulario.motivoCodigo === '03' ? formulario.itemIndice ?? undefined : undefined,
     descripcionCorregida: formulario.motivoCodigo === '03' ? descripcion : undefined,
+    descuentoGlobal: formulario.motivoCodigo === '04' ? formulario.descuentoGlobal : undefined,
+    descuentoPorItemIndice: formulario.motivoCodigo === '05' ? formulario.descuentoPorItemIndice ?? undefined : undefined,
+    descuentoPorItemMonto: formulario.motivoCodigo === '05' ? formulario.descuentoPorItemMonto : undefined,
+    devolucionTotal: formulario.motivoCodigo === '06' ? formulario.devolucionTotal : undefined,
+    devolucionPorItemIndice: formulario.motivoCodigo === '07' ? formulario.devolucionPorItemIndice ?? undefined : undefined,
+    bonificacion: formulario.motivoCodigo === '08' ? formulario.bonificacion : undefined,
+    disminucionValorMonto: formulario.motivoCodigo === '09' ? formulario.disminucionValorMonto : undefined,
+    otrosConceptos: formulario.motivoCodigo === '10' ? formulario.otrosConceptos : undefined,
+    ajustesIVAP: formulario.motivoCodigo === '11' ? formulario.ajustesIVAP : undefined,
+    ajustesExportacion: formulario.motivoCodigo === '12' ? formulario.ajustesExportacion : undefined,
+    ajustesMontosFechas: formulario.motivoCodigo === '13' ? formulario.ajustesMontosFechas : undefined
   };
 };
 
@@ -47,6 +118,7 @@ interface Props {
   motivoBloqueoAnulacion?: string;
   onCerrar: () => void;
   onProcesada?: () => void | Promise<void>;
+  onSolicitarAutorizacion?: (motivoCodigo: '01' | '02' | '03', itemIndice?: number | null, descripcionCorregida?: string) => void;
 }
 
 const moneda = (valor: number, codigo = 'PEN') => new Intl.NumberFormat('es-PE', {
@@ -72,6 +144,7 @@ export function NotaCreditoModal({
   motivoBloqueoAnulacion,
   onCerrar,
   onProcesada,
+  onSolicitarAutorizacion,
 }: Props) {
   const [contexto, setContexto] = useState<ContextoNotaCreditoFaregas | null>(null);
   const [notas, setNotas] = useState<NotaElectronicaFaregas[]>([]);
@@ -79,6 +152,7 @@ export function NotaCreditoModal({
   const [procesando, setProcesando] = useState(false);
   const [consultandoId, setConsultandoId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [emitirError, setEmitirError] = useState<string | null>(null);
   const [motivoCodigo, setMotivoCodigo] = useState<MotivoNota>('03');
   const [solicitudId, setSolicitudId] = useState<number | null>(null);
   const [itemIndice, setItemIndice] = useState<number | null>(null);
@@ -89,6 +163,7 @@ export function NotaCreditoModal({
     if (!certificadoId) return;
     setCargando(true);
     setError('');
+    setEmitirError(null);
     try {
       const [contextoResponse, documentosResponse] = await Promise.all([
         faregasCertificadosApi.obtenerContextoNotaCredito(certificadoId),
@@ -98,7 +173,9 @@ export function NotaCreditoModal({
       const notasCredito = ((documentosResponse.data?.notas || []) as NotaElectronicaFaregas[])
         .filter((nota) => nota.tipo === 'CREDITO');
       const autorizacion = nuevoContexto.autorizaciones.find((item) => item.ejecutablePorUsuario);
-      const motivoInicial: MotivoNota = permitirMotivosAnulacion && autorizacion ? '01' : '03';
+      const motivoInicial: MotivoNota = permitirMotivosAnulacion && autorizacion
+        ? autorizacion.motivoCodigo || '01'
+        : '03';
       setContexto(nuevoContexto);
       setNotas(notasCredito);
       setMotivoCodigo(motivoInicial);
@@ -128,27 +205,23 @@ export function NotaCreditoModal({
   }, [abierto, onCerrar, procesando]);
 
   const autorizacionesEjecutables = useMemo(
-    () => contexto?.autorizaciones.filter((item) => item.ejecutablePorUsuario) || [],
-    [contexto],
+    () => contexto?.autorizaciones.filter((item) => (
+      item.ejecutablePorUsuario && item.motivoCodigo === motivoCodigo
+    )) || [],
+    [contexto, motivoCodigo],
   );
   const motivoSeleccionado = contexto?.motivos.find((motivo) => motivo.codigo === motivoCodigo);
   const solicitudSeleccionada = contexto?.autorizaciones.find((item) => item.id === solicitudId) || null;
   const requiereSolicitud = motivoRequiereSolicitud(motivoCodigo);
-  const puedeEmitir = Boolean(
-    contexto
-    && !procesando
-    && (!requiereSolicitud || (permitirMotivosAnulacion && solicitudSeleccionada?.ejecutablePorUsuario))
-    && (motivoCodigo !== '03' || (itemIndice !== null && descripcionCorregida.trim().length >= 5)),
-  );
+  const modificaDescripcion = motivoModificaDescripcion(motivoCodigo);
+  const implementado = motivoImplementado(motivoCodigo);
 
   const seleccionarMotivo = (codigo: MotivoNota) => {
     setMotivoCodigo(codigo);
-    if (codigo === '03') {
-      setSolicitudId(null);
-      setSustento('');
-      return;
-    }
-    const autorizacion = autorizacionesEjecutables[0];
+    setEmitirError(null);
+    const autorizacion = contexto?.autorizaciones.find((item) => (
+      item.ejecutablePorUsuario && item.motivoCodigo === codigo
+    ));
     setSolicitudId(autorizacion?.id || null);
     setSustento(autorizacion?.motivo || '');
   };
@@ -157,14 +230,66 @@ export function NotaCreditoModal({
     const seleccionada = contexto?.autorizaciones.find((item) => item.id === id);
     setSolicitudId(id);
     setSustento(seleccionada?.motivo || '');
+    setEmitirError(null);
   };
+
+  const motivoEmitidoOpendiente = useMemo(() => {
+    if (!notas || notas.length === 0) return null;
+    return notas.find((n) => n.motivoCodigo === motivoCodigo && ['PENDIENTE', 'PENDIENTE_SUNAT', 'ERROR'].includes(n.estado));
+  }, [notas, motivoCodigo]);
+
+  const tienePermisoEmitir = useMemo(() => {
+    return contextoPermiteEmitirNota(contexto);
+  }, [contexto]);
+
+  const puedeEmitir = useMemo(() => {
+    if (!contexto) return false;
+    if (procesando) return false;
+    if (!implementado) return false;
+
+    // Para motivos que requieren solicitud (01, 02), verificar autorización ejecutable.
+    // Para motivo 03, el permiso ya fue validado por el backend al cargar el contexto.
+    if (requiereSolicitud) {
+      if (!tienePermisoEmitir) return false;
+      if (!solicitudSeleccionada?.ejecutablePorUsuario) return false;
+    }
+
+    if (modificaDescripcion) {
+      if (itemIndice === null) return false;
+      if (!descripcionCorregida.trim() || descripcionCorregida.trim().length < 5) return false;
+    }
+
+    if (motivoEmitidoOpendiente) return false;
+
+    return true;
+  }, [contexto, procesando, implementado, requiereSolicitud, tienePermisoEmitir, solicitudSeleccionada, modificaDescripcion, itemIndice, descripcionCorregida, motivoEmitidoOpendiente]);
+
+  const motivoNoPuedeEmitirTexto = useMemo(() => {
+    if (!contexto) return 'Cargando contexto fiscal…';
+    if (!implementado) return `El motivo ${motivoCodigo} est\u00e1 pendiente de implementaci\u00f3n fiscal.`;
+    if (requiereSolicitud) {
+      if (!tienePermisoEmitir) return 'No tiene permiso para emitir notas de cr\u00e9dito.';
+      if (!solicitudSeleccionada?.ejecutablePorUsuario) {
+        return 'La solicitud administrativa requerida no est\u00e1 aprobada o no es ejecutable.';
+      }
+    }
+    if (modificaDescripcion) {
+      if (itemIndice === null) return 'Seleccione la l\u00ednea a corregir.';
+      if (!descripcionCorregida.trim()) return 'Ingrese la nueva descripci\u00f3n.';
+      if (descripcionCorregida.trim().length < 5) return 'La nueva descripci\u00f3n debe tener al menos 5 caracteres.';
+    }
+    if (motivoEmitidoOpendiente) {
+      return `Existe una nota ${motivoEmitidoOpendiente.estado.toLowerCase()} para este motivo. Consulte su estado antes de emitir otra.`;
+    }
+    return null;
+  }, [contexto, implementado, motivoCodigo, requiereSolicitud, tienePermisoEmitir, solicitudSeleccionada, modificaDescripcion, itemIndice, descripcionCorregida, motivoEmitidoOpendiente]);
 
   const emitir = async () => {
     if (!certificadoId || !contexto || !puedeEmitir) return;
     const confirmacion = await Swal.fire({
       icon: 'warning',
-      title: '¿Emitir la nota de crédito?',
-      text: `${motivoCodigo} — ${motivoSeleccionado?.descripcion || ''}. El documento se enviará a NubeFact y puede quedar pendiente de confirmación SUNAT.`,
+      title: '\u00bfEmitir la nota de cr\u00e9dito?',
+      text: `${motivoCodigo} — ${motivoSeleccionado?.descripcion || ''}. El documento se enviar\u00e1 a NubeFact y puede quedar pendiente de confirmaci\u00f3n SUNAT.`,
       showCancelButton: true,
       confirmButtonText: 'EMITIR AHORA',
       cancelButtonText: 'REVISAR',
@@ -174,6 +299,7 @@ export function NotaCreditoModal({
 
     setProcesando(true);
     setError('');
+    setEmitirError(null);
     try {
       const response = await faregasCertificadosApi.emitirNotaElectronica(certificadoId, construirSolicitudNotaCredito({
         motivoCodigo,
@@ -192,7 +318,7 @@ export function NotaCreditoModal({
         confirmButtonColor: '#052A79',
       });
     } catch (err) {
-      setError(mensajeError(err));
+      setEmitirError(mensajeError(err));
     } finally {
       setProcesando(false);
     }
@@ -232,6 +358,7 @@ export function NotaCreditoModal({
         <div className="overflow-y-auto p-4 md:p-6">
           {cargando && !contexto ? <div className="flex min-h-64 items-center justify-center gap-3 text-sm font-bold text-slate-600"><Loader2 className="h-6 w-6 animate-spin text-[#052A79]" /> Cargando comprobante original…</div> : null}
           {error && <div className="mb-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700"><AlertTriangle className="h-5 w-5 shrink-0" /> {error}</div>}
+          {emitirError && <div className="mb-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700"><AlertTriangle className="h-5 w-5 shrink-0" /> {emitirError}</div>}
 
           {contexto && <div className="space-y-5">
             <section className="rounded-xl border border-slate-200">
@@ -260,17 +387,25 @@ export function NotaCreditoModal({
               <div className="grid gap-2 border-t bg-slate-50 p-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
                 <div><p className="text-xs text-slate-500">DESCUENTO</p><p className="font-bold">{moneda(contexto.comprobante.totales.descuento, contexto.comprobante.moneda)}</p></div>
                 <div><p className="text-xs text-slate-500">BASE GRAVADA</p><p className="font-bold">{moneda(contexto.comprobante.totales.gravada, contexto.comprobante.moneda)}</p></div>
-                <div><p className="text-xs text-slate-500">INAFECTA / EXONERADA</p><p className="font-bold">{moneda(contexto.comprobante.totales.inafecta + contexto.comprobante.totales.exonerada, contexto.comprobante.moneda)}</p></div>
-                <div><p className="text-xs text-slate-500">IGV</p><p className="font-bold">{moneda(contexto.comprobante.totales.igv, contexto.comprobante.moneda)}</p></div>
-                <div><p className="text-xs text-slate-500">TOTAL</p><p className="text-lg font-black text-[#052A79]">{moneda(contexto.comprobante.totales.total, contexto.comprobante.moneda)}</p></div>
+                <div><p className="text-xs font-bold text-slate-500">INAFECTA / EXONERADA</p><p className="font-bold">{moneda(contexto.comprobante.totales.inafecta + contexto.comprobante.totales.exonerada, contexto.comprobante.moneda)}</p></div>
+                <div><p className="text-xs font-bold text-slate-500">IGV</p><p className="font-bold">{moneda(contexto.comprobante.totales.igv, contexto.comprobante.moneda)}</p></div>
+                <div><p className="text-xs font-bold text-[#052A79]">TOTAL</p><p className="font-black">{moneda(contexto.comprobante.totales.total, contexto.comprobante.moneda)}</p></div>
               </div>
             </section>
 
             <section className="grid gap-4 rounded-xl border border-blue-200 bg-blue-50/50 p-4 md:grid-cols-2">
               <label className="text-xs font-black text-slate-700">MOTIVO SUNAT
-                <select value={motivoCodigo} onChange={(event) => seleccionarMotivo(event.target.value as MotivoNota)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm">
-                  {contexto.motivos.filter((motivo) => permitirMotivosAnulacion || motivo.codigo === '03').map((motivo) => <option key={motivo.codigo} value={motivo.codigo}>{motivo.codigo} — {motivo.descripcion}</option>)}
+                <select value={motivoCodigo} onChange={(event) => seleccionarMotivo(event.target.value as MotivoNota)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm" disabled={!implementado}>
+                  {contexto.motivos.filter((motivo) => permitirMotivosAnulacion || motivo.codigo === '03').map((motivo) => {
+                    const m = MOTIVOS_NOTA_CREDITO[motivo.codigo as MotivoNota];
+                    return (
+                      <option key={motivo.codigo} value={motivo.codigo} disabled={!m?.implementado}>
+                        {motivo.codigo} — {motivo.descripcion}{!m?.implementado ? ' (pendiente)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
+                {!implementado && <span title="Motivo pendiente de implementación fiscal"><HelpCircle className="ml-1 h-3 w-3 text-amber-500" /></span>}
               </label>
 
               {requiereSolicitud ? <label className="text-xs font-black text-slate-700">SOLICITUD ADMINISTRATIVA APROBADA
@@ -287,14 +422,15 @@ export function NotaCreditoModal({
 
               {requiereSolicitud ? <div className="md:col-span-2">
                 {!permitirMotivosAnulacion && <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">{motivoBloqueoAnulacion || 'Este trámite no permite una nota por anulación.'}</p>}
-                {solicitudSeleccionada ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm"><p className="flex items-center gap-2 font-black text-emerald-800"><ShieldCheck className="h-4 w-4" /> Solicitud #{solicitudSeleccionada.id} aprobada</p><p className="mt-1 text-emerald-900">{solicitudSeleccionada.motivo}</p><p className="mt-1 text-xs text-emerald-700">Solicitó: {solicitudSeleccionada.usuarioSolicitante} · Aprobó: {solicitudSeleccionada.usuarioDecision || '—'}</p></div> : <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">No existe una solicitud aprobada y ejecutable para este comprobante.</div>}
-              </div> : <>
+                {solicitudSeleccionada ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm"><p className="flex items-center gap-2 font-black text-emerald-800"><ShieldCheck className="h-4 w-4" /> Solicitud #{solicitudSeleccionada.id} aprobada</p><p className="mt-1 text-emerald-900">{solicitudSeleccionada.motivo}</p><p className="mt-1 text-xs text-emerald-700">Solicitó: {solicitudSeleccionada.usuarioSolicitante} · Aprobó: {solicitudSeleccionada.usuarioDecision || '—'}</p></div> : <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800"><span>No existe una solicitud aprobada y ejecutable para este comprobante y motivo.</span>{onSolicitarAutorizacion && <button type="button" onClick={() => onSolicitarAutorizacion(motivoCodigo, itemIndice, descripcionCorregida)} className="rounded-lg bg-[#052A79] px-4 py-2 text-xs font-black text-white">SOLICITAR AUTORIZACIÓN</button>}</div>}
+              </div> : null}
+              {modificaDescripcion ? <>
                 <div className="md:col-span-2 rounded-lg border bg-white p-3 text-sm"><p className="text-xs font-bold text-slate-500">DESCRIPCIÓN ORIGINAL</p><p>{contexto.items.find((item) => item.indice === itemIndice)?.descripcion || 'Seleccione una línea.'}</p></div>
                 <label className="text-xs font-black text-slate-700 md:col-span-2">NUEVA DESCRIPCIÓN
                   <textarea value={descripcionCorregida} onChange={(event) => setDescripcionCorregida(event.target.value)} maxLength={250} rows={3} placeholder="Escriba la descripción correcta que aparecerá en la nota" className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm font-normal" />
                   <span className="mt-1 block text-right font-normal text-slate-500">{descripcionCorregida.length}/250</span>
                 </label>
-              </>}
+              </> : null}
             </section>
 
             <section className="rounded-xl border border-slate-200">
@@ -304,6 +440,8 @@ export function NotaCreditoModal({
                 {notas.length === 0 && <tr><td colSpan={5} className="p-5 text-center text-slate-500">No hay notas de crédito registradas.</td></tr>}
               </tbody></table></div>
             </section>
+
+            {motivoNoPuedeEmitirTexto && <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800"><HelpCircle className="h-4 w-4 shrink-0 mr-2" /> {motivoNoPuedeEmitirTexto}</div>}
           </div>}
         </div>
 

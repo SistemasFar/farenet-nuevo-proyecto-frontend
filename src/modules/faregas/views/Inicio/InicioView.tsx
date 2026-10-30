@@ -7,7 +7,7 @@ import type { FacturacionFaregas } from '../../types/faregas-api';
 import Swal from 'sweetalert2';
 import { FileText, FileEdit, Eye, Ban, RefreshCw, ClipboardX } from 'lucide-react';
 import { nombreTipoCertificadoPanel } from './tipo-certificado-panel';
-import { abrirPdfNubefact } from '../../services/faregas-comprobante-visor.service';
+import { abrirPdfNotaCreditoNubefact, abrirPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
 import { SolicitudOperacionModal } from './SolicitudOperacionModal';
 import { NotaCreditoModal } from './NotaCreditoModal';
@@ -57,9 +57,11 @@ export interface BorradorPanel {
   solicitudOperacionEstado?: string | null;
   solicitudOperacionTipo?: string | null;
   solicitudOperacionMotivo?: string | null;
+  solicitudOperacionResultadoFiscal?: Record<string, unknown> | null;
   notaCreditoId?: number | null;
   estadoNotaCredito?: string | null;
   nroNotaCredito?: string | null;
+  notaCreditoPdfDisponible?: boolean | null;
 }
 
 const normalizarTexto = (valor?: string | null): string => {
@@ -168,6 +170,50 @@ const esAnulacionAceptada = (item: BorradorPanel) => (
   String(item.estadoAnulacion || '').trim().toUpperCase() === 'ACEPTADO'
 );
 
+export const esNotaCreditoPendiente = (item: BorradorPanel) => {
+  const estado = String(item.estadoNotaCredito || '').trim().toUpperCase();
+  return estado === 'PENDIENTE' || estado === 'PENDIENTE_SUNAT' || estado === 'INCERTA' || estado === 'ERROR';
+};
+
+export const esNotaCreditoAceptada = (item: BorradorPanel) => (
+  String(item.estadoNotaCredito || '').trim().toUpperCase() === 'ACEPTADA'
+);
+
+export const esNotaCreditoRechazada = (item: BorradorPanel) => (
+  String(item.estadoNotaCredito || '').trim().toUpperCase() === 'RECHAZADA'
+);
+
+export const notaCreditoExiste = (item: BorradorPanel) => (
+  Boolean(item.notaCreditoId) && Boolean(String(item.estadoNotaCredito || '').trim())
+);
+
+export const notaCreditoBloqueaOperacionesFiscales = (item: BorradorPanel) => {
+  if (esNotaCreditoPendiente(item)) return true;
+  if (esNotaCreditoAceptada(item)) return true;
+  if (esNotaCreditoRechazada(item)) return true;
+  return false;
+};
+
+export const etiquetaEstadoNotaCredito = (estado?: string | null): string => {
+  switch (String(estado || '').trim().toUpperCase()) {
+    case 'PENDIENTE': return 'Nota de Crédito Pendiente';
+    case 'PENDIENTE_SUNAT': return 'Nota de Crédito Pendiente SUNAT';
+    case 'ACEPTADA': return 'Nota de Crédito Aceptada';
+    case 'RECHAZADA': return 'Nota de Crédito Rechazada';
+    case 'ERROR': return 'Nota de Crédito Error';
+    case 'INCERTA': return 'Nota de Crédito Estado Incierto';
+    default: return 'Sin Nota de Crédito';
+  }
+};
+
+export const claseEstadoNotaCredito = (estado?: string | null): string => {
+  const estadoUpper = String(estado || '').trim().toUpperCase();
+  if (estadoUpper === 'ACEPTADA') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (estadoUpper === 'RECHAZADA' || estadoUpper === 'ERROR') return 'bg-red-50 text-red-700 border-red-200';
+  if (estadoUpper === 'PENDIENTE' || estadoUpper === 'PENDIENTE_SUNAT' || estadoUpper === 'INCERTA') return 'bg-amber-50 text-amber-700 border-amber-200';
+  return 'bg-slate-50 text-slate-700 border-slate-200';
+};
+
 
 export const tieneCertificadoDefinitivo = (item: BorradorPanel) => {
   const estadoTecnico = String(item.estado || '').trim().toUpperCase();
@@ -214,6 +260,42 @@ export const etiquetaSolicitudAnulacion = (estado?: string | null): string => {
   }
 };
 
+export const etiquetaSolicitudOperacionPanel = (item: Pick<BorradorPanel,
+  'solicitudOperacionEstado' | 'solicitudOperacionTipo' | 'solicitudOperacionResultadoFiscal'>): string => {
+  if (item.solicitudOperacionTipo !== 'EMITIR_NOTA_CREDITO') {
+    return etiquetaSolicitudAnulacion(item.solicitudOperacionEstado);
+  }
+  const fiscal = String(item.solicitudOperacionResultadoFiscal?.estado || '').trim().toUpperCase();
+  const etiquetas: Record<string, string> = {
+    AUTORIZADA_EN_COLA: 'Nota autorizada — en cola',
+    ESPERANDO_COMPROBANTE: 'Nota autorizada — esperando confirmación del comprobante',
+    EMITIENDO: 'Nota en emisión',
+    PENDIENTE: 'Nota pendiente de SUNAT',
+    PENDIENTE_SUNAT: 'Nota pendiente de SUNAT',
+    ACEPTADO: 'Nota aceptada',
+    ACEPTADA: 'Nota aceptada',
+    RECHAZADO: 'Nota rechazada',
+    RECHAZADA: 'Nota rechazada',
+    BLOQUEADA: 'Emisión de nota bloqueada',
+    RESULTADO_INCIERTO: 'Resultado de nota incierto — pendiente de consulta',
+    ERROR: 'Error al emitir la nota',
+  };
+  return etiquetas[fiscal] || etiquetaEstadoSolicitudNota(item.solicitudOperacionEstado);
+};
+
+const etiquetaEstadoSolicitudNota = (estado?: string | null): string => {
+  switch (String(estado || '').trim().toUpperCase()) {
+    case 'PENDIENTE_APROBACION': return 'Nota por autorizar';
+    case 'APROBADA': return 'Nota autorizada — pendiente de ejecución';
+    case 'EN_EJECUCION': return 'Nota en ejecución';
+    case 'COMPLETADA': return 'Nota aceptada';
+    case 'RECHAZADA': return 'Autorización de nota rechazada';
+    case 'CANCELADA': return 'Solicitud de nota cancelada';
+    case 'ERROR': return 'Error al emitir la nota';
+    default: return 'Sin solicitud';
+  }
+};
+
 export const certificadoImporteFinalCero = (item: Pick<BorradorPanel, 'anulacionImporteCero' | 'importeFinal'>): boolean => {
   if (item.anulacionImporteCero === true) return true;
   if (item.importeFinal === null || item.importeFinal === undefined || item.importeFinal === '') return false;
@@ -240,11 +322,18 @@ export const puedeSolicitarAnulacionCertificado = (item: BorradorPanel, permisos
   && !certificadoAnulacionBloqueadaPorImporte(item)
   && !esSolicitudActivaAnulacion(item.solicitudOperacionEstado)
   && !esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)
+  && !notaCreditoBloqueaOperacionesFiscales(item)
 );
 
 export const puedeCrearNotaCreditoPanel = (item: BorradorPanel, permisos: string[]) => {
   if (!permisos.includes('FAREGAS_NOTA_CREDITO')) return false;
-  if (item.anulacionEnPlazo !== false) return false;
+
+  // TEMPORAL: En entorno de pruebas NubeFact DEMO, omitir la regla de 24 horas
+  // para permitir la emisión inmediata de notas de crédito.
+  // Controlado por la variable de entorno VITE_NOTA_CREDITO_SIN_PLAZO_24H.
+  const sinPlazo24h = import.meta.env.VITE_NOTA_CREDITO_SIN_PLAZO_24H === 'true';
+  if (!sinPlazo24h && item.anulacionEnPlazo !== false) return false;
+
   if (esSolicitudActivaAnulacion(item.solicitudOperacionEstado) || esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)) return false;
   if (esAnulacionPendiente(item) || esAnulacionAceptada(item)) return false;
   const comprobanteAceptado = esResumenComprobanteOperable(item);
@@ -265,6 +354,9 @@ export function InicioView() {
   const [mostrarDuplicado, setMostrarDuplicado] = useState(false);
   const [certificadoSolicitudId, setCertificadoSolicitudId] = useState<number | null>(null);
   const [solicitudSolicitadaId, setSolicitudSolicitadaId] = useState<number | null>(null);
+  const [solicitudNotaCreditoMotivo, setSolicitudNotaCreditoMotivo] = useState<'01' | '02' | '03' | null>(null);
+  const [solicitudNotaCreditoItemIndice, setSolicitudNotaCreditoItemIndice] = useState<number | null>(null);
+  const [solicitudNotaCreditoDescripcion, setSolicitudNotaCreditoDescripcion] = useState<string>('');
   const [notaCreditoModal, setNotaCreditoModal] = useState<{
     certificadoId: number;
     permitirMotivosAnulacion: boolean;
@@ -436,6 +528,15 @@ export function InicioView() {
       await abrirPdfNubefact(certificadoId);
     } catch (err) {
       await Swal.fire('No se pudo consultar', err instanceof Error ? err.message : 'No se pudo obtener el comprobante.', 'error');
+    } finally {
+      setAccionEnProceso(null);
+    }
+  };
+
+  const verNotaCredito = async (certificadoId: number, notaCreditoId: number) => {
+    try {
+      setAccionEnProceso(certificadoId);
+      await abrirPdfNotaCreditoNubefact(certificadoId, notaCreditoId);
     } finally {
       setAccionEnProceso(null);
     }
@@ -715,16 +816,19 @@ export function InicioView() {
                   const solicitudActiva = esSolicitudActivaAnulacion(solicitudEstado);
                   const solicitudCompletada = esSolicitudCompletadaAnulacion(solicitudEstado);
                   const accionesCongeladas = solicitudActiva || anulacionPendiente || anulacionAceptada;
-                  const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
-                  const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos);
+                  const notaCreditoBloquea = notaCreditoBloqueaOperacionesFiscales(ins);
+                  const accionesFiscalesCongeladas = accionesCongeladas || notaCreditoBloquea;
+                  const certificadoEditable = ins.estado === 'BORRADOR' && !accionesFiscalesCongeladas;
+                  const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos) && !notaCreditoBloquea;
                   const anulacionBloqueadaPorImporte = certificadoAnulacionBloqueadaPorImporte(ins)
                     && certificadoEmitidoVisible(ins)
                     && puedeCrearSolicitudAnulacion(permisos);
-                  const puedeCrearNota = puedeCrearNotaCreditoPanel(ins, permisos);
+                  const puedeCrearNota = puedeCrearNotaCreditoPanel(ins, permisos) && !notaCreditoBloquea;
                   // Los controles permanecen visibles aunque el resumen todavía no se haya
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
                   // de abrir/enviar algo, por lo que no debilita la validación tributaria.
                   const puedeVerComprobante = Boolean(ins.enlacePdf);
+                  const puedeVerNotaCredito = Boolean(ins.notaCreditoId && ins.notaCreditoPdfDisponible);
 
                   return (
                     <tr
@@ -784,6 +888,17 @@ export function InicioView() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center align-middle" onClick={(event) => event.stopPropagation()}>
                         <div className="flex h-full flex-wrap items-center justify-center gap-1.5">
+                          {notaCreditoExiste(ins) && (
+                            <BadgeEstado value={ins.estadoNotaCredito} />
+                          )}
+                          {notaCreditoBloquea && (
+                            <button
+                              type="button"
+                              disabled
+                              title="Nota de crédito registrada: operaciones fiscales bloqueadas para este comprobante"
+                              className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
+                            ><Ban size={16} /></button>
+                          )}
                           {puedeVerComprobante && (
                             <button
                               type="button"
@@ -791,6 +906,16 @@ export function InicioView() {
                               onClick={() => void verComprobante(ins.id)}
                               title="Ver comprobante"
                               className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
+                            ><FileText size={16} /></button>
+                          )}
+                          {puedeVerNotaCredito && ins.notaCreditoId && (
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === ins.id}
+                              onClick={() => void verNotaCredito(ins.id, Number(ins.notaCreditoId))}
+                              title="Ver / Descargar nota de crédito"
+                              aria-label={`Ver / Descargar nota de crédito ${ins.nroNotaCredito || ''}`.trim()}
+                              className="rounded-md border border-orange-300 bg-orange-50 px-2.5 py-1.5 text-orange-700 hover:bg-orange-100 disabled:opacity-50"
                             ><FileText size={16} /></button>
                           )}
                           {!solicitudCompletada && anulacionPendiente && ins.anulacionId && (
@@ -854,7 +979,7 @@ export function InicioView() {
                               className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
                             >
                               <ClipboardX size={16} />
-                              {etiquetaSolicitudAnulacion(solicitudEstado)}
+                              {etiquetaSolicitudOperacionPanel(ins)}
                             </button>
                           )}
                           {!solicitudCompletada && accionesCongeladas && tienePermisoNotaCredito && (
@@ -890,9 +1015,12 @@ export function InicioView() {
               const solicitudActiva = esSolicitudActivaAnulacion(solicitudEstado);
               const solicitudCompletada = esSolicitudCompletadaAnulacion(solicitudEstado);
               const accionesCongeladas = solicitudActiva || anulacionPendiente || anulacionAceptada;
-              const certificadoEditable = ins.estado === 'BORRADOR' && !accionesCongeladas;
+              const notaCreditoBloquea = notaCreditoBloqueaOperacionesFiscales(ins);
+              const accionesFiscalesCongeladas = accionesCongeladas || notaCreditoBloquea;
+              const certificadoEditable = ins.estado === 'BORRADOR' && !accionesFiscalesCongeladas;
               const puedeVerComprobante = Boolean(ins.enlacePdf);
-              const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos);
+              const puedeVerNotaCredito = Boolean(ins.notaCreditoId && ins.notaCreditoPdfDisponible);
+              const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos) && !notaCreditoBloquea;
               const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos);
               const anulacionBloqueadaPorImporte = certificadoAnulacionBloqueadaPorImporte(ins)
                 && certificadoEmitidoVisible(ins)
@@ -922,11 +1050,19 @@ export function InicioView() {
                       <div className="text-xs text-slate-500">{ins.estado === 'EMITIDO' && ins.fechaEmision ? ins.fechaEmision : formatearFecha(ins.fechaCreacion)}</div>
                     </div>
                     <BadgeEstado value={estadoCertificadoPanel(ins)} />
+                    {notaCreditoExiste(ins) && (
+                      <BadgeEstado value={ins.estadoNotaCredito} />
+                    )}
                   </div>
 
                   {anulacionPendiente && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
                       Pendiente de revisión · las acciones tributarias están congeladas.
+                    </div>
+                  )}
+                  {notaCreditoBloquea && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                      Nota de Crédito {etiquetaEstadoNotaCredito(ins.estadoNotaCredito)} · operaciones fiscales bloqueadas.
                     </div>
                   )}
                   
@@ -955,7 +1091,7 @@ export function InicioView() {
                     </div>
                   </div>
 
-                  {((!certificadoEditable && !solicitudCompletada) || puedeVerComprobante) && (
+                  {((!certificadoEditable && !solicitudCompletada) || puedeVerComprobante || puedeVerNotaCredito) && (
                     <div className="pt-3 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       {!certificadoEditable && !solicitudCompletada && (
                         <button
@@ -973,6 +1109,15 @@ export function InicioView() {
                           onClick={() => void verComprobante(ins.id)}
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
                         ><FileText size={16} /> PDF</button>
+                      )}
+                      {puedeVerNotaCredito && ins.notaCreditoId && (
+                        <button
+                          type="button"
+                          disabled={accionEnProceso === ins.id}
+                          onClick={() => void verNotaCredito(ins.id, Number(ins.notaCreditoId))}
+                          title="Ver / Descargar nota de crédito"
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+                        ><FileText size={16} /> Nota de crédito</button>
                       )}
                     </div>
                   )}
@@ -1023,7 +1168,7 @@ export function InicioView() {
                           onClick={() => abrirSolicitudExistente(ins)}
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
                         >
-                          <ClipboardX size={16} /> {etiquetaSolicitudAnulacion(solicitudEstado)}
+                          <ClipboardX size={16} /> {etiquetaSolicitudOperacionPanel(ins)}
                         </button>
                       )}
                       {!solicitudActiva && accionesCongeladas && !solicitudCompletada && (
@@ -1087,7 +1232,11 @@ export function InicioView() {
         abierto={certificadoSolicitudId !== null}
         certificadoId={certificadoSolicitudId}
         solicitudId={solicitudSolicitadaId}
-        onCerrar={() => { setCertificadoSolicitudId(null); setSolicitudSolicitadaId(null); }}
+        tipoSolicitudInicial={solicitudNotaCreditoMotivo ? 'EMITIR_NOTA_CREDITO' : 'ANULAR_AMBOS'}
+        motivoNotaCredito={solicitudNotaCreditoMotivo}
+        motivoNotaCreditoItemIndice={solicitudNotaCreditoItemIndice}
+        motivoNotaCreditoDescripcion={solicitudNotaCreditoDescripcion}
+        onCerrar={() => { setCertificadoSolicitudId(null); setSolicitudSolicitadaId(null); setSolicitudNotaCreditoMotivo(null); setSolicitudNotaCreditoItemIndice(null); setSolicitudNotaCreditoDescripcion(''); }}
         onCreada={() => { void cargarInspecciones(page, pageSize); }}
       />
       <NotaCreditoModal
@@ -1097,6 +1246,15 @@ export function InicioView() {
         motivoBloqueoAnulacion={notaCreditoModal?.motivoBloqueoNota}
         onCerrar={() => setNotaCreditoModal(null)}
         onProcesada={() => cargarInspecciones(page, pageSize)}
+        onSolicitarAutorizacion={(motivoCodigo, itemIndice, descripcionCorregida) => {
+          const certificadoId = notaCreditoModal?.certificadoId || null;
+          setNotaCreditoModal(null);
+          setSolicitudSolicitadaId(null);
+          setSolicitudNotaCreditoMotivo(motivoCodigo);
+          setSolicitudNotaCreditoItemIndice(itemIndice ?? null);
+          setSolicitudNotaCreditoDescripcion(descripcionCorregida ?? '');
+          setCertificadoSolicitudId(certificadoId);
+        }}
       />
     </div>
   );

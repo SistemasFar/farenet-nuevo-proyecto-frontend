@@ -143,6 +143,7 @@ export interface FacturacionFaregas {
   aceptadaSunat: boolean | null;
   sunatDescription: NullableText;
   enlacePdf: NullableText;
+  tieneNotaCredito?: boolean;
   enlacePdfFaregas?: NullableText;
   enlaceXml: NullableText;
   enlaceCdr: NullableText;
@@ -280,8 +281,9 @@ export interface NotaElectronicaFaregas {
 }
 
 export interface ContextoNotaCreditoFaregas {
+    puedeEmitir: boolean;
   motivos: Array<{
-    codigo: '01' | '02' | '03';
+    codigo: '01' | '02' | '03' | '04' | '05' | '06' | '07' | '08' | '09' | '10' | '11' | '12' | '13';
     descripcion: string;
     requiereSolicitud: boolean;
     modificaDescripcion: boolean;
@@ -338,6 +340,7 @@ export interface ContextoNotaCreditoFaregas {
     usuarioDecision: NullableText;
     fechaSolicitud: string;
     fechaDecision: NullableText;
+      motivoCodigo: '01' | '02' | null;
     ejecutablePorUsuario: boolean;
   }>;
 }

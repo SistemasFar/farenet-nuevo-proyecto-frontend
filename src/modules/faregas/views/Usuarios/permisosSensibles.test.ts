@@ -12,6 +12,7 @@ describe('permisos sensibles del editor de perfiles', () => {
   it('marca como sensibles los permisos operativos de alto impacto', () => {
     expect(esPermisoSensible('FAREGAS_SOLICITUD_APROBAR')).toBe(true);
     expect(esPermisoSensible('FAREGAS_CERTIFICADO_RECTIFICAR_EJECUTAR')).toBe(true);
+    expect(esPermisoSensible('FAREGAS_ACCESO_GLOBAL_SEDES')).toBe(true);
     expect(esPermisoSensible('FAREGAS_SOLICITUD_CREAR')).toBe(false);
     expect(esPermisoSensible('MENU_USUARIOS')).toBe(false);
   });

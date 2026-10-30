@@ -4,6 +4,7 @@ export type TipoSolicitudOperacion =
   | 'ANULAR_CERTIFICADO'
   | 'ANULAR_COMPROBANTE'
   | 'ANULAR_AMBOS'
+  | 'EMITIR_NOTA_CREDITO'
   | 'RECTIFICAR_CERTIFICADO'
   | 'RECTIFICAR_COMPROBANTE'
   | 'RECTIFICAR_AMBOS';
@@ -282,6 +283,7 @@ export const faregasSolicitudesOperacionApi = {
     version: number,
     justificacion?: string,
     confirmarAutoaprobacion = false,
+    confirmarAutoejecucion = false,
   ): Promise<SolicitudOperacion> => {
     const respuesta = await faregasFetch(`/solicitudes-operacion/${id}/aprobar`, {
       method: 'POST',
@@ -289,6 +291,7 @@ export const faregasSolicitudesOperacionApi = {
         version,
         justificacion,
         ...(confirmarAutoaprobacion ? { confirmarAutoaprobacion: true } : {}),
+        ...(confirmarAutoejecucion ? { confirmarAutoejecucion: true } : {}),
       }),
     });
     return respuesta.data;
@@ -357,6 +360,23 @@ export const etiquetaEstadoSolicitud = (estado: EstadoSolicitudOperacion) => ({
 
 export const etiquetaEstadoSolicitudDetallado = (solicitud: SolicitudOperacion) => {
   const fiscal = String(solicitud.resultadoFiscal?.estado || '').trim().toUpperCase();
+  if (solicitud.tipoOperacion === 'EMITIR_NOTA_CREDITO') {
+    const etiquetasNota: Record<string, string> = {
+      AUTORIZADA_EN_COLA: 'Nota autorizada — en cola',
+      ESPERANDO_COMPROBANTE: 'Esperando confirmación fiscal del comprobante original',
+      EMITIENDO: 'Nota en emisión',
+      PENDIENTE: 'Nota pendiente de SUNAT',
+      PENDIENTE_SUNAT: 'Nota pendiente de SUNAT',
+      ACEPTADO: 'Nota aceptada',
+      ACEPTADA: 'Nota aceptada',
+      RECHAZADO: 'Nota rechazada',
+      RECHAZADA: 'Nota rechazada',
+      BLOQUEADA: 'Emisión bloqueada',
+      RESULTADO_INCIERTO: 'Resultado incierto — pendiente de consulta',
+      ERROR: 'Error al emitir la nota',
+    };
+    if (etiquetasNota[fiscal]) return etiquetasNota[fiscal];
+  }
   if (solicitud.tipoOperacion === 'ANULAR_AMBOS') {
     if (solicitud.estado === 'EN_EJECUCION' && [
       'PENDIENTE', 'PENDIENTE_SUNAT', 'EN_TRAMITE', 'BAJA_FISCAL_PENDIENTE',
@@ -373,6 +393,7 @@ export const etiquetaTipoSolicitud = (tipo: TipoSolicitudOperacion) => ({
   ANULAR_CERTIFICADO: 'Anular certificado',
   ANULAR_COMPROBANTE: 'Anular comprobante',
   ANULAR_AMBOS: 'Anular certificado y comprobante',
+  EMITIR_NOTA_CREDITO: 'Autorizar nota de crédito',
   RECTIFICAR_CERTIFICADO: 'Rectificar certificado',
   RECTIFICAR_COMPROBANTE: 'Rectificar comprobante',
   RECTIFICAR_AMBOS: 'Rectificar certificado y comprobante',

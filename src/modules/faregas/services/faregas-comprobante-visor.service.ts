@@ -171,3 +171,50 @@ export async function abrirPdfNubefact(
     return false;
   }
 }
+
+/**
+ * Abre el PDF oficial ya persistido de una nota de crédito. Esta operación es
+ * estrictamente de lectura: el endpoint no consulta ni reenvía el documento.
+ */
+export async function abrirPdfNotaCreditoNubefact(
+  certificadoId: number,
+  notaCreditoId: number,
+  options: AbrirPdfNubefactOptions = {},
+): Promise<boolean> {
+  const ventana = options.ventanaPrevia !== undefined
+    ? options.ventanaPrevia
+    : (typeof window !== 'undefined' && typeof window.open === 'function' ? window.open('', '_blank') : null);
+  if (ventana) ventana.opener = null;
+
+  try {
+    const blob = await faregasFetchBlob(
+      `/certificados/borradores/${certificadoId}/facturacion/notas/credito/${notaCreditoId}/pdf`,
+    );
+    const url = URL.createObjectURL(blob);
+    if (ventana && !ventana.closed) {
+      ventana.location.href = url;
+    } else if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.target = '_blank';
+      enlace.rel = 'noopener noreferrer';
+      enlace.click();
+    }
+    setTimeout(() => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // Ignorar error al revocar
+      }
+    }, 60_000);
+    return true;
+  } catch (error) {
+    ventana?.close();
+    await Swal.fire(
+      'No se pudo abrir la nota de crédito',
+      error instanceof Error ? error.message : 'El PDF oficial de la nota de crédito no está disponible.',
+      'error',
+    );
+    return false;
+  }
+}

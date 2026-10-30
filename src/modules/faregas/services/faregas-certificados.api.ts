@@ -170,8 +170,12 @@ export const faregasCertificadosApi = {
     fetchWithToken(`/certificados/borradores/${id}/facturacion/notas/contexto`),
   consultarFacturacionElectronica: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/consultar`, { method: 'POST' }),
   emitirNotaElectronica: (id: number, data: {
-    tipo: 'CREDITO'; motivoCodigo: '01' | '02' | '03'; sustento: string;
+    tipo: 'CREDITO'; motivoCodigo: '01' | '02' | '03' | '04' | '05' | '06' | '07' | '08' | '09' | '10' | '11' | '12' | '13'; sustento: string;
     solicitudId?: number; itemIndice?: number; descripcionCorregida?: string;
+    descuentoGlobal?: number; descuentoPorItemIndice?: number; descuentoPorItemMonto?: number;
+    devolucionTotal?: boolean; devolucionPorItemIndice?: number; bonificacion?: boolean;
+    disminucionValorMonto?: number; otrosConceptos?: string; ajustesIVAP?: string;
+    ajustesExportacion?: string; ajustesMontosFechas?: string;
   }) => fetchWithToken(`/certificados/borradores/${id}/facturacion/notas`, {
     method: 'POST', body: JSON.stringify(data)
   }),

@@ -601,8 +601,7 @@ export default function App() {
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
                     const userPerms = fUser?.permisos || [];
-                    const pId = String(fUser?.perfilId || fUser?.perfil_id || '').toUpperCase();
-                    return userPerms.includes('MENU_DASHBOARD') || userPerms.includes('DASHBOARD_GLOBAL') || userPerms.includes('DASHBOARD_SEDE') || pId === 'SISTEMAS' || pId === 'AMINISTRADOR' ? (
+                    return userPerms.includes('MENU_DASHBOARD') || userPerms.includes('DASHBOARD_GLOBAL') || userPerms.includes('DASHBOARD_SEDE') ? (
                       <FaregasDashboardView />
                     ) : (
                       <ForbiddenView />
@@ -661,7 +660,10 @@ export default function App() {
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
                     const userPerms = fUser?.permisos || [];
-                    return userPerms.includes('FAREGAS_SOLICITUD_VER') || userPerms.includes('FAREGAS_SOLICITUD_ADMINISTRAR') ? (
+                    return userPerms.includes('FAREGAS_SOLICITUD_VER')
+                      || userPerms.includes('FAREGAS_SOLICITUD_APROBAR')
+                      || userPerms.includes('FAREGAS_SOLICITUD_RECHAZAR')
+                      || userPerms.includes('FAREGAS_SOLICITUD_ADMINISTRAR') ? (
                       <FaregasSolicitudesOperacionView />
                     ) : (
                       <ForbiddenView />

@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, FileText, Loader2, PlayCircle, RefreshCw, ShieldAlert, X, XCircle } from 'lucide-react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import {
@@ -76,7 +76,8 @@ function DetalleSolicitud({
   const puedeRechazar = permisos.includes('FAREGAS_SOLICITUD_RECHAZAR')
     || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
   const esRectificacion = solicitud.tipoOperacion === 'RECTIFICAR_CERTIFICADO';
-  const bloqueoImporte = !esRectificacion && (
+  const esAutorizacionNota = solicitud.tipoOperacion === 'EMITIR_NOTA_CREDITO';
+  const bloqueoImporte = solicitud.tipoOperacion === 'ANULAR_AMBOS' && (
     solicitud.anulacionImporteCero === true
     || solicitud.anulacionImporteNoDeterminable === true
     || Boolean(detalle?.bloqueoImporte)
@@ -310,9 +311,13 @@ function DetalleSolicitud({
     const resultado = await Swal.fire({
       title: accion === 'aprobar' ? '¿Aprobar solicitud?' : accion === 'rechazar' ? '¿Rechazar solicitud?' : '¿Cancelar solicitud?',
       text: accion === 'aprobar'
-        ? esAutoaprobacion
-          ? 'Esta excepción quedará auditada. La solicitud sólo quedará aprobada y pendiente de ejecución; no se modificará ningún documento.'
-          : 'Quedará aprobada y pendiente de ejecución; no se modificará ningún documento.'
+        ? esAutorizacionNota
+          ? esAutoaprobacion
+            ? 'Esta excepción quedará auditada. Al aprobar, FAREGAS creará un único trabajo fiscal y lo procesará automáticamente.'
+            : 'Al aprobar, FAREGAS creará un único trabajo fiscal y lo procesará automáticamente.'
+          : esAutoaprobacion
+            ? 'Esta excepción quedará auditada. La solicitud sólo quedará aprobada y pendiente de ejecución; no se modificará ningún documento.'
+            : 'Quedará aprobada y pendiente de ejecución; no se modificará ningún documento.'
         : undefined,
       input: requiereTexto ? 'textarea' : undefined,
       inputLabel: requiereTexto ? 'Justificación obligatoria' : 'Justificación opcional',
@@ -345,13 +350,20 @@ function DetalleSolicitud({
           solicitud.version,
           texto || undefined,
           esAutoaprobacion,
+          esAutoaprobacion && esAutorizacionNota,
         )
         : accion === 'rechazar'
           ? await faregasSolicitudesOperacionApi.rechazar(solicitud.id, solicitud.version, texto)
           : await faregasSolicitudesOperacionApi.cancelar(solicitud.id, solicitud.version, texto);
       onActualizada(actualizada);
       await refrescar();
-      await Swal.fire('Decisión registrada', etiquetaEstadoSolicitud(actualizada.estado), 'success');
+      await Swal.fire(
+        'Decisión registrada',
+        accion === 'aprobar' && esAutorizacionNota
+          ? 'Nota autorizada. La ejecución automática quedó encolada.'
+          : etiquetaEstadoSolicitud(actualizada.estado),
+        'success'
+      );
     } catch (error) {
       await Swal.fire('No se pudo registrar', error instanceof Error ? error.message : 'Intente nuevamente.', 'error');
     } finally { setProcesando(false); }
@@ -361,8 +373,8 @@ function DetalleSolicitud({
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true">
       <div className="max-h-[95vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div className="sticky top-0 z-10 flex items-start justify-between bg-[#052A79] px-5 py-4 text-white">
-          <div><h2 className="text-lg font-bold">{esRectificacion ? 'Solicitud de rectificación' : 'Solicitud de anulación'} #{solicitud.id}</h2><p className="text-xs text-blue-100">{esRectificacion ? 'Corrección técnica con conservación de número, fecha original y comprobante' : 'Detalle y trazabilidad de la anulación total'}</p></div>
-          <button type="button" onClick={onCerrar} className="rounded p-1 hover:bg-white/10"><X /></button>
+          <div><h2 className="text-lg font-bold">{esRectificacion ? 'Solicitud de rectificación' : esAutorizacionNota ? 'Autorización de nota de crédito' : 'Solicitud de anulación'} #{solicitud.id}</h2><p className="text-xs text-blue-100">{esRectificacion ? 'Corrección técnica con conservación de número, fecha original y comprobante' : esAutorizacionNota ? 'Autoriza la emisión fiscal desde FAREGAS sin anular el certificado técnico' : 'Detalle y trazabilidad de la anulación total'}</p></div>
+          <button type="button" onClick={onCerrar} aria-label="Cerrar solicitud" className="rounded p-1 hover:bg-white/10"><X /></button>
         </div>
         <div className="space-y-4 p-5">
           <div className="grid gap-3 md:grid-cols-4">
@@ -490,12 +502,14 @@ function DetalleSolicitud({
             {enlaceComprobante && <a href={enlaceComprobante} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white"><FileText size={16} /> Ver comprobante</a>}
             {!esRectificacion && solicitud.certificadoId && ['EN_EJECUCION', 'REQUIERE_INTERVENCION', 'ERROR'].includes(solicitud.estado) && <button type="button" disabled={sincronizando} onClick={() => void sincronizarEstadoFiscal()} className="flex items-center gap-1 rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-800 disabled:opacity-50">{sincronizando ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Sincronizar estado fiscal</button>}
             {puedeEjecutar && <button type="button" disabled={procesando} onClick={() => void (esRectificacion ? ejecutarRectificacion() : ejecutarAnulacion())} className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${esAutoejecucion ? 'bg-amber-700' : esRectificacion ? 'bg-red-700' : 'bg-[#052A79]'}`}>{esAutoejecucion ? <ShieldAlert size={16} /> : esRectificacion ? <FileText size={16} /> : <PlayCircle size={16} />} {esAutoejecucion ? 'Autoejecutar (excepcional)' : esRectificacion ? 'Ejecutar rectificación' : ['REQUIERE_INTERVENCION', 'ERROR'].includes(solicitud.estado) ? 'Reintentar ejecución' : 'Ejecutar anulación total'}</button>}
-            {['ANULAR_AMBOS', 'RECTIFICAR_CERTIFICADO'].includes(solicitud.tipoOperacion) && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && <button type="button" disabled={procesando} onClick={() => void decidir('cancelar')} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700">Cancelar mi solicitud</button>}
-            {['ANULAR_AMBOS', 'RECTIFICAR_CERTIFICADO'].includes(solicitud.tipoOperacion) && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeRechazar && <button type="button" disabled={procesando} onClick={() => void decidir('rechazar')} className="flex items-center gap-1 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white"><XCircle size={16} /> Rechazar</button>}
+            {['ANULAR_AMBOS', 'EMITIR_NOTA_CREDITO', 'RECTIFICAR_CERTIFICADO'].includes(solicitud.tipoOperacion) && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && <button type="button" disabled={procesando} onClick={() => void decidir('cancelar')} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700">Cancelar mi solicitud</button>}
+            {['ANULAR_AMBOS', 'EMITIR_NOTA_CREDITO', 'RECTIFICAR_CERTIFICADO'].includes(solicitud.tipoOperacion) && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeRechazar && <button type="button" disabled={procesando} onClick={() => void decidir('rechazar')} className="flex items-center gap-1 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white"><XCircle size={16} /> Rechazar</button>}
             {solicitud.tipoOperacion === 'ANULAR_AMBOS' && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeAprobarYEjecutar && <button type="button" id="btn-aprobar-y-ejecutar-anulacion-total" disabled={procesando} onClick={() => void aprobarYEjecutarAnulacion()} className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{procesando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Aprobar y ejecutar anulación total</button>}
             {solicitud.tipoOperacion === 'RECTIFICAR_CERTIFICADO' && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeAprobarSolicitud && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Aprobar solicitud</button>}
+            {solicitud.tipoOperacion === 'EMITIR_NOTA_CREDITO' && solicitud.estado === 'PENDIENTE_APROBACION' && !esPropia && puedeAprobarSolicitud && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Aprobar autorización</button>}
             {solicitud.tipoOperacion === 'ANULAR_AMBOS' && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && puedeAprobarYEjecutar && <button type="button" id="btn-autoaprobar-y-ejecutar-anulacion-total" disabled={procesando} onClick={() => void aprobarYEjecutarAnulacion()} className="flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{procesando ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Autoaprobar y ejecutar anulación total</button>}
             {solicitud.tipoOperacion === 'RECTIFICAR_CERTIFICADO' && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && puedeAprobarSolicitud && puedeAutoaprobar && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Autoaprobar excepcionalmente</button>}
+            {solicitud.tipoOperacion === 'EMITIR_NOTA_CREDITO' && solicitud.estado === 'PENDIENTE_APROBACION' && esPropia && puedeAprobarSolicitud && puedeAutoaprobar && <button type="button" disabled={procesando} onClick={() => void decidir('aprobar')} className="flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white"><CheckCircle2 size={16} /> Autoaprobar autorización</button>}
           </div>
           {solicitud.estado === 'PENDIENTE_APROBACION' && motivoBloqueoAprobacion && (
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
@@ -512,6 +526,9 @@ function DetalleSolicitud({
 export function SolicitudesOperacionView() {
   const { permisos, plantaKey } = useOutletContext<MainLayoutContext>();
   const puedeVer = permisos.includes('FAREGAS_SOLICITUD_VER') || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
+  const puedeAbrirDetalle = puedeVer
+    || permisos.includes('FAREGAS_SOLICITUD_APROBAR')
+    || permisos.includes('FAREGAS_SOLICITUD_RECHAZAR');
   const [solicitudes, setSolicitudes] = useState<SolicitudOperacion[]>([]);
   const [seleccionada, setSeleccionada] = useState<SolicitudOperacion | null>(null);
   const [loading, setLoading] = useState(false);
@@ -522,6 +539,14 @@ export function SolicitudesOperacionView() {
   const [filtros, setFiltros] = useState({ fechaDesde: hoyLocal(), fechaHasta: hoyLocal(), estado: '', tipoOperacion: '', usuarioSolicitante: '', plantaKey: '' });
 
   const { id: idParam } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+
+  const cerrarDetalle = useCallback(() => {
+    setSeleccionada(null);
+    if (idParam) {
+      navigate('/faregas/auditoria/solicitudes', { replace: true });
+    }
+  }, [idParam, navigate]);
 
   const cargar = useCallback(async (pagina = page) => {
     if (!puedeVer) return;
@@ -545,15 +570,21 @@ export function SolicitudesOperacionView() {
   useEffect(() => {
     if (!idParam || seleccionada) return;
     const solicitud = solicitudes.find((s) => String(s.id) === idParam);
-    if (solicitud) {
-      setSeleccionada(solicitud);
-    }
-  }, [idParam, solicitudes, seleccionada]);
+    if (!puedeAbrirDetalle) return;
+    const detalle = solicitud
+      ? Promise.resolve(solicitud)
+      : faregasSolicitudesOperacionApi.obtener(Number(idParam));
+    detalle
+      .then(setSeleccionada)
+      .catch((err) => setError(err instanceof Error ? err.message : 'No se pudo abrir la solicitud.'));
+  }, [idParam, solicitudes, seleccionada, puedeAbrirDetalle]);
 
   const estados = useMemo<EstadoSolicitudOperacion[]>(() => ['PENDIENTE_APROBACION', 'APROBADA', 'RECHAZADA', 'CANCELADA', 'EN_EJECUCION', 'COMPLETADA', 'ERROR', 'REQUIERE_INTERVENCION'], []);
-  const tipos = useMemo<TipoSolicitudOperacion[]>(() => ['ANULAR_AMBOS', 'ANULAR_CERTIFICADO', 'ANULAR_COMPROBANTE', 'RECTIFICAR_CERTIFICADO'], []);
+  const tipos = useMemo<TipoSolicitudOperacion[]>(() => ['ANULAR_AMBOS', 'EMITIR_NOTA_CREDITO', 'ANULAR_CERTIFICADO', 'ANULAR_COMPROBANTE', 'RECTIFICAR_CERTIFICADO'], []);
 
-  if (!puedeVer) return <div className="m-6 rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">No tiene permiso para consultar solicitudes administrativas.</div>;
+  if ((!idParam && !puedeVer) || (idParam && !puedeAbrirDetalle)) {
+    return <div className="m-6 rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">No tiene permiso para consultar solicitudes administrativas.</div>;
+  }
 
   return (
     <div className="min-h-full bg-slate-50 p-4 md:p-6">
@@ -587,7 +618,7 @@ export function SolicitudesOperacionView() {
           <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-slate-600"><span>{total} solicitudes</span><div className="flex items-center gap-2"><button disabled={page <= 1} onClick={() => void cargar(page - 1)} className="rounded border p-2 disabled:opacity-40"><ChevronLeft size={16} /></button><span>Página {page} de {totalPages}</span><button disabled={page >= totalPages} onClick={() => void cargar(page + 1)} className="rounded border p-2 disabled:opacity-40"><ChevronRight size={16} /></button></div></div>
         </div>
       </div>
-      {seleccionada && <DetalleSolicitud solicitud={seleccionada} permisos={permisos} onCerrar={() => setSeleccionada(null)} onActualizada={(actualizada) => { setSeleccionada(actualizada); setSolicitudes((actuales) => actuales.map((item) => item.id === actualizada.id ? actualizada : item)); }} />}
+      {seleccionada && <DetalleSolicitud solicitud={seleccionada} permisos={permisos} onCerrar={cerrarDetalle} onActualizada={(actualizada) => { setSeleccionada((actual) => actual?.id === actualizada.id ? actualizada : actual); setSolicitudes((actuales) => actuales.map((item) => item.id === actualizada.id ? actualizada : item)); }} />}
     </div>
   );
 }

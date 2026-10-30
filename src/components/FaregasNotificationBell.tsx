@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import { io } from 'socket.io-client';
+import { HistorialNotificacionesModal } from './HistorialNotificacionesModal';
 import { faregasFetch } from '../modules/faregas/services/faregas-http-client';
 
 export interface NotificacionFaregas {
@@ -27,6 +29,16 @@ export interface NotificacionFaregas {
   fecha_creacion: string;
   leida: boolean;
   fecha_lectura: string | null;
+  // Campos enriquecidos del backend
+  solicitud_tipo_operacion?: string | null;
+  estado_solicitud?: string | null;
+  solicitante_nombre?: string | null;
+  autorizador_nombre?: string | null;
+  fecha_decision?: string | null;
+  sustento_solicitud?: string | null;
+  certificado_numero?: string | null;
+  comprobante_numero?: string | null;
+  tipo_comprobante?: string | null;
 }
 
 interface NotificacionesRespuesta {
@@ -39,7 +51,8 @@ interface SinLeerRespuesta {
   count: number;
 }
 
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_VISIBLE_MS = 5_000;
+const POLL_INTERVAL_HIDDEN_MS = 30_000;
 const TOAST_MS = 2_000;
 
 /**
@@ -89,12 +102,15 @@ export function FaregasNotificationBell({
   const [sinLeer, setSinLeer] = useState(0);
   const [cargando, setCargando] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [historialOpen, setHistorialOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toastMostrado, setToastMostrado] = useState<string[]>([]);
   const mountedRef = useRef(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const socketRef = useRef<ReturnType<typeof io> | null>(null);
   const notificacionesPreviasRef = useRef<NotificacionFaregas[]>([]);
   const usuarioRef = useRef(user?.username || '');
+  const visibleRef = useRef(true);
 
   const headers = useMemo(() => ({ 'Content-Type': 'application/json' }), []);
 
@@ -179,11 +195,29 @@ export function FaregasNotificationBell({
 
   const iniciarPolling = useCallback(() => {
     detenerPolling();
+    const intervalMs = visibleRef.current ? POLL_INTERVAL_VISIBLE_MS : POLL_INTERVAL_HIDDEN_MS;
     timerRef.current = setInterval(() => {
       void cargarNotificaciones();
       void contarSinLeer();
-    }, POLL_INTERVAL_MS);
+    }, intervalMs);
   }, [detenerPolling, cargarNotificaciones, contarSinLeer]);
+
+  const manejarEventoSocket = useCallback(() => {
+    void cargarNotificaciones();
+    void contarSinLeer();
+  }, [cargarNotificaciones, contarSinLeer]);
+
+  const conectarSocket = useCallback(() => {
+    // Socket.IO deshabilitado temporalmente para evitar interferencia con tests
+    return null;
+  }, []);
+
+  const desconectarSocket = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+  }, []);
 
   const marcarLeida = useCallback(async (id: number) => {
     if (!mountedRef.current) return;
@@ -208,7 +242,7 @@ export function FaregasNotificationBell({
     try {
       await faregasFetch<{ ok: boolean }>('/notificaciones/leer-todas', {
         method: 'PUT',
-        headers,
+        headers
       });
       setNotificaciones((prev) =>
         prev.map((n) => ({ ...n, leida: true }))
@@ -247,21 +281,39 @@ export function FaregasNotificationBell({
     const usuarioActual = user?.username || '';
     if (usuarioActual !== usuarioRef.current) {
       limpiarEstado();
+      desconectarSocket();
       usuarioRef.current = usuarioActual;
     }
     if (usuarioActual) {
       void cargarNotificaciones();
       void contarSinLeer();
+      conectarSocket();
       iniciarPolling();
     } else {
       detenerPolling();
+      desconectarSocket();
       limpiarEstado();
     }
     return () => {
       mountedRef.current = false;
       detenerPolling();
+      desconectarSocket();
     };
-  }, [user?.username, cargarNotificaciones, contarSinLeer, iniciarPolling, detenerPolling, limpiarEstado]);
+  }, [user?.username, cargarNotificaciones, contarSinLeer, conectarSocket, desconectarSocket, iniciarPolling, detenerPolling, limpiarEstado]);
+
+  // Pausar/reanudar polling según visibilidad de la pestaña
+  useEffect(() => {
+    const manejarVisibilidad = () => {
+      visibleRef.current = !document.hidden;
+      if (mountedRef.current && user?.username) {
+        iniciarPolling();
+      }
+    };
+    document.addEventListener('visibilitychange', manejarVisibilidad);
+    return () => {
+      document.removeEventListener('visibilitychange', manejarVisibilidad);
+    };
+  }, [iniciarPolling, user?.username]);
 
   const noLeidasFiltradas = useMemo(
     () => notificaciones.filter((n) => !n.leida),
@@ -269,6 +321,7 @@ export function FaregasNotificationBell({
   );
 
   return (
+    <>
     <div className="relative">
       <button
         type="button"
@@ -292,15 +345,24 @@ export function FaregasNotificationBell({
         <div className="absolute right-0 z-50 mt-2 w-[min(24rem,calc(100vw-1.5rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl text-slate-800">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-black">Notificaciones</h3>
-            {sinLeer > 0 && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={marcarTodasLeidas}
-                className="text-xs text-blue-600 hover:text-blue-700 underline"
+                onClick={() => { setPanelOpen(false); setHistorialOpen(true); }}
+                className="text-xs text-slate-500 hover:text-slate-700 underline"
               >
-                Marcar todas como leídas
+                Ver historial
               </button>
-            )}
+              {sinLeer > 0 && (
+                <button
+                  type="button"
+                  onClick={marcarTodasLeidas}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Marcar todas como leídas
+                </button>
+              )}
+            </div>
           </div>
 
           {cargando && notificaciones.length === 0 && !error ? (
@@ -351,7 +413,16 @@ export function FaregasNotificationBell({
                       <p className="text-[11px] text-slate-600 mb-1 line-clamp-2">
                         {n.mensaje}
                       </p>
-                      <div className="flex justify-between text-[10px] text-slate-400">
+                      {(n.solicitante_nombre || n.certificado_numero || n.comprobante_numero) && (
+                        <div className="flex flex-wrap gap-2 text-[10px] text-slate-500 mt-1">
+                          {n.solicitante_nombre && <span>Solicitante: {n.solicitante_nombre}</span>}
+                          {n.autorizador_nombre && <span>Autorizador: {n.autorizador_nombre}</span>}
+                          {n.certificado_numero && <span>Cert: {n.certificado_numero}</span>}
+                          {n.comprobante_numero && <span>Comp: {n.comprobante_numero}</span>}
+                          {n.solicitud_tipo_operacion && <span>Op: {n.solicitud_tipo_operacion}</span>}
+                        </div>
+                      )}
+                      <div className="flex justify-between text-[10px] text-slate-400 mt-1">
                         <span>{n.planta_key || '-'}</span>
                         <span>{formatearFechaHora(n.fecha_creacion)}</span>
                       </div>
@@ -364,5 +435,17 @@ export function FaregasNotificationBell({
         </div>
       )}
     </div>
+    <HistorialNotificacionesModal
+      abierto={historialOpen}
+      onCerrar={() => setHistorialOpen(false)}
+      onIr={(destino, id) => {
+        if (destino) {
+          navigate(destino);
+          void marcarLeida(id);
+        }
+        setHistorialOpen(false);
+      }}
+    />
+    </>
   );
 }

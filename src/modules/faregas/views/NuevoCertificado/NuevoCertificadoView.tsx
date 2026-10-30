@@ -114,6 +114,38 @@ const fechaLocalIso = (fecha = new Date()) => {
   const dia = String(fecha.getDate()).padStart(2, '0');
   return `${anio}-${mes}-${dia}`;
 };
+
+/**
+ * Calcula la fecha de vigencia automática: exactamente un año calendario
+ * después de la fecha actual en zona horaria America/Lima.
+ * Maneja años bisiestos: 29 de febrero → 28 de febrero en año no bisiesto.
+ * Retorna cadena YYYY-MM-DD.
+ */
+const calcularVigenciaHasta = (): string => {
+  const hoyPeruStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+
+  const [year, month, day] = hoyPeruStr.split('-').map(Number);
+  const anioSiguiente = year + 1;
+
+  let diaFinal = day;
+  let mesFinal = month;
+
+  if (month === 2 && day === 29) {
+    const esBisiesto = (anioSiguiente % 4 === 0 && anioSiguiente % 100 !== 0) || anioSiguiente % 400 === 0;
+    if (!esBisiesto) {
+      diaFinal = 28;
+    }
+  }
+
+  return `${String(anioSiguiente).padStart(4, '0')}-${String(mesFinal).padStart(2, '0')}-${String(diaFinal).padStart(2, '0')}`;
+};
+
+export { calcularVigenciaHasta };
 const enteroValue = (value: unknown, maximoDigitos: number) =>
   normalizarEnteroCertificado(textValue(value), maximoDigitos);
 
@@ -221,7 +253,7 @@ const construirEstadoVehiculoRecuperado = (
     formGlp = {
       ...actual.formGlp,
       tallerAutorizadoId: glp.taller_autorizado_id || actual.formGlp.tallerAutorizadoId,
-      fechaVigencia: textValue(glp.vigencia_hasta).slice(0, 10) || actual.formGlp.fechaVigencia,
+      fechaVigencia: actual.formGlp.fechaVigencia || textValue(glp.vigencia_hasta).slice(0, 10),
       expedienteTecnico: glp.expediente_tecnico || actual.formGlp.expedienteTecnico,
       combustiblePosterior: glp.combustible_posterior || actual.formGlp.combustiblePosterior || '',
       pesoNetoPosterior: glp.peso_neto_posterior == null
@@ -250,7 +282,7 @@ const construirEstadoVehiculoRecuperado = (
     formGnv = {
       ...actual.formGnv,
       tallerAutorizadoId: gnv.taller_autorizado_id || actual.formGnv.tallerAutorizadoId,
-      fechaVigencia: textValue(gnv.vigencia_hasta).slice(0, 10) || actual.formGnv.fechaVigencia,
+      fechaVigencia: actual.formGnv.fechaVigencia || textValue(gnv.vigencia_hasta).slice(0, 10),
       expedienteTecnico: gnv.expediente_tecnico || actual.formGnv.expedienteTecnico,
       observaciones: gnv.observaciones || actual.formGnv.observaciones || '',
       combustiblePosterior: gnv.combustible_posterior || actual.formGnv.combustiblePosterior || '',
@@ -450,8 +482,8 @@ function NuevoCertificadoWizard() {
 
   // Form State (Vehículo)
   const [formPropietario, setFormPropietario] = useState<any>({});
-  const [formGlp, setFormGlp] = useState<any>({});
-  const [formGnv, setFormGnv] = useState<any>({});
+  const [formGlp, setFormGlp] = useState<any>({ fechaVigencia: calcularVigenciaHasta() });
+  const [formGnv, setFormGnv] = useState<any>({ fechaVigencia: calcularVigenciaHasta() });
   const [formConformidad, setFormConformidad] = useState<any>({});
   const [formatoFormulario, setFormatoFormulario] = useState<FormularioFormatoDinamicoFaregas | null>(null);
   const [formatoValores, setFormatoValores] = useState<Record<string, string>>({});
@@ -906,9 +938,10 @@ function NuevoCertificadoWizard() {
             const gnv = detalle.data?.gnv;
             if (gnv) {
               setFormCaja(prev => ({ ...prev, modalidadCertificado: gnv.modalidad || '' }));
-              setFormGnv({
-                tallerAutorizadoId: gnv.taller_autorizado_id || '',
-                fechaVigencia: textValue(gnv.vigencia_hasta).slice(0, 10),
+              setFormGnv((prev: any) => ({
+                ...prev,
+                tallerAutorizadoId: gnv.taller_autorizado_id || prev.tallerAutorizadoId,
+                fechaVigencia: prev.fechaVigencia || textValue(gnv.vigencia_hasta).slice(0, 10),
                 modalidad: gnv.modalidad || '',
                 numeroChip: gnv.numero_chip || '',
                 observaciones: gnv.observaciones || '',
@@ -931,17 +964,18 @@ function NuevoCertificadoWizard() {
                   };
                 }),
                 verificaciones: (detalle.data?.verificaciones || []).map(mapVerificacionBorrador),
-              });
+              }));
             }
           } else if (res.data.tipo?.clave === 'GLP_ANUAL') {
             const detalle = await faregasCertificadosApi.obtenerGlp(certificadoId);
             const glp = detalle.data?.glp;
             if (glp) {
               setFormCaja(prev => ({ ...prev, modalidadCertificado: glp.modalidad || '' }));
-              setFormGlp({
-                tallerAutorizadoId: glp.taller_autorizado_id || '',
-                fechaVigencia: textValue(glp.vigencia_hasta).slice(0, 10),
-                expedienteTecnico: glp.expediente_tecnico || '',
+              setFormGlp((prev: any) => ({
+                ...prev,
+                tallerAutorizadoId: glp.taller_autorizado_id || prev.tallerAutorizadoId,
+                fechaVigencia: prev.fechaVigencia || textValue(glp.vigencia_hasta).slice(0, 10),
+                expedienteTecnico: glp.expediente_tecnico || prev.expedienteTecnico,
                 modalidad: glp.modalidad || '',
                 combustiblePosterior: glp.combustible_posterior || '',
                 pesoNetoPosterior: enteroValue(glp.peso_neto_posterior, 6),
@@ -957,7 +991,7 @@ function NuevoCertificadoWizard() {
                   numeroSerie: componente.numero_serie || '',
                 })),
                 verificaciones: (detalle.data?.verificaciones || []).map(mapVerificacionBorrador),
-              });
+              }));
             }
           } else if (res.data.tipo?.clave === 'CONFORMIDAD') {
             const detalle = await faregasCertificadosApi.obtenerConformidad(certificadoId);
@@ -1175,7 +1209,7 @@ function NuevoCertificadoWizard() {
           setFormGlp((prev: any) => ({
             ...prev,
             tallerAutorizadoId: glp.taller_autorizado_id || prev.tallerAutorizadoId,
-            fechaVigencia: textValue(glp.vigencia_hasta).slice(0, 10) || prev.fechaVigencia,
+            fechaVigencia: prev.fechaVigencia || textValue(glp.vigencia_hasta).slice(0, 10),
             expedienteTecnico: glp.expediente_tecnico || prev.expedienteTecnico,
             componentes: (glp.componentes || []).map((componente: any) => ({
               orden: Number(componente.orden),
@@ -1202,7 +1236,7 @@ function NuevoCertificadoWizard() {
           setFormGnv((prev: any) => ({
             ...prev,
             tallerAutorizadoId: gnv.taller_autorizado_id || prev.tallerAutorizadoId,
-            fechaVigencia: textValue(gnv.vigencia_hasta).slice(0, 10) || prev.fechaVigencia,
+            fechaVigencia: prev.fechaVigencia || textValue(gnv.vigencia_hasta).slice(0, 10),
             // Si el backend devuelve NULL no se pisa lo que el operador ya
             // escribió en pantalla; sólo se hidrata cuando hay valor guardado.
             observaciones: gnv.observaciones || prev.observaciones || '',
@@ -2623,6 +2657,7 @@ function NuevoCertificadoWizard() {
     certificadoId
     && certificadoEstado === 'EMITIDO'
     && !modoRectificacion
+    && !facturacion?.tieneNotaCredito
   );
 
   return (
@@ -3110,6 +3145,16 @@ function NuevoCertificadoWizard() {
                   onClick={() => navigate(`/faregas/certificados/${certificadoId}/rectificar`)}
                   className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-600 px-5 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-red-700"
                   title="Rectificar directamente el certificado sin reemitir el comprobante"
+                >
+                  <PencilLine className="h-4 w-4" /> RECTIFICAR CERTIFICADO
+                </button>
+              )}
+              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && !puedeMostrarBotonRectificar && facturacion?.tieneNotaCredito && (
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-100 px-5 py-2.5 text-xs font-black text-slate-400 shadow-sm cursor-not-allowed"
+                  title="No se puede rectificar este certificado porque su comprobante ya tiene una nota de crédito emitida."
                 >
                   <PencilLine className="h-4 w-4" /> RECTIFICAR CERTIFICADO
                 </button>

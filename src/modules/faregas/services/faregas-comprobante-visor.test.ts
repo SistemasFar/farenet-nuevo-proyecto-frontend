@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  abrirPdfNotaCreditoNubefact,
   abrirPdfNubefact,
   descargarCertificadoFaregas,
   descargarPdfNubefact,
@@ -94,6 +95,27 @@ describe('faregas-comprobante-visor.service', () => {
       'PDF_NUBEFACT_NO_DISPONIBLE',
       'error',
     );
+  });
+
+  it('abre la nota de crédito persistida sin invocar un endpoint de emisión', async () => {
+    const mockBlob = new Blob(['%PDF-1.4 nota'], { type: 'application/pdf' });
+    const spyFetchBlob = vi.spyOn(httpClient, 'faregasFetchBlob').mockResolvedValue(mockBlob);
+    const mockVentana = {
+      location: { href: '' },
+      closed: false,
+      opener: null,
+      close: vi.fn(),
+    } as unknown as Window;
+
+    const resultado = await abrirPdfNotaCreditoNubefact(347, 8, { ventanaPrevia: mockVentana });
+
+    expect(spyFetchBlob).toHaveBeenCalledOnce();
+    expect(spyFetchBlob).toHaveBeenCalledWith(
+      '/certificados/borradores/347/facturacion/notas/credito/8/pdf',
+    );
+    expect(String(spyFetchBlob.mock.calls[0]?.[0])).not.toContain('/emitir');
+    expect(mockVentana.location.href).toBe('blob:http://localhost/test-blob');
+    expect(resultado).toBe(true);
   });
 
   it.each([

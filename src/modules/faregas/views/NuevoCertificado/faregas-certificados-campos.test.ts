@@ -386,7 +386,7 @@ describe('Validacion frontend de campos visibles y obligatorios', () => {
 
   it('GNV Anual: exige fecha de vigencia y verificaciones anuales', () => {
     const obligatorios = camposObligatoriosVisibles('GNV_ANUAL', 'ANUAL');
-    expect(obligatorios).toContain('gnv.fechaVigencia');
+    expect(obligatorios).not.toContain('gnv.fechaVigencia');
     expect(obligatorios).not.toContain('gnv.combustiblePosterior');
     expect(obligatorios).not.toContain('gnv.pesoNetoPosterior');
 

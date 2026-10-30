@@ -7,6 +7,9 @@ import {
   filtrarPermisosDelCatalogo,
   filtrarPermisosVigentes,
 } from './permisosSensibles';
+import {
+  perfilTieneAccesoGlobalSedes,
+} from './acceso-global-sedes';
 
 import {
   atributosDocumento,
@@ -242,15 +245,11 @@ export function UsuariosView() {
   };
 
   const handlePerfilUsuarioChange = (newPerfilId: string) => {
-    if (newPerfilId === 'SISTEMAS') {
-      setFormData({ ...formData, perfil_id: newPerfilId, sedes: [] });
-    } else {
-      const perfilObj = perfiles.find(p => p.clave === newPerfilId);
-      const allowedSedes = perfilObj?.sedes || [];
-      const currentSedes = formData.sedes || [];
-      const validSedes = currentSedes.filter((s: string) => allowedSedes.includes(s));
-      setFormData({ ...formData, perfil_id: newPerfilId, sedes: validSedes });
-    }
+    const perfilObj = perfiles.find(p => p.clave === newPerfilId);
+    const allowedSedes = perfilObj?.sedes || [];
+    const currentSedes = formData.sedes || [];
+    const validSedes = currentSedes.filter((s: string) => allowedSedes.includes(s));
+    setFormData({ ...formData, perfil_id: newPerfilId, sedes: validSedes });
   };
 
   const handleDeleteUsuario = async (username: string) => {
@@ -363,6 +362,8 @@ export function UsuariosView() {
     'FAREGAS_CERTIFICADO_ANULAR_EJECUTAR',
     'FAREGAS_CERTIFICADO_RECTIFICAR_EJECUTAR',
     'FAREGAS_NOTA_CREDITO',
+    'FAREGAS_NOTA_CREDITO_APROBAR',
+    'FAREGAS_NOTA_CREDITO_AUTOAPROBAR',
     'FAREGAS_ANULAR_COMPROBANTE'
   ] as const;
   const PERMISO_INICIO = 'MENU_INICIO';
@@ -377,6 +378,8 @@ export function UsuariosView() {
     FAREGAS_CERTIFICADO_ANULAR_EJECUTAR: 'Ejecutar anulación autorizada',
     FAREGAS_CERTIFICADO_RECTIFICAR_EJECUTAR: 'Rectificar certificado directamente',
     FAREGAS_NOTA_CREDITO: 'Emitir nota de crédito',
+    FAREGAS_NOTA_CREDITO_APROBAR: 'Aprobar y rechazar notas de crédito',
+    FAREGAS_NOTA_CREDITO_AUTOAPROBAR: 'Autoaprobar nota de crédito propia (excepcional)',
     FAREGAS_ANULAR_COMPROBANTE: 'Anular comprobante electrónico'
   };
 
@@ -586,7 +589,7 @@ export function UsuariosView() {
                       <td className="px-4 py-3">{u.user_type}</td>
                       <td className="px-4 py-3">{u.perfil_id}</td>
                       <td className="px-4 py-3">
-                        {u.perfil_id === 'SISTEMAS' ? (
+                        {perfilTieneAccesoGlobalSedes(perfiles, u.perfil_id) ? (
                           <span className="text-xs font-semibold text-gray-500">Todas</span>
                         ) : (
                           <div
@@ -1026,7 +1029,7 @@ export function UsuariosView() {
                                     </select>
                                 </div>
                                 <div>
-                                    {formData.perfil_id === 'SISTEMAS' ? (
+                                    {perfilTieneAccesoGlobalSedes(perfiles, formData.perfil_id) ? (
                                     <>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Asignadas</label>
                                         <div className="text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded p-3 text-center">

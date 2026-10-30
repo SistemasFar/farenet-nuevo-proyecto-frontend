@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+
+// Preservar el comportamiento original de la regla de 24 horas en las pruebas:
+// VITE_NOTA_CREDITO_SIN_PLAZO_24H no está definido (o es false) por defecto.
+try {
+  import.meta.env.VITE_NOTA_CREDITO_SIN_PLAZO_24H = undefined;
+} catch (_e) {
+  // import.meta.env puede ser de solo lectura en algunos entornos de prueba
+}
+
 import {
   tieneCertificadoDefinitivo,
   certificadoEmitidoVisible,
@@ -8,6 +17,7 @@ import {
   esSolicitudActivaAnulacion,
   esSolicitudCompletadaAnulacion,
   etiquetaSolicitudAnulacion,
+  etiquetaSolicitudOperacionPanel,
   puedeSolicitarAnulacionCertificado,
   puedeCrearNotaCreditoPanel,
   certificadoImporteFinalCero,
@@ -118,7 +128,7 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     expect(inicioViewCode.match(/Solicitar anulación total — requiere autorización de un usuario con permiso para aprobar/g)?.length).toBe(2);
 
     expect(modalCode).toContain('Solicitar anulación total');
-    expect(modalCode).toContain("tipoOperacion: 'ANULAR_AMBOS'");
+    expect(modalCode).toContain("tipoOperacion: esSolicitudNotaCredito ? 'EMITIR_NOTA_CREDITO' : 'ANULAR_AMBOS'");
     expect(modalCode).toContain('Enviar solicitud');
     expect(modalCode).not.toContain('RECTIFICAR_');
     expect(modalCode).not.toContain('ANULAR_CERTIFICADO');
@@ -164,6 +174,30 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     expect(etiquetaSolicitudAnulacion('COMPLETADA')).toBe('Anulado');
   });
 
+  it('11b. Inicio muestra el estado real del trabajo automático de nota de crédito', () => {
+    const base = {
+      id: 710,
+      solicitudOperacionTipo: 'EMITIR_NOTA_CREDITO',
+      solicitudOperacionEstado: 'APROBADA',
+    } as BorradorPanel;
+    expect(etiquetaSolicitudOperacionPanel({
+      ...base,
+      solicitudOperacionResultadoFiscal: { estado: 'AUTORIZADA_EN_COLA' },
+    })).toBe('Nota autorizada — en cola');
+    expect(etiquetaSolicitudOperacionPanel({
+      ...base,
+      solicitudOperacionResultadoFiscal: { estado: 'ESPERANDO_COMPROBANTE' },
+    })).toBe('Nota autorizada — esperando confirmación del comprobante');
+    expect(etiquetaSolicitudOperacionPanel({
+      ...base,
+      solicitudOperacionResultadoFiscal: { estado: 'BLOQUEADA' },
+    })).toBe('Emisión de nota bloqueada');
+    expect(etiquetaSolicitudOperacionPanel({
+      ...base,
+      solicitudOperacionResultadoFiscal: { estado: 'RESULTADO_INCIERTO' },
+    })).toBe('Resultado de nota incierto — pendiente de consulta');
+  });
+
   it('12. Bloque A: el botón de anulación solo aparece sin solicitud activa ni completada', () => {
     const permisos = ['FAREGAS_SOLICITUD_CREAR'];
 
@@ -190,7 +224,7 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
   it('14. Bloque A: el indicador abre la solicitud existente y no el formulario de creación', () => {
     const modalCode = fs.readFileSync(path.resolve(__dirname, 'SolicitudOperacionModal.tsx'), 'utf8');
     expect(modalCode).toContain('faregasSolicitudesOperacionApi.obtener(solicitudId)');
-    expect(modalCode).toContain('Detalle de la solicitud de anulación');
+    expect(modalCode).toContain('Detalle de la solicitud');
   });
 
   it('15. El detalle del Panel permite ejecutar/autoejecutar y advierte el estado PENDIENTE_SUNAT', () => {
@@ -242,5 +276,14 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     expect(inicioViewCode).toContain('certificadoAnulacionBloqueadaPorImporte');
     expect(inicioViewCode).toContain('Anulación no disponible');
     expect(modalCode).toContain('Anulación bloqueada');
+  });
+
+  it('17. muestra la descarga naranja solo cuando la nota tiene PDF persistido', () => {
+    const inicioViewCode = fs.readFileSync(path.resolve(__dirname, 'InicioView.tsx'), 'utf8');
+    expect(inicioViewCode).toContain('notaCreditoPdfDisponible');
+    expect(inicioViewCode).toContain('abrirPdfNotaCreditoNubefact');
+    expect(inicioViewCode).toContain('Ver / Descargar nota de crédito');
+    expect(inicioViewCode).toContain('border-orange-300 bg-orange-50');
+    expect(inicioViewCode).toContain('puedeVerNotaCredito && ins.notaCreditoId');
   });
 });

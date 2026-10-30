@@ -79,6 +79,20 @@ describe('faregas-solicitudes-operacion.api', () => {
     });
   });
 
+  it('autoaprueba una autorización fiscal con confirmación de autoejecución', async () => {
+    const spy = vi.spyOn(httpClient, 'faregasFetch').mockResolvedValue({ data: { id: 1, estado: 'APROBADA' } });
+    await faregasSolicitudesOperacionApi.aprobar(1, 1, 'Excepción fiscal sustentada', true, true);
+    expect(spy).toHaveBeenCalledWith('/solicitudes-operacion/1/aprobar', {
+      method: 'POST',
+      body: JSON.stringify({
+        version: 1,
+        justificacion: 'Excepción fiscal sustentada',
+        confirmarAutoaprobacion: true,
+        confirmarAutoejecucion: true,
+      }),
+    });
+  });
+
   it('rechaza enviando version y justificacion obligatoria', async () => {
     const spy = vi.spyOn(httpClient, 'faregasFetch').mockResolvedValue({ data: { id: 1, estado: 'RECHAZADA' } });
     const res = await faregasSolicitudesOperacionApi.rechazar(1, 1, 'No procede por vencimiento');
@@ -223,6 +237,24 @@ describe('faregas-solicitudes-operacion.api', () => {
       estado: 'COMPLETADA',
       resultadoFiscal: { estado: 'BAJA_ACEPTADA' },
     })).toBe('Anulación completada');
+  });
+
+  it('distingue cola, bloqueo y resultado incierto de una nota automática', () => {
+    const base = { tipoOperacion: 'EMITIR_NOTA_CREDITO', estado: 'APROBADA' } as SolicitudOperacion;
+    expect(etiquetaEstadoSolicitudDetallado({
+      ...base,
+      resultadoFiscal: { estado: 'AUTORIZADA_EN_COLA' },
+    })).toBe('Nota autorizada — en cola');
+    expect(etiquetaEstadoSolicitudDetallado({
+      ...base,
+      estado: 'ERROR',
+      resultadoFiscal: { estado: 'BLOQUEADA' },
+    })).toBe('Emisión bloqueada');
+    expect(etiquetaEstadoSolicitudDetallado({
+      ...base,
+      estado: 'EN_EJECUCION',
+      resultadoFiscal: { estado: 'RESULTADO_INCIERTO' },
+    })).toBe('Resultado incierto — pendiente de consulta');
   });
 
   it('sincroniza la anulación total mediante reanudación idempotente', async () => {
