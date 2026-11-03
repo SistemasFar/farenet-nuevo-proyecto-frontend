@@ -6,6 +6,7 @@ import { maestrosApi, inspeccionesApi } from '@/services/api';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 import { faregasClientesApi } from '../../services/faregas-clientes.api';
 import { faregasPagosApi } from '../../services/faregas-pagos.api';
+import type { ConsultaDescuentoResult } from '../../services/faregas-descuentos.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
 import { CheckCircle2, FileText, CreditCard, ArrowLeft, Search, Loader2, Save, Eye, PencilLine, History, Send } from 'lucide-react';
@@ -409,6 +410,7 @@ function NuevoCertificadoWizard() {
 
   const [precioSubtotal, setPrecioSubtotal] = useState<number>(0);
   const [descuento, setDescuento] = useState<number>(0);
+  const [descuentoAplicado, setDescuentoAplicado] = useState<ConsultaDescuentoResult | null>(null);
   const [precioTotal, setPrecioTotal] = useState<number>(0);
   const [resumenComercial, setResumenComercial] = useState<ResumenComercialFaregas | null>(null);
 
@@ -438,6 +440,36 @@ function NuevoCertificadoWizard() {
       setPrecioTotal(importe);
     }
   };
+
+  const onDescuentoChange = React.useCallback(
+    (desc: ConsultaDescuentoResult | null) => {
+      const precioChip = Number(resumenComercial?.precioChip || 0);
+      if (desc) {
+        setPrecioSubtotal(desc.tarifaOriginal);
+        setDescuento(desc.importeDescuento);
+        setPrecioTotal(desc.importeFinal + precioChip);
+        setDescuentoAplicado(desc);
+        setResumenComercial((actual) => actual ? {
+          ...actual,
+          precioCertificado: desc.tarifaOriginal,
+          descuentoCertificado: desc.importeDescuento,
+          certificadoNeto: desc.importeFinal,
+          importeTotal: desc.importeFinal + precioChip,
+        } : actual);
+      } else {
+        setDescuento(0);
+        setDescuentoAplicado(null);
+        setPrecioTotal(precioSubtotal + precioChip);
+        setResumenComercial((actual) => actual ? {
+          ...actual,
+          descuentoCertificado: 0,
+          certificadoNeto: precioSubtotal,
+          importeTotal: precioSubtotal + precioChip,
+        } : actual);
+      }
+    },
+    [precioSubtotal, resumenComercial]
+  );
 
 
 
@@ -1440,19 +1472,20 @@ function NuevoCertificadoWizard() {
     if (autosaveControlRef.current.estaPersistido('TITULARES', snapshotTitulares)) {
       return titularesFuente;
     }
-    const incompleto = titularesFuente.find(t => (
-      !t.tipoDocumento.trim()
-      || !t.nroDocumento.trim()
-      || !t.nombreRazonSocial.trim()
+    const titularesCompletos = titularesFuente.filter(t => (
+      t.tipoDocumento.trim()
+      && t.nroDocumento.trim()
+      && t.nombreRazonSocial.trim()
     ));
-    if (incompleto) {
-      throw new Error(`Complete el tipo, número de documento y nombre o razón social del titular de orden ${incompleto.orden}.`);
+    if (titularesCompletos.length === 0) {
+      autosaveControlRef.current.sembrar('TITULARES', snapshotTitulares);
+      return titularesFuente;
     }
 
     let huboCambios = false;
     const guardados: TitularState[] = [];
 
-    for (const titular of titularesFuente) {
+    for (const titular of titularesCompletos) {
       const clienteId = await asegurarClienteFaregas(titular);
       const data = {
         clienteId,
@@ -2839,31 +2872,8 @@ function NuevoCertificadoWizard() {
               onInvalidarConsulta={() => {
                 setIsConsultado(false);
                 setDescuento(0);
+                setDescuentoAplicado(null);
                 setPrecioTotal(precioSubtotal + Number(resumenComercial?.precioChip || 0));
-              }}
-              onDescuentoChange={(desc) => {
-                const precioChip = Number(resumenComercial?.precioChip || 0);
-                if (desc) {
-                  setPrecioSubtotal(desc.tarifaOriginal);
-                  setDescuento(desc.importeDescuento);
-                  setPrecioTotal(desc.importeFinal + precioChip);
-                  setResumenComercial((actual) => actual ? {
-                    ...actual,
-                    precioCertificado: desc.tarifaOriginal,
-                    descuentoCertificado: desc.importeDescuento,
-                    certificadoNeto: desc.importeFinal,
-                    importeTotal: desc.importeFinal + precioChip,
-                  } : actual);
-                } else {
-                  setDescuento(0);
-                  setPrecioTotal(precioSubtotal + precioChip);
-                  setResumenComercial((actual) => actual ? {
-                    ...actual,
-                    descuentoCertificado: 0,
-                    certificadoNeto: precioSubtotal,
-                    importeTotal: precioSubtotal + precioChip,
-                  } : actual);
-                }
               }}
             />
           )}
@@ -2979,6 +2989,9 @@ function NuevoCertificadoWizard() {
               }}
               erroresCampo={errores}
               onCorregirCampo={limpiarErrorCampo}
+              certificadoId={certificadoId}
+              descuentoActual={descuentoAplicado}
+              onDescuentoChange={onDescuentoChange}
               onCondicionPagoChange={(condicionPago) => {
                 if (formFacturacion.tipoDocFac === 'BOLETA' && condicionPago === 'CREDITO') return;
                 limpiarErrorCampo('pagos');

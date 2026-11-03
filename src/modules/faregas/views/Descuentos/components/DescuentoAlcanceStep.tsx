@@ -125,9 +125,9 @@ export function DescuentoAlcanceStep({
           const key = String(planta.key);
           const disponibles = agruparServiciosLogicos(serviciosPorPlanta, [key]).length;
           const seleccionada = sedesSet.has(key);
-          return <label key={key} className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-xs ${disponibles ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'} ${seleccionada ? 'border-[#052a79] bg-blue-50 text-[#052a79]' : 'border-slate-200'}`}>
-            <input type="checkbox" disabled={!disponibles} checked={seleccionada} onChange={event => onCambiarSede(key, event.target.checked)} />
-            <MapPin className="h-4 w-4" /><span className="flex-1 font-bold">{planta.nombre}</span><span className="text-slate-400">{disponibles}</span>
+          return <label key={key} className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 text-xs ${disponibles ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'} ${seleccionada ? 'border-[#052a79] bg-blue-50 text-[#052a79]' : 'border-slate-200 hover:bg-slate-50'}`}>
+            <input type="checkbox" disabled={!disponibles} checked={seleccionada} onChange={event => onCambiarSede(key, event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-[#052a79] focus:ring-[#052a79] accent-[#052a79]" />
+            <MapPin className="h-4 w-4 text-slate-400" /><span className="flex-1 font-bold text-slate-700">{planta.nombre}</span><span className="text-slate-400">{disponibles}</span>
           </label>;
         })}
       </div>
@@ -137,19 +137,33 @@ export function DescuentoAlcanceStep({
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <div><b className="text-xs">SERVICIOS</b><p className="mt-1 text-xs text-slate-500">Listado consolidado. La disponibilidad indica en cuántas sedes seleccionadas existe cada servicio.</p></div>
         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_12rem]">
-          <label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={buscarServicio} onChange={event => setBuscarServicio(event.target.value)} placeholder="Buscar servicio..." className="input pl-9" /></label>
+          <label className="w-full">
+            <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 focus-within:border-[#052a79] focus-within:ring-1 focus-within:ring-[#052a79]/20">
+              <Search size={16} className="shrink-0 text-slate-500" aria-hidden="true" />
+              <input
+                type="text"
+                value={buscarServicio}
+                onChange={event => setBuscarServicio(event.target.value)}
+                placeholder="Buscar servicio..."
+                className="min-w-0 flex-1 border-0 bg-transparent outline-none text-slate-700 text-sm focus:ring-0"
+              />
+            </div>
+          </label>
           <select value={filtroTipo} onChange={event => setFiltroTipo(event.target.value as FiltroTipo)} className="input"><option value="TODOS">Todos los tipos</option><option value="GLP">GLP</option><option value="GNV">GNV</option><option value="CONFORMIDAD">Conformidad</option></select>
         </div>
-        <div className="mt-3 max-h-64 overflow-y-auto rounded-lg border">
+        <div className="mt-3 max-h-64 overflow-y-auto rounded-lg border border-slate-200">
           {serviciosConsolidados.length === 0 ? <p className="p-6 text-center text-xs text-slate-500">No hay servicios para este criterio.</p> : serviciosConsolidados.map(item => {
             const seleccionado = serviciosSeleccionados.includes(item.key);
             const minimo = item.precios.length ? Math.min(...item.precios) : null;
             const maximo = item.precios.length ? Math.max(...item.precios) : null;
             const precio = minimo == null ? 'Sin P. venta' : minimo === maximo ? dinero(minimo) : `${dinero(minimo)} – ${dinero(maximo)}`;
-            return <label key={item.key} className={`grid cursor-pointer items-center gap-3 border-b px-3 py-3 text-xs last:border-b-0 md:grid-cols-[auto_1fr_auto_auto] ${seleccionado ? 'bg-blue-50/60' : 'bg-white'}`}>
-              <input type="checkbox" checked={seleccionado} onChange={event => onCambiarServicio(item.key, event.target.checked)} />
-              <span><b>{item.nombre}</b><small className="mt-1 block text-slate-400">{item.categoria || tipoServicio(item.referencia)}</small></span>
-              <span className="rounded-full bg-slate-100 px-2 py-1 font-bold text-slate-600">Disponible en {item.sedes.size} de {sedesSeleccionadas.length} sedes</span>
+            const disponibleTodas = item.sedes.size === sedesSeleccionadas.length;
+            return <label key={item.key} className={`flex cursor-pointer items-start gap-3 border-b border-slate-100 px-3 py-3.5 text-xs last:border-b-0 ${seleccionado ? 'bg-blue-50 border-[#052a79] outline-none focus-within:ring-2 focus-within:ring-[#052a79]/20' : 'bg-white hover:bg-slate-50'}`}>
+              <div className="flex items-center gap-2 mt-0.5">
+                <input type="checkbox" checked={seleccionado} onChange={event => onCambiarServicio(item.key, event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-[#052a79] focus:ring-[#052a79] accent-[#052a79]" />
+                <span className="flex-1"><b className="text-slate-800">{item.nombre}</b><small className="mt-0.5 block text-slate-500">{item.categoria || tipoServicio(item.referencia)}</small></span>
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${disponibleTodas ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>Disponible {item.sedes.size}/{sedesSeleccionadas.length}</span>
               <span className={`font-bold ${minimo == null ? 'text-red-600' : 'text-[#052a79]'}`}>P. venta: {precio}</span>
             </label>;
           })}
@@ -199,6 +213,6 @@ export function DescuentoAlcanceStep({
       </section>
     </>}
 
-    <div className="flex justify-end border-t pt-4"><button type="button" onClick={onGuardar} className="h-10 rounded-lg bg-green-600 px-8 text-xs font-black text-white hover:bg-green-700">GUARDAR ALCANCE Y CONTINUAR</button></div>
+    <div className="flex justify-end border-t pt-4"><button type="button" onClick={onGuardar} className="h-10 rounded-lg bg-green-600 px-8 text-xs font-black text-white hover:bg-green-700">GUARDAR DESCUENTO</button></div>
   </div>;
 }

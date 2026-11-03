@@ -19,6 +19,20 @@ export interface ConsultaDescuentoResult {
   usosDisponibles: number;
 }
 
+export interface DescuentoDisponible {
+  id: number;
+  nombre: string;
+  tipo: string;
+  empresaAliada?: string;
+  tipoCalculo: 'FLAT' | 'MONTO' | 'PORCENTAJE';
+  valor: number;
+  tarifaOriginal: number;
+  importeDescuento: number;
+  importeFinal: number;
+  beneficio: string;
+  autorizaGratuidad: boolean;
+}
+
 export interface DescuentoAdmin {
   id: number;
   codigo: string;
@@ -144,4 +158,18 @@ export const faregasDescuentosAdminApi = {
   cambiarEstadoCodigo: (id: number, activo: boolean) => faregasFetch(`/descuentos/codigos/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ activo }) }),
   obtenerImpacto: async (id: number) => (await faregasFetch(`/descuentos/${id}/impacto`)).impacto as ImpactoDescuento,
   eliminar: async (id: number) => (await faregasFetch(`/descuentos/${id}`, { method: 'DELETE' })).resultado as EliminarDescuentoResultado,
+};
+
+export const listarDescuentosDisponibles = async (certificadoId: number): Promise<DescuentoDisponible[]> => {
+  const res = await faregasFetch<{ success: boolean; descuentos: DescuentoDisponible[] }>(
+    `/descuentos/borradores/${certificadoId}/disponibles`
+  );
+  return res?.descuentos || [];
+};
+
+export const aplicarDescuentoDirecto = async (certificadoId: number, descuentoId: number): Promise<ConsultaDescuentoResult> => {
+  return faregasFetch(`/descuentos/borradores/${certificadoId}/aplicar`, {
+    method: 'PUT',
+    body: JSON.stringify({ descuentoId }),
+  });
 };

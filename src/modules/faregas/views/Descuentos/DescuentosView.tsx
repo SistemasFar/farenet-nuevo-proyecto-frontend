@@ -3,8 +3,6 @@ import { Edit, Power, PowerOff, Loader2, Trash2, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasDescuentosAdminApi, type DescuentoAdmin, type DescuentoFormData, type ImpactoDescuento, type TipoCampana } from '../../services/faregas-descuentos.api';
 import { DescuentoAlcanceStep } from './components/DescuentoAlcanceStep';
-import { DescuentoCodigosStep } from './components/DescuentoCodigosStep';
-import { CodigosListadoModal } from './components/CodigosListadoModal';
 import {
   aplicarBeneficioGeneral,
   beneficioInicial,
@@ -73,9 +71,7 @@ export function DescuentosView() {
   const [excepciones, setExcepciones] = useState<Set<string>>(new Set());
   const [mostrarExcepciones, setMostrarExcepciones] = useState(false);
   const [sedesSeleccionadas, setSedesSeleccionadas] = useState<string[]>([]);
-  const [codigoTab, setCodigoTab] = useState<'DATOS' | 'CONFIGURAR' | 'LISTADO'>('CONFIGURAR');
-  const [totalCodigosDetalle, setTotalCodigosDetalle] = useState(0);
-  const [campanaCodigos, setCampanaCodigos] = useState<DescuentoAdmin | null>(null);
+  const [codigoTab, setCodigoTab] = useState<'DATOS' | 'CONFIGURAR'>('CONFIGURAR');
   const [eliminandoId, setEliminandoId] = useState<number | null>(null);
 
   const eliminarDescuento = async (d: DescuentoAdmin) => {
@@ -138,23 +134,19 @@ export function DescuentosView() {
       } else {
         const creado = await faregasDescuentosAdminApi.crear(payload) as { id: number };
         await cargar();
-        await abrirCodigos(creado.id, 'CONFIGURAR');
         setShowForm(false);
+        await abrirCodigos(creado.id, 'CONFIGURAR');
         await Swal.fire('Campaña creada', 'Paso 1 completado. Ahora configura las sedes, los servicios y el beneficio económico.', 'info');
       }
     }
     catch (e: unknown) { Swal.fire('No se pudo guardar', e instanceof Error ? e.message : 'Error inesperado.', 'error'); }
   };
-  const abrirCodigos = async (id: number, tab?: 'DATOS' | 'CONFIGURAR' | 'LISTADO') => {
+  const abrirCodigos = async (id: number, tab?: 'DATOS' | 'CONFIGURAR') => {
     try {
-      const [respuesta, paginaCodigos] = await Promise.all([
-        faregasDescuentosAdminApi.detalle(id) as Promise<Detalle>,
-        faregasDescuentosAdminApi.listarCodigos(id, { limit: 1, offset: 0 }),
-      ]);
+      const respuesta = await faregasDescuentosAdminApi.detalle(id) as Promise<Detalle>;
       setDetalle(respuesta);
       setEditando(id);
       setForm(formDesdeDescuento(respuesta.descuento));
-      setTotalCodigosDetalle(paginaCodigos.total);
       const reglasNormalizadas = (respuesta.reglas || []).map(regla => ({
         plantaKey: String(regla.plantaKey), servicioId: Number(regla.servicioId), tipoCalculo: regla.tipoCalculo,
         valor: regla.valor ?? '', valorContado: regla.valorContado ?? '', valorCredito: regla.valorCredito ?? '',
@@ -166,7 +158,7 @@ export function DescuentosView() {
       setBeneficioGeneral(reconstruccion.beneficio);
       setExcepciones(new Set(reconstruccion.excepciones));
       setMostrarExcepciones(reconstruccion.modoPersonalizado);
-      setCodigoTab(tab || (paginaCodigos.total ? 'LISTADO' : 'CONFIGURAR'));
+      setCodigoTab(tab || 'CONFIGURAR');
     }
     catch (e: unknown) { Swal.fire('Error', e instanceof Error ? e.message : 'No se pudieron cargar los códigos.', 'error'); }
   };
@@ -236,16 +228,80 @@ export function DescuentosView() {
     if (reglaIncompleta) return void Swal.fire('Valor requerido', 'Completa el valor de todas las reglas seleccionadas.', 'warning');
     try {
       await faregasDescuentosAdminApi.guardarReglas(detalle.descuento.id, { reglas });
-      await abrirCodigos(detalle.descuento.id, 'LISTADO');
+
+      // Verificar que las reglas se hayan persistido correctamente en el backend
+      const verificar = await faregasDescuentosAdminApi.detalle(detalle.descuento.id);
+      const reglasPersistidas = (verificar.reglas || []).map(r => ({
+        plantaKey: String(r.plantaKey),
+        servicioId: Number(r.servicioId),
+        tipoCalculo: String(r.tipoCalculo || ''),
+        valor: r.valor == null ? null : Number(r.valor),
+        valorContado: r.valorContado == null ? null : Number(r.valorContado),
+        valorCredito: r.valorCredito == null ? null : Number(r.valorCredito),
+      }));
+
+      // Comparación semántica por clave (plantaKey, servicioId)
+      // Normalizar números y strings numéricos, null y campos vacíos
+      const normalizarValor = (v: unknown): number | null => {
+        if (v === '' || v == null) return null;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+
+      const enviadasMap = new Map<string, { tipoCalculo: string; valor: number | null; valorContado: number | null; valorCredito: number | null }>();
+      for (const r of reglas) {
+        const clave = `${String(r.plantaKey)}::${Number(r.servicioId)}`;
+        enviadasMap.set(clave, {
+          tipoCalculo: String(r.tipoCalculo || '').trim().toUpperCase(),
+          valor: normalizarValor(r.valor),
+          valorContado: normalizarValor(r.valorContado),
+          valorCredito: normalizarValor(r.valorCredito),
+        });
+      }
+
+      const persistidasMap = new Map<string, { tipoCalculo: string; valor: number | null; valorContado: number | null; valorCredito: number | null }>();
+      for (const r of reglasPersistidas) {
+        const clave = `${r.plantaKey}::${r.servicioId}`;
+        persistidasMap.set(clave, {
+          tipoCalculo: r.tipoCalculo,
+          valor: r.valor,
+          valorContado: r.valorContado,
+          valorCredito: r.valorCredito,
+        });
+      }
+
+      // Verificar que las claves coincidan
+      const clavesEnviadas = [...enviadasMap.keys()].sort();
+      const clavesPersistidas = [...persistidasMap.keys()].sort();
+      if (clavesEnviadas.join('|') !== clavesPersistidas.join('|')) {
+        await Swal.fire('Error de persistencia', 'Las combinaciones de sede/servicio no se guardaron correctamente. Intente nuevamente.', 'error');
+        return;
+      }
+
+      // Verificar que los valores coincidan para cada clave
+      let hayDiferencia = false;
+      for (const clave of clavesEnviadas) {
+        const env = enviadasMap.get(clave)!;
+        const per = persistidasMap.get(clave)!;
+        if (env.tipoCalculo !== per.tipoCalculo ||
+            env.valor !== per.valor ||
+            env.valorContado !== per.valorContado ||
+            env.valorCredito !== per.valorCredito) {
+          hayDiferencia = true;
+          break;
+        }
+      }
+
+      if (hayDiferencia) {
+        await Swal.fire('Error de persistencia', 'Los beneficios no se guardaron correctamente. Intente nuevamente.', 'error');
+        return;
+      }
+
       await cargar();
-      await Swal.fire('Alcance guardado', 'Paso 2 completado. Ahora crea el primer código que autorizará el uso de este beneficio.', 'success');
+      setDetalle(null);
+      setEditando(null);
+      await Swal.fire('Descuento configurado', 'Descuento configurado correctamente. Ya estará disponible para los servicios y sedes autorizados durante su vigencia.', 'success');
     } catch (e: unknown) { Swal.fire('No se pudieron guardar las reglas', e instanceof Error ? e.message : 'Error inesperado.', 'error'); }
-  };
-  const refrescarCodigos = async () => {
-    if (!detalle) return;
-    const pagina = await faregasDescuentosAdminApi.listarCodigos(detalle.descuento.id, { limit: 1, offset: 0 });
-    setTotalCodigosDetalle(pagina.total);
-    await cargar();
   };
 
   return (
@@ -256,9 +312,9 @@ export function DescuentosView() {
       <div className="flex justify-between items-start flex-col gap-4">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Campañas, convenios y descuentos</h1>
-          <p className="text-sm text-gray-500">
-            Define primero la campaña, luego su alcance económico y finalmente los códigos que autorizan su uso.
-          </p>
+            <p className="text-sm text-gray-500">
+              Define primero la campaña y configura su alcance económico.
+            </p>
         </div>
       </div>
 
@@ -311,29 +367,27 @@ export function DescuentosView() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs capitalize text-slate-500"><tr><th className="px-4 py-3">Nombre del descuento</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Empresa</th><th className="px-4 py-3">Vigencia</th><th className="px-4 py-3">Alcance y códigos</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Acciones</th></tr></thead>
-            <tbody className="divide-y divide-gray-100">{loading ? <tr><td colSpan={7} className="p-12 text-center"><Loader2 className="mx-auto animate-spin" /></td></tr> : lista.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-slate-400">No hay campañas o convenios registrados.</td></tr> : lista.map(d => <tr key={d.id} className="hover:bg-gray-50"><td className="px-4 py-3"><b className="text-[#052a79]">{d.nombre}</b>{d.protegido && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">PROTEGIDO</span>}</td><td className="px-4 py-3">{d.tipo}</td><td className="px-4 py-3">{d.empresa_aliada_nombre || '-'}</td><td className="px-4 py-3">{fecha(d.fecha_inicio)} – {fecha(d.fecha_fin)}</td><td className="px-4 py-3"><div className="flex flex-col items-start gap-1.5"><b className="rounded-md bg-blue-50 px-2 py-1 text-xs text-[#052a79]">{Number(d.total_codigos).toLocaleString('es-PE')} código(s)</b><span className="text-[11px] leading-tight text-slate-500">{d.total_servicios} servicios configurados<br/>{d.usos_realizados} usos realizados</span><button type="button" onClick={() => setCampanaCodigos(d)} className="text-xs font-bold text-[#052a79] underline">Ver códigos</button></div></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 font-bold text-xs ${d.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td className="px-4 py-3"><div className="flex items-center gap-2"><button onClick={() => abrirCodigos(d.id, 'DATOS')} title="Editar y gestionar campaña" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button>{!d.protegido && <><button onClick={async () => { await faregasDescuentosAdminApi.cambiarEstado(d.id, !d.activo); await cargar(); }} title={d.activo ? 'Desactivar' : 'Activar'} className={d.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-green-100 transition-colors"}>{d.activo ? <PowerOff size={18} /> : <Power size={18} />}</button><button onClick={() => void eliminarDescuento(d)} disabled={eliminandoId === d.id} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-red-600 hover:bg-red-100 transition-colors disabled:cursor-wait disabled:opacity-50"><Trash2 size={18} /></button></>}</div></td></tr>)}</tbody>
+            <thead className="bg-slate-50 text-xs capitalize text-slate-500"><tr><th className="px-4 py-3">Nombre del descuento</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Empresa</th><th className="px-4 py-3">Vigencia</th><th className="px-4 py-3">Alcance</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Acciones</th></tr></thead>
+            <tbody className="divide-y divide-gray-100">{loading ? <tr><td colSpan={7} className="p-12 text-center"><Loader2 className="mx-auto animate-spin" /></td></tr> : lista.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-slate-400">No hay campañas o convenios registrados.</td></tr> : lista.map(d => <tr key={d.id} className="hover:bg-gray-50"><td className="px-4 py-3"><b className="text-[#052a79]">{d.nombre}</b>{d.protegido && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">PROTEGIDO</span>}</td><td className="px-4 py-3">{d.tipo}</td><td className="px-4 py-3">{d.empresa_aliada_nombre || '-'}</td><td className="px-4 py-3">{fecha(d.fecha_inicio)} – {fecha(d.fecha_fin)}</td><td className="px-4 py-3"><span className="text-[11px] leading-tight text-slate-500">{d.total_servicios} servicios configurados<br/>{d.usos_realizados} usos realizados</span></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 font-bold text-xs ${d.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td className="px-4 py-3"><div className="flex items-center gap-2"><button onClick={() => abrirCodigos(d.id, 'DATOS')} title="Editar y gestionar campaña" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button>{!d.protegido && <><button onClick={async () => { await faregasDescuentosAdminApi.cambiarEstado(d.id, !d.activo); await cargar(); }} title={d.activo ? 'Desactivar' : 'Activar'} className={d.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-green-100 transition-colors"}>{d.activo ? <PowerOff size={18} /> : <Power size={18} />}</button><button onClick={() => void eliminarDescuento(d)} disabled={eliminandoId === d.id} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-red-600 hover:bg-red-100 transition-colors disabled:cursor-wait disabled:opacity-50"><Trash2 size={18} /></button></>}</div></td></tr>)}</tbody>
           </table>
         </div>
       </div>
 
-      {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white"><div className="flex items-center justify-between border-b px-6 py-4"><div><h2 className="text-lg font-black">Crear descuento</h2><p className="mt-1 text-xs text-slate-500">Paso 1 de 3 · Datos generales y vigencia</p></div><button onClick={() => setShowForm(false)}><X /></button></div><DatosGeneralesCampos form={form} ejecutivos={ejecutivos} onChange={setForm} mostrarAyuda /><div className="flex justify-end gap-2 border-t p-4"><button onClick={() => setShowForm(false)} className="rounded-lg border px-5 py-2 text-xs font-bold">Cancelar</button><button onClick={() => void guardar(false)} className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-black text-white">Crear y configurar</button></div></div></div>}
+      {showForm && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"><div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white"><div className="flex items-center justify-between border-b px-6 py-4"><div><h2 className="text-lg font-black">Crear descuento</h2><p className="mt-1 text-xs text-slate-500">Paso 1 de 2 · Datos generales y vigencia</p></div><button onClick={() => setShowForm(false)}><X /></button></div><DatosGeneralesCampos form={form} ejecutivos={ejecutivos} onChange={setForm} mostrarAyuda /><div className="flex justify-end gap-2 border-t p-4"><button onClick={() => setShowForm(false)} className="rounded-lg border px-5 py-2 text-xs font-bold">Cancelar</button><button onClick={() => void guardar(false)} className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-black text-white">Crear y configurar</button></div></div></div>}
 
       {detalle && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
         <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white">
-          <div className="flex items-center justify-between border-b px-6 py-4"><div><h2 className="text-lg font-black">Editar y gestionar campaña — {detalle.descuento.nombre}</h2><p className="text-xs text-slate-500">Edita los datos generales, el alcance, el beneficio y los códigos desde un único flujo.</p></div><button onClick={() => { setDetalle(null); setEditando(null); }}><X /></button></div>
-          <div className="grid grid-cols-3 border-b bg-slate-50 px-6 py-3 text-xs font-bold">
+          <div className="flex items-center justify-between border-b px-6 py-4"><div><h2 className="text-lg font-black">Editar y gestionar campaña — {detalle.descuento.nombre}</h2><p className="text-xs text-slate-500">Edita los datos generales, el alcance y el beneficio desde un único flujo.</p></div><button onClick={() => { setDetalle(null); setEditando(null); }}><X /></button></div>
+          <div className="grid grid-cols-2 border-b bg-slate-50 px-6 py-3 text-xs font-bold">
             <div className="flex items-center gap-2 text-green-700"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100">✓</span><span>1. Datos generales</span></div>
             <div className={`flex items-center justify-center gap-2 ${reglas.length ? 'text-green-700' : 'text-[#052a79]'}`}><span className={`flex h-6 w-6 items-center justify-center rounded-full ${reglas.length ? 'bg-green-100' : 'bg-blue-100'}`}>{reglas.length ? '✓' : '2'}</span><span>2. Alcance y beneficio</span></div>
-            <div className={`flex items-center justify-end gap-2 ${totalCodigosDetalle ? 'text-green-700' : 'text-slate-500'}`}><span className={`flex h-6 w-6 items-center justify-center rounded-full ${totalCodigosDetalle ? 'bg-green-100' : 'bg-slate-200'}`}>{totalCodigosDetalle ? '✓' : '3'}</span><span>3. Códigos</span></div>
           </div>
-          <nav className="grid grid-cols-3 border-b px-6 text-xs font-bold text-slate-500">
+          <nav className="grid grid-cols-2 border-b px-6 text-xs font-bold text-slate-500">
             <button type="button" onClick={() => setCodigoTab('DATOS')} className={`border-b-2 px-1 py-3 ${codigoTab === 'DATOS' ? 'border-[#052a79] text-[#052a79]' : 'border-transparent'}`}>Datos generales</button>
             <button type="button" onClick={() => setCodigoTab('CONFIGURAR')} className={`border-b-2 px-1 py-3 ${codigoTab === 'CONFIGURAR' ? 'border-[#052a79] text-[#052a79]' : 'border-transparent'}`}>Alcance y beneficio ({reglas.length})</button>
-            <button type="button" onClick={() => setCodigoTab('LISTADO')} className={`border-b-2 px-1 py-3 ${codigoTab === 'LISTADO' ? 'border-[#052a79] text-[#052a79]' : 'border-transparent'}`}>Códigos de autorización ({totalCodigosDetalle})</button>
           </nav>
 
-          {codigoTab === 'DATOS' && <div><DatosGeneralesCampos form={form} ejecutivos={ejecutivos} onChange={setForm} mostrarAyuda /><div className="flex flex-wrap justify-end gap-2 border-t p-4"><button type="button" onClick={() => void guardar(false)} className="rounded-lg border border-[#052a79] px-5 py-2 text-xs font-black text-[#052a79]">GUARDAR DATOS</button><button type="button" onClick={() => void guardar(true)} className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-black text-white">GUARDAR Y CONTINUAR</button></div></div>}
+          {codigoTab === 'DATOS' && <div><DatosGeneralesCampos form={form} ejecutivos={ejecutivos} onChange={setForm} mostrarAyuda /><div className="flex flex-wrap justify-end gap-2 border-t p-4"><button type="button" onClick={() => void guardar(false)} className="rounded-lg border border-[#052a79] px-5 py-2 text-xs font-black text-[#052a79]">GUARDAR DATOS</button><button type="button" onClick={() => void guardar(true)} className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-black text-white">GUARDAR DESCUENTO</button></div></div>}
 
           {codigoTab === 'CONFIGURAR' && <DescuentoAlcanceStep
             plantas={plantas}
@@ -354,16 +408,8 @@ export function DescuentosView() {
             onRestaurarBeneficio={restaurarBeneficio}
             onGuardar={guardarReglas}
           />}
-
-          {codigoTab === 'LISTADO' && (reglas.length ? <DescuentoCodigosStep
-              descuento={detalle.descuento}
-              totalCodigos={totalCodigosDetalle}
-              onCambio={refrescarCodigos}
-              onVerCodigos={() => setCampanaCodigos(detalle.descuento)}
-            /> : <div className="m-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-800">Primero completa y guarda el alcance y beneficio del Paso 2.</div>)}
         </div>
       </div>}
-      {campanaCodigos && <CodigosListadoModal descuento={campanaCodigos} onCerrar={() => setCampanaCodigos(null)} onCambio={cargar} />}
     </div>);
 }
 

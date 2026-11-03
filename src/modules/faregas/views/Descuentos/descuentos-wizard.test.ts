@@ -152,7 +152,7 @@ describe('wizard administrativo de descuentos', () => {
   it('la tabla principal ya no renderiza códigos individuales', () => {
     const fuente = readFileSync(new URL('./DescuentosView.tsx', import.meta.url), 'utf8');
     expect(fuente).not.toContain('nombres_codigos');
-    expect(fuente).toContain('Ver códigos');
+    expect(fuente).not.toContain('Ver códigos');
   });
 
   it('unifica editar y gestionar en un solo botón de lápiz', () => {
@@ -163,13 +163,13 @@ describe('wizard administrativo de descuentos', () => {
     expect(fuente).not.toContain('<Settings');
   });
 
-  it('el modal de gestión permite navegar por los tres pasos', () => {
+  it('el modal de gestión permite navegar por los dos pasos', () => {
     const fuente = readFileSync(new URL('./DescuentosView.tsx', import.meta.url), 'utf8');
     expect(fuente).toContain("codigoTab === 'DATOS'");
     expect(fuente).toContain("codigoTab === 'CONFIGURAR'");
-    expect(fuente).toContain("codigoTab === 'LISTADO'");
+    expect(fuente).not.toContain("codigoTab === 'LISTADO'");
     expect(fuente).toContain('DatosGeneralesCampos');
-    expect(fuente).toContain("listarCodigos(id, { limit: 1, offset: 0 })");
+    expect(fuente).not.toContain("listarCodigos(id, { limit: 1, offset: 0 })");
   });
 
   it('cerrar el wizard sólo descarta estado local y no guarda', () => {

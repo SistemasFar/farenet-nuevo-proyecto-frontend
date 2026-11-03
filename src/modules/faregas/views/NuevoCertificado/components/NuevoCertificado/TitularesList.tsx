@@ -1,5 +1,5 @@
 import { DatosFacturacion } from './DatosFacturacion';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Search, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
@@ -50,6 +50,26 @@ export function TitularesList({
   soloLectura = false,
 }: TitularesListProps) {
   const [buscandoUuid, setBuscandoUuid] = useState<string | null>(null);
+  const titularInicializadoRef = useRef(false);
+
+  useEffect(() => {
+    if (titularInicializadoRef.current || titulares.length > 0) return;
+    titularInicializadoRef.current = true;
+    setTitulares(prev => [
+      ...prev,
+      {
+        _uuid: Math.random().toString(36).substring(2) + Date.now().toString(36),
+        titularId: null,
+        orden: 1,
+        clienteId: null,
+        tipoDocumento: 'DNI',
+        nroDocumento: '',
+        nombreRazonSocial: '',
+        direccion: ''
+      }
+    ]);
+  }, [titulares, setTitulares]);
+
   const facturarAlTitular = Boolean(titulares.length > 0 && formFacturacion.usarTitularPrincipalFac);
   const titularPrincipal = [...titulares].sort((a, b) => a.orden - b.orden)[0] || null;
   const errorTitular = (indice: number, campo: string) => erroresCampo[`titular.${indice}.${campo}`];

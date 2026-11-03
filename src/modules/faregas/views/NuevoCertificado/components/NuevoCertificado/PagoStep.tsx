@@ -3,6 +3,8 @@ import { CreditCard, PlusCircle, Trash2, AlertCircle, ShieldAlert } from 'lucide
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../../NuevoCertificadoView';
 import type { ResumenComercialFaregas } from '../../../../types/faregas-api';
+import type { ConsultaDescuentoResult } from '../../../../services/faregas-descuentos.api';
+import { SelectorDescuento } from './SelectorDescuento';
 import { MensajeError, type ErroresCampo } from '../../faregas-wizard-errores';
 import { GestorCuotasCredito, type CuotaCreditoItem } from '../../../components/GestorCuotasCredito';
 
@@ -34,6 +36,9 @@ interface PagoStepProps {
   compact?: boolean;
   erroresCampo?: ErroresCampo;
   onCorregirCampo?: (campo: string) => void;
+  certificadoId?: number;
+  descuentoActual?: ConsultaDescuentoResult | null;
+  onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
 }
 
 export function PagoStep({
@@ -62,6 +67,9 @@ export function PagoStep({
   compact = false,
   erroresCampo = {},
   onCorregirCampo,
+  certificadoId,
+  descuentoActual = null,
+  onDescuentoChange,
 }: PagoStepProps) {
 
   const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
@@ -198,6 +206,14 @@ export function PagoStep({
                 )}
               </div>
             )}
+          </div>
+
+          <div className="rounded-2xl border-2 border-slate-200 bg-white p-5 space-y-4">
+            <SelectorDescuento
+              certificadoId={certificadoId}
+              descuentoActual={descuentoActual}
+              onDescuentoChange={onDescuentoChange}
+            />
           </div>
 
           <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden">

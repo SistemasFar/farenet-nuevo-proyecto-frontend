@@ -153,7 +153,38 @@ export const reconstruirPaso2 = (reglas: ReglaDescuento[], disponibilidad: Servi
     regla.plantaKey,
     regla.servicioId,
   )))];
-  const beneficio = reglas.length ? obtenerBeneficio(reglas[0]) : beneficioInicial();
+
+  // Determinar el beneficio general de forma determinista: el beneficio que aparece
+  // con mayor frecuencia entre todas las reglas. Si hay empate, el primero en orden
+  // de aparición estable (ordenado por plantaKey y servicioId). Esto evita que una
+  // excepción (ej. 100%) se convierta erróneamente en beneficio general por aparecer
+  // primero en el array devuelto por el backend.
+  let beneficio = beneficioInicial();
+  if (reglas.length > 0) {
+    const conteo = new Map<string, { beneficio: BeneficioDescuento; cantidad: number }>();
+    for (const regla of reglas) {
+      const clave = `${regla.tipoCalculo}|${regla.valor}|${regla.valorContado}|${regla.valorCredito}`;
+      const existente = conteo.get(clave);
+      if (existente) {
+        existente.cantidad += 1;
+      } else {
+        conteo.set(clave, { beneficio: obtenerBeneficio(regla), cantidad: 1 });
+      }
+    }
+    let maxCantidad = 0;
+    for (const { beneficio: b, cantidad } of conteo.values()) {
+      if (cantidad > maxCantidad) {
+        maxCantidad = cantidad;
+        beneficio = b;
+      }
+    }
+    // Empate: elegir por orden de aparición (primer bloque con maxCantidad)
+    if (maxCantidad > 0) {
+      const ordenadas = [...conteo.entries()].sort((a, b) => b[1].cantidad - a[1].cantidad);
+      beneficio = ordenadas[0][1].beneficio;
+    }
+  }
+
   const excepciones = reglas
     .filter(regla => !beneficiosIguales(regla, beneficio))
     .map(regla => claveRegla(regla.plantaKey, regla.servicioId));

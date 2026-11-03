@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { AlertTriangle, CheckCircle, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Search, Tag } from 'lucide-react';
 import { faregasTarifasApi } from '../../../../services/faregas-tarifas.api';
 import type { FormCajaState } from '../../NuevoCertificadoView';
 import type {
@@ -8,8 +8,6 @@ import type {
   ServicioCatalogoFaregas,
 } from '../../../../types/faregas-api';
 
-import type { ConsultaDescuentoResult } from '../../../../services/faregas-descuentos.api';
-import { ConsultaDescuento } from './ConsultaDescuento';
 import { MensajeError, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
 
 /** Clase original del campo de placa; el error sólo sustituye el color. */
@@ -25,9 +23,9 @@ interface CajaStepProps {
   consultando: boolean;
   onConsultar: () => Promise<void>;
   onInvalidarConsulta: () => void;
-  onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
   erroresCampo?: ErroresCampo;
   onCorregirCampo?: (campo: string) => void;
+  catalogoInicial?: CatalogoFaregas | null;
 }
 
 const normalizarBusqueda = (valor: string) => valor
@@ -56,15 +54,15 @@ export function CajaStep({
   consultando,
   onConsultar,
   onInvalidarConsulta,
-  onDescuentoChange,
   erroresCampo = {},
   onCorregirCampo,
+  catalogoInicial,
 }: CajaStepProps) {
   const esError = (campo: string) => Boolean(erroresCampo[campo]);
-  const [catalogo, setCatalogo] = useState<CatalogoFaregas | null>(null);
+  const [catalogo, setCatalogo] = useState<CatalogoFaregas | null>(catalogoInicial ?? null);
   const [categoriaActiva, setCategoriaActiva] = useState('TODOS');
   const [busqueda, setBusqueda] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!catalogoInicial);
   const [error, setError] = useState('');
   const [reintento, setReintento] = useState(0);
 
@@ -261,11 +259,6 @@ export function CajaStep({
               <div><span className="block text-xs font-semibold text-blue-600">Total</span><span className="text-lg font-black text-[#052a79]">S/ {seleccion.servicio.tarifa.importeTotal.toFixed(2)}</span></div>
             </div>
           </section>
-
-          <ConsultaDescuento
-            certificadoId={certificadoId}
-            onDescuentoChange={onDescuentoChange}
-          />
         </>
       )}
       <span className="sr-only">Sede activa: {plantaSeleccionada}</span>
