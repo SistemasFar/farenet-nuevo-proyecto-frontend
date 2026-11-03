@@ -365,12 +365,17 @@ export const validarDatosInicialesCampos = (caja: Record<string, any>): ErroresC
     const mensaje = errorDeCampo(caja[regla.campo], regla);
     if (mensaje) marcar(errores, regla.campo, mensaje);
   }
+  // Para certificados de taller (TALLER_INSPECCION), el nombre del taller
+  // no es requerido en el paso de datos iniciales: el backend ya no lo exige
+  // y el flujo permite avanzar directamente al siguiente paso.
   const esTaller = String(caja.tipo_flujo || '').toUpperCase() === 'TALLER_INSPECCION';
-  const identificador = esTaller
-    ? { campo: 'tallerNombre', etiqueta: 'el nombre del taller' }
-    : { campo: 'placa', etiqueta: 'la placa' };
-  const mensajeIdentificador = errorDeCampo(caja[identificador.campo], identificador);
-  if (mensajeIdentificador) marcar(errores, identificador.campo, mensajeIdentificador);
+  if (!esTaller) {
+    const identificador = esTaller
+      ? { campo: 'tallerNombre', etiqueta: 'el nombre del taller' }
+      : { campo: 'placa', etiqueta: 'la placa' };
+    const mensajeIdentificador = errorDeCampo(caja[identificador.campo], identificador);
+    if (mensajeIdentificador) marcar(errores, identificador.campo, mensajeIdentificador);
+  }
   if (caja.tipoCertificado !== 'CONFORMIDAD' && vacio(caja.modalidadCertificado)) {
     marcar(errores, 'modalidadCertificado', 'Seleccione si el certificado es inicial o anual.');
   }

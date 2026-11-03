@@ -37,7 +37,7 @@ describe('FAREGAS — MEJORAS WIZARD NUEVO CERTIFICADO', () => {
   });
 
   describe('Identificación estructurada de inspecciones de taller', () => {
-    it('solicita nombre del taller y no placa cuando el flujo es TALLER_INSPECCION', () => {
+    it('permite avanzar sin nombre del taller ni placa cuando el flujo es TALLER_INSPECCION', () => {
       const errores = validarDatosInicialesCampos({
         tarifaCodigo: 'SURCO-0422',
         tipo_flujo: 'TALLER_INSPECCION',
@@ -46,7 +46,7 @@ describe('FAREGAS — MEJORAS WIZARD NUEVO CERTIFICADO', () => {
         tallerNombre: '',
         placa: '',
       });
-      expect(errores.tallerNombre).toBeDefined();
+      expect(errores.tallerNombre).toBeUndefined();
       expect(errores.placa).toBeUndefined();
     });
 

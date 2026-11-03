@@ -2172,7 +2172,8 @@ function NuevoCertificadoWizard() {
       return;
     }
     if (currentStepIndex === indicePaso('DATOS_INICIALES')) {
-      if (!isConsultado) {
+      const esInspeccionTaller = formCaja.tipo_flujo === 'TALLER_INSPECCION';
+      if (!isConsultado && !esInspeccionTaller) {
         Swal.fire('Consulta requerida', 'Primero presione Consultar para validar los datos iniciales.', 'info');
         return;
       }
@@ -2180,6 +2181,7 @@ function NuevoCertificadoWizard() {
       setIsSavingStep(true);
       try {
         let idBorrador = certificadoId;
+        let borradorCreado = false;
         if (!idBorrador) {
           const res = await faregasCertificadosApi.crearBorrador({
             tipoCertificadoClave: formCaja.tipoCertificado,
@@ -2192,6 +2194,7 @@ function NuevoCertificadoWizard() {
           idBorrador = Number(res?.data?.id);
           if (!idBorrador) throw new Error('El servidor no devolvió el identificador del borrador.');
           setCertificadoId(idBorrador);
+          borradorCreado = true;
         } else {
           await faregasCertificadosApi.actualizarBorrador(idBorrador, { tarifaCodigo: formCaja.tarifaCodigo });
           if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
@@ -2215,6 +2218,9 @@ function NuevoCertificadoWizard() {
         const pasoVehiculo = indicePaso('VEHICULO');
         setFurthestStepIndex(prev => Math.max(prev, pasoVehiculo));
         setCurrentStepIndex(pasoVehiculo);
+        if (borradorCreado) {
+          navigate(`/faregas/certificados/${idBorrador}/continuar`, { replace: true });
+        }
       } catch (e: any) {
         Swal.fire('Error', e.message || 'No se pudo crear el borrador', 'error');
       } finally {
@@ -3196,7 +3202,7 @@ function NuevoCertificadoWizard() {
                 )}
               </div>
             ) : null
-          ) : currentStepIndex === indicePaso('DATOS_INICIALES') && !isConsultado ? (
+          ) : currentStepIndex === indicePaso('DATOS_INICIALES') && !isConsultado && formCaja.tipo_flujo !== 'TALLER_INSPECCION' ? (
             <span className="text-xs font-semibold text-slate-500">Complete los datos y presione Consultar.</span>
           ) : (
             <button

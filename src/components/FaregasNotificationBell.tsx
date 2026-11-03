@@ -111,6 +111,7 @@ export function FaregasNotificationBell({
   const notificacionesPreviasRef = useRef<NotificacionFaregas[]>([]);
   const usuarioRef = useRef(user?.username || '');
   const visibleRef = useRef(true);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const headers = useMemo(() => ({ 'Content-Type': 'application/json' }), []);
 
@@ -315,6 +316,17 @@ export function FaregasNotificationBell({
     };
   }, [iniciarPolling, user?.username]);
 
+  useEffect(() => {
+    const cerrarAlHacerClickFuera = (event: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+        setPanelOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', cerrarAlHacerClickFuera);
+    return () => document.removeEventListener('mousedown', cerrarAlHacerClickFuera);
+  }, []);
+
   const noLeidasFiltradas = useMemo(
     () => notificaciones.filter((n) => !n.leida),
     [notificaciones]
@@ -322,7 +334,7 @@ export function FaregasNotificationBell({
 
   return (
     <>
-    <div className="relative">
+    <div className="relative" ref={panelRef}>
       <button
         type="button"
         onClick={() => setPanelOpen((p) => !p)}

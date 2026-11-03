@@ -160,4 +160,23 @@ describe('FaregasNotificationBell', () => {
     const punto = container.querySelector('span[class*="bg-red-500"]');
     expect(punto).toBeTruthy();
   });
+
+  it('7. cierra el panel al hacer clic fuera de la campana', async () => {
+    vi.mocked(fetch).mockResolvedValue(mockFetchResponse({ ok: true, data: [] }));
+    const { container } = renderBell();
+    await act(async () => {
+      await esperar(250);
+    });
+
+    const campana = container.querySelector('button[aria-label*="Notificaciones"]')!;
+    await act(async () => {
+      campana.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.textContent).toContain('No tienes notificaciones');
+
+    await act(async () => {
+      document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    });
+    expect(container.textContent).not.toContain('No tienes notificaciones');
+  });
 });

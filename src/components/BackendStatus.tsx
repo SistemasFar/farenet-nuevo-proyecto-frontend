@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Status = 'online' | 'slow' | 'offline';
 
@@ -11,6 +11,7 @@ export function BackendStatus() {
   const [latency, setLatency] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [lastCheck, setLastCheck] = useState('');
+  const widgetRef = useRef<HTMLDivElement>(null);
 
   const checkBackend = async () => {
     const start = performance.now();
@@ -47,6 +48,17 @@ export function BackendStatus() {
     };
   }, []);
 
+  useEffect(() => {
+    const cerrarAlHacerClickFuera = (event: MouseEvent) => {
+      if (widgetRef.current && !widgetRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', cerrarAlHacerClickFuera);
+    return () => document.removeEventListener('mousedown', cerrarAlHacerClickFuera);
+  }, []);
+
   const colorClass = {
     online: 'text-emerald-400',
     slow: 'text-orange-400',
@@ -66,7 +78,7 @@ export function BackendStatus() {
   }[status];
 
   return (
-    <div className="relative">
+    <div className="relative" ref={widgetRef}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}

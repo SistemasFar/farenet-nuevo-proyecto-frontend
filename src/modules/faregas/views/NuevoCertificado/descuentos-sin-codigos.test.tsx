@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { SelectorDescuento } from './components/NuevoCertificado/SelectorDescuento';
@@ -223,6 +226,36 @@ describe('FAREGAS — Implementación de Descuentos sin Códigos', () => {
     expect(html).toContain('Tarifa Original');
     expect(html).toContain('S/ 90.00');
     expect(html).not.toContain('Ingresa el código de descuento');
+  });
+
+  it('6. Venta sin certificado puede volver de CON DESCUENTO a SIN DESCUENTO', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<SelectorDescuento />);
+    });
+
+    const radios = container.querySelectorAll<HTMLInputElement>('input[type="radio"]');
+    expect(radios).toHaveLength(2);
+    expect(radios[0].checked).toBe(true);
+
+    await act(async () => {
+      radios[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(radios[1].checked).toBe(true);
+
+    await act(async () => {
+      radios[0].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(radios[0].checked).toBe(true);
+    expect(radios[1].checked).toBe(false);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
   });
 
 });

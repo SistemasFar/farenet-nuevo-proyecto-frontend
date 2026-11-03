@@ -14,7 +14,7 @@ import Swal from 'sweetalert2';
 interface SelectorDescuentoProps {
   certificadoId?: number;
   descuentoActual?: ConsultaDescuentoResult | null;
-  onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
+  onDescuentoChange?: (descuento: ConsultaDescuentoResult | null) => void;
 }
 
 export function SelectorDescuento({
@@ -58,7 +58,7 @@ export function SelectorDescuento({
           setDescuentoAplicado(guardado);
           setDescuentoSeleccionadoId(String(guardado.descuentoId));
           setModoDescuento('con');
-          onChangeRef.current(guardado);
+          onChangeRef.current?.(guardado);
         } else if (descuentoActual) {
           setDescuentoAplicado(descuentoActual);
           setDescuentoSeleccionadoId(String(descuentoActual.descuentoId));
@@ -79,15 +79,24 @@ export function SelectorDescuento({
   }, [certificadoId]);
 
   const seleccionarSinDescuento = async () => {
-    if (!certificadoId) return;
+    const descuentoAnterior = descuentoAplicado;
     setModoDescuento('sin');
     setDescuentoSeleccionadoId('');
+
+    if (!certificadoId) {
+      setDescuentoAplicado(null);
+      onChangeRef.current?.(null);
+      return;
+    }
+
     setAplicando(true);
     try {
       await quitarDescuentoBorrador(certificadoId);
       setDescuentoAplicado(null);
-      onChangeRef.current(null);
+      onChangeRef.current?.(null);
     } catch (err: unknown) {
+      setModoDescuento(descuentoAnterior ? 'con' : 'sin');
+      setDescuentoSeleccionadoId(descuentoAnterior ? String(descuentoAnterior.descuentoId) : '');
       Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo retirar el descuento.', 'error');
     } finally {
       setAplicando(false);
@@ -109,7 +118,7 @@ export function SelectorDescuento({
     try {
       const resultado = await aplicarDescuentoDirecto(certificadoId, descuentoId);
       setDescuentoAplicado(resultado);
-      onChangeRef.current(resultado);
+      onChangeRef.current?.(resultado);
       Swal.fire({
         icon: 'success',
         title: 'Descuento Aplicado',

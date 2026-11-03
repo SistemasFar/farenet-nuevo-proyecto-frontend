@@ -89,7 +89,6 @@ export function CajaStep({
       .finally(() => {
         if (!cancelado) setLoading(false);
       });
-
     return () => { cancelado = true; };
   }, [reintento, setFormCaja]);
 
@@ -211,20 +210,17 @@ export function CajaStep({
             })}
           </div>
         )}
+
       </section>
 
-      {seleccion && (
+      {seleccion && !esInspeccionTaller && (
         <section className="space-y-4 border-t border-slate-100 pt-5">
-          {(seleccion.servicio.requiere_vehiculo || esInspeccionTaller) && (
+          {seleccion.servicio.requiere_vehiculo && !esInspeccionTaller && (
             <h4 className="text-sm font-bold capitalize tracking-wider text-slate-700">2. Datos Básicos</h4>
           )}
           <div className="flex flex-col sm:flex-row items-end justify-between gap-4">
             {esInspeccionTaller ? (
-              <div className="w-full sm:max-w-lg space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Nombre del Taller <span className="text-red-500">*</span></label>
-                <input type="text" className={claseConError(CLASE_CAMPO, esError('tallerNombre'))} data-campo-error={esError('tallerNombre') ? true : undefined} aria-invalid={esError('tallerNombre') ? true : undefined} aria-describedby={esError('tallerNombre') ? 'error-tallerNombre' : undefined} placeholder="Ej.: CHARING S.A.C." value={formCaja.tallerNombre} onChange={(event) => { onCorregirCampo?.('tallerNombre'); onInvalidarConsulta(); setFormCaja((actual) => ({ ...actual, tallerNombre: event.target.value.toUpperCase() })); }} maxLength={200} />
-                <MensajeError campo="tallerNombre" errores={erroresCampo} />
-              </div>
+              <div></div>
             ) : seleccion.servicio.requiere_vehiculo ? (
               <div className="w-full sm:max-w-xs space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Placa de Rodaje <span className="text-red-500">*</span></label>
@@ -232,21 +228,36 @@ export function CajaStep({
                 <MensajeError campo="placa" errores={erroresCampo} />
               </div>
             ) : <div />}
-
-            <button
-              type="button"
-              onClick={() => void onConsultar()}
-              disabled={consultando || (esInspeccionTaller ? !formCaja.tallerNombre.trim() : (seleccion.servicio.requiere_vehiculo && !formCaja.placa))}
-              className="flex w-full sm:w-auto min-w-[180px] items-center justify-center gap-2 rounded-xl bg-[#052a79] px-6 h-[42px] text-xs font-black text-white shadow-sm transition hover:bg-[#041d54] disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              <Search className="h-4 w-4" />
-              {consultando ? 'CONSULTANDO…' : consultaRealizada ? 'CONSULTAR NUEVAMENTE' : 'CONSULTAR'}
-            </button>
+            {esInspeccionTaller ? (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => void onConsultar()}
+                  disabled={consultando}
+                  className="flex w-full sm:w-auto min-w-[180px] items-center justify-center gap-2 rounded-xl bg-[#052a79] px-6 h-[42px] text-xs font-black text-white shadow-sm transition hover:bg-[#041d54] disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  <Search className="h-4 w-4" />
+                  {consultando ? 'CONSULTANDO…' : 'CONSULTAR'}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => void onConsultar()}
+                  disabled={consultando || (seleccion.servicio.requiere_vehiculo && !formCaja.placa)}
+                  className="flex w-full sm:w-auto min-w-[180px] items-center justify-center gap-2 rounded-xl bg-[#052a79] px-6 h-[42px] text-xs font-black text-white shadow-sm transition hover:bg-[#041d54] disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  <Search className="h-4 w-4" />
+                  {consultando ? 'CONSULTANDO…' : consultaRealizada ? 'CONSULTAR NUEVAMENTE' : 'CONSULTAR'}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       )}
 
-      {seleccion && consultaRealizada && (
+      {seleccion && (consultaRealizada || esInspeccionTaller) && (
         <>
           <section className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
             <h4 className="mb-4 text-sm font-bold capitalize tracking-wider text-[#052a79]">Servicio Seleccionado</h4>
