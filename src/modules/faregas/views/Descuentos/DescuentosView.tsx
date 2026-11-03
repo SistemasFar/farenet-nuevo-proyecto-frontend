@@ -73,6 +73,35 @@ export function DescuentosView() {
   const [sedesSeleccionadas, setSedesSeleccionadas] = useState<string[]>([]);
   const [codigoTab, setCodigoTab] = useState<'DATOS' | 'CONFIGURAR'>('CONFIGURAR');
   const [eliminandoId, setEliminandoId] = useState<number | null>(null);
+  const hayCambiosEnReglas = (): boolean => {
+    if (!detalle) return false;
+
+    const normalizar = (items: ReglaDescuento[]) =>
+      items
+        .map((regla) => {
+          const numero = (valor: unknown) =>
+            valor === '' || valor == null ? null : Number(valor);
+
+          return {
+            plantaKey: String(regla.plantaKey),
+            servicioId: Number(regla.servicioId),
+            tipoCalculo: String(regla.tipoCalculo).trim().toUpperCase(),
+            valor: numero(regla.valor),
+            valorContado: numero(regla.valorContado),
+            valorCredito: numero(regla.valorCredito),
+          };
+        })
+        .sort((a, b) =>
+          a.plantaKey.localeCompare(b.plantaKey) ||
+          a.servicioId - b.servicioId
+        );
+
+    return (
+      JSON.stringify(normalizar(reglas)) !==
+      JSON.stringify(normalizar(detalle.reglas || []))
+    );
+  };
+
 
   const eliminarDescuento = async (d: DescuentoAdmin) => {
     setEliminandoId(d.id);
@@ -127,10 +156,39 @@ export function DescuentosView() {
     const payload = { ...form };
     try {
       if (editando) {
+        const reglasPendientes = hayCambiosEnReglas();
+
+        // 1. Guardar los datos generales.
         await faregasDescuentosAdminApi.actualizar(editando, payload);
+
+        // 2. Guardar también las reglas modificadas.
+        if (reglasPendientes) {
+          const reglasGuardadas = await guardarReglas({
+            cerrar: false,
+            mostrarExito: false,
+          });
+
+          if (!reglasGuardadas) {
+            // No recargar ni cerrar el formulario.
+            // Los datos generales ya pueden haberse guardado.
+            return;
+          }
+        }
+
+        // 3. Recuperar la configuración persistida.
         await cargar();
-        await abrirCodigos(editando, continuar ? 'CONFIGURAR' : 'DATOS');
-        await Swal.fire('Datos actualizados', 'Los datos generales de la campaña fueron guardados.', 'success');
+
+        await abrirCodigos(
+          editando,
+          continuar ? 'CONFIGURAR' : 'DATOS'
+        );
+
+        // 4. Confirmar únicamente cuando todo terminó.
+        await Swal.fire(
+          'Descuento guardado',
+          'Los datos generales, sedes, servicios y beneficios se guardaron correctamente.',
+          'success'
+        );
       } else {
         const creado = await faregasDescuentosAdminApi.crear(payload) as { id: number };
         await cargar();
@@ -219,13 +277,31 @@ export function DescuentosView() {
       ? { ...regla, ...obtenerBeneficio(beneficioGeneral) }
       : regla));
   };
-  const guardarReglas = async () => {
-    if (!detalle) return;
-    if (!sedesSeleccionadas.length || !reglas.length) return void Swal.fire('Reglas requeridas', 'Selecciona al menos una sede y un servicio.', 'warning');
+  const guardarReglas = async (
+    opciones: { cerrar?: boolean; mostrarExito?: boolean } = {}
+  ): Promise<boolean> => {
+    const { cerrar = true, mostrarExito = true } = opciones;
+    if (!detalle) return false;
+
+    if (!sedesSeleccionadas.length || !reglas.length) {
+      await Swal.fire(
+        'Reglas requeridas',
+        'Selecciona al menos una sede y un servicio.',
+        'warning'
+      );
+      return false;
+    }
     const reglaIncompleta = reglas.find(regla => regla.tipoCalculo === 'FLAT'
       ? regla.valorContado === '' && regla.valorCredito === ''
       : regla.valor === '');
-    if (reglaIncompleta) return void Swal.fire('Valor requerido', 'Completa el valor de todas las reglas seleccionadas.', 'warning');
+    if (reglaIncompleta) {
+      await Swal.fire(
+        'Valor requerido',
+        'Completa el valor de todas las reglas seleccionadas.',
+        'warning'
+      );
+      return false;
+    }
     try {
       await faregasDescuentosAdminApi.guardarReglas(detalle.descuento.id, { reglas });
 
@@ -275,7 +351,7 @@ export function DescuentosView() {
       const clavesPersistidas = [...persistidasMap.keys()].sort();
       if (clavesEnviadas.join('|') !== clavesPersistidas.join('|')) {
         await Swal.fire('Error de persistencia', 'Las combinaciones de sede/servicio no se guardaron correctamente. Intente nuevamente.', 'error');
-        return;
+        return false;
       }
 
       // Verificar que los valores coincidan para cada clave
@@ -284,9 +360,9 @@ export function DescuentosView() {
         const env = enviadasMap.get(clave)!;
         const per = persistidasMap.get(clave)!;
         if (env.tipoCalculo !== per.tipoCalculo ||
-            env.valor !== per.valor ||
-            env.valorContado !== per.valorContado ||
-            env.valorCredito !== per.valorCredito) {
+          env.valor !== per.valor ||
+          env.valorContado !== per.valorContado ||
+          env.valorCredito !== per.valorCredito) {
           hayDiferencia = true;
           break;
         }
@@ -294,14 +370,32 @@ export function DescuentosView() {
 
       if (hayDiferencia) {
         await Swal.fire('Error de persistencia', 'Los beneficios no se guardaron correctamente. Intente nuevamente.', 'error');
-        return;
+        return false;
       }
 
-      await cargar();
-      setDetalle(null);
-      setEditando(null);
-      await Swal.fire('Descuento configurado', 'Descuento configurado correctamente. Ya estará disponible para los servicios y sedes autorizados durante su vigencia.', 'success');
-    } catch (e: unknown) { Swal.fire('No se pudieron guardar las reglas', e instanceof Error ? e.message : 'Error inesperado.', 'error'); }
+      if (cerrar) {
+        await cargar();
+        setDetalle(null);
+        setEditando(null);
+      }
+
+      if (mostrarExito) {
+        await Swal.fire(
+          'Descuento configurado',
+          'Los cambios fueron guardados correctamente.',
+          'success'
+        );
+      }
+
+      return true;
+    } catch (e: unknown) {
+      await Swal.fire(
+        'No se pudieron guardar las reglas',
+        e instanceof Error ? e.message : 'Error inesperado.',
+        'error'
+      );
+      return false;
+    }
   };
 
   return (
@@ -312,9 +406,9 @@ export function DescuentosView() {
       <div className="flex justify-between items-start flex-col gap-4">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Campañas, convenios y descuentos</h1>
-            <p className="text-sm text-gray-500">
-              Define primero la campaña y configura su alcance económico.
-            </p>
+          <p className="text-sm text-gray-500">
+            Define primero la campaña y configura su alcance económico.
+          </p>
         </div>
       </div>
 
@@ -368,7 +462,7 @@ export function DescuentosView() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs capitalize text-slate-500"><tr><th className="px-4 py-3">Nombre del descuento</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Empresa</th><th className="px-4 py-3">Vigencia</th><th className="px-4 py-3">Alcance</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Acciones</th></tr></thead>
-            <tbody className="divide-y divide-gray-100">{loading ? <tr><td colSpan={7} className="p-12 text-center"><Loader2 className="mx-auto animate-spin" /></td></tr> : lista.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-slate-400">No hay campañas o convenios registrados.</td></tr> : lista.map(d => <tr key={d.id} className="hover:bg-gray-50"><td className="px-4 py-3"><b className="text-[#052a79]">{d.nombre}</b>{d.protegido && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">PROTEGIDO</span>}</td><td className="px-4 py-3">{d.tipo}</td><td className="px-4 py-3">{d.empresa_aliada_nombre || '-'}</td><td className="px-4 py-3">{fecha(d.fecha_inicio)} – {fecha(d.fecha_fin)}</td><td className="px-4 py-3"><span className="text-[11px] leading-tight text-slate-500">{d.total_servicios} servicios configurados<br/>{d.usos_realizados} usos realizados</span></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 font-bold text-xs ${d.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td className="px-4 py-3"><div className="flex items-center gap-2"><button onClick={() => abrirCodigos(d.id, 'DATOS')} title="Editar y gestionar campaña" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button>{!d.protegido && <><button onClick={async () => { await faregasDescuentosAdminApi.cambiarEstado(d.id, !d.activo); await cargar(); }} title={d.activo ? 'Desactivar' : 'Activar'} className={d.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-green-100 transition-colors"}>{d.activo ? <PowerOff size={18} /> : <Power size={18} />}</button><button onClick={() => void eliminarDescuento(d)} disabled={eliminandoId === d.id} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-red-600 hover:bg-red-100 transition-colors disabled:cursor-wait disabled:opacity-50"><Trash2 size={18} /></button></>}</div></td></tr>)}</tbody>
+            <tbody className="divide-y divide-gray-100">{loading ? <tr><td colSpan={7} className="p-12 text-center"><Loader2 className="mx-auto animate-spin" /></td></tr> : lista.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-slate-400">No hay campañas o convenios registrados.</td></tr> : lista.map(d => <tr key={d.id} className="hover:bg-gray-50"><td className="px-4 py-3"><b className="text-[#052a79]">{d.nombre}</b>{d.protegido && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">PROTEGIDO</span>}</td><td className="px-4 py-3">{d.tipo}</td><td className="px-4 py-3">{d.empresa_aliada_nombre || '-'}</td><td className="px-4 py-3">{fecha(d.fecha_inicio)} – {fecha(d.fecha_fin)}</td><td className="px-4 py-3"><span className="text-[11px] leading-tight text-slate-500">{d.total_servicios} servicios configurados<br />{d.usos_realizados} usos realizados</span></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 font-bold text-xs ${d.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.activo ? 'ACTIVO' : 'INACTIVO'}</span></td><td className="px-4 py-3"><div className="flex items-center gap-2"><button onClick={() => abrirCodigos(d.id, 'DATOS')} title="Editar y gestionar campaña" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors"><Edit size={18} /></button>{!d.protegido && <><button onClick={async () => { await faregasDescuentosAdminApi.cambiarEstado(d.id, !d.activo); await cargar(); }} title={d.activo ? 'Desactivar' : 'Activar'} className={d.activo ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors" : "rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-green-100 transition-colors"}>{d.activo ? <PowerOff size={18} /> : <Power size={18} />}</button><button onClick={() => void eliminarDescuento(d)} disabled={eliminandoId === d.id} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-red-600 hover:bg-red-100 transition-colors disabled:cursor-wait disabled:opacity-50"><Trash2 size={18} /></button></>}</div></td></tr>)}</tbody>
           </table>
         </div>
       </div>
@@ -387,8 +481,47 @@ export function DescuentosView() {
             <button type="button" onClick={() => setCodigoTab('CONFIGURAR')} className={`border-b-2 px-1 py-3 ${codigoTab === 'CONFIGURAR' ? 'border-[#052a79] text-[#052a79]' : 'border-transparent'}`}>Alcance y beneficio ({reglas.length})</button>
           </nav>
 
-          {codigoTab === 'DATOS' && <div><DatosGeneralesCampos form={form} ejecutivos={ejecutivos} onChange={setForm} mostrarAyuda /><div className="flex flex-wrap justify-end gap-2 border-t p-4"><button type="button" onClick={() => void guardar(false)} className="rounded-lg border border-[#052a79] px-5 py-2 text-xs font-black text-[#052a79]">GUARDAR DATOS</button><button type="button" onClick={() => void guardar(true)} className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-black text-white">GUARDAR DESCUENTO</button></div></div>}
+          {codigoTab === 'DATOS' && (
+            <div>
+              <DatosGeneralesCampos
+                form={form}
+                ejecutivos={ejecutivos}
+                onChange={setForm}
+                mostrarAyuda
+              />
 
+              <div className="flex flex-wrap justify-end gap-2 border-t p-4">
+                {/* BOTÓN: GUARDAR DATOS */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hayCambiosEnReglas()) {
+                      void Swal.fire(
+                        'Cambios pendientes',
+                        'Tienes modificaciones en Alcance y beneficio. Usa GUARDAR DESCUENTO para guardar toda la configuración.',
+                        'warning'
+                      );
+                      return;
+                    }
+
+                    void guardar(false);
+                  }}
+                  className="rounded-lg border border-[#052a79] px-5 py-2 text-xs font-black text-[#052a79]"
+                >
+                  GUARDAR DATOS
+                </button>
+
+                {/* BOTÓN: GUARDAR DESCUENTO */}
+                <button
+                  type="button"
+                  onClick={() => void guardar(true)}
+                  className="rounded-lg bg-[#052a79] px-5 py-2 text-xs font-black text-white"
+                >
+                  GUARDAR DESCUENTO
+                </button>
+              </div>
+            </div>
+          )}
           {codigoTab === 'CONFIGURAR' && <DescuentoAlcanceStep
             plantas={plantas}
             serviciosPorPlanta={serviciosPorPlanta}
@@ -406,7 +539,9 @@ export function DescuentosView() {
             onMostrarExcepciones={setMostrarExcepciones}
             onCambiarExcepcion={actualizarExcepcion}
             onRestaurarBeneficio={restaurarBeneficio}
-            onGuardar={guardarReglas}
+            onGuardar={() => {
+              void guardarReglas();
+            }}
           />}
         </div>
       </div>}
