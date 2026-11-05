@@ -47,7 +47,7 @@ export default function FormatoDetalleModal({
   const [editorVersion, setEditorVersion] = useState<FormatoVersion | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [showVersionSource, setShowVersionSource] = useState(false);
-  const [showProtectedVersionConfirm, setShowProtectedVersionConfirm] = useState(false);
+  const [editorSistemaSoloLectura, setEditorSistemaSoloLectura] = useState(false);
   const [notice, setNotice] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importWordInputRef = useRef<HTMLInputElement>(null);
@@ -125,19 +125,32 @@ export default function FormatoDetalleModal({
     }
   };
 
-  const crearVersionOficialProtegida = async () => {
-    if (!formato || !formato.es_protegido || !canManageProtected) return;
-    setWorking(true);
+  const verDiseno = async (version: FormatoVersion) => {
+    if (!formato) return;
     setError('');
     setNotice('');
+    if (version.motor === 'HTML_DINAMICO') {
+      setEditorSistemaSoloLectura(false);
+      setEditorVersion(version);
+      return;
+    }
+    if (formato.codigo !== 'GLP_INICIAL' || version.motor !== 'SISTEMA') {
+      setError('Esta versión no contiene un documento HTML compatible con el diseñador visual.');
+      return;
+    }
+    setWorking(true);
     try {
-      const resultado = await faregasFormatosApi.crearVersionOficialProtegida(formato.id);
-      setShowProtectedVersionConfirm(false);
-      await cargarVersiones(formato.id);
-      if (resultado.reutilizada) {
-        setNotice('Este certificado ya tenía una versión borrador pendiente. Se abrió ese borrador sin crear otro.');
-      }
-      setEditorVersion(resultado.version);
+      const estado = await faregasFormatosApi.obtenerDisenoSistema(formato.id);
+      const versionVisual = [estado.borrador, estado.vigente, ...estado.historial]
+        .find((item) => item?.id === version.id);
+      if (!versionVisual) throw new Error('La versión SISTEMA seleccionada no contiene una configuración visual recuperable.');
+      const preview = await faregasFormatosApi.previsualizarDisenoSistema(formato.id, versionVisual.diseno, version.id);
+      setEditorSistemaSoloLectura(true);
+      setEditorVersion({
+        ...version,
+        configuracion: { ...(version.configuracion || {}), html: preview.html }
+      });
+      setNotice('La versión SISTEMA se muestra con el certificado GLP_INICIAL real. Es de solo lectura porque no contiene HTML editable persistido.');
     } catch (cause) {
       setError(mensajeError(cause));
     } finally {
@@ -277,8 +290,8 @@ export default function FormatoDetalleModal({
   };
 
   if (formato && editorVersion) {
-    return editorVersion.motor === 'HTML_DINAMICO'
-      ? <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-slate-100 text-slate-500">Cargando diseñador…</div>}><FormatoHtmlVariablesEditor key={editorVersion.id} formato={formato} version={editorVersion} canEditProtected={canManageProtected} onOpenVersion={(nuevaVersion) => { setEditorVersion(nuevaVersion); void cargarVersiones(formato.id); }} onBack={() => { setEditorVersion(null); void cargarVersiones(formato.id); }} /></Suspense>
+    return editorVersion.motor === 'HTML_DINAMICO' || editorSistemaSoloLectura
+      ? <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-slate-100 text-slate-500">Cargando diseñador…</div>}><FormatoHtmlVariablesEditor key={`${editorVersion.id}-${editorSistemaSoloLectura ? 'sistema' : 'html'}`} formato={formato} version={editorVersion} canEditProtected={!editorSistemaSoloLectura && canManageProtected} readOnlyNotice={editorSistemaSoloLectura ? 'Esta versión SISTEMA no contiene HTML editable. Se muestra el GLP_INICIAL real en modo de solo lectura para evitar guardar un diseño que la emisión no utilizaría.' : ''} onOpenVersion={(nuevaVersion) => { setEditorSistemaSoloLectura(false); setEditorVersion(nuevaVersion); void cargarVersiones(formato.id); }} onBack={() => { setEditorSistemaSoloLectura(false); setEditorVersion(null); void cargarVersiones(formato.id); }} /></Suspense>
       : <FormatosVariablesEditor formato={formato} version={editorVersion} onBack={() => { setEditorVersion(null); void cargarVersiones(formato.id); }} />;
   }
 
@@ -321,7 +334,6 @@ export default function FormatoDetalleModal({
                 {!formato.es_protegido && <button type="button" disabled={working} onClick={() => void cambiarEstado()} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">{formato.activo ? 'Desactivar formato' : 'Reactivar formato'}</button>}
                 {!formato.es_protegido && formato.motor === 'HTML_DINAMICO' && <button type="button" disabled={working} onClick={() => setShowVersionSource(true)} className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileUp size={16} /> Nueva versión</button>}
                 {!formato.es_protegido && formato.motor === 'DOCX_DINAMICO' && <><input type="file" ref={fileInputRef} onChange={subirVersion} accept=".docx" className="hidden" /><button type="button" disabled={working} onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><FileUp size={16} /> Subir versión DOCX</button></>}
-                {formato.es_protegido && canManageProtected && <button type="button" disabled={working} onClick={() => setShowProtectedVersionConfirm(true)} className="flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><Edit3 size={16} /> Editar certificado protegido</button>}
                 {contextoOperacion && (formato.es_protegido || operacionesVinculadas.length > 1) && <button type="button" disabled={working} onClick={() => void crearVarianteOperacion()} className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Crear variante para esta operación</button>}
                 {!contextoOperacion && formato.es_protegido && onCreateVariant && <button type="button" onClick={() => onCreateVariant(formato)} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">Crear variante</button>}
                 <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-semibold text-slate-600">Cerrar</button>
@@ -350,7 +362,7 @@ export default function FormatoDetalleModal({
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <button type="button" onClick={() => void previsualizar(version)} className="flex items-center gap-1 rounded border px-3 py-1.5 text-sm font-semibold"><Eye size={16} /> Preview</button>
-                          {version.motor === 'HTML_DINAMICO' && <button type="button" onClick={() => setEditorVersion(version)} className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700"><Edit3 size={16} /> {version.estado === 'BORRADOR' && (!formato.es_protegido || canManageProtected) ? 'Diseñar certificado' : 'Ver diseño'}</button>}
+                          {(version.motor === 'HTML_DINAMICO' || (formato.codigo === 'GLP_INICIAL' && version.motor === 'SISTEMA')) && <button type="button" disabled={working} onClick={() => void verDiseno(version)} className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700 disabled:opacity-50"><Edit3 size={16} /> Ver diseño</button>}
                           {version.motor === 'DOCX_DINAMICO' && !formato.es_protegido && version.estado === 'BORRADOR' && <button type="button" onClick={() => setEditorVersion(version)} className="flex items-center gap-1 rounded bg-blue-100 px-3 py-1.5 text-sm font-semibold text-blue-700"><Edit3 size={16} /> Configurar variables</button>}
                           {!formato.es_protegido && version.estado !== 'VIGENTE' && <button type="button" disabled={working} onClick={() => void eliminar(version)} className="flex items-center gap-1 rounded border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600"><Trash2 size={16} /> Eliminar</button>}
                           {!formato.es_protegido && version.estado === 'BORRADOR' && <button type="button" disabled={working} onClick={() => void activar(version)} className="flex items-center gap-1 rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white"><PlayCircle size={16} /> Activar versión</button>}
@@ -409,23 +421,6 @@ export default function FormatoDetalleModal({
         </div>
       )}
 
-      {showProtectedVersionConfirm && formato && (
-        <div className="fixed inset-0 z-[70] grid place-items-center bg-black/60 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-[#052A79]">Editar certificado protegido</h3>
-            <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
-              <p className="font-bold">Esta plantilla es utilizada por {operacionesVinculadas.length} operaciones.</p>
-              <p>Se creará una nueva versión oficial para editar.</p>
-              <p>La versión actual no será modificada.</p>
-              <p>Los certificados ya emitidos conservarán su versión original.</p>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" disabled={working} onClick={() => setShowProtectedVersionConfirm(false)} className="rounded-lg border px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">Cancelar</button>
-              <button type="button" disabled={working} onClick={() => void crearVersionOficialProtegida()} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Crear nueva versión oficial</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

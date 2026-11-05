@@ -32,6 +32,36 @@ export interface VariableCatalogo {
   demo: string;
 }
 
+export interface DisenoSistemaVisual {
+  textos: { titulo: string; certifica: string };
+  pagina: { paddingPx: number };
+  titulo: { fontSizePx: number; textAlign: 'left' | 'center' | 'right' | 'justify'; marginTopPx: number; marginBottomPx: number };
+  cuerpo: { fontSizePx: number; lineHeight: number };
+  tablas: { fontSizePx: number; cellPaddingPx: number; borderWidthPx: number };
+  pie: { fontSizePx: number; textAlign: 'left' | 'center' | 'right' | 'justify'; marginTopPx: number };
+}
+
+export interface VersionDisenoSistema {
+  id: number;
+  version: number;
+  estado: 'BORRADOR' | 'VIGENTE' | 'RETIRADA';
+  motor: 'SISTEMA';
+  diseno: DisenoSistemaVisual;
+  creadoEn: string | null;
+  vigenteDesde: string | null;
+}
+
+export interface EstadoDisenoSistema {
+  formatoId: number;
+  codigo: string;
+  nombre: string;
+  capacidades: { textos: { titulo: boolean; certifica: boolean } };
+  borrador: VersionDisenoSistema | null;
+  vigente: VersionDisenoSistema | null;
+  historial: VersionDisenoSistema[];
+  disenoPredeterminado: DisenoSistemaVisual;
+}
+
 export const faregasFormatosApi = {
   listarFormatos: async (): Promise<Formato[]> => {
     return faregasFetch('/formatos') as Promise<Formato[]>;
@@ -167,9 +197,51 @@ export const faregasFormatosApi = {
     });
   },
 
+  obtenerDisenoSistema: async (formatoId: number): Promise<EstadoDisenoSistema> => {
+    return faregasFetch(`/formatos/${formatoId}/diseno-sistema`) as Promise<EstadoDisenoSistema>;
+  },
+
+  crearBorradorDisenoSistema: async (formatoId: number): Promise<{ version: VersionDisenoSistema; reutilizada: boolean }> => {
+    return faregasFetch(`/formatos/${formatoId}/diseno-sistema/borrador`, {
+      method: 'POST',
+    }) as Promise<{ version: VersionDisenoSistema; reutilizada: boolean }>;
+  },
+
+  guardarBorradorDisenoSistema: async (
+    formatoId: number,
+    versionId: number,
+    diseno: DisenoSistemaVisual
+  ): Promise<{ message: string; version: VersionDisenoSistema }> => {
+    return faregasFetch(`/formatos/${formatoId}/diseno-sistema/borrador/${versionId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ diseno }),
+    }) as Promise<{ message: string; version: VersionDisenoSistema }>;
+  },
+
+  previsualizarDisenoSistema: async (
+    formatoId: number,
+    diseno: DisenoSistemaVisual,
+    versionId?: number
+  ): Promise<{ html: string; diseno: DisenoSistemaVisual; codigo: string; nombre: string; capacidades: EstadoDisenoSistema['capacidades'] }> => {
+    return faregasFetch(`/formatos/${formatoId}/diseno-sistema/preview`, {
+      method: 'POST',
+      body: JSON.stringify({ diseno, versionId: versionId || null }),
+    }) as Promise<{ html: string; diseno: DisenoSistemaVisual; codigo: string; nombre: string; capacidades: EstadoDisenoSistema['capacidades'] }>;
+  },
+
+  activarBorradorDisenoSistema: async (
+    formatoId: number,
+    versionId: number
+  ): Promise<{ message: string; version: VersionDisenoSistema }> => {
+    return faregasFetch(`/formatos/${formatoId}/diseno-sistema/borrador/${versionId}/activar`, {
+      method: 'PUT',
+    }) as Promise<{ message: string; version: VersionDisenoSistema }>;
+  },
+
   obtenerPreviewHtml: async (formatoId: number, versionId: number): Promise<string> => {
     const response = await faregasFetch(`/formatos/${formatoId}/versiones/${versionId}/preview`) as { html?: string };
     if (!response.html) throw new Error('El servidor no devolvió una previsualización HTML.');
     return response.html;
-  }
+  },
+
 };

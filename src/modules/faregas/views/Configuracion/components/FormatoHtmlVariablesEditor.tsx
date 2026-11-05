@@ -48,6 +48,7 @@ interface Props {
   onBack: () => void;
   onOpenVersion?: (version: FormatoVersion) => void;
   canEditProtected?: boolean;
+  readOnlyNotice?: string;
 }
 
 type PanelTab = 'VARIABLES' | 'IMAGENES' | 'PROPIEDADES';
@@ -55,7 +56,7 @@ type PanelTab = 'VARIABLES' | 'IMAGENES' | 'PROPIEDADES';
 const mensajeError = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
 const limiteTabla = (value: number) => Math.max(1, Math.min(20, Number.isFinite(value) ? value : 1));
 
-export default function FormatoHtmlVariablesEditor({ formato, version, onBack, onOpenVersion, canEditProtected = false }: Props) {
+export default function FormatoHtmlVariablesEditor({ formato, version, onBack, onOpenVersion, canEditProtected = false, readOnlyNotice = '' }: Props) {
   const [variables, setVariables] = useState<VariableCatalogo[]>([]);
   const [loadingVariables, setLoadingVariables] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -366,7 +367,7 @@ export default function FormatoHtmlVariablesEditor({ formato, version, onBack, o
         </div>
       )}
 
-      {(error || notice) && <div className={`mx-4 mt-2 rounded border px-3 py-2 text-sm ${error ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-800'}`}>{error || notice}</div>}
+      {(error || notice || readOnlyNotice) && <div className={`mx-4 mt-2 rounded border px-3 py-2 text-sm ${error ? 'border-red-200 bg-red-50 text-red-700' : 'border-blue-200 bg-blue-50 text-blue-800'}`}>{error || notice || readOnlyNotice}</div>}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <main className="flex flex-1 justify-center overflow-auto bg-slate-200 p-6">
