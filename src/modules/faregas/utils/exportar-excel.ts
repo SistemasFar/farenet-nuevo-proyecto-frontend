@@ -135,30 +135,55 @@ export interface ExcelSheetDefinition {
   name: string;
   columns: ExcelColumn[];
   rows: Array<Record<string, ExcelCellValue>>;
+  title?: string;
+  metadata?: Array<[string, ExcelCellValue]>;
+  groupHeaders?: Array<{ header: string; start: number; end: number }>;
+  headerRow?: number;
+  numberColumnsRow?: boolean;
+  note?: string;
 }
 
-function generarWorksheetXml(columns: ExcelColumn[], rows: Array<Record<string, ExcelCellValue>>) {
+function generarWorksheetXml(sheet: ExcelSheetDefinition) {
+  const { columns, rows } = sheet;
   const lastColumn = columnName(Math.max(columns.length - 1, 0));
-  const lastRow = Math.max(rows.length + 1, 1);
+  const groupRow = sheet.groupHeaders?.length ? (sheet.headerRow || 7) - 1 : 0;
+  const headerRowIndex = sheet.headerRow || (groupRow ? 7 : sheet.title ? 6 : 1);
+  const dataStart = headerRowIndex + (sheet.numberColumnsRow ? 2 : 1);
+  const lastRow = Math.max(rows.length + dataStart - 1, headerRowIndex);
   const columnDefinitions = columns.map((column, index) => {
     const width = Math.min(Math.max(column.width || column.header.length + 2, 10), 60);
     return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
   }).join('');
-  const headerRow = columns.map((column, index) => cellXml(column.header, `${columnName(index)}1`, 1)).join('');
+  const preamble: string[] = [];
+  if (sheet.title) preamble.push(`<row r="1">${cellXml(sheet.title, 'A1', 1)}</row>`);
+  (sheet.metadata || []).forEach(([label, value], index) => {
+    const row = index + 2;
+    preamble.push(`<row r="${row}">${cellXml(label, `A${row}`, 1)}${cellXml(value, `B${row}`)}</row>`);
+  });
+  const headerRow = columns.map((column, index) => cellXml(column.header, `${columnName(index)}${headerRowIndex}`, 1)).join('');
+  const sequenceRow = sheet.numberColumnsRow
+    ? `<row r="${headerRowIndex + 1}">${columns.map((_, index) => cellXml(index + 1, `${columnName(index)}${headerRowIndex + 1}`, 2)).join('')}</row>` : '';
   const dataRows = rows.map((row, rowIndex) => {
     const cells = columns.map((column, columnIndex) => {
       const styleIndex = column.format === 'text' ? 2 : column.format === 'decimal2' ? 3 : 0;
-      return cellXml(row[column.key], `${columnName(columnIndex)}${rowIndex + 2}`, styleIndex);
+      return cellXml(row[column.key], `${columnName(columnIndex)}${rowIndex + dataStart}`, styleIndex);
     }).join('');
-    return `<row r="${rowIndex + 2}">${cells}</row>`;
+    return `<row r="${rowIndex + dataStart}">${cells}</row>`;
   }).join('');
+  const merges = [
+    ...(sheet.groupHeaders?.filter((group) => group.end > group.start).map((group) => `<mergeCell ref="${columnName(group.start - 1)}${groupRow}:${columnName(group.end - 1)}${groupRow}"/>`) || []),
+    ...(sheet.note ? [`<mergeCell ref="A6:${lastColumn}6"/>`] : [])
+  ];
+  const occupiedRows = new Set([...preamble.map((_, index) => index + 1), groupRow, sheet.note ? 6 : 0, headerRowIndex, ...(sheet.numberColumnsRow ? [headerRowIndex + 1] : [])].filter(Boolean));
+  const blankRows = Array.from({ length: headerRowIndex - 1 }, (_, index) => index + 1)
+    .filter((row) => !occupiedRows.has(row)).map((row) => `<row r="${row}"/>`).join('');
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <dimension ref="A1:${lastColumn}${lastRow}"/>
-  <sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+  <sheetViews><sheetView workbookViewId="0"><pane ySplit="${headerRowIndex}" topLeftCell="A${dataStart}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
   <cols>${columnDefinitions}</cols>
-  <sheetData><row r="1">${headerRow}</row>${dataRows}</sheetData>
-  <autoFilter ref="A1:${lastColumn}${lastRow}"/>
+  <sheetData>${preamble.join('')}${blankRows}${sheet.note ? `<row r="6">${cellXml(sheet.note, 'A6')}</row>` : ''}${groupRow ? `<row r="${groupRow}">${sheet.groupHeaders!.map((group) => cellXml(group.header, `${columnName(group.start - 1)}${groupRow}`, 1)).join('')}</row>` : ''}<row r="${headerRowIndex}">${headerRow}</row>${sequenceRow}${dataRows}</sheetData>
+  <autoFilter ref="A${headerRowIndex}:${lastColumn}${lastRow}"/>${merges.length ? `<mergeCells count="${merges.length}">${merges.join('')}</mergeCells>` : ''}
 </worksheet>`;
 }
 
@@ -167,7 +192,7 @@ export function crearExcelBytes(
   columns: ExcelColumn[],
   rows: Array<Record<string, ExcelCellValue>>
 ) {
-  const worksheet = generarWorksheetXml(columns, rows);
+  const worksheet = generarWorksheetXml({ name: sheetName, columns, rows });
   const sheet = safeSheetName(sheetName);
   const files = [
     { name: '[Content_Types].xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
@@ -221,7 +246,7 @@ export function crearExcelVariasHojasBytes(sheets: ExcelSheetDefinition[]) {
     },
     ...listaHojas.map((s, index) => ({
       name: `xl/worksheets/sheet${index + 1}.xml`,
-      content: generarWorksheetXml(s.columns, s.rows)
+      content: generarWorksheetXml(s)
     }))
   ];
 

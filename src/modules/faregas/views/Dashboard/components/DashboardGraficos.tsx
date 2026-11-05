@@ -39,6 +39,12 @@ export const DashboardGraficos: React.FC<DashboardGraficosProps> = ({
 
   // Productos con venta en el período
   const productosConVenta = productos.filter((producto) => producto.unidadesVendidas > 0);
+  const categoriasProductos = [...productosConVenta.reduce((categorias, producto) => {
+    const nombre = producto.categoria || 'Sin categoría de catálogo';
+    const actual = categorias.get(nombre) || { unidades: 0, totalSoles: 0 };
+    categorias.set(nombre, { unidades: actual.unidades + producto.unidadesVendidas, totalSoles: actual.totalSoles + producto.totalSoles });
+    return categorias;
+  }, new Map<string, { unidades: number; totalSoles: number }>()).entries()];
   const totalUnidadesGeneral = productosConVenta.reduce((total, producto) => total + producto.unidadesVendidas, 0);
   const productoFiltrado = productoIdSeleccionado
     ? productosConVenta.find((p) => p.id === productoIdSeleccionado)
@@ -173,6 +179,17 @@ export const DashboardGraficos: React.FC<DashboardGraficosProps> = ({
           ) : <span className="text-xs text-slate-500">Distribución por unidades</span>}
         </div>
 
+        {categoriasProductos.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Totales por categoría real del catálogo">
+            {categoriasProductos.map(([categoria, valores]) => (
+              <div key={categoria} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs">
+                <span className="font-semibold text-slate-700">{categoria}</span>
+                <span className="ml-2 text-slate-500">{valores.unidades} un. · S/ {valores.totalSoles.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {productosConVenta.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-slate-400 text-sm">
             Sin productos facturados en el período
@@ -226,7 +243,7 @@ export const DashboardGraficos: React.FC<DashboardGraficosProps> = ({
                       />
                       <div className="min-w-0">
                         <div className="truncate font-semibold text-slate-700" title={producto.descripcion}>{producto.descripcion}</div>
-                        <div className="text-xs text-slate-400 font-mono">{producto.sku}</div>
+                        <div className="text-xs text-slate-400"><span className="font-mono">{producto.sku}</span>{producto.categoria ? ` · ${producto.categoria}` : ''}</div>
                       </div>
                     </div>
                     <div className="shrink-0 text-right">

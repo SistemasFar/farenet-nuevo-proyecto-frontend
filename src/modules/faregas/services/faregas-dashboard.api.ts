@@ -156,6 +156,7 @@ export interface ProductoDetalleItem {
   sku: string;
   descripcion: string;
   unidad: string;
+  categoria?: string;
   unidadesVendidas: number;
   totalSoles: number;
   operaciones: number;
@@ -276,6 +277,33 @@ export interface DashboardRequestOptions {
   signal?: AbortSignal;
 }
 
+export interface ReporteFinancieroResponse {
+  metadatos: { desde: string; hasta: string; fechaGeneracion: string; usuarioExportador: string; plantas: string[]; razonSocialEmisor: string; rucEmisor: string };
+  operaciones: Array<Record<string, any>>;
+  lineas: Array<Record<string, any>>;
+  ventasDirectas: Array<Record<string, any>>;
+  comprobantes: Array<Record<string, any>>;
+  ordenes: Array<Record<string, any>>;
+  pagos: Array<Record<string, any>>;
+  descuentos: Array<Record<string, any>>;
+  ajustes: Array<Record<string, any>>;
+  sedes?: Array<Record<string, any>>;
+}
+
+export interface DocumentosEmitidosExtendidoResponse {
+  cabeceras: Array<Record<string, any>>;
+  lineas: Array<Record<string, any>>;
+}
+
+export interface ResumenMensualFacturacionResponse {
+  cabeceras: Array<Record<string, any>>;
+  metadatos?: { empresasEmisoras?: string[]; rucEmisores?: string[] };
+}
+
+export interface RegistroVentasTributarioResponse {
+  documentos: Array<Record<string, any>>;
+}
+
 function construirQueryString(params: Record<string, unknown>) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -349,6 +377,30 @@ export const faregasDashboardApi = {
   obtenerExportacion: async (filtros: FiltrosDashboard): Promise<DashboardExportacionResponse> => {
     const qs = construirQueryString(filtros as Record<string, unknown>);
     const res = await faregasFetch(`/dashboard/exportacion${qs}`);
+    return res.data;
+  },
+
+  obtenerReporteFinanciero: async (filtros: FiltrosDashboard): Promise<ReporteFinancieroResponse> => {
+    const qs = construirQueryString(filtros as Record<string, unknown>);
+    const res = await faregasFetch(`/dashboard/exportacion-financiera${qs}`);
+    return res.data;
+  },
+
+  obtenerDocumentosEmitidosExtendido: async (filtros: FiltrosDashboard): Promise<DocumentosEmitidosExtendidoResponse> => {
+    const qs = construirQueryString(filtros as Record<string, unknown>);
+    const res = await faregasFetch(`/dashboard/documentos-emitidos-extendido${qs}`);
+    return res.data;
+  },
+
+  obtenerResumenMensualFacturacion: async (filtros: FiltrosDashboard): Promise<ResumenMensualFacturacionResponse> => {
+    const qs = construirQueryString(filtros as Record<string, unknown>);
+    const res = await faregasFetch(`/dashboard/resumen-mensual-facturacion${qs}`);
+    return res.data;
+  },
+
+  obtenerRegistroVentasTributario: async (filtros: FiltrosDashboard): Promise<RegistroVentasTributarioResponse> => {
+    const qs = construirQueryString(filtros as Record<string, unknown>);
+    const res = await faregasFetch(`/dashboard/registro-ventas-tributario${qs}`);
     return res.data;
   }
 };

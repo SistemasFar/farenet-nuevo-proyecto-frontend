@@ -26,6 +26,7 @@ import { FaregasConfiguracionView } from './modules/faregas/views/Configuracion/
 import { FaregasFacturacionView } from './modules/faregas/views/Facturacion/FaregasFacturacionView';
 import { DescuentosView as FaregasDescuentosView } from './modules/faregas/views/Descuentos/DescuentosView';
 import { FaregasDashboardView } from './modules/faregas/views/Dashboard/FaregasDashboardView';
+import { ReportesFinancierosView } from './modules/faregas/views/Dashboard/ReportesFinancierosView';
 import { ChipsView as FaregasChipsView } from './modules/faregas/views/Chips/ChipsView';
 
 import { useEmpresa } from './context/EmpresaContext';
@@ -603,6 +604,20 @@ export default function App() {
                     const userPerms = fUser?.permisos || [];
                     return userPerms.includes('MENU_DASHBOARD') || userPerms.includes('DASHBOARD_GLOBAL') || userPerms.includes('DASHBOARD_SEDE') ? (
                       <FaregasDashboardView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                }
+              />
+              <Route
+                path="reportes-financieros"
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    return userPerms.includes('MENU_DASHBOARD') || userPerms.includes('DASHBOARD_GLOBAL') || userPerms.includes('DASHBOARD_SEDE') ? (
+                      <ReportesFinancierosView />
                     ) : (
                       <ForbiddenView />
                     );

@@ -20,8 +20,13 @@ export const ResumenGeneralTab: React.FC<ResumenGeneralTabProps> = ({ resumen, s
         'cantidadOperaciones',
         'ventaOperativaGenerada',
         'certificadosEmitidos',
+        'duplicadosEmitidos',
+        'productosVendidos',
         'totalCobrado',
         'saldoPendiente',
+        'montoDescontado',
+        'facturasAceptadas',
+        'boletasAceptadas',
         'comprobantesRechazadosOError'
       ]}
       titulo="Panorama del período"
@@ -29,10 +34,10 @@ export const ResumenGeneralTab: React.FC<ResumenGeneralTabProps> = ({ resumen, s
     />
     <DashboardGraficos
       serieDiaria={resumen?.serieDiaria || []}
-      distribucionCertificados={[]}
-      distribucionPagos={[]}
-      productos={[]}
-      mostrar={['evolucion']}
+      distribucionCertificados={resumen?.distribucionCertificados || []}
+      distribucionPagos={resumen?.distribucionPagos || []}
+      productos={resumen?.distribucionProductos || []}
+      mostrar={['evolucion', 'certificados', 'productos', 'pagos']}
     />
     <DashboardSedes sedes={sedes} cargando={cargando} />
     <DashboardAlertas alertas={resumen?.alertas || []} />

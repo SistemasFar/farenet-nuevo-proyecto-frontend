@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from './MainLayout';
-import { faregasDashboardApi, type FiltrosDashboard } from '../../services/faregas-dashboard.api';
-import { exportarDashboardExcel } from '../../utils/faregas-dashboard-exportacion';
-import { obtenerRangoRapido, validarRangoFechasDashboard } from '../../utils/faregas-dashboard-fechas';
+import type { FiltrosDashboard } from '../../services/faregas-dashboard.api';
+import { obtenerRangoRapido } from '../../utils/faregas-dashboard-fechas';
 import { CertificadosTab } from './components/CertificadosTab';
 import { CobranzaFacturacionTab } from './components/CobranzaFacturacionTab';
 import { DashboardFiltros } from './components/DashboardFiltros';
@@ -14,6 +13,7 @@ import { useFaregasDashboardData, type DashboardTabId } from './hooks/useFaregas
 
 export const FaregasDashboardView: React.FC = () => {
   const context = useOutletContext<MainLayoutContext>();
+  const navigate = useNavigate();
   const user = context?.user;
   const perfilId = user?.perfilId || (user as any)?.perfil_id;
   const permisos = (context?.permisos && context.permisos.length > 0)
@@ -22,9 +22,8 @@ export const FaregasDashboardView: React.FC = () => {
   const plantaActiva = context?.plantaSeleccionada;
   const plantasDisponibles = context?.plantasDisponibles || [];
 
-  const { puedeVerGlobal, puedeExportar } = resolverPermisosDashboard(permisos, perfilId);
+  const { puedeVerGlobal } = resolverPermisosDashboard(permisos, perfilId);
   const [tabActiva, setTabActiva] = useState<DashboardTabId>('resumen');
-  const [exportando, setExportando] = useState(false);
   const [filtros, setFiltros] = useState<FiltrosDashboard>(() => {
     const { desde, hasta } = obtenerRangoRapido('30D');
     return { alcance: puedeVerGlobal ? 'GLOBAL' : 'SEDE', desde, hasta };
@@ -35,31 +34,6 @@ export const FaregasDashboardView: React.FC = () => {
   const handleCambiarFiltros = (nuevos: Partial<FiltrosDashboard>) => {
     dashboard.reiniciarPaginas();
     setFiltros((actuales) => ({ ...actuales, ...nuevos }));
-  };
-
-  const handleExportarExcel = async () => {
-    if (!puedeExportar) {
-      alert('No tiene permiso DASHBOARD_EXPORTAR para descargar el reporte.');
-      return;
-    }
-
-    const validacion = validarRangoFechasDashboard(filtros.desde || '', filtros.hasta || '');
-    if (!validacion.valido) {
-      alert(validacion.mensaje || 'El período máximo permitido es de un mes. Selecciona un rango de fechas más corto.');
-      return;
-    }
-
-    setExportando(true);
-    try {
-      const reporte = await faregasDashboardApi.obtenerExportacion(filtros);
-      exportarDashboardExcel(reporte, filtros);
-    } catch (error: unknown) {
-      console.error('Error al exportar reporte Excel multi-hoja:', error);
-      const mensaje = error instanceof Error ? error.message : 'Error inesperado al exportar Excel.';
-      alert(`No se pudo exportar el reporte: ${mensaje}`);
-    } finally {
-      setExportando(false);
-    }
   };
 
   const conteos: Partial<Record<DashboardTabId, number | undefined>> = {
@@ -100,12 +74,10 @@ export const FaregasDashboardView: React.FC = () => {
         filtros={filtros}
         onCambiarFiltros={handleCambiarFiltros}
         onActualizar={() => void dashboard.recargar()}
-        onExportar={() => void handleExportarExcel()}
-        exportando={exportando}
+        onAbrirReportes={() => navigate('/faregas/reportes-financieros')}
         plantasDisponibles={plantasDisponibles}
         plantaActivaNombre={plantaActiva?.nombre || 'Sede Actual'}
         puedeVerGlobal={puedeVerGlobal}
-        puedeExportar={puedeExportar}
         cargando={dashboard.cargando}
         tiposCertificadoDisponibles={dashboard.resumen?.distribucionCertificados.map((item) => item.tipo)}
       />

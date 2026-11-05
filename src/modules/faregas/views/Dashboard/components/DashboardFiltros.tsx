@@ -7,13 +7,11 @@ interface DashboardFiltrosProps {
   filtros: FiltrosDashboard;
   onCambiarFiltros: (nuevos: Partial<FiltrosDashboard>) => void;
   onActualizar: () => void;
-  onExportar: () => void;
-  exportando: boolean;
+  onAbrirReportes: () => void;
   cargando: boolean;
   plantasDisponibles: PlantaAsignada[];
   plantaActivaNombre: string;
   puedeVerGlobal: boolean;
-  puedeExportar: boolean;
   tiposCertificadoDisponibles?: string[];
 }
 
@@ -21,13 +19,11 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
   filtros,
   onCambiarFiltros,
   onActualizar,
-  onExportar,
-  exportando,
+  onAbrirReportes,
   cargando,
   plantasDisponibles,
   plantaActivaNombre,
   puedeVerGlobal,
-  puedeExportar,
   tiposCertificadoDisponibles = ['GLP', 'GNV', 'CONFORMIDAD', 'COMPLEMENTARIOS']
 }) => {
   const validacionRango = validarRangoFechasDashboard(filtros.desde || '', filtros.hasta || '');
@@ -122,24 +118,17 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
             {cargando ? 'Actualizando...' : 'Actualizar'}
           </button>
 
-          {puedeExportar && (
-            <button
+          <button
               type="button"
-              onClick={onExportar}
-              disabled={exportando || !esRangoValido}
-              title={!esRangoValido ? (validacionRango.mensaje || 'Período no permitido') : 'Exportar reporte consolidado'}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-white text-sm font-semibold rounded-lg shadow-sm transition ${
-                exportando || !esRangoValido
-                  ? 'bg-emerald-300 cursor-not-allowed opacity-60'
-                  : 'bg-emerald-700 hover:bg-emerald-800'
-              }`}
+              onClick={onAbrirReportes}
+              title="Abrir reportes financieros"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-white text-sm font-semibold rounded-lg shadow-sm transition bg-emerald-700 hover:bg-emerald-800"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              {exportando ? 'Generando Excel...' : '↓ Exportar Excel'}
-            </button>
-          )}
+              Reportes financieros
+          </button>
         </div>
       </div>
 
