@@ -15,6 +15,7 @@ import {
   estadoCertificadoPanel,
   estadoComprobantePanel,
 } from '../../utils/documentos-electronicos';
+import { fechaFiscalEsAnteriorALima, fechaFiscalEsHoyLima, milisegundosHastaMedianocheLima, obtenerFechaHoyLima, parsearFechaFiscal } from '../../utils/fecha-fiscal-dia';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
@@ -23,6 +24,12 @@ export interface BorradorPanel {
   fechaCreacion?: string;
   fechaActualizacion?: string;
   fechaEmision?: string | null;
+  fechaDocumentoFiscal?: string | null;
+  facturacionId?: number | null;
+  facturacionProveedor?: string | null;
+  facturacionSerie?: string | null;
+  facturacionNumero?: number | string | null;
+  enlaceXml?: string | null;
   numeroCertificado?: string | null;
   placa?: string;
   clienteDocumento?: string;
@@ -159,8 +166,16 @@ const esComprobanteOperable = (facturacion: Pick<FacturacionFaregas, 'estado' | 
 const esResumenComprobanteOperable = (item: BorradorPanel) => {
   const entorno = String(item.entornoFacturador || '').trim().toUpperCase();
   const estado = String(item.estadoFacturacion || '').trim().toUpperCase();
+  const identidadCompleta = Boolean(String(item.facturacionSerie || '').trim())
+    && Number(item.facturacionNumero) > 0
+    && Boolean(String(item.nroComprobante || '').trim());
+  const tieneArtefactoFiscal = Boolean(item.enlacePdf || item.enlaceXml);
   return (estado === 'ACEPTADO' && item.aceptadaSunat === true)
-    || (entorno === 'DEMO' && estado === 'PENDIENTE_SUNAT' && Boolean(item.nroComprobante) && Boolean(item.enlacePdf));
+    || (entorno === 'DEMO'
+      && String(item.facturacionProveedor || '').trim().toUpperCase() === 'NUBEFACT'
+      && estado === 'PENDIENTE_SUNAT'
+      && identidadCompleta
+      && tieneArtefactoFiscal);
 };
 
 const esAnulacionPendiente = (item: BorradorPanel) => ['BORRADOR', 'PENDIENTE']
@@ -315,29 +330,55 @@ export const mensajeBloqueoAnulacionCertificado = (item: Pick<BorradorPanel, 'an
     : 'Este certificado tiene un importe final de S/ 0.00 y no admite anulación.'
 );
 
-export const puedeSolicitarAnulacionCertificado = (item: BorradorPanel, permisos: string[]) => (
+export const puedeSolicitarAnulacionCertificado = (item: BorradorPanel, permisos: string[], hoyLima = obtenerFechaHoyLima()) => (
   puedeCrearSolicitudAnulacion(permisos)
   && certificadoEmitidoVisible(item)
-  && item.anulacionEnPlazo === true
+  && Boolean(item.facturacionId)
+  && fechaFiscalEsHoyLima(item.fechaDocumentoFiscal, hoyLima)
+  && esResumenComprobanteOperable(item)
   && !certificadoAnulacionBloqueadaPorImporte(item)
   && !esSolicitudActivaAnulacion(item.solicitudOperacionEstado)
   && !esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)
   && !notaCreditoBloqueaOperacionesFiscales(item)
 );
 
-export const puedeCrearNotaCreditoPanel = (item: BorradorPanel, permisos: string[]) => {
+export const puedeCrearNotaCreditoPanel = (item: BorradorPanel, permisos: string[], hoyLima = obtenerFechaHoyLima()) => {
   if (!permisos.includes('FAREGAS_NOTA_CREDITO')) return false;
-
-  // TEMPORAL: En entorno de pruebas NubeFact DEMO, omitir la regla de 24 horas
-  // para permitir la emisión inmediata de notas de crédito.
-  // Controlado por la variable de entorno VITE_NOTA_CREDITO_SIN_PLAZO_24H.
-  const sinPlazo24h = import.meta.env.VITE_NOTA_CREDITO_SIN_PLAZO_24H === 'true';
-  if (!sinPlazo24h && item.anulacionEnPlazo !== false) return false;
+  if (!fechaFiscalEsAnteriorALima(item.fechaDocumentoFiscal, hoyLima)) return false;
 
   if (esSolicitudActivaAnulacion(item.solicitudOperacionEstado) || esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)) return false;
   if (esAnulacionPendiente(item) || esAnulacionAceptada(item)) return false;
+  if (notaCreditoBloqueaOperacionesFiscales(item)) return false;
   const comprobanteAceptado = esResumenComprobanteOperable(item);
   return comprobanteAceptado;
+};
+
+export const motivoNotaCreditoNoDisponible = (item: BorradorPanel, permisos: string[], hoyLima = obtenerFechaHoyLima()): string | null => {
+  if (!permisos.includes('FAREGAS_NOTA_CREDITO')) return null;
+  if (!item.facturacionId) return 'Sin comprobante fiscal asociado.';
+  if (!parsearFechaFiscal(item.fechaDocumentoFiscal)) return 'Falta una fecha fiscal verificable; no se habilitan acciones fiscales.';
+  if (!fechaFiscalEsAnteriorALima(item.fechaDocumentoFiscal, hoyLima)) return 'La nota de crédito se habilita desde el día siguiente a la fecha fiscal de emisión.';
+  if (esSolicitudActivaAnulacion(item.solicitudOperacionEstado)) return 'Hay una solicitud fiscal en trámite.';
+  if (esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)) return 'La operación fiscal de este comprobante ya fue completada.';
+  if (esAnulacionPendiente(item)) return 'Hay una anulación pendiente; consulte su resultado antes de continuar.';
+  if (esAnulacionAceptada(item) || String(item.estadoFacturacion || '').toUpperCase() === 'ANULADO') return 'El comprobante ya está anulado.';
+  if (notaCreditoBloqueaOperacionesFiscales(item)) {
+    return item.estadoNotaCredito
+      ? `Ya existe una nota de crédito con estado ${etiquetaEstadoNotaCredito(item.estadoNotaCredito)}.`
+      : 'Ya existe una nota de crédito vinculada a este comprobante.';
+  }
+  if (String(item.estado || '').toUpperCase() !== 'EMITIDO') return 'El certificado no está emitido.';
+  if (esResumenComprobanteOperable(item)) return null;
+  const estado = String(item.estadoFacturacion || '').trim().toUpperCase();
+  if (estado === 'PENDIENTE_SUNAT') {
+    return String(item.entornoFacturador || '').trim().toUpperCase() === 'DEMO'
+      ? 'El comprobante DEMO aún no tiene identidad o archivos fiscales completos.'
+      : 'El comprobante está pendiente de aceptación SUNAT; no admite nota de crédito todavía.';
+  }
+  if (estado === 'RECHAZADO') return 'El comprobante fue rechazado; no admite nota de crédito.';
+  if (estado === 'ANULADO') return 'El comprobante ya está anulado.';
+  if (estado === 'ACEPTADO' && item.aceptadaSunat !== true) return 'No hay aceptación fiscal verificable de SUNAT.';
+  return 'El estado fiscal actual del comprobante no admite nota de crédito.';
 };
 
 export function InicioView() {
@@ -349,6 +390,7 @@ export function InicioView() {
   const puedeVerSolicitudes = permisos.includes('FAREGAS_SOLICITUD_VER') || permisos.includes('FAREGAS_SOLICITUD_ADMINISTRAR');
   const [borradores, setBorradores] = useState<BorradorPanel[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hoyLima, setHoyLima] = useState(() => obtenerFechaHoyLima());
   const [error, setError] = useState('');
   const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
   const [mostrarDuplicado, setMostrarDuplicado] = useState(false);
@@ -377,6 +419,24 @@ export function InicioView() {
   const puedeConsultar = useMemo(() => {
     return plantaSeleccionada && plantaSeleccionada.trim() !== '';
   }, [plantaSeleccionada]);
+
+  useEffect(() => {
+    const actualizarFecha = () => setHoyLima(obtenerFechaHoyLima());
+    const temporizador = window.setTimeout(actualizarFecha, milisegundosHastaMedianocheLima());
+    const alVolver = () => {
+      actualizarFecha();
+      if (document.visibilityState === 'visible') void cargarInspecciones(page, pageSize);
+    };
+    window.addEventListener('focus', alVolver);
+    document.addEventListener('visibilitychange', alVolver);
+    return () => {
+      window.clearTimeout(temporizador);
+      window.removeEventListener('focus', alVolver);
+      document.removeEventListener('visibilitychange', alVolver);
+    };
+    // Se programa un solo temporizador hasta medianoche; al ejecutarse, el nuevo
+    // día recalcula y programa la próxima transición.
+  }, [hoyLima, page, pageSize]);
 
 
 
@@ -543,11 +603,25 @@ export function InicioView() {
   };
 
   const abrirRegistro = (ins: BorradorPanel) => {
+    setHoyLima(obtenerFechaHoyLima());
     const editable = ins.estado === 'BORRADOR' && !esAnulacionPendiente(ins) && !esAnulacionAceptada(ins);
     navigate(`/faregas/certificados/${ins.id}/continuar${editable ? '' : '?vista=consulta'}`);
   };
 
-  const solicitarAnulacionTotal = (ins: BorradorPanel) => {
+  const solicitarAnulacionTotal = async (ins: BorradorPanel) => {
+    try {
+      const facturacion = await obtenerFacturacion(ins.id);
+      const hoy = obtenerFechaHoyLima();
+      setHoyLima(hoy);
+      if (!facturacion || !fechaFiscalEsHoyLima(facturacion.fechaDocumento, hoy)) {
+        await Swal.fire('Acción no disponible', 'La anulación solo puede solicitarse durante el día fiscal de emisión (hora de Perú).', 'warning');
+        await cargarInspecciones(page, pageSize);
+        return;
+      }
+    } catch (err) {
+      await Swal.fire('No se pudo validar la fecha', err instanceof Error ? err.message : 'No se pudo verificar la fecha fiscal del comprobante.', 'error');
+      return;
+    }
     setCertificadoSolicitudId(ins.id);
     setSolicitudSolicitadaId(null);
   };
@@ -585,6 +659,13 @@ export function InicioView() {
       setAccionEnProceso(certificadoId);
       const facturacion = await comprobarComprobanteOperable(certificadoId);
       if (!facturacion) return;
+      const hoy = obtenerFechaHoyLima();
+      setHoyLima(hoy);
+      if (!fechaFiscalEsAnteriorALima(facturacion.fechaDocumento, hoy)) {
+        await Swal.fire('Acción no disponible', 'La nota de crédito se habilita desde el día siguiente a la fecha fiscal de emisión (hora de Perú).', 'warning');
+        await cargarInspecciones(page, pageSize);
+        return;
+      }
       setNotaCreditoModal({
         certificadoId,
         permitirMotivosAnulacion,
@@ -819,11 +900,14 @@ export function InicioView() {
                   const notaCreditoBloquea = notaCreditoBloqueaOperacionesFiscales(ins);
                   const accionesFiscalesCongeladas = accionesCongeladas || notaCreditoBloquea;
                   const certificadoEditable = ins.estado === 'BORRADOR' && !accionesFiscalesCongeladas;
-                  const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos) && !notaCreditoBloquea;
+                  const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos, hoyLima) && !notaCreditoBloquea;
                   const anulacionBloqueadaPorImporte = certificadoAnulacionBloqueadaPorImporte(ins)
                     && certificadoEmitidoVisible(ins)
                     && puedeCrearSolicitudAnulacion(permisos);
-                  const puedeCrearNota = puedeCrearNotaCreditoPanel(ins, permisos) && !notaCreditoBloquea;
+                  const puedeCrearNota = puedeCrearNotaCreditoPanel(ins, permisos, hoyLima) && !notaCreditoBloquea;
+                  const motivoAccionFiscal = !puedeCrearNota && !puedeSolicitar
+                    ? motivoNotaCreditoNoDisponible(ins, permisos, hoyLima)
+                    : null;
                   // Los controles permanecen visibles aunque el resumen todavía no se haya
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
                   // de abrir/enviar algo, por lo que no debilita la validación tributaria.
@@ -991,6 +1075,7 @@ export function InicioView() {
                             ><FileEdit size={16} /></button>
                           )}
                         </div>
+                        {motivoAccionFiscal && <p className="mt-1 max-w-[220px] whitespace-normal text-left text-[10px] text-slate-500">{motivoAccionFiscal}</p>}
                       </td>
                     </tr>
                   );
@@ -1020,8 +1105,11 @@ export function InicioView() {
               const certificadoEditable = ins.estado === 'BORRADOR' && !accionesFiscalesCongeladas;
               const puedeVerComprobante = Boolean(ins.enlacePdf);
               const puedeVerNotaCredito = Boolean(ins.notaCreditoId && ins.notaCreditoPdfDisponible);
-              const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos) && !notaCreditoBloquea;
-              const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos);
+              const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos, hoyLima) && !notaCreditoBloquea;
+              const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos, hoyLima);
+              const motivoAccionFiscal = !puedeCrearNotaCredito && !puedeSolicitar
+                ? motivoNotaCreditoNoDisponible(ins, permisos, hoyLima)
+                : null;
               const anulacionBloqueadaPorImporte = certificadoAnulacionBloqueadaPorImporte(ins)
                 && certificadoEmitidoVisible(ins)
                 && puedeCrearSolicitudAnulacion(permisos);
@@ -1121,7 +1209,7 @@ export function InicioView() {
                       )}
                     </div>
                   )}
-                  {!solicitudCompletada && (puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar) && (
+                  {!solicitudCompletada && (puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar || motivoAccionFiscal) && (
                     <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       {anulacionPendiente && ins.anulacionId && (
                         <button
@@ -1176,6 +1264,7 @@ export function InicioView() {
                           Acciones congeladas
                         </button>
                       )}
+                      {motivoAccionFiscal && <p className="w-full text-xs text-slate-500">{motivoAccionFiscal}</p>}
                     </div>
                   )}
                 </div>

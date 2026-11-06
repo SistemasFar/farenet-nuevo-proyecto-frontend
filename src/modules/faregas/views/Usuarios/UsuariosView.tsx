@@ -829,6 +829,9 @@ export function UsuariosView() {
                             {/* SECCIÓN IDENTIDAD */}
                             <div className="bg-white p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Identidad</h3>
+                                <p className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                                    FAREGAS guarda este perfil en su propio almacenamiento. Hasta aplicar la migración de perfiles, las altas independientes y los cambios personales estarán temporalmente bloqueados; no se modificará el padrón de FARENET.
+                                </p>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Tipo de Documento <span className="text-red-500">*</span></label>

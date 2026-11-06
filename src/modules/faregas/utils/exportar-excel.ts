@@ -4,7 +4,7 @@ export interface ExcelColumn {
   key: string;
   header: string;
   width?: number;
-  format?: 'text' | 'decimal2';
+  format?: 'text' | 'decimal2' | 'date' | 'currency';
 }
 
 interface ZipEntry {
@@ -141,6 +141,7 @@ export interface ExcelSheetDefinition {
   headerRow?: number;
   numberColumnsRow?: boolean;
   note?: string;
+  totalsRow?: boolean;
 }
 
 function generarWorksheetXml(sheet: ExcelSheetDefinition) {
@@ -150,6 +151,7 @@ function generarWorksheetXml(sheet: ExcelSheetDefinition) {
   const headerRowIndex = sheet.headerRow || (groupRow ? 7 : sheet.title ? 6 : 1);
   const dataStart = headerRowIndex + (sheet.numberColumnsRow ? 2 : 1);
   const lastRow = Math.max(rows.length + dataStart - 1, headerRowIndex);
+  const filterLastRow = Math.max(headerRowIndex, lastRow - (sheet.totalsRow && rows.length ? 1 : 0));
   const columnDefinitions = columns.map((column, index) => {
     const width = Math.min(Math.max(column.width || column.header.length + 2, 10), 60);
     return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
@@ -165,14 +167,19 @@ function generarWorksheetXml(sheet: ExcelSheetDefinition) {
     ? `<row r="${headerRowIndex + 1}">${columns.map((_, index) => cellXml(index + 1, `${columnName(index)}${headerRowIndex + 1}`, 2)).join('')}</row>` : '';
   const dataRows = rows.map((row, rowIndex) => {
     const cells = columns.map((column, columnIndex) => {
-      const styleIndex = column.format === 'text' ? 2 : column.format === 'decimal2' ? 3 : 0;
+      const isTotal = Boolean(sheet.totalsRow && rowIndex === rows.length - 1);
+      const baseStyle = column.format === 'text' ? 2 : column.format === 'decimal2' ? 3 : column.format === 'date' ? 4 : column.format === 'currency' ? 5 : 0;
+      const styleIndex = isTotal
+        ? (column.format === 'currency' ? 9 : column.format === 'decimal2' ? 7 : column.format === 'date' ? 8 : 6)
+        : baseStyle;
       return cellXml(row[column.key], `${columnName(columnIndex)}${rowIndex + dataStart}`, styleIndex);
     }).join('');
     return `<row r="${rowIndex + dataStart}">${cells}</row>`;
   }).join('');
   const merges = [
     ...(sheet.groupHeaders?.filter((group) => group.end > group.start).map((group) => `<mergeCell ref="${columnName(group.start - 1)}${groupRow}:${columnName(group.end - 1)}${groupRow}"/>`) || []),
-    ...(sheet.note ? [`<mergeCell ref="A6:${lastColumn}6"/>`] : [])
+    ...(sheet.note ? [`<mergeCell ref="A6:${lastColumn}6"/>`] : []),
+    ...(sheet.title ? [`<mergeCell ref="A1:${lastColumn}1"/>`] : [])
   ];
   const occupiedRows = new Set([...preamble.map((_, index) => index + 1), groupRow, sheet.note ? 6 : 0, headerRowIndex, ...(sheet.numberColumnsRow ? [headerRowIndex + 1] : [])].filter(Boolean));
   const blankRows = Array.from({ length: headerRowIndex - 1 }, (_, index) => index + 1)
@@ -183,7 +190,7 @@ function generarWorksheetXml(sheet: ExcelSheetDefinition) {
   <sheetViews><sheetView workbookViewId="0"><pane ySplit="${headerRowIndex}" topLeftCell="A${dataStart}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
   <cols>${columnDefinitions}</cols>
   <sheetData>${preamble.join('')}${blankRows}${sheet.note ? `<row r="6">${cellXml(sheet.note, 'A6')}</row>` : ''}${groupRow ? `<row r="${groupRow}">${sheet.groupHeaders!.map((group) => cellXml(group.header, `${columnName(group.start - 1)}${groupRow}`, 1)).join('')}</row>` : ''}<row r="${headerRowIndex}">${headerRow}</row>${sequenceRow}${dataRows}</sheetData>
-  <autoFilter ref="A${headerRowIndex}:${lastColumn}${lastRow}"/>${merges.length ? `<mergeCells count="${merges.length}">${merges.join('')}</mergeCells>` : ''}
+  <autoFilter ref="A${headerRowIndex}:${lastColumn}${filterLastRow}"/>${merges.length ? `<mergeCells count="${merges.length}">${merges.join('')}</mergeCells>` : ''}
 </worksheet>`;
 }
 
@@ -242,7 +249,7 @@ export function crearExcelVariasHojasBytes(sheets: ExcelSheetDefinition[]) {
     },
     {
       name: 'xl/styles.xml',
-      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF052A79"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`
+      content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;S/&quot; #,##0.00"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF052A79"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF7"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top style="thin"><color rgb="FF64748B"/></top><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="10"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="4" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1"/><xf numFmtId="14" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1"/><xf numFmtId="164" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyNumberFormat="1"/></cellXfs></styleSheet>`
     },
     ...listaHojas.map((s, index) => ({
       name: `xl/worksheets/sheet${index + 1}.xml`,

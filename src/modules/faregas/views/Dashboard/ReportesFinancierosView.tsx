@@ -2,19 +2,22 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import type { MainLayoutContext } from './MainLayout';
 import { faregasDashboardApi, type FiltrosDashboard } from '../../services/faregas-dashboard.api';
-import { exportarDashboardExcel } from '../../utils/faregas-dashboard-exportacion';
 import { exportarReporteFinanciero } from '../../utils/faregas-reporte-financiero';
+import { exportarReporteVentaMensual } from '../../utils/faregas-reporte-venta-mensual';
+import { exportarResumenDashboard } from '../../utils/faregas-resumen-dashboard';
 import { exportarDocumentosEmitidosExtendido } from '../../utils/faregas-documentos-emitidos-extendido';
 import { exportarResumenMensualFacturacion } from '../../utils/faregas-resumen-mensual-facturacion';
 import { exportarRegistroVentasTributario } from '../../utils/faregas-registro-ventas-tributario';
-import { validarRangoFechasDashboard } from '../../utils/faregas-dashboard-fechas';
+import { obtenerFechaHoyLima, validarRangoFechasDashboard } from '../../utils/faregas-dashboard-fechas';
 import { resolverPermisosDashboard } from './dashboard-config';
 
 const REPORTES = [
   { id: 'consolidado', nombre: 'Reporte financiero consolidado', disponible: true },
   { id: 'documentos', nombre: 'Documentos emitidos — Extendido', disponible: true },
   { id: 'resumen', nombre: 'Resumen mensual de facturación', disponible: true },
-  { id: 'tributario', nombre: 'Registro de ventas tributario', disponible: true }
+  { id: 'tributario', nombre: 'Registro de ventas tributario', disponible: true },
+  { id: 'venta-mensual', nombre: 'Reporte de Venta Mensual', disponible: true },
+  { id: 'dashboard', nombre: 'Resumen Dashboard', disponible: true }
 ] as const;
 
 export const ReportesFinancierosView: React.FC = () => {
@@ -28,8 +31,7 @@ export const ReportesFinancierosView: React.FC = () => {
   const [plantaKey, setPlantaKey] = useState('');
   const [reporte, setReporte] = useState<string>(REPORTES[0].id);
   const [exportando, setExportando] = useState(false);
-  const [exportandoAnterior, setExportandoAnterior] = useState(false);
-  const [tipoExportacion, setTipoExportacion] = useState<'consolidado' | 'documentos' | 'resumen' | 'tributario' | null>(null);
+  const [tipoExportacion, setTipoExportacion] = useState<'consolidado' | 'documentos' | 'resumen' | 'tributario' | 'venta-mensual' | 'dashboard' | null>(null);
   const reporteSeleccionado = useMemo(() => REPORTES.find((item) => item.id === reporte), [reporte]);
   const habilitado = Boolean(reporteSeleccionado?.disponible && puedeExportar);
 
@@ -57,23 +59,44 @@ export const ReportesFinancierosView: React.FC = () => {
     }
   };
 
-  const descargarExportacionAnterior = async () => {
-    const filtros: FiltrosDashboard = {
-      alcance: puedeVerGlobal ? 'GLOBAL' : 'SEDE',
-      desde: `${anio}-${String(mes).padStart(2, '0')}-01`,
-      hasta: `${anio}-${String(mes).padStart(2, '0')}-${String(new Date(anio, mes, 0).getDate()).padStart(2, '0')}`,
+  const filtrosPeriodo = (): FiltrosDashboard => {
+    const desde = `${anio}-${String(mes).padStart(2, '0')}-01`;
+    const finMes = `${anio}-${String(mes).padStart(2, '0')}-${String(new Date(anio, mes, 0).getDate()).padStart(2, '0')}`;
+    const hoyLima = obtenerFechaHoyLima();
+    return {
+      alcance: puedeVerGlobal ? 'GLOBAL' : 'SEDE', desde,
+      hasta: hoyLima.slice(0, 7) === desde.slice(0, 7) ? hoyLima : finMes,
       ...(plantaKey ? { plantaKey } : {})
     };
-    setExportandoAnterior(true);
+  };
+
+  const descargarVentaMensual = async () => {
+    const filtros = filtrosPeriodo();
+    const validacion = validarRangoFechasDashboard(filtros.desde || '', filtros.hasta || '');
+    if (!validacion.valido) { window.alert(validacion.mensaje || 'El período seleccionado no es válido.'); return; }
+    setTipoExportacion('venta-mensual');
+    try {
+      const [datos, dashboard] = await Promise.all([
+        faregasDashboardApi.obtenerReporteFinanciero(filtros),
+        faregasDashboardApi.obtenerExportacion(filtros)
+      ]);
+      exportarReporteVentaMensual(datos, filtros, dashboard);
+    } catch (error) {
+      window.alert(`No se pudo exportar el Reporte de Venta Mensual: ${error instanceof Error ? error.message : 'Error inesperado.'}`);
+    } finally { setTipoExportacion(null); }
+  };
+
+  const descargarResumenDashboard = async () => {
+    const filtros = filtrosPeriodo();
+    const validacion = validarRangoFechasDashboard(filtros.desde || '', filtros.hasta || '');
+    if (!validacion.valido) { window.alert(validacion.mensaje || 'El período seleccionado no es válido.'); return; }
+    setTipoExportacion('dashboard');
     try {
       const datos = await faregasDashboardApi.obtenerExportacion(filtros);
-      exportarDashboardExcel(datos, filtros);
+      exportarResumenDashboard(datos, filtros);
     } catch (error) {
-      const mensaje = error instanceof Error ? error.message : 'Error inesperado al exportar Excel.';
-      window.alert(`No se pudo exportar la versión anterior: ${mensaje}`);
-    } finally {
-      setExportandoAnterior(false);
-    }
+      window.alert(`No se pudo exportar el Resumen Dashboard: ${error instanceof Error ? error.message : 'Error inesperado.'}`);
+    } finally { setTipoExportacion(null); }
   };
 
   const descargarDocumentosEmitidos = async () => {
@@ -136,6 +159,8 @@ export const ReportesFinancierosView: React.FC = () => {
     if (reporte === 'documentos') return void descargarDocumentosEmitidos();
     if (reporte === 'resumen') return void descargarResumenMensual();
     if (reporte === 'tributario') return void descargarRegistroTributario();
+    if (reporte === 'venta-mensual') return void descargarVentaMensual();
+    if (reporte === 'dashboard') return void descargarResumenDashboard();
     return void descargarConsolidado();
   };
 
@@ -178,15 +203,8 @@ export const ReportesFinancierosView: React.FC = () => {
           </button>
           {reporteSeleccionado && !reporteSeleccionado.disponible && <span className="text-sm font-medium text-amber-700">Próximamente</span>}
           {reporteSeleccionado?.disponible && !puedeExportar && <span className="text-sm text-slate-500">No tienes permiso para exportar este reporte.</span>}
-          {reporteSeleccionado?.disponible && puedeExportar && <span className="text-sm text-slate-500">{reporte === 'documentos' ? 'Reproduce las 56 columnas del modelo; las líneas se separan para evitar repetir importes. Para NC la fecha de emisión queda vacía; el período se filtra por fecha de aceptación y se muestra aparte.' : reporte === 'resumen' ? 'Efectividad = aceptados SUNAT en producción / documentos del período. DEMO y estados adicionales no se clasifican como aceptados; NC se filtran por aceptación, sin sustituir su fecha de emisión.' : reporte === 'tributario' ? 'Libro de revisión contable; no es un PLE oficial certificado para SUNAT. Clasificaciones sin dato fiscal explícito quedan vacías. En NC, emisión queda vacía y aceptación se indica en Estado.' : 'Se descargará el Excel consolidado.'}</span>}
+          {reporteSeleccionado?.disponible && puedeExportar && <span className="text-sm text-slate-500">{reporte === 'documentos' ? 'Reproduce las 56 columnas del modelo; las líneas se separan para evitar repetir importes. Para NC la fecha de emisión queda vacía; el período se filtra por fecha de aceptación y se muestra aparte.' : reporte === 'resumen' ? 'Efectividad = aceptados SUNAT en producción / documentos del período. DEMO y estados adicionales no se clasifican como aceptados; NC se filtran por aceptación, sin sustituir su fecha de emisión.' : reporte === 'tributario' ? 'Libro de revisión contable; no es un PLE oficial certificado para SUNAT. Clasificaciones sin dato fiscal explícito quedan vacías. En NC, emisión queda vacía y aceptación se indica en Estado.' : reporte === 'venta-mensual' ? 'Importes por línea y pagos divididos detallados sin repetir el total. No se hallaron metas mensuales configuradas; placa y teléfono quedan vacíos cuando la fuente financiera no los expone.' : reporte === 'dashboard' ? 'Incluye las métricas y tablas de Resumen General, Ventas y Productos, Certificados, y Cobranza y Facturación con las definiciones actuales del Dashboard.' : 'Se descargará el Excel consolidado.'}</span>}
         </div>
-        {puedeExportar && (
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <button type="button" disabled={exportandoAnterior} onClick={() => void descargarExportacionAnterior()} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-              {exportandoAnterior ? 'Generando…' : 'Descargar Excel anterior del Dashboard'}
-            </button>
-          </div>
-        )}
       </section>
     </div>
   );

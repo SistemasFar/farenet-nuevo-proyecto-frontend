@@ -5,6 +5,7 @@ import { faregasCertificadosApi } from '../../../../services/faregas-certificado
 import { permisosSession } from '@/services/api';
 import type { AnulacionElectronicaFaregas, FacturacionFaregas, NotaElectronicaFaregas } from '../../../../types/faregas-api';
 import { NotaCreditoModal } from '../../../Inicio/NotaCreditoModal';
+import { fechaFiscalEsAnteriorALima, fechaFiscalEsHoyLima, milisegundosHastaMedianocheLima, obtenerFechaHoyLima } from '../../../../utils/fecha-fiscal-dia';
 
 interface Props {
   certificadoId: number;
@@ -21,6 +22,7 @@ export function DocumentosElectronicosPanel({ certificadoId, facturacion, integr
   const [cargando, setCargando] = useState(false);
   const [procesando, setProcesando] = useState(false);
   const [ahoraMs, setAhoraMs] = useState(Date.now);
+  const [hoyLima, setHoyLima] = useState(() => obtenerFechaHoyLima());
   const [mostrarNota, setMostrarNota] = useState(false);
   const permisos = permisosSession.obtener();
   const tienePermisoNC = permisos.includes('FAREGAS_NOTA_CREDITO');
@@ -53,6 +55,18 @@ export function DocumentosElectronicosPanel({ certificadoId, facturacion, integr
     return () => window.clearTimeout(timer);
   }, [facturacion, notas, ahoraMs]);
 
+  useEffect(() => {
+    const actualizar = () => setHoyLima(obtenerFechaHoyLima());
+    const timer = window.setTimeout(actualizar, milisegundosHastaMedianocheLima());
+    window.addEventListener('focus', actualizar);
+    document.addEventListener('visibilitychange', actualizar);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', actualizar);
+      document.removeEventListener('visibilitychange', actualizar);
+    };
+  }, [hoyLima]);
+
   const consultarComprobante = async () => {
     setProcesando(true);
     try {
@@ -63,6 +77,11 @@ export function DocumentosElectronicosPanel({ certificadoId, facturacion, integr
   };
 
   const anular = async (tipoDocumento: 'FACTURACION' | 'CREDITO' | 'DEBITO', documentoId?: number) => {
+    if (tipoDocumento === 'FACTURACION' && !fechaFiscalEsHoyLima(facturacion.fechaDocumento, obtenerFechaHoyLima())) {
+      setHoyLima(obtenerFechaHoyLima());
+      await Swal.fire('Acción no disponible', 'La anulación solo puede solicitarse durante el día fiscal de emisión (hora de Perú).', 'warning');
+      return;
+    }
     const confirmacion = await Swal.fire({
       title: '¿Desea solicitar la anulación del comprobante electrónico?',
       text: 'Esta operación afecta al comprobante fiscal. No anula automáticamente el certificado técnico ni devuelve los pagos registrados.',
@@ -102,8 +121,8 @@ export function DocumentosElectronicosPanel({ certificadoId, facturacion, integr
         <div><h4 className="font-black text-slate-800">Documentos relacionados</h4><p className="text-sm text-slate-500">Consultas, notas de crédito/débito y anulaciones.</p></div>
         <div className="flex gap-2">
           <button type="button" disabled={soloLectura || procesando || !integracionDisponible} onClick={consultarComprobante} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-black disabled:opacity-40"><RefreshCw className="h-4 w-4" /> CONSULTAR</button>
-          <button type="button" title={!tienePermisoNC ? 'No tienes permiso para emitir Notas de Crédito' : facturacion.estado === 'ACEPTADO' ? 'Crear una nota vinculada al comprobante aceptado' : 'La nota requiere un comprobante aceptado por SUNAT'} disabled={soloLectura || procesando || !integracionDisponible || facturacion.estado !== 'ACEPTADO' || !tienePermisoNC} onClick={() => setMostrarNota(true)} className="flex items-center gap-2 rounded-lg bg-[#052a79] px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"><FileMinus2 className="h-4 w-4" /> NUEVA NOTA</button>
-          <button type="button" title={!tienePermisoAnular ? 'No tiene autorización para anular comprobantes electrónicos' : facturacion.anulacionEnPlazo && Number(facturacion.anulacionHastaMs) > ahoraMs ? 'Anular comprobante electrónico' : 'Plazo vencido: use una nota de crédito'} disabled={soloLectura || procesando || !integracionDisponible || !tienePermisoAnular || facturacion.estado !== 'ACEPTADO' || facturacion.anulacionEnPlazo !== true || Number(facturacion.anulacionHastaMs) <= ahoraMs} onClick={() => anular('FACTURACION')} className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40"><RotateCcw className="h-4 w-4" /> ANULAR COMPROBANTE</button>
+          {fechaFiscalEsAnteriorALima(facturacion.fechaDocumento, hoyLima) && <button type="button" title={!tienePermisoNC ? 'No tienes permiso para emitir Notas de Crédito' : facturacion.estado === 'ACEPTADO' ? 'Crear una nota vinculada al comprobante aceptado' : 'La nota requiere un comprobante aceptado por SUNAT'} disabled={soloLectura || procesando || !integracionDisponible || facturacion.estado !== 'ACEPTADO' || !tienePermisoNC} onClick={() => setMostrarNota(true)} className="flex items-center gap-2 rounded-lg bg-[#052a79] px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"><FileMinus2 className="h-4 w-4" /> NUEVA NOTA</button>}
+          {fechaFiscalEsHoyLima(facturacion.fechaDocumento, hoyLima) && <button type="button" title={!tienePermisoAnular ? 'No tiene autorización para anular comprobantes electrónicos' : 'Anular comprobante electrónico'} disabled={soloLectura || procesando || !integracionDisponible || !tienePermisoAnular || facturacion.estado !== 'ACEPTADO'} onClick={() => anular('FACTURACION')} className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40"><RotateCcw className="h-4 w-4" /> ANULAR COMPROBANTE</button>}
         </div>
       </div>
 

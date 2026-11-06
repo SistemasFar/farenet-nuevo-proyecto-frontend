@@ -20,12 +20,14 @@ import {
   etiquetaSolicitudOperacionPanel,
   puedeSolicitarAnulacionCertificado,
   puedeCrearNotaCreditoPanel,
+  motivoNotaCreditoNoDisponible,
   certificadoImporteFinalCero,
   certificadoAnulacionBloqueadaPorImporte,
   mensajeBloqueoAnulacionCertificado,
   type BorradorPanel,
 } from './InicioView';
 import { esMotivoAnulacionNotaCredito } from '../../utils/documentos-electronicos';
+import { fechaFiscalEsAnteriorALima, fechaFiscalEsHoyLima } from '../../utils/fecha-fiscal-dia';
 
 describe('InicioView - tieneCertificadoDefinitivo y visualización del número DG', () => {
   it('1. Retorna true cuando el certificado está EMITIDO y tiene un número DG válido', () => {
@@ -200,25 +202,74 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
 
   it('12. Bloque A: el botón de anulación solo aparece sin solicitud activa ni completada', () => {
     const permisos = ['FAREGAS_SOLICITUD_CREAR'];
+    const base: BorradorPanel = {
+      id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', facturacionId: 44,
+      fechaDocumentoFiscal: '2026-11-06', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true,
+    };
 
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true } as BorradorPanel, permisos)).toBe(true);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: false } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'PENDIENTE_APROBACION' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'APROBADA' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'EN_EJECUCION' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'REQUIERE_INTERVENCION' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'COMPLETADA' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado(base, permisos, '2026-11-06')).toBe(true);
+    expect(puedeSolicitarAnulacionCertificado({ ...base, fechaDocumentoFiscal: '2026-11-05' }, permisos, '2026-11-06')).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ ...base, solicitudOperacionEstado: 'PENDIENTE_APROBACION' }, permisos, '2026-11-06')).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ ...base, solicitudOperacionEstado: 'APROBADA' }, permisos, '2026-11-06')).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ ...base, solicitudOperacionEstado: 'EN_EJECUCION' }, permisos, '2026-11-06')).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ ...base, solicitudOperacionEstado: 'REQUIERE_INTERVENCION' }, permisos, '2026-11-06')).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ ...base, solicitudOperacionEstado: 'COMPLETADA' }, permisos, '2026-11-06')).toBe(false);
     // Una solicitud rechazada o cancelada permite reabrir la solicitud nueva.
-    expect(puedeSolicitarAnulacionCertificado({ id: 1, estado: 'EMITIDO', numeroCertificado: 'DG-41-0001', anulacionEnPlazo: true, solicitudOperacionEstado: 'RECHAZADA' } as BorradorPanel, permisos)).toBe(true);
+    expect(puedeSolicitarAnulacionCertificado({ ...base, solicitudOperacionEstado: 'RECHAZADA' }, permisos, '2026-11-06')).toBe(true);
   });
 
   it('13. Bloque A: notas de crédito congeladas durante una solicitud activa o completada', () => {
     const permisos = ['FAREGAS_NOTA_CREDITO'];
+    const base: BorradorPanel = {
+      id: 1, estado: 'EMITIDO', facturacionId: 2, fechaDocumentoFiscal: '2026-11-05',
+      estadoFacturacion: 'ACEPTADO', aceptadaSunat: true,
+    };
 
-    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, anulacionEnPlazo: false } as BorradorPanel, permisos)).toBe(true);
-    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, anulacionEnPlazo: true } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, anulacionEnPlazo: false, solicitudOperacionEstado: 'PENDIENTE_APROBACION' } as BorradorPanel, permisos)).toBe(false);
-    expect(puedeCrearNotaCreditoPanel({ id: 1, estado: 'EMITIDO', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, anulacionEnPlazo: false, solicitudOperacionEstado: 'COMPLETADA' } as BorradorPanel, permisos)).toBe(false);
+    expect(puedeCrearNotaCreditoPanel(base, permisos, '2026-11-06')).toBe(true);
+    expect(puedeCrearNotaCreditoPanel({ ...base, fechaDocumentoFiscal: '2026-11-06' }, permisos, '2026-11-06')).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ ...base, solicitudOperacionEstado: 'PENDIENTE_APROBACION' }, permisos, '2026-11-06')).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ ...base, solicitudOperacionEstado: 'COMPLETADA' }, permisos, '2026-11-06')).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ ...base, notaCreditoId: 8, estadoNotaCredito: 'ACEPTADA' }, permisos, '2026-11-06')).toBe(false);
+  });
+
+  it('18. Alterna según fecha fiscal y no habilita notas para estados fiscales no operables', () => {
+    const permisosAnular = ['FAREGAS_SOLICITUD_CREAR'];
+    const permisosNota = ['FAREGAS_NOTA_CREDITO'];
+    const base: BorradorPanel = {
+      id: 1, facturacionId: 55, estado: 'EMITIDO', numeroCertificado: 'DG-41-1',
+      fechaDocumentoFiscal: '2026-11-06', estadoFacturacion: 'ACEPTADO', aceptadaSunat: true,
+    };
+    expect(puedeSolicitarAnulacionCertificado(base, permisosAnular, '2026-11-06')).toBe(true);
+    expect(puedeCrearNotaCreditoPanel(base, permisosNota, '2026-11-06')).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado(base, permisosAnular, '2026-11-07')).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ ...base, fechaDocumentoFiscal: '2026-11-05' }, permisosNota, '2026-11-06')).toBe(true);
+    expect(puedeCrearNotaCreditoPanel({ ...base, fechaDocumentoFiscal: '2026-11-01' }, permisosNota, '2026-11-06')).toBe(true);
+
+    const demoPendiente: BorradorPanel = {
+      ...base, fechaDocumentoFiscal: '2026-11-05', estadoFacturacion: 'PENDIENTE_SUNAT', aceptadaSunat: null,
+      entornoFacturador: 'DEMO', facturacionProveedor: 'NUBEFACT', facturacionSerie: 'BBB1',
+      facturacionNumero: 282, nroComprobante: 'BBB1-00000282', enlacePdf: 'pdf', enlaceXml: 'xml',
+    };
+    expect(puedeCrearNotaCreditoPanel(demoPendiente, permisosNota, '2026-11-06')).toBe(true);
+    const pendienteProduccion = { ...demoPendiente, entornoFacturador: 'PRODUCCION' };
+    expect(puedeCrearNotaCreditoPanel(pendienteProduccion, permisosNota, '2026-11-06')).toBe(false);
+    expect(motivoNotaCreditoNoDisponible(pendienteProduccion, permisosNota, '2026-11-06')).toContain('pendiente de aceptación SUNAT');
+    expect(puedeCrearNotaCreditoPanel({ ...base, estadoFacturacion: 'RECHAZADO', aceptadaSunat: false, fechaDocumentoFiscal: '2026-11-05' }, permisosNota, '2026-11-06')).toBe(false);
+    expect(motivoNotaCreditoNoDisponible({ ...base, estadoFacturacion: 'RECHAZADO', aceptadaSunat: false, fechaDocumentoFiscal: '2026-11-05' }, permisosNota, '2026-11-06')).toContain('rechazado');
+    expect(puedeCrearNotaCreditoPanel({ ...base, estadoFacturacion: 'ANULADO', fechaDocumentoFiscal: '2026-11-05' }, permisosNota, '2026-11-06')).toBe(false);
+    expect(puedeSolicitarAnulacionCertificado({ ...base, fechaDocumentoFiscal: null }, permisosAnular, '2026-11-06')).toBe(false);
+    expect(motivoNotaCreditoNoDisponible({ ...base, fechaDocumentoFiscal: null }, permisosNota, '2026-11-06')).toContain('fecha fiscal verificable');
+    expect(puedeCrearNotaCreditoPanel({ ...base, fechaDocumentoFiscal: '2026-11-05' }, [], '2026-11-06')).toBe(false);
+    expect(motivoNotaCreditoNoDisponible({ ...base, fechaDocumentoFiscal: '2026-11-05' }, [], '2026-11-06')).toBe(null);
+    expect(puedeCrearNotaCreditoPanel({ ...base, fechaDocumentoFiscal: '2026-11-05', notaCreditoId: 3, estadoNotaCredito: 'PENDIENTE' }, permisosNota, '2026-11-06')).toBe(false);
+    expect(motivoNotaCreditoNoDisponible({ ...base, fechaDocumentoFiscal: '2026-11-05', notaCreditoId: 3, estadoNotaCredito: 'PENDIENTE' }, permisosNota, '2026-11-06')).toContain('Ya existe una nota');
+  });
+
+  it('19. Normaliza la fecha DATE serializada por PostgreSQL como ISO en la zona de Lima', () => {
+    const serializada = '2026-11-05T05:00:00.000Z';
+    expect(fechaFiscalEsAnteriorALima(serializada, '2026-11-06')).toBe(true);
+    expect(fechaFiscalEsHoyLima(serializada, '2026-11-05')).toBe(true);
+    expect(fechaFiscalEsHoyLima(null, '2026-11-05')).toBe(false);
   });
 
   it('14. Bloque A: el indicador abre la solicitud existente y no el formulario de creación', () => {
