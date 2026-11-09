@@ -145,6 +145,7 @@ export interface CertificadoDetalleItem {
   usuarioCreacion: string;
   fechaCreacion: string;
   fechaEmision: string | null;
+  fechaHoraEmision: string | null;
   importeTotal: number;
   placa: string | null;
   marca: string | null;

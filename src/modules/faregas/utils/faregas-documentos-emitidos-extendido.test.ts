@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { DocumentosEmitidosExtendidoResponse } from '../services/faregas-dashboard.api';
-import { construirHojasDocumentosEmitidosExtendido } from './faregas-documentos-emitidos-extendido';
+import type { DocumentosEmitidosExtendidoResponse, ReporteFinancieroResponse } from '../services/faregas-dashboard.api';
+import { construirHojasDocumentosEmitidosExtendido, construirHojasUnificadas } from './faregas-documentos-emitidos-extendido';
 
 const sample: DocumentosEmitidosExtendidoResponse = {
   cabeceras: [
@@ -17,14 +17,14 @@ describe('Documentos emitidos — Extendido', () => {
   it('conserva la estructura de 56 campos y un solo total por comprobante', () => {
     const [cabeceras, lineas] = construirHojasDocumentosEmitidosExtendido(sample, '2026-10-01', '2026-10-31');
     expect(cabeceras.name).toBe('Datos');
-    expect(cabeceras.columns).toHaveLength(56);
+    expect(cabeceras.columns).toHaveLength(68);
     expect(cabeceras.rows).toHaveLength(2);
     expect(cabeceras.rows[0]).toMatchObject({ numeroDocumento: 'F001-20', total: 118, descuentos: 5, metodoPago: 'Visa', montoPago: 118, items: 2, descripcion: '' });
     expect(lineas.rows).toHaveLength(2);
     expect(lineas.rows[0]).toMatchObject({ documento: 'F001-20', totalLinea: 118 });
     expect(cabeceras.title).toContain('Registro de comprobantes');
     expect(cabeceras.headerRow).toBe(7);
-    expect(cabeceras.groupHeaders).toHaveLength(8);
+    expect(cabeceras.groupHeaders).toHaveLength(7);
   });
 
   it('mantiene referencias y la ausencia de datos del modelo sin rellenarlos', () => {
@@ -52,5 +52,19 @@ describe('Documentos emitidos — Extendido', () => {
     expect(sheets[1].rows).toHaveLength(1);
     expect(sheets[3].name).toBe('Datos_20222222222');
     expect(sheets[4].rows).toHaveLength(1);
+  });
+
+  it('FUSIÓN: incluye hoja consolidada sin perder columnas extendido', () => {
+    const consolidado = {
+      metadatos: { desde: '2026-10-01', hasta: '2026-10-31', fechaGeneracion: '2026-10-31T12:00:00Z', usuarioExportador: 'test', plantas: ['ATE'], razonSocialEmisor: '', rucEmisor: '' },
+      operaciones: [], lineas: [], ventasDirectas: [], comprobantes: [], ordenes: [], pagos: [], descuentos: [], ajustes: []
+    } as unknown as ReporteFinancieroResponse;
+    const unificadas = construirHojasUnificadas(sample, consolidado, '2026-10-01', '2026-10-31');
+    expect(unificadas.some((h) => h.name.includes('Consolidado'))).toBe(true);
+    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(68);
+    // Horas: certificado con hora explícita → HH:mm:ss
+    const conHora = { ...sample, cabeceras: [{ ...sample.cabeceras[0], fecha_hora_emision: '2026-10-08T13:15:32Z' }] };
+    const [cab] = construirHojasDocumentosEmitidosExtendido(conHora);
+    expect(cab.rows[0]).toMatchObject({ horaEmisionCertificado: '08:15:32' });
   });
 });

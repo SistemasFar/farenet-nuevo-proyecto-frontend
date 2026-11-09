@@ -44,7 +44,7 @@ export const DashboardCertificados: React.FC<DashboardCertificadosProps> = ({
               <th className="py-2.5 px-3">Sede</th>
               <th className="py-2.5 px-3">Estado</th>
               <th className="py-2.5 px-3 text-right">Total S/.</th>
-              <th className="py-2.5 px-3">Fecha Creación</th>
+              <th className="py-2.5 px-3">Fecha de Emisión</th>
               <th className="py-2.5 px-3">Usuario</th>
             </tr>
           </thead>
@@ -91,7 +91,36 @@ export const DashboardCertificados: React.FC<DashboardCertificadosProps> = ({
                     S/ {c.importeTotal.toFixed(2)}
                   </td>
                   <td className="py-2.5 px-3 text-slate-500">
-                    {new Date(c.fechaCreacion).toLocaleDateString('es-PE')}
+                    {(() => {
+                      // Timestamp para certificados emitidos (no draft)
+                      const timestamp = c.fechaHoraEmision && c.estado === 'EMITIDO' ? c.fechaHoraEmision : null;
+                      const isDraft = c.estado === 'BORRADOR';
+                      
+                      if (timestamp) {
+                        const date = new Date(timestamp);
+                        const esHoraLima = date.getTimezoneOffset() === -300; // -5 horas
+                        return (
+                          <div>
+                            <div>{date.toLocaleDateString('es-PE')}</div>
+                            {esHoraLima && (
+                              <div className="text-xs text-slate-400 font-mono">
+                                {date.getHours().toString().padStart(2, '0')}:{date.getMinutes().toString().padStart(2, '0')}:{date.getSeconds().toString().padStart(2, '0')}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                      
+                      // Timestamp no disponible o draft: usar fechaCreacion
+                      return (
+                        <div>
+                          <div>{new Date(c.fechaCreacion).toLocaleDateString('es-PE')}</div>
+                          {isDraft && (
+                            <div className="text-xs text-slate-400 font-mono">CREACIÓN</div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="py-2.5 px-3 text-slate-600 font-mono text-xs">
                     {c.usuarioCreacion}
