@@ -218,3 +218,63 @@ export async function abrirPdfNotaCreditoNubefact(
     return false;
   }
 }
+
+/**
+ * Asegura que el HTML del certificado se previsualice centrado horizontalmente
+ * en pantalla (@media screen) sin romper ni alterar los márgenes de impresión (@media print / A4).
+ */
+function normalizarEncabezadoConformidad(html: string): string {
+  if (!html.includes('CERTIFICADO DE CONFORMIDAD') || !html.includes('76.2pt')) return html;
+  let fixed = html;
+  fixed = fixed.replace(
+    'padding: 107.45pt 56.65pt 70.9pt 84.75pt;',
+    'padding: 30pt 56.65pt 60pt 84.75pt;'
+  );
+  fixed = fixed.replace(
+    /\.header-sub\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*76\.2pt;[\s\S]*?\}/i,
+    `.header-sub {
+      width: 254pt;
+      box-sizing: border-box;
+      font-size: 8pt;
+      color: #000;
+      line-height: 9.6pt;
+      text-align: center;
+      margin: 0 0 16pt -61.55pt;
+    }`
+  );
+  fixed = fixed.replace(
+    /(\.title\s*\{[\s\S]*?)margin:\s*18\.55pt\s+0\s+0;/i,
+    '$1margin: 0;'
+  );
+  fixed = fixed.replace(
+    '<div class="header-sub" style="text-align: left;">',
+    '<div class="header-sub">'
+  );
+  return fixed;
+}
+
+export function asegurarCentradoHtml(html: string | null | undefined): string {
+  if (!html || typeof html !== 'string') return '';
+  const normalizado = normalizarEncabezadoConformidad(html);
+  if (/@media\s+screen[\s\S]*?body[\s\S]*?margin-(?:left|inline)/i.test(normalizado)) {
+    return normalizado;
+  }
+  const estiloCentrado = `
+    <style id="faregas-preview-centrado">
+      @media screen {
+        html {
+          width: 100% !important;
+          min-height: 100% !important;
+        }
+        body {
+          margin-left: auto !important;
+          margin-right: auto !important;
+        }
+      }
+    </style>
+  `;
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${estiloCentrado}</head>`);
+  }
+  return estiloCentrado + normalizado;
+}

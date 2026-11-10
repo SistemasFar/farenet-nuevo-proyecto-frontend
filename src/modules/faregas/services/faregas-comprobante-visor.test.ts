@@ -6,6 +6,7 @@ import {
   descargarCertificadoFaregas,
   descargarPdfNubefact,
   mostrarCargaComprobanteNubefact,
+  asegurarCentradoHtml,
 } from './faregas-comprobante-visor.service';
 import * as httpClient from './faregas-http-client';
 import Swal from 'sweetalert2';
@@ -147,5 +148,47 @@ describe('faregas-comprobante-visor.service', () => {
     expect(enlacesCreados).toHaveLength(1);
     expect(enlacesCreados[0]?.download).toBe(filename);
     expect(resultado).toBe(true);
+  });
+
+  describe('asegurarCentradoHtml', () => {
+    it('devuelve cadena vacía si el valor es falsy', () => {
+      expect(asegurarCentradoHtml(null)).toBe('');
+      expect(asegurarCentradoHtml(undefined)).toBe('');
+      expect(asegurarCentradoHtml('')).toBe('');
+    });
+
+    it('no duplica la regla si el HTML ya cuenta con @media screen y margen horizontal auto', () => {
+      const htmlConCentrado = `<!DOCTYPE html><html><head><style>
+        @media screen { html { width: 100%; } body { margin-left: auto; margin-right: auto; } }
+      </style></head><body><h1>Doc</h1></body></html>`;
+
+      const resultado = asegurarCentradoHtml(htmlConCentrado);
+      expect(resultado).toBe(htmlConCentrado);
+      expect(resultado.match(/@media\s+screen/g)).toHaveLength(1);
+    });
+
+    it('inyecta centrado horizontal en pantalla para documentos sin @media screen (como snapshot histórico)', () => {
+      const htmlHistorico = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Certificado DG-39-000428</title>
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    html { width: 210mm; min-height: 297mm; background: #fff; }
+    body { margin: 0; width: 210mm; min-height: 297mm; }
+  </style>
+</head>
+<body><h1>Certificado Emitido</h1></body>
+</html>`;
+
+      const resultado = asegurarCentradoHtml(htmlHistorico);
+      expect(resultado).toContain('@media screen');
+      expect(resultado).toContain('margin-left: auto !important');
+      expect(resultado).toContain('margin-right: auto !important');
+      expect(resultado).toContain('width: 100% !important');
+      expect(resultado).toContain('@page { size: A4 portrait; margin: 0; }');
+      expect(resultado).toContain('<h1>Certificado Emitido</h1>');
+    });
   });
 });

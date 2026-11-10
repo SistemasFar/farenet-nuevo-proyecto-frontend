@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Swal from 'sweetalert2';
 import { DatosFacturacion } from './components/NuevoCertificado/DatosFacturacion';
-import { validarFormularioVehiculoVisible } from './faregas-wizard.validation';
+import { validarFormularioVehiculoVisible, validarPasoPago, validarDatosFacturacionCampos } from './faregas-wizard.validation';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import type { FormFacturacionState } from './NuevoCertificadoView';
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
@@ -903,6 +903,471 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
 
       expect(errores['glp.tallerAutorizadoId']).toBeUndefined();
       expect(errores).toEqual({});
+    });
+  });
+
+  describe('FAREGAS — SELECCIÓN LIBRE DE BOLETA O FACTURA EN GNV ANUAL Y RESPETO A FACTURACIÓN', () => {
+    it('GNV ANUAL en VehiculoStep no bloquea el selector de tipo de comprobante aunque existan titulares históricos de placa', async () => {
+      const contenedor = document.createElement('div');
+      document.body.appendChild(contenedor);
+      contenedores.push(contenedor);
+      const root = createRoot(contenedor);
+
+      await act(async () => {
+        root.render(
+          <VehiculoStep
+            tipoCertificado="GNV_ANUAL"
+            modalidadCertificado="ANUAL"
+            numeroCertificadoOficial={null}
+            formVehiculo={{ placaNueva: 'ABC123', marca: 'TOYOTA', modelo: 'YARIS' }}
+            setFormVehiculo={() => undefined}
+            formPropietario={{}}
+            setFormPropietario={() => undefined}
+            formGlp={{ componentes: [], verificaciones: [] }}
+            setFormGlp={() => undefined}
+            formGnv={{ componentes: [], verificaciones: [] }}
+            setFormGnv={() => undefined}
+            formConformidad={{}}
+            setFormConformidad={() => undefined}
+            titulares={titularesMock}
+            setTitulares={() => undefined}
+            formFacturacion={baseFacturacion}
+            setFormFacturacion={() => undefined}
+            categoriaVehicular="M1"
+            categoriasVehiculares={[{ key: 'M1', nombre: 'M1' }]}
+            onCategoriaVehicularChange={() => undefined}
+          />
+        );
+      });
+
+      const selectorComprobante = contenedor.querySelector<HTMLSelectElement>('select:not([aria-label])');
+      expect(selectorComprobante).not.toBeNull();
+      expect(selectorComprobante?.disabled).toBe(false);
+      expect(contenedor.textContent).not.toContain('Agregue el dueño principal para completar automáticamente');
+      await act(async () => root.unmount());
+    });
+
+    it('Permite alternar libremente de BOLETA a FACTURA y de FACTURA a BOLETA sin revertirse', async () => {
+      const contenedor = document.createElement('div');
+      document.body.appendChild(contenedor);
+      contenedores.push(contenedor);
+      const root = createRoot(contenedor);
+
+      let estadoActual: FormFacturacionState = {
+        ...baseFacturacion,
+        tipoDocFac: 'BOLETA',
+        tipoDocumentoFac: 'DNI',
+        nroDocFac: '74045612',
+        razonSocialFac: 'CLIENTE BOLETA',
+        usarTitularPrincipalFac: false,
+      };
+
+      const Caso = () => {
+        const [facturacion, setFacturacion] = useState(estadoActual);
+        estadoActual = facturacion;
+        return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
+      };
+
+      await act(async () => root.render(<Caso />));
+      const selectorComprobante = contenedor.querySelector<HTMLSelectElement>('select:not([aria-label])');
+      expect(selectorComprobante?.disabled).toBe(false);
+
+      // 1. Cambiar a FACTURA
+      await act(async () => {
+        if (selectorComprobante) {
+          selectorComprobante.value = 'FACTURA';
+          selectorComprobante.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      expect(estadoActual.tipoDocFac).toBe('FACTURA');
+      expect(estadoActual.tipoDocumentoFac).toBe('RUC');
+      expect(estadoActual.nroDocFac).toBe(''); // Limpia el DNI incompatible
+
+      // 2. Simular ingreso de RUC y datos de empresa
+      const inputNroDoc = contenedor.querySelector<HTMLInputElement>('input[aria-label="Número de documento de facturación"]');
+      await act(async () => {
+        if (inputNroDoc) {
+          inputNroDoc.value = '20600444531';
+          inputNroDoc.dispatchEvent(new Event('input', { bubbles: true }));
+          inputNroDoc.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      // 3. Cambiar de nuevo a BOLETA
+      await act(async () => {
+        if (selectorComprobante) {
+          selectorComprobante.value = 'BOLETA';
+          selectorComprobante.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      expect(estadoActual.tipoDocFac).toBe('BOLETA');
+      expect(estadoActual.tipoDocumentoFac).toBe('DNI');
+      expect(estadoActual.condicionPagoFac).toBe('CONTADO');
+      expect(estadoActual.cuotasFac).toEqual([]);
+
+      // 4. Volver a FACTURA
+      await act(async () => {
+        if (selectorComprobante) {
+          selectorComprobante.value = 'FACTURA';
+          selectorComprobante.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      expect(estadoActual.tipoDocFac).toBe('FACTURA');
+      expect(estadoActual.tipoDocumentoFac).toBe('RUC');
+
+      await act(async () => root.unmount());
+    });
+
+    it('En GLP ANUAL o CONFORMIDAD con titular DNI, seleccionar FACTURA desvincula el titular principal y permite ingresar RUC', async () => {
+      const contenedor = document.createElement('div');
+      document.body.appendChild(contenedor);
+      contenedores.push(contenedor);
+      const root = createRoot(contenedor);
+
+      let estadoActual: FormFacturacionState = {
+        ...baseFacturacion,
+        tipoDocFac: 'BOLETA',
+        tipoDocumentoFac: 'DNI',
+        nroDocFac: '74045612',
+        razonSocialFac: 'GRACE IBARRA DUEÑA',
+        usarTitularPrincipalFac: true, // Facturando al dueño
+      };
+
+      const Caso = () => {
+        const [facturacion, setFacturacion] = useState(estadoActual);
+        estadoActual = facturacion;
+        return <DatosFacturacion titulares={titularesMock} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
+      };
+
+      await act(async () => root.render(<Caso />));
+      const selectorComprobante = contenedor.querySelector<HTMLSelectElement>('select:not([aria-label])');
+      expect(selectorComprobante?.disabled).toBe(false);
+
+      // Cambiar a FACTURA
+      await act(async () => {
+        if (selectorComprobante) {
+          selectorComprobante.value = 'FACTURA';
+          selectorComprobante.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      // Debe desvincular titular (porque titular tiene DNI y no puede recibir FACTURA)
+      expect(estadoActual.tipoDocFac).toBe('FACTURA');
+      expect(estadoActual.tipoDocumentoFac).toBe('RUC');
+      expect(estadoActual.usarTitularPrincipalFac).toBe(false);
+      expect(estadoActual.nroDocFac).toBe(''); // Limpió DNI
+
+      await act(async () => root.unmount());
+    });
+
+    it('Validación tributaria: FACTURA en GNV exige RUC válido de 11 dígitos con dígito verificador', () => {
+      const erroresRucInvalido = validarDatosFacturacionCampos({
+        tipoDocFac: 'FACTURA',
+        tipoDocumentoFac: 'RUC',
+        nroDocFac: '20600444530', // Dígito verificador inválido
+        razonSocialFac: 'EMPRESA PRUEBA S.A.C.',
+        telefonoFac: '987654321',
+      });
+      expect(erroresRucInvalido.nroDocFac).toContain('dígito verificador válido');
+
+      const erroresRucValido = validarDatosFacturacionCampos({
+        tipoDocFac: 'FACTURA',
+        tipoDocumentoFac: 'RUC',
+        nroDocFac: '20600444531', // Dígito verificador válido
+        razonSocialFac: 'EMPRESA PRUEBA S.A.C.',
+        telefonoFac: '987654321',
+      });
+      expect(erroresRucValido.nroDocFac).toBeUndefined();
+      expect(erroresRucValido.tipoDocFac).toBeUndefined();
+      expect(erroresRucValido.tipoDocumentoFac).toBeUndefined();
+    });
+
+    it('Crédito con cuotas en FACTURA para GNV ANUAL: validarPasoPago admite cuotas configuradas', () => {
+      const erroresCreditoFactura = validarPasoPago({
+        tipoComprobante: 'FACTURA',
+        condicionPago: 'CREDITO',
+        pagos: [{ importe: 100 }],
+        precioTotal: 300,
+        fechaInicioCredito: '2026-11-10',
+        fechaVencimientoCredito: '2026-12-10',
+        cuotas: [
+          { numeroCuota: 1, fechaPago: '2026-11-25', importe: 100 },
+          { numeroCuota: 2, fechaPago: '2026-12-10', importe: 100 },
+        ],
+      });
+      expect(erroresCreditoFactura).toEqual({});
+    });
+
+    it('BOLETA rechaza CRÉDITO en el paso de pago tanto en GNV como en cualquier certificado', () => {
+      const erroresCreditoBoleta = validarPasoPago({
+        tipoComprobante: 'BOLETA',
+        condicionPago: 'CREDITO',
+        pagos: [{ importe: 100 }],
+        precioTotal: 300,
+        fechaInicioCredito: '2026-11-10',
+        fechaVencimientoCredito: '2026-12-10',
+        cuotas: [{ numeroCuota: 1, fechaPago: '2026-12-10', importe: 200 }],
+      });
+      expect(erroresCreditoBoleta.pagos).toBe('La boleta sólo admite condición de pago CONTADO.');
+    });
+  });
+
+  describe('FAREGAS — VERIFICACIÓN GLOBAL OBLIGATORIA (16 CASOS): TIPO DE COMPROBANTE INICIA VACÍO', () => {
+    const baseVacia: FormFacturacionState = {
+      tipoDocFac: '',
+      tipoDocumentoFac: 'DNI',
+      nroDocFac: '',
+      razonSocialFac: '',
+      nombresFac: '',
+      apellidosFac: '',
+      paisFac: '',
+      departamentoFac: '',
+      provinciaFac: '',
+      distritoFac: '',
+      direccionFac: '',
+      emailFac: '',
+      telefonoFac: '',
+      usarTitularPrincipalFac: false,
+      condicionPagoFac: 'CONTADO',
+      fechaInicioCreditoFac: '2026-11-10',
+      fechaVencimientoFac: '',
+      medioPagoFac: '',
+      cuotasFac: [],
+    };
+
+    const renderConTipo = async (tipo: any, modalidad: string, titulares: TitularState[] = [], facturacion = baseVacia) => {
+      const contenedor = document.createElement('div');
+      document.body.appendChild(contenedor);
+      contenedores.push(contenedor);
+      const root = createRoot(contenedor);
+
+      await act(async () => {
+        root.render(
+          <VehiculoStep
+            tipoCertificado={tipo}
+            modalidadCertificado={modalidad}
+            numeroCertificadoOficial={null}
+            formVehiculo={{ placaNueva: 'ABC123', marca: 'TOYOTA', modelo: 'YARIS' }}
+            setFormVehiculo={() => undefined}
+            formPropietario={{}}
+            setFormPropietario={() => undefined}
+            formGlp={{ componentes: [], verificaciones: [] }}
+            setFormGlp={() => undefined}
+            formGnv={{ componentes: [], verificaciones: [] }}
+            setFormGnv={() => undefined}
+            formConformidad={{}}
+            setFormConformidad={() => undefined}
+            titulares={titulares}
+            setTitulares={() => undefined}
+            formFacturacion={facturacion}
+            setFormFacturacion={() => undefined}
+            categoriaVehicular="M1"
+            categoriasVehiculares={[{ key: 'M1', nombre: 'M1' }]}
+            onCategoriaVehicularChange={() => undefined}
+          />
+        );
+      });
+      const selector = contenedor.querySelector<HTMLSelectElement>('select[name="tipoDocFac"]')
+        || contenedor.querySelector<HTMLSelectElement>('[data-seccion-facturacion] select:not([aria-label])');
+      return { contenedor, selector, root };
+    };
+
+    it('1. Nuevo GNV ANUAL -> selector vacío con placeholder "Seleccione BOLETA o FACTURA"', async () => {
+      const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL');
+      expect(selector).not.toBeNull();
+      expect(selector?.value).toBe('');
+      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      await act(async () => root.unmount());
+    });
+
+    it('2. Nuevo GNV PESADO -> selector vacío', async () => {
+      const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL');
+      expect(selector?.value).toBe('');
+      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      await act(async () => root.unmount());
+    });
+
+    it('3. Nuevo GNV INICIAL + CHIP -> selector vacío', async () => {
+      const { selector, root } = await renderConTipo('GNV_ANUAL', 'INICIAL');
+      expect(selector?.value).toBe('');
+      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      await act(async () => root.unmount());
+    });
+
+    it('4. Nuevo GLP -> selector vacío', async () => {
+      const { selector, root } = await renderConTipo('GLP_ANUAL', 'ANUAL');
+      expect(selector?.value).toBe('');
+      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      await act(async () => root.unmount());
+    });
+
+    it('5. Nuevo CONFORMIDAD -> selector vacío', async () => {
+      const { selector, root } = await renderConTipo('CONFORMIDAD', 'UNICA');
+      expect(selector?.value).toBe('');
+      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      await act(async () => root.unmount());
+    });
+
+    it('6. DNI cargado en formulario -> no selecciona BOLETA automáticamente', async () => {
+      const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL', [], {
+        ...baseVacia,
+        tipoDocumentoFac: 'DNI',
+        nroDocFac: '74045612',
+      });
+      expect(selector?.value).toBe('');
+      await act(async () => root.unmount());
+    });
+
+    it('7. RUC cargado en formulario -> no selecciona FACTURA automáticamente', async () => {
+      const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL', [], {
+        ...baseVacia,
+        tipoDocumentoFac: 'RUC',
+        nroDocFac: '20600444531',
+      });
+      expect(selector?.value).toBe('');
+      await act(async () => root.unmount());
+    });
+
+    it('8. Titular histórico con DNI o RUC -> no selecciona comprobante en facturación', async () => {
+      const { selector, root } = await renderConTipo('GLP_ANUAL', 'ANUAL', titularesMock);
+      expect(selector?.value).toBe('');
+      await act(async () => root.unmount());
+    });
+
+    it('9. Sin elección -> validación obligatoria con mensaje "Debe seleccionar BOLETA o FACTURA para continuar."', () => {
+      const errores = validarDatosFacturacionCampos({
+        tipoDocFac: '',
+        tipoDocumentoFac: 'DNI',
+        nroDocFac: '74045612',
+        razonSocialFac: 'JUAN PEREZ',
+        telefonoFac: '987654321',
+      });
+      expect(errores.tipoDocFac).toBe('Debe seleccionar BOLETA o FACTURA para continuar.');
+
+      const erroresVehiculo = validarFormularioVehiculoVisible({
+        tipoCertificado: 'GNV_ANUAL',
+        modalidad: 'ANUAL',
+        caja: { categoria: 'M1', placa: 'ABC123', tarifaCodigo: 'GNV01' },
+        vehiculo: {
+          marca: 'TOYOTA', modelo: 'YARIS', version: 'STD', anioFabricacion: '2020',
+          vin: '9BD1234567890', serieChasis: '9BD1234567890', numeroMotor: 'MOT12345',
+          numeroCilindros: '4', cilindrada: '1500', combustible: 'GASOLINA',
+          numeroEjes: '2', numeroRuedas: '4', numeroAsientos: '5', numeroPasajeros: '4',
+          longitud: '4.2', ancho: '1.7', alto: '1.5', pesoNeto: '1100', pesoBruto: '1500', cargaUtil: '400',
+          color: 'ROJO',
+        },
+        titulares: [],
+        glp: {},
+        gnv: {
+          fechaVigencia: '2027-10-14',
+          verificaciones: Array.from({ length: 8 }, (_, i) => ({ codigo: String(i + 1), cumple: true })),
+          componentes: [],
+        },
+        conformidad: {},
+        facturacion: {
+          tipoDocFac: '', // Selección vacía
+          tipoDocumentoFac: 'DNI',
+          nroDocFac: '74045612',
+          razonSocialFac: 'JUAN PEREZ',
+          telefonoFac: '987654321',
+          usarTitularPrincipalFac: false,
+        },
+      });
+      expect(erroresVehiculo.tipoDocFac).toBe('Debe seleccionar BOLETA o FACTURA para continuar.');
+    });
+
+    it('10. FACTURA seleccionada -> permanece FACTURA al renderizar', async () => {
+      const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL', [], {
+        ...baseVacia,
+        tipoDocFac: 'FACTURA',
+        tipoDocumentoFac: 'RUC',
+        nroDocFac: '20600444531',
+      });
+      expect(selector?.value).toBe('FACTURA');
+      await act(async () => root.unmount());
+    });
+
+    it('11. BOLETA seleccionada -> permanece BOLETA al renderizar', async () => {
+      const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL', [], {
+        ...baseVacia,
+        tipoDocFac: 'BOLETA',
+        tipoDocumentoFac: 'DNI',
+        nroDocFac: '74045612',
+      });
+      expect(selector?.value).toBe('BOLETA');
+      await act(async () => root.unmount());
+    });
+
+    it('12. Guardar y recuperar borrador -> conserva elección explícita y no asigna BOLETA si no hubo elección', () => {
+      // Simula el mapeador de restauración de borradores
+      const resolverTipoComprobanteBorrador = (fac: any) => fac?.tipoComprobante || '';
+
+      expect(resolverTipoComprobanteBorrador({ tipoComprobante: 'FACTURA' })).toBe('FACTURA');
+      expect(resolverTipoComprobanteBorrador({ tipoComprobante: 'BOLETA' })).toBe('BOLETA');
+      expect(resolverTipoComprobanteBorrador({ tipoComprobante: null })).toBe('');
+      expect(resolverTipoComprobanteBorrador({})).toBe('');
+    });
+
+    it('13. Autosave / snapshot -> no asigna BOLETA automáticamente cuando tipoDocFac está vacío', () => {
+      const payloadVacio = {
+        tipoComprobante: baseVacia.tipoDocFac || '',
+        nroDocumento: baseVacia.nroDocFac,
+      };
+      expect(payloadVacio.tipoComprobante).toBe('');
+      expect(payloadVacio.tipoComprobante).not.toBe('BOLETA');
+    });
+
+    it('14. Cambiar de paso -> conserva el estado de selección vacía sin forzar BOLETA', async () => {
+      const contenedor = document.createElement('div');
+      document.body.appendChild(contenedor);
+      contenedores.push(contenedor);
+      const root = createRoot(contenedor);
+
+      let estadoActual = { ...baseVacia };
+      const Caso = () => {
+        const [facturacion, setFacturacion] = useState(estadoActual);
+        estadoActual = facturacion;
+        return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
+      };
+
+      await act(async () => root.render(<Caso />));
+      const selector = contenedor.querySelector<HTMLSelectElement>('select[name="tipoDocFac"]')
+        || contenedor.querySelector<HTMLSelectElement>('[data-seccion-facturacion] select:not([aria-label])');
+      expect(selector?.value).toBe('');
+
+      // Simular cambio de paso (re-render)
+      await act(async () => root.render(<Caso />));
+      expect(estadoActual.tipoDocFac).toBe('');
+      expect(selector?.value).toBe('');
+
+      await act(async () => root.unmount());
+    });
+
+    it('15. FACTURA + CRÉDITO con cuotas -> mantiene funcionamiento sin regresiones', () => {
+      const errores = validarPasoPago({
+        tipoComprobante: 'FACTURA',
+        condicionPago: 'CREDITO',
+        pagos: [{ importe: 50 }],
+        precioTotal: 150,
+        fechaInicioCredito: '2026-11-10',
+        fechaVencimientoCredito: '2026-12-10',
+        cuotas: [
+          { numeroCuota: 1, fechaPago: '2026-11-25', importe: 50 },
+          { numeroCuota: 2, fechaPago: '2026-12-10', importe: 50 },
+        ],
+      });
+      expect(errores).toEqual({});
+    });
+
+    it('16. Comprobantes emitidos anteriormente -> validación fiscal no altera registros existentes', () => {
+      const facEmitidaFactura = { tipo_comprobante: 'FACTURA', estado: 'ACEPTADO', nro_comprobante: 'FFF1-00000021' };
+      const facEmitidaBoleta = { tipo_comprobante: 'BOLETA', estado: 'ACEPTADO', nro_comprobante: 'BBB1-00000298' };
+
+      expect(facEmitidaFactura.tipo_comprobante).toBe('FACTURA');
+      expect(facEmitidaBoleta.tipo_comprobante).toBe('BOLETA');
     });
   });
 

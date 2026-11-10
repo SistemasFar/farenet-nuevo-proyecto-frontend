@@ -15,19 +15,27 @@ interface SelectorDescuentoProps {
   certificadoId?: number;
   descuentoActual?: ConsultaDescuentoResult | null;
   onDescuentoChange?: (descuento: ConsultaDescuentoResult | null) => void;
+  esTaller?: boolean;
+  tienePagosRegistrados?: boolean;
 }
+
+type ModoDescuento = 'sin' | 'con' | 'cortesia';
 
 export function SelectorDescuento({
   certificadoId,
   descuentoActual,
   onDescuentoChange,
+  esTaller = false,
+  tienePagosRegistrados = false,
 }: SelectorDescuentoProps) {
   const [descuentosDisponibles, setDescuentosDisponibles] = useState<DescuentoDisponible[]>([]);
   const [cargandoLista, setCargandoLista] = useState(false);
   const [aplicando, setAplicando] = useState(false);
-  const [modoDescuento, setModoDescuento] = useState<'sin' | 'con'>(
-    descuentoActual ? 'con' : 'sin'
-  );
+  const [modoDescuento, setModoDescuento] = useState<ModoDescuento>(() => {
+    if (descuentoActual?.autorizaGratuidad) return 'cortesia';
+    if (descuentoActual) return 'con';
+    return 'sin';
+  });
   const [descuentoSeleccionadoId, setDescuentoSeleccionadoId] = useState<string>(
     descuentoActual?.descuentoId ? String(descuentoActual.descuentoId) : ''
   );
@@ -57,12 +65,12 @@ export function SelectorDescuento({
         if (guardado) {
           setDescuentoAplicado(guardado);
           setDescuentoSeleccionadoId(String(guardado.descuentoId));
-          setModoDescuento('con');
+          setModoDescuento(guardado.autorizaGratuidad ? 'cortesia' : 'con');
           onChangeRef.current?.(guardado);
         } else if (descuentoActual) {
           setDescuentoAplicado(descuentoActual);
           setDescuentoSeleccionadoId(String(descuentoActual.descuentoId));
-          setModoDescuento('con');
+          setModoDescuento(descuentoActual.autorizaGratuidad ? 'cortesia' : 'con');
         }
       })
       .catch((err: unknown) => {
@@ -80,6 +88,7 @@ export function SelectorDescuento({
 
   const seleccionarSinDescuento = async () => {
     const descuentoAnterior = descuentoAplicado;
+    const modoAnterior = modoDescuento;
     setModoDescuento('sin');
     setDescuentoSeleccionadoId('');
 
@@ -95,9 +104,78 @@ export function SelectorDescuento({
       setDescuentoAplicado(null);
       onChangeRef.current?.(null);
     } catch (err: unknown) {
-      setModoDescuento(descuentoAnterior ? 'con' : 'sin');
+      setModoDescuento(modoAnterior);
       setDescuentoSeleccionadoId(descuentoAnterior ? String(descuentoAnterior.descuentoId) : '');
       Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo retirar el descuento.', 'error');
+    } finally {
+      setAplicando(false);
+    }
+  };
+
+  const seleccionarConDescuento = async () => {
+    if (modoDescuento === 'cortesia') {
+      if (certificadoId) {
+        setAplicando(true);
+        try {
+          await quitarDescuentoBorrador(certificadoId);
+          setDescuentoAplicado(null);
+          onChangeRef.current?.(null);
+        } catch (err: unknown) {
+          Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo retirar la cortesía.', 'error');
+          return;
+        } finally {
+          setAplicando(false);
+        }
+      }
+    }
+    setModoDescuento('con');
+    setDescuentoSeleccionadoId('');
+  };
+
+  const handleSeleccionarCortesia = async () => {
+    if (tienePagosRegistrados) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Pagos registrados',
+        text: 'Para aplicar cortesía debe eliminar los pagos registrados previamente.',
+        confirmButtonColor: '#052a79'
+      });
+      return;
+    }
+
+    if (!certificadoId) return;
+
+    const modoAnterior = modoDescuento;
+    const descuentoAnterior = descuentoAplicado;
+    setModoDescuento('cortesia');
+    setDescuentoSeleccionadoId('');
+    setAplicando(true);
+
+    try {
+      // Buscar el descuento con autorizaGratuidad configurado para taller o aplicar DESCUENTO_TALLER
+      const descGratuito = descuentosDisponibles.find(
+        (d) => d.autorizaGratuidad || d.codigo === 'DESCUENTO_TALLER'
+      );
+      let resultado: ConsultaDescuentoResult;
+      if (descGratuito) {
+        resultado = await aplicarDescuentoDirecto(certificadoId, descGratuito.id);
+      } else {
+        resultado = await aplicarDescuentoDirecto(certificadoId, 17); // ID canónico DESCUENTO CERTIFICADO TALLER
+      }
+      setDescuentoAplicado(resultado);
+      onChangeRef.current?.(resultado);
+      Swal.fire({
+        icon: 'success',
+        title: 'Cortesía Aplicada',
+        text: 'Se aplicó cortesía de taller (Operación Gratuita).',
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    } catch (err: unknown) {
+      setModoDescuento(modoAnterior);
+      setDescuentoAplicado(descuentoAnterior);
+      const mensaje = err instanceof Error ? err.message : 'No se pudo aplicar la cortesía seleccionada.';
+      Swal.fire('Error', mensaje, 'error');
     } finally {
       setAplicando(false);
     }
@@ -143,7 +221,7 @@ export function SelectorDescuento({
           Descuento
         </label>
 
-        <div className="flex gap-4 mb-3">
+        <div className="flex flex-wrap gap-4 mb-3">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
@@ -159,24 +237,39 @@ export function SelectorDescuento({
               type="radio"
               name="tipoDescuento"
               checked={modoDescuento === 'con'}
-              onChange={() => setModoDescuento('con')}
+              onChange={() => void seleccionarConDescuento()}
               className="h-4 w-4 text-[#052a79] focus:ring-[#052a79]"
             />
             <span className="text-sm font-bold text-slate-700">CON DESCUENTO</span>
           </label>
+          {esTaller && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="tipoDescuento"
+                checked={modoDescuento === 'cortesia'}
+                onChange={() => void handleSeleccionarCortesia()}
+                className="h-4 w-4 text-[#052a79] focus:ring-[#052a79]"
+              />
+              <span className="text-sm font-bold text-emerald-700 flex items-center gap-1">
+                <Sparkles className="h-3.5 w-3.5" />
+                CORTESÍA
+              </span>
+            </label>
+          )}
         </div>
 
-        {cargandoLista ? (
+        {modoDescuento === 'con' && cargandoLista ? (
           <div className="flex items-center gap-2.5 h-[42px] px-4 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500">
             <Loader2 className="h-4 w-4 animate-spin text-[#052a79]" />
             Cargando descuentos configurados para este servicio...
           </div>
-        ) : errorCarga ? (
+        ) : modoDescuento === 'con' && errorCarga ? (
           <div className="flex items-center gap-2 p-3 rounded-xl border border-red-200 bg-red-50 text-xs text-red-700 font-medium">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{errorCarga}</span>
           </div>
-        ) : descuentosDisponibles.length === 0 ? (
+        ) : modoDescuento === 'con' && descuentosDisponibles.length === 0 ? (
           <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-xs font-medium text-amber-800">
             No existen descuentos vigentes configurados para este servicio en esta sede.
           </div>

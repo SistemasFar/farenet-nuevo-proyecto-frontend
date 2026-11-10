@@ -39,6 +39,7 @@ interface PagoStepProps {
   certificadoId?: number;
   descuentoActual?: ConsultaDescuentoResult | null;
   onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
+  esTaller?: boolean;
 }
 
 export function PagoStep({
@@ -70,11 +71,15 @@ export function PagoStep({
   certificadoId,
   descuentoActual = null,
   onDescuentoChange,
+  esTaller = false,
 }: PagoStepProps) {
 
   const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
+  const esCortesia = Boolean(descuentoActual?.autorizaGratuidad);
+  const totalPagarCalculado = esCortesia ? 0 : totalPagar;
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
-  const pendiente = totalPagar - pagado;
+  const pendiente = esCortesia ? 0 : (totalPagarCalculado - pagado);
+  const descuentoVisual = esCortesia ? tarifaOriginal : descuento;
   const cuentaFaregas = maestrosPago?.cuentasCorrientes?.[0];
   const entidadFaregas = maestrosPago?.entidadesFinancieras?.find(
     (entidad) => entidad.key === cuentaFaregas?.entidadfinanciera_key
@@ -140,17 +145,21 @@ export function PagoStep({
           <div className={`rounded-2xl border-2 border-slate-200 bg-white ${compact ? 'p-4' : 'p-5'}`}>
             <label className="mb-2 block text-xs font-bold text-slate-500">CONDICIÓN DE PAGO</label>
             <select
-              value={condicionPago}
-              disabled={esBoleta}
+              value={esCortesia ? 'CONTADO' : condicionPago}
+              disabled={esBoleta || esCortesia}
               onChange={(event) => onCondicionPagoChange(event.target.value as 'CONTADO' | 'CREDITO')}
               className="w-full rounded-xl border-2 border-slate-200 p-3 font-bold text-[#052a79] disabled:bg-slate-100 disabled:text-slate-600"
             >
-              <option value="CONTADO">CONTADO — debe completar el pago</option>
-              {!esBoleta && <option value="CREDITO">CRÉDITO — el saldo se distribuirá en cuotas</option>}
+              <option value="CONTADO">{esCortesia ? 'CONTADO — CORTESÍA (Operación Gratuita)' : 'CONTADO — debe completar el pago'}</option>
+              {!esBoleta && !esCortesia && <option value="CREDITO">CRÉDITO — el saldo se distribuirá en cuotas</option>}
             </select>
-            {esBoleta && <p className="mt-2 text-xs font-semibold text-slate-500">La boleta sólo admite condición de pago CONTADO.</p>}
+            {esCortesia ? (
+              <p className="mt-2 text-xs font-semibold text-emerald-700">Las operaciones de cortesía se emiten exclusivamente al contado con importe S/ 0.00.</p>
+            ) : esBoleta ? (
+              <p className="mt-2 text-xs font-semibold text-slate-500">La boleta sólo admite condición de pago CONTADO.</p>
+            ) : null}
             
-            {condicionPago === 'CREDITO' && (
+            {!esCortesia && condicionPago === 'CREDITO' && (
               <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3 space-y-3">
                 <p className="text-xs font-black tracking-wide text-[#052a79]">PERÍODO DEL CRÉDITO</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -213,36 +222,65 @@ export function PagoStep({
               certificadoId={certificadoId}
               descuentoActual={descuentoActual}
               onDescuentoChange={onDescuentoChange}
+              esTaller={esTaller}
+              tienePagosRegistrados={pagosAgregados.length > 0}
             />
           </div>
 
           <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden">
+            {esCortesia && (
+              <div className="p-4 bg-emerald-50 border-b border-emerald-200 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-black text-emerald-900 uppercase">CORTESÍA — Operación gratuita. No requiere registrar pagos.</p>
+                  <p className="text-[11px] font-semibold text-emerald-700">Esta certificación de taller no genera deuda ni requiere registrar pagos en efectivo, tarjeta ni banco.</p>
+                </div>
+              </div>
+            )}
             <div className="flex border-b border-slate-200 bg-slate-50">
               {['EFECTIVO', 'TARJETA', 'BANCO'].map((tab) => (
                 <button
                   key={tab}
+                  type="button"
+                  disabled={esCortesia}
                   onClick={() => setPagoTab(tab as TipoPago)}
                   className={`flex-1 py-4 font-bold text-sm tracking-wider transition-colors ${
                     pagoTab === tab
                       ? 'bg-white text-[#052a79] border-b-2 border-b-[#f59e0b]'
                       : 'text-slate-400 hover:text-slate-600'
-                  }`}
+                  } ${esCortesia ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {tab}
                 </button>
               ))}
             </div>
 
-            <div className={`${compact ? 'space-y-4 p-4' : 'space-y-6 p-6'}`}>
+            <div className={`${compact ? 'space-y-4 p-4' : 'space-y-6 p-6'} ${esCortesia ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">MONTO (S/)</label>
-                  <input type="number" name="importe" value={formPago.importe || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-lg focus:border-[#f59e0b] focus:ring-0" placeholder="0.00" />
+                  <input
+                    type="number"
+                    name="importe"
+                    disabled={esCortesia}
+                    value={formPago.importe || ''}
+                    onChange={handleInput}
+                    className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold text-lg focus:border-[#f59e0b] focus:ring-0 disabled:bg-slate-100"
+                    placeholder="0.00"
+                  />
                 </div>
                 {pagoTab !== 'EFECTIVO' && (
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">N° OPERACIÓN / REFERENCIA</label>
-                    <input type="text" name="nroOperacion" value={formPago.nroOperacion || ''} onChange={handleInput} className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0" placeholder="EJ: 123456" />
+                    <input
+                      type="text"
+                      name="nroOperacion"
+                      disabled={esCortesia}
+                      value={formPago.nroOperacion || ''}
+                      onChange={handleInput}
+                      className="w-full p-3 border-2 border-slate-200 rounded-xl capitalize font-bold focus:border-[#f59e0b] focus:ring-0 disabled:bg-slate-100"
+                      placeholder="EJ: 123456"
+                    />
                   </div>
                 )}
               </div>
@@ -314,8 +352,11 @@ export function PagoStep({
 
               <button
                 type="button"
+                disabled={esCortesia}
                 onClick={agregarMockPago}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-[#052a79] text-white rounded-xl font-bold hover:bg-[#041e56] transition"
+                className={`w-full flex items-center justify-center gap-2 py-3 bg-[#052a79] text-white rounded-xl font-bold hover:bg-[#041e56] transition ${
+                  esCortesia ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 <PlusCircle className="w-5 h-5" /> AGREGAR PAGO
               </button>
@@ -345,7 +386,11 @@ export function PagoStep({
               </div>
             )}
 
-            {pagosAgregados.length === 0 ? (
+            {esCortesia ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-center">
+                <p className="text-xs font-bold text-emerald-800">Operación gratuita por cortesía: sin pagos registrados.</p>
+              </div>
+            ) : pagosAgregados.length === 0 ? (
               <p className="text-slate-400 text-sm italic">No hay pagos registrados.</p>
             ) : (
               <div className="space-y-3">
@@ -400,14 +445,19 @@ export function PagoStep({
             
             <div className={compact ? 'space-y-3' : 'space-y-4'}>
               <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">{labelTarifaOriginal}</span><span className="font-bold text-slate-700">S/ {tarifaOriginal.toFixed(2)}</span></div>
-              {descuento > 0 && <div className="flex justify-between items-center"><span className="text-emerald-700 font-semibold">Descuento certificado:</span><span className="font-black text-emerald-700">- S/ {descuento.toFixed(2)}</span></div>}
+              {descuentoVisual > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-emerald-700 font-semibold">{esCortesia ? 'Cortesía de taller:' : 'Descuento certificado:'}</span>
+                  <span className="font-black text-emerald-700">- S/ {descuentoVisual.toFixed(2)}</span>
+                </div>
+              )}
               {resumenComercial?.requiereChip && (
                 <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">Chip y porta chip:</span><span className="font-bold text-slate-700">S/ {resumenComercial.precioChip.toFixed(2)}</span></div>
               )}
               {resumenComercial?.requiereChip && <div className="h-px bg-slate-200" />}
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-semibold">Total a pagar:</span>
-                <span className="text-slate-800 font-black text-xl">S/ {totalPagar.toFixed(2)}</span>
+                <span className="text-slate-800 font-black text-xl">S/ {totalPagarCalculado.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-semibold">Pagado:</span>
@@ -421,7 +471,11 @@ export function PagoStep({
                 </span>
               </div>
             </div>
-            {pendiente > 0 ? (
+            {esCortesia ? (
+              <div className={`${compact ? 'mt-4' : 'mt-6'} rounded-lg border border-emerald-300 bg-emerald-100 p-3 text-center text-xs font-bold text-emerald-800`}>
+                Cortesía aplicada. Puede continuar sin registrar pagos.
+              </div>
+            ) : pendiente > 0 ? (
               <p className={`text-xs font-bold text-center capitalize ${compact ? 'mt-4' : 'mt-6'} ${condicionPago === 'CREDITO' ? 'text-blue-600' : 'text-red-500'}`}>
                 {condicionPago === 'CREDITO'
                   ? 'El saldo pendiente se registrará en cuotas'

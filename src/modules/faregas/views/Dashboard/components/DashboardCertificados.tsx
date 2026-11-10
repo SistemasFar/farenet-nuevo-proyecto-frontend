@@ -92,32 +92,44 @@ export const DashboardCertificados: React.FC<DashboardCertificadosProps> = ({
                   </td>
                   <td className="py-2.5 px-3 text-slate-500">
                     {(() => {
-                      // Timestamp para certificados emitidos (no draft)
-                      const timestamp = c.fechaHoraEmision && c.estado === 'EMITIDO' ? c.fechaHoraEmision : null;
-                      const isDraft = c.estado === 'BORRADOR';
-                      
-                      if (timestamp) {
-                        const date = new Date(timestamp);
-                        const esHoraLima = date.getTimezoneOffset() === -300; // -5 horas
+                      if (c.estado === 'EMITIDO') {
+                        if (c.fechaHoraEmision) {
+                          const date = new Date(c.fechaHoraEmision);
+                          if (!Number.isNaN(date.getTime())) {
+                            const parts = new Intl.DateTimeFormat('es-PE', {
+                              timeZone: 'America/Lima',
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            }).formatToParts(date);
+                            const part = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value || '';
+                            return (
+                              <div>
+                                <div>{part('day')}/{part('month')}/{part('year')}</div>
+                                <div className="text-xs text-slate-500 font-mono">
+                                  {part('hour')}:{part('minute')}:{part('second')}
+                                </div>
+                              </div>
+                            );
+                          }
+                        }
                         return (
                           <div>
-                            <div>{date.toLocaleDateString('es-PE')}</div>
-                            {esHoraLima && (
-                              <div className="text-xs text-slate-400 font-mono">
-                                {date.getHours().toString().padStart(2, '0')}:{date.getMinutes().toString().padStart(2, '0')}:{date.getSeconds().toString().padStart(2, '0')}
-                              </div>
-                            )}
+                            <div>{new Date(c.fechaCreacion).toLocaleDateString('es-PE')}</div>
+                            <div className="text-xs text-slate-400 font-mono">Hora sin registro</div>
                           </div>
                         );
                       }
                       
-                      // Timestamp no disponible o draft: usar fechaCreacion
+                      // Para borradores o no emitidos: usar fechaCreacion
                       return (
                         <div>
                           <div>{new Date(c.fechaCreacion).toLocaleDateString('es-PE')}</div>
-                          {isDraft && (
-                            <div className="text-xs text-slate-400 font-mono">CREACIÓN</div>
-                          )}
+                          <div className="text-xs text-slate-400 font-mono">Creación</div>
                         </div>
                       );
                     })()}

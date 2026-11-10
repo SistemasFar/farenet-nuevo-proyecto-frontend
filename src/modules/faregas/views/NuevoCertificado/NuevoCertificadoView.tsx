@@ -449,6 +449,13 @@ function NuevoCertificadoWizard() {
         setDescuento(desc.importeDescuento);
         setPrecioTotal(desc.importeFinal + precioChip);
         setDescuentoAplicado(desc);
+        if (desc.autorizaGratuidad) {
+          setFormFacturacion((prev) => ({
+            ...prev,
+            condicionPagoFac: 'CONTADO',
+            cuotasFac: [],
+          }));
+        }
         setResumenComercial((actual) => actual ? {
           ...actual,
           precioCertificado: desc.tarifaOriginal,
@@ -539,7 +546,7 @@ function NuevoCertificadoWizard() {
   const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
     tipoDocFac: '', tipoDocumentoFac: 'DNI', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
-    emailFac: '', telefonoFac: '', usarTitularPrincipalFac: true,
+    emailFac: '', telefonoFac: '', usarTitularPrincipalFac: false,
     condicionPagoFac: 'CONTADO', fechaInicioCreditoFac: fechaLocalIso(), fechaVencimientoFac: '',
     medioPagoFac: '', cuotasFac: []
   });
@@ -629,25 +636,21 @@ function NuevoCertificadoWizard() {
   useEffect(() => {
     if (!formFacturacion.usarTitularPrincipalFac || !titularPrincipal) return;
 
-    const tipoComprobante = titularPrincipal.tipoDocumento === 'RUC' ? 'FACTURA' : 'BOLETA';
     const tipoDocumentoFac = String(titularPrincipal.tipoDocumento || 'DNI').trim().toUpperCase();
 
     // El documento, nombre y dirección deben reflejarse en el mismo clic. La
     // consulta remota sólo completa contacto y nunca bloquea el checkbox.
+    // El tipo de comprobante (tipoDocFac) NO se modifica automáticamente por el
+    // titular; la elección entre BOLETA y FACTURA siempre corresponde al usuario.
     setFormFacturacion((prev) => {
       const sincronizada = {
         ...prev,
-        tipoDocFac: tipoComprobante,
         tipoDocumentoFac,
         nroDocFac: titularPrincipal.nroDocumento,
         razonSocialFac: titularPrincipal.nombreRazonSocial,
         direccionFac: titularPrincipal.direccion,
-        condicionPagoFac: tipoComprobante === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
-        fechaVencimientoFac: tipoComprobante === 'BOLETA' ? '' : prev.fechaVencimientoFac,
-        cuotasFac: tipoComprobante === 'BOLETA' ? [] : prev.cuotasFac,
       };
-      const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
-        && prev.tipoDocumentoFac === sincronizada.tipoDocumentoFac
+      const sinCambios = prev.tipoDocumentoFac === sincronizada.tipoDocumentoFac
         && prev.nroDocFac === sincronizada.nroDocFac
         && prev.razonSocialFac === sincronizada.razonSocialFac
         && prev.direccionFac === sincronizada.direccionFac;
@@ -682,14 +685,14 @@ function NuevoCertificadoWizard() {
     return () => {
       activo = false;
     };
-  }, [formFacturacion.usarTitularPrincipalFac, titularPrincipal]);
+  }, [formFacturacion.usarTitularPrincipalFac, titularPrincipal, formCaja.tipoCertificado]);
 
   const construirPayloadFacturacion = (cuotas = formFacturacion.cuotasFac) => {
-    const tipoComprobante = formFacturacion.tipoDocFac || 'BOLETA';
+    const tipoComprobante = formFacturacion.tipoDocFac || '';
     const condicionPago = tipoComprobante === 'BOLETA' ? 'CONTADO' : formFacturacion.condicionPagoFac;
     return ({
       tipoComprobante,
-      tipoDocumentoCliente: formFacturacion.tipoDocumentoFac || (formFacturacion.nroDocFac.length === 11 ? 'RUC' : 'DNI'),
+      tipoDocumentoCliente: formFacturacion.tipoDocumentoFac || (formFacturacion.nroDocFac.length === 11 ? 'RUC' : (tipoComprobante === 'FACTURA' ? 'RUC' : 'DNI')),
       nroDocumento: formFacturacion.nroDocFac,
       nombreRazonSocial: formFacturacion.razonSocialFac,
       direccion: formFacturacion.direccionFac,
@@ -700,7 +703,7 @@ function NuevoCertificadoWizard() {
       fechaVencimiento: condicionPago === 'CREDITO' ? (formFacturacion.fechaVencimientoFac || null) : null,
       medioPago: medioPagoCalculado || null,
       cuotas: condicionPago === 'CREDITO' ? cuotas : [],
-      facturarAlDuenoPrincipal: formFacturacion.usarTitularPrincipalFac,
+      facturarAlDuenoPrincipal: formCaja.tipoCertificado === 'GNV_ANUAL' ? false : formFacturacion.usarTitularPrincipalFac,
     });
   };
 
@@ -928,27 +931,16 @@ function NuevoCertificadoWizard() {
             const facturacionRes = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
             const fac = facturacionRes.data?.facturacion;
             if (fac) {
-              const titularPrincipalCargado = [...titularesCargados].sort((a, b) => a.orden - b.orden)[0];
-              const documentoFacturacion = String(fac.nroDocumento || '').trim();
-              const mismoTitularPrincipal = Boolean(
-                titularPrincipalCargado
-                && documentoFacturacion
-                && documentoFacturacion === String(titularPrincipalCargado.nroDocumento || '').trim()
-              );
               setFormFacturacion(prev => ({
                 ...prev,
-                tipoDocFac: fac.tipoComprobante || 'BOLETA',
+                tipoDocFac: fac.tipoComprobante || '',
                 tipoDocumentoFac: fac.tipoDocumentoCliente || (String(fac.nroDocumento || '').length === 11 ? 'RUC' : 'DNI'),
                 nroDocFac: fac.nroDocumento || '',
                 razonSocialFac: fac.nombreRazonSocial || '',
                 direccionFac: fac.direccion || '',
                 emailFac: fac.email || '',
                 telefonoFac: fac.telefono || '',
-                // Los borradores anteriores guardaban `false` aunque sus datos
-                // correspondieran al propietario. Se reconoce esa coincidencia
-                // para aplicar el nuevo valor predeterminado sin convertir en
-                // titular a un cliente alterno con otro documento.
-                usarTitularPrincipalFac: fac.facturarAlDuenoPrincipal === true || mismoTitularPrincipal,
+                usarTitularPrincipalFac: fac.facturarAlDuenoPrincipal === true,
                 condicionPagoFac: fac.tipoComprobante === 'BOLETA' ? 'CONTADO' : (fac.condicionPago || 'CONTADO'),
                 fechaInicioCreditoFac: String(fac.fechaInicioCredito || prev.fechaInicioCreditoFac || fechaLocalIso()).slice(0, 10),
                 fechaVencimientoFac: fac.tipoComprobante === 'BOLETA' ? '' : String(fac.fechaVencimiento || '').slice(0, 10),
@@ -1741,6 +1733,7 @@ function NuevoCertificadoWizard() {
       fechaInicioCredito: formFacturacion.fechaInicioCreditoFac,
       fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
       cuotas,
+      esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
     });
     const erroresCliente = validarDatosFacturacionCampos(formFacturacion);
     const primerError = Object.values({ ...erroresCliente, ...erroresPago })[0];
@@ -2211,6 +2204,7 @@ function NuevoCertificadoWizard() {
         } else if (formCaja.tipoCertificado === 'GNV_ANUAL') {
           setFormGnv((prev: any) => ({ ...prev, modalidad: formCaja.modalidadCertificado }));
         }
+        setFormFacturacion((prev) => ({ ...prev, usarTitularPrincipalFac: false }));
         const tarifaResponse = await faregasCertificadosApi.obtenerPagos(idBorrador);
         aplicarResumenComercial(tarifaResponse.data);
         setLastSavedAt(new Date());
@@ -2273,6 +2267,7 @@ function NuevoCertificadoWizard() {
           fechaInicioCredito: formFacturacion.fechaInicioCreditoFac,
           fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
           cuotas: cuotasCreditoResueltas,
+          esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
         }))) return;
         setIsSavingStep(true);
         try {
@@ -2998,6 +2993,7 @@ function NuevoCertificadoWizard() {
               certificadoId={certificadoId}
               descuentoActual={descuentoAplicado}
               onDescuentoChange={onDescuentoChange}
+              esTaller={formCaja.tipo_flujo === 'TALLER_INSPECCION'}
               onCondicionPagoChange={(condicionPago) => {
                 if (formFacturacion.tipoDocFac === 'BOLETA' && condicionPago === 'CREDITO') return;
                 limpiarErrorCampo('pagos');

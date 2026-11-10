@@ -12,11 +12,6 @@ const textoUnico = (values: unknown[], separator = ', ') => [...new Set(values
 const columnas = (...entries: Array<[string, string, number?, ExcelColumn['format']?]>): ExcelColumn[] =>
   entries.map(([key, header, width, format]) => ({ key, header, width, format }));
 
-const prepararSubtotal = (linea: Row, cantidad: number) => {
-  const precio = numero(linea.precio_unitario);
-  return moneda(cantidad * precio);
-};
-
 /** Conserva ceros iniciales y elimina únicamente etiquetas documentarias. */
 export function limpiarDocumentoCliente(tipo: unknown, valor: unknown): string {
   const numeroDocumento = String(valor ?? '').trim();
@@ -54,7 +49,7 @@ export function horaEmisionCertificado(
   if (estadoCert !== 'EMITIDO' && estadoCert !== 'ANULADO') return 'NO EMITIDO';
 
   // FASE 3: única fuente confiable = fecha_hora_emision (timestamptz).
-  const rawHora = (linea as any).fecha_hora_emision ?? (doc as any)?.fecha_hora_emision;
+  const rawHora = (linea as any).fecha_hora_emision ?? (linea as any).hora_emision_certificado ?? (doc as any)?.fecha_hora_emision ?? (doc as any)?.hora_emision_certificado;
   if (rawHora) return formatearHoraLima(rawHora);
   return 'SIN REGISTRO';
 }
@@ -87,8 +82,17 @@ export function formatearHoraLima(raw: unknown): string {
 export function clasificarMediosPago(
   pagos: Row[],
   importeNeto: number,
-  importePagado: number
+  importePagado: number,
+  creditoInfo?: { esCredito?: boolean; cuotasCount?: number; esCortesia?: boolean }
 ): { tipoPago: string; formaPago: string } {
+  if (creditoInfo?.esCortesia) {
+    return { tipoPago: 'CORTESÍA', formaPago: 'CORTESÍA' };
+  }
+  if (creditoInfo?.esCredito) {
+    const cuotas = Number(creditoInfo.cuotasCount || 0);
+    const forma = cuotas > 1 ? `${cuotas} CUOTAS` : '1 CUOTA';
+    return { tipoPago: 'CRÉDITO', formaPago: forma };
+  }
   const confirmados = pagos.filter(pagoConfirmado);
   if (!confirmados.length) {
     if (importeNeto <= 0 && importePagado <= 0) return { tipoPago: 'NO APLICA', formaPago: 'NO APLICA' };
@@ -122,22 +126,6 @@ const tipoComprobante = (doc: Row) => {
   return raw ? String(doc.tipo_comprobante) : '';
 };
 const pagoConfirmado = (pago: Row) => ['CAN', 'CONFIRMADO', 'PAGADO'].includes(estado(pago.estado));
-const normalizarEtiquetaPago = (value: unknown) => String(value || '').trim().toUpperCase().replaceAll('_', ' ');
-const tipoPago = (pago: Row) => {
-  const tipo = normalizarEtiquetaPago(pago.tipocontado_key || pago.medio_pago);
-  if (tipo.includes('EFECTIVO')) return 'EFECTIVO';
-  if (tipo.includes('BANCO') || tipo.includes('TRANSFER') || tipo.includes('DEPOS')) return 'BANCO';
-  if (tipo.includes('TARJETA')) return 'TARJETA';
-  return 'SIN IDENTIFICAR';
-};
-const formaPago = (pago: Row) => {
-  const tipo = tipoPago(pago);
-  const forma = normalizarEtiquetaPago(pago.tipo_tarjeta || pago.tarjeta_key || pago.modalidad_tarjeta);
-  if (tipo === 'EFECTIVO') return 'EFECTIVO';
-  if (tipo === 'BANCO') return forma || 'BANCO';
-  if (tipo === 'TARJETA') return forma || 'SIN IDENTIFICAR';
-  return forma || 'SIN IDENTIFICAR';
-};
 const cantidadLinea = (linea: Row) => numero(linea.cantidad) || 1;
 const descripcionLinea = (linea: Row) => {
   const cantidad = cantidadLinea(linea);
@@ -179,9 +167,9 @@ const estadoFiscal = (doc: Row) => {
 };
 
 export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse): Array<Record<string, ExcelCellValue>> {
-  const operaciones = data.operaciones.map((row) => ({ ...row, key: `OP-${row.id}`, idOperacion: `OP-${row.id}` }));
+  const operaciones = (data.operaciones || []).map((row) => ({ ...row, key: `OP-${row.id}`, idOperacion: `OP-${row.id}` }));
   const directasPorId = new Map<string, Row>();
-  data.ventasDirectas.forEach((row) => {
+  (data.ventasDirectas || []).forEach((row) => {
     const key = String(row.id);
     const actual = directasPorId.get(key) || { ...row, detalles: [] };
     if (row.detalle_id) actual.detalles.push(row);
@@ -196,7 +184,7 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
   const ventas: Row[] = [...operaciones, ...directas];
 
   const lineasPorVenta = new Map<string, Row[]>();
-  data.lineas.forEach((linea) => {
+  (data.lineas || []).forEach((linea) => {
     const key = `OP-${linea.operacion_id}`;
     lineasPorVenta.set(key, [...(lineasPorVenta.get(key) || []), linea]);
   });
@@ -206,24 +194,24 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
   }))));
 
   const docsPorVenta = new Map<string, Row[]>();
-  data.comprobantes.forEach((doc) => {
+  (data.comprobantes || []).forEach((doc) => {
     const key = doc.operacion_id ? `OP-${doc.operacion_id}` : doc.venta_id ? `VD-${doc.venta_id}` : '';
     if (key) docsPorVenta.set(key, [...(docsPorVenta.get(key) || []), doc]);
   });
   const ordenesPorVenta = new Map<string, Row[]>();
-  data.ordenes.forEach((orden) => {
+  (data.ordenes || []).forEach((orden) => {
     const key = orden.operacion_id ? `OP-${orden.operacion_id}` : orden.venta_id ? `VD-${orden.venta_id}` : '';
     if (key) ordenesPorVenta.set(key, [...(ordenesPorVenta.get(key) || []), orden]);
   });
   const pagosPorOrden = new Map<string, Row[]>();
-  data.pagos.forEach((pago) => pagosPorOrden.set(String(pago.orden_pago_id), [...(pagosPorOrden.get(String(pago.orden_pago_id)) || []), pago]));
+  (data.pagos || []).forEach((pago) => pagosPorOrden.set(String(pago.orden_pago_id), [...(pagosPorOrden.get(String(pago.orden_pago_id)) || []), pago]));
 
     const descuentosPorVenta = new Map<string, Row[]>();
     const operacionPorCertificado = new Map<string, string>();
-    data.lineas.forEach((linea) => linea.certificado_id && operacionPorCertificado.set(String(linea.certificado_id), `OP-${linea.operacion_id}`));
-    const ordenPorId = new Map(data.ordenes.map((orden) => [String(orden.id), orden]));
-    const docPorId = new Map(data.comprobantes.map((doc) => [String(doc.id), doc]));
-    data.descuentos.filter((item) => estado(item.estado) === 'APLICADO').forEach((item) => {
+    (data.lineas || []).forEach((linea) => linea.certificado_id && operacionPorCertificado.set(String(linea.certificado_id), `OP-${linea.operacion_id}`));
+    const ordenPorId = new Map((data.ordenes || []).map((orden) => [String(orden.id), orden]));
+    const docPorId = new Map((data.comprobantes || []).map((doc) => [String(doc.id), doc]));
+    (data.descuentos || []).filter((item) => estado(item.estado) === 'APLICADO').forEach((item) => {
       const orden = item.orden_pago_id ? ordenPorId.get(String(item.orden_pago_id)) : undefined;
       const doc = item.facturacion_id
         ? docPorId.get(String(item.facturacion_id))
@@ -236,41 +224,102 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
 
   const filas: Array<Record<string, ExcelCellValue>> = [];
   for (const venta of ventas) {
-    if (['ANULADO', 'ANULADA', 'CANCELADO'].includes(estado(venta.estado))) continue;
+    if (['ANULADO', 'ANULADA', 'CANCELADO', 'BORRADOR'].includes(estado(venta.estado))) continue;
     const todasLasLineas = lineasPorVenta.get(venta.key) || [];
-    const lineasVigentes = todasLasLineas.filter((linea) => estado(linea.certificado_estado) !== 'ANULADO');
-    if (todasLasLineas.length && !lineasVigentes.length) continue;
     const docsOriginales = docsPorVenta.get(venta.key) || [];
     const docsVigentes = docsOriginales.filter((doc) => !documentoFiscalInvalido(doc));
     if (docsOriginales.length && !docsVigentes.length) continue;
+
+    const ordenes = ordenesPorVenta.get(venta.key) || [];
+    const pagos = ordenes.flatMap((orden) => pagosPorOrden.get(String(orden.id)) || []).filter(pagoConfirmado);
+    const importePagado = moneda(pagos.reduce((sum, pago) => sum + numero(pago.importe), 0));
+
+    // REGLA FUNDAMENTAL DE CONFIRMACIÓN COMERCIAL (Excluir borradores y no confirmadas)
+    const lineasConCert = todasLasLineas.filter((l) => Boolean(l.certificado_id || l.numero_certificado));
+    const esDup = esDuplicado(todasLasLineas);
+
+    if (lineasConCert.length > 0 && !esDup) {
+      const estadosCert = lineasConCert.map((l) => estado(l.certificado_estado));
+      // Si todos los certificados están en BORRADOR (o vacíos) -> EXCLUIR DEFINITIVAMENTE (ej. OC 604)
+      const todosBorradores = estadosCert.every((e) => e === 'BORRADOR' || !e);
+      if (todosBorradores) continue;
+
+      // Si todos los certificados están ANULADOS -> EXCLUIR
+      const todosAnulados = estadosCert.every((e) => e === 'ANULADO');
+      if (todosAnulados) continue;
+
+      // Certificados emitidos sin comprobante fiscal válido Y sin pagos confirmados -> EXCLUIR si la operación comercial no está confirmada (ej. OC 603 con PENDIENTE_PAGO)
+      const tieneComprobanteValido = docsVigentes.length > 0;
+      const tienePagoConfirmado = importePagado > 0;
+      const ventaConfirmada = ['PAGADO', 'FACTURADO'].includes(estado(venta.estado));
+      if (!tieneComprobanteValido && !tienePagoConfirmado && !ventaConfirmada) {
+        continue;
+      }
+    } else if (esDup) {
+      const tieneComprobanteValido = docsVigentes.length > 0;
+      const tienePagoConfirmado = importePagado > 0;
+      const confirmada = ['PAGADO', 'FACTURADO', 'EMITIDO', 'CONFIRMADO'].includes(estado(venta.estado))
+        || tieneComprobanteValido || tienePagoConfirmado;
+      if (!confirmada) continue;
+    } else if (venta.key.startsWith('VD-')) {
+      const tieneComprobanteValido = docsVigentes.length > 0;
+      const tienePagoConfirmado = importePagado > 0;
+      const confirmada = ['PAGADO', 'FACTURADO', 'EMITIDO', 'CONFIRMADO'].includes(estado(venta.estado))
+        || tieneComprobanteValido || tienePagoConfirmado;
+      if (!confirmada) continue;
+    } else {
+      const tieneComprobanteValido = docsVigentes.length > 0;
+      const tienePagoConfirmado = importePagado > 0;
+      const confirmada = ['PAGADO', 'FACTURADO', 'EMITIDO', 'CONFIRMADO'].includes(estado(venta.estado))
+        || tieneComprobanteValido || tienePagoConfirmado;
+      if (!confirmada) continue;
+    }
+
+    const lineasVigentes = todasLasLineas.filter((linea) => {
+      const est = estado(linea.certificado_estado);
+      return est !== 'ANULADO' && est !== 'BORRADOR';
+    });
+    if (todasLasLineas.length && !lineasVigentes.length) continue;
 
     const idsCertificados = new Set(lineasVigentes.map((linea) => String(linea.certificado_id || '')).filter(Boolean));
     const descuentos = (descuentosPorVenta.get(venta.key) || []).filter((item) =>
       !item.certificado_id || !idsCertificados.size || idsCertificados.has(String(item.certificado_id))
     );
     const descuento = moneda(descuentos.reduce((sum, item) => sum + numero(item.importe_descuento), 0));
-    const totalBase = todasLasLineas.length
+    const totalBase = lineasVigentes.length
       ? moneda(lineasVigentes.reduce((sum, linea) => sum + numero(linea.importe_total), 0))
       : moneda(venta.importe_total);
-    const subtotalLineas = todasLasLineas.length
-      ? moneda(lineasVigentes.reduce((sum, linea) => sum + (cantidadLinea(linea) * numero(linea.precio_unitario)), 0))
-      : totalBase;
     const importeBruto = moneda(totalBase + descuento);
     const notaCreditoParcial = moneda(docsVigentes.reduce((sum, doc) => sum + numero(doc.nota_credito_parcial_total), 0));
     const importeNeto = moneda(Math.max(0, totalBase - notaCreditoParcial));
-    const ordenes = ordenesPorVenta.get(venta.key) || [];
-    const pagos = ordenes.flatMap((orden) => pagosPorOrden.get(String(orden.id)) || []).filter(pagoConfirmado);
-    const importePagado = moneda(pagos.reduce((sum, pago) => sum + numero(pago.importe), 0));
-    const sinImporteExigible = importeNeto <= 0 && importePagado <= 0;
-    // Mismo criterio que Datos (sin inventar; CON_PAGO real o NO APLICA/SIN PAGO).
-    const { tipoPago: tipoPagoCons, formaPago: formaPagoCons } = clasificarMediosPago(pagos, importeNeto, importePagado);
-    const tiposPago = tipoPagoCons;
-    const formasPago = formaPagoCons;
-    const saldoPendiente = moneda(Math.max(0, importeNeto - importePagado));
+    const docCredito = docsVigentes.find((doc) => estado(doc.condicion_pago) === 'CREDITO')
+      || docsOriginales.find((doc) => estado(doc.condicion_pago) === 'CREDITO');
+    const ordenCredito = ordenes.find((ord) => estado(ord.formapago_key).includes('CREDITO'));
+    const esCredito = Boolean(docCredito || ordenCredito);
+    const cuotasCount = docCredito ? Number(docCredito.cuotas_count || docCredito.max_cuota || 0) : 0;
+    const esCortesiaVenta = Boolean(
+      descuentos.some((d) => String(d.codigo || d.nombre_descuento || '').toUpperCase().includes('DESCUENTO_TALLER') || String(d.tipo_descuento || '').toUpperCase() === 'CONVENIO')
+      || docsVigentes.some((doc) => Boolean(
+        (doc as any).es_cortesia
+        || String((doc as any).tipo_pago || '').toUpperCase() === 'CORTESÍA'
+        || String((doc as any).forma_pago || '').toUpperCase() === 'CORTESÍA'
+        || (Number(doc.importe_total || 0) === 0 && JSON.stringify(doc.campos_dinamicos || '').includes('1002'))
+      ))
+      || (totalBase === 0 && importeBruto > 0 && descuento === importeBruto)
+    );
+    // Mismo criterio que Datos (sin inventar; CRÉDITO + N CUOTAS, o CON_PAGO real o NO APLICA/SIN PAGO).
+    const { tipoPago: tipoPagoCons, formaPago: formaPagoCons } = clasificarMediosPago(
+      pagos,
+      importeNeto,
+      importePagado,
+      { esCredito, cuotasCount, esCortesia: esCortesiaVenta }
+    );
+    const tiposPago = esCortesiaVenta ? 'CORTESÍA' : tipoPagoCons;
+    const formasPago = esCortesiaVenta ? 'CORTESÍA' : formaPagoCons;
+    const saldoPendiente = esCortesiaVenta ? 0 : moneda(Math.max(0, importeNeto - importePagado));
     const docCliente = docsVigentes.map((doc) => limpiarDocumentoCliente(doc.tipo_documento_cliente, doc.nro_documento)).find(Boolean);
     const productosAdicionales = lineasVigentes.filter((linea) => estado(linea.tipo_item) === 'PRODUCTO'
       || (!linea.certificado_id && !linea.numero_certificado && !linea.duplicado_id));
-    const preciosUnitarios = [...new Set(lineasVigentes.map((linea) => moneda(linea.precio_unitario)))];
     // Hora por certificado: si hay varios, se conserva cada una (unión por línea).
     // Si no hay hora real, SIN REGISTRO / NO EMITIDO (nunca fecha_modificacion).
     const horasCertificados = textoUnico(
@@ -280,8 +329,7 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
       ' | '
     ) || '';
 
-    // TOTAL DE VENTAS VIGENTES: excluir anulación/NC pendientes o confirmadas.
-    // Importe histórico cobrado se conserva en su columna; no se falsifica.
+    // TOTAL DE VENTAS VIGENTES: prioridad determinista para anulación y NC.
     const tienePendienteAnulacion = docsVigentes.some((doc) => {
       const est = String((doc as any).estado_solicitud_anulacion || '').toUpperCase();
       return Boolean((doc as any).documento_anulacion) && est !== 'RECHAZADO'
@@ -289,18 +337,41 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
     });
     const anulacionConfirmadaF = docsVigentes.some((doc) => esVerdadero((doc as any).aceptada_anulacion_sunat) && (doc as any).fecha_anulacion_confirmacion);
     const ncTotalAceptada = docsVigentes.some((doc) => esVerdadero((doc as any).nota_anulacion_total_aceptada) || documentoFiscalInvalido(doc));
-    const ncPendiente = docsVigentes.some((doc) => {
+    const ncTotalPendiente = docsVigentes.some((doc) => {
       const est = String((doc as any).estado_nota_credito || '').toUpperCase();
-      return est === 'PENDIENTE' || est === 'PENDIENTE_SUNAT';
-    }) || docsVigentes.some((doc) => String((doc as any).estado_nota_credito || '').toUpperCase() === 'PENDIENTE');
+      const tipoAf = String((doc as any).tipo_afectacion_nota_credito || '').toUpperCase();
+      return (est === 'PENDIENTE' || est === 'PENDIENTE_SUNAT') && (!tipoAf || tipoAf.includes('TOTAL'));
+    });
     const certificadoAnulado = lineasVigentes.some((linea) => estado(linea.certificado_estado) === 'ANULADO');
-    const excluido = anulacionConfirmadaF || ncTotalAceptada || certificadoAnulado || tienePendienteAnulacion || ncPendiente;
-    const motivoExclusion = anulacionConfirmadaF ? 'ANULADO'
-      : ncTotalAceptada ? 'NC TOTAL ACEPTADA'
-      : certificadoAnulado ? 'ANULADO'
-      : tienePendienteAnulacion ? 'ANULACIÓN PENDIENTE'
-      : ncPendiente ? 'NOTA DE CRÉDITO PENDIENTE' : '';
-    const importeConsiderado = excluido ? 0 : moneda(importeNeto);
+
+    let motivoExclusion = '';
+    let importeConsiderado = esCortesiaVenta ? 0 : moneda(importeNeto);
+
+    if (esCortesiaVenta) {
+      motivoExclusion = 'CORTESÍA';
+      importeConsiderado = 0;
+    } else if (anulacionConfirmadaF) {
+      motivoExclusion = 'ANULACIÓN ACEPTADA';
+      importeConsiderado = 0;
+    } else if (tienePendienteAnulacion) {
+      motivoExclusion = 'ANULACIÓN PENDIENTE';
+      importeConsiderado = 0;
+    } else if (ncTotalAceptada) {
+      motivoExclusion = 'NC TOTAL ACEPTADA';
+      importeConsiderado = 0;
+    } else if (ncTotalPendiente) {
+      motivoExclusion = 'NC TOTAL PENDIENTE';
+      importeConsiderado = 0;
+    } else if (certificadoAnulado) {
+      motivoExclusion = 'CERTIFICADO ANULADO';
+      importeConsiderado = 0;
+    } else if (notaCreditoParcial > 0) {
+      // El importeNeto ya descuenta la nota de crédito parcial; no restar dos veces.
+      importeConsiderado = moneda(importeNeto);
+      if (importeConsiderado === 0) {
+        motivoExclusion = 'NC TOTAL ACEPTADA';
+      }
+    }
 
     const anulacionNcRegistrada = ((): string => {
       // Marca administrativa (no fiscal): Sí si hay solicitud vigente o NC vigente.
@@ -313,7 +384,7 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
     })();
     filas.push({
       fecha: fechaExcel(docsVigentes.find((doc) => doc.fecha_documento)?.fecha_documento || venta.fecha_creacion),
-      horaEmisionCertificadoC: horaCertificados,
+      horaEmisionCertificadoC: horasCertificados,
       sede: venta.planta_nombre || venta.planta_key || '', operacion: venta.idOperacion, placa: venta.placa || '',
       cliente: textoUnico(docsVigentes.map((doc) => doc.nombre_razon_social)) || venta.nombre_cliente_snapshot || '',
       documento: docCliente || limpiarDocumentoCliente(venta.tipo_documento_cliente_snapshot, venta.documento_cliente_snapshot),
@@ -364,7 +435,7 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
         if (/CORRECCION|CORRECCIÓN/i.test(det)) return 'CORRECCIÓN';
         return det;
       })(),
-      tipoPago: tiposPago, formaPago: formasPago, cortesiaDescuento: etiquetaDescuento(descuentos),
+      tipoPago: tiposPago, formaPago: formasPago, cortesiaDescuento: esCortesiaVenta ? 'CORTESÍA' : etiquetaDescuento(descuentos),
        importeBruto, descuento, importeNeto, importeConsiderado, motivoExclusion, importePagado, saldoPendiente,
        estadoCertificado: textoUnico(lineasVigentes.map((linea) => linea.certificado_estado)) || '-',
        estadoComprobante: textoUnico(docsVigentes.map(estadoFiscal)) || 'Sin comprobante'
@@ -372,26 +443,32 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
   }
 
   filas.sort((a, b) => numero(a.fecha) - numero(b.fecha) || String(a.operacion).localeCompare(String(b.operacion)));
-  const totales = filas.reduce<{ bruto: number; descuento: number; neto: number; considerado: number; pagado: number; saldo: number }>((acc, row) => ({
-    bruto: acc.bruto + numero(row.importeBruto),
-    descuento: acc.descuento + numero(row.descuento), neto: acc.neto + numero(row.importeNeto),
-    considerado: acc.considerado + numero(row.importeConsiderado),
-    pagado: acc.pagado + numero(row.importePagado), saldo: acc.saldo + numero(row.saldoPendiente)
-  }), { bruto: 0, descuento: 0, neto: 0, considerado: 0, pagado: 0, saldo: 0 });
+  const totales = filas.reduce<{ bruto: number; descuento: number; neto: number; considerado: number; pagado: number; saldo: number }>((acc, row) => {
+    const esVigente = numero(row.importeConsiderado) > 0;
+    const pagoComputable = esVigente ? Math.min(numero(row.importePagado), numero(row.importeConsiderado)) : 0;
+    return {
+      bruto: acc.bruto + numero(row.importeBruto),
+      descuento: acc.descuento + numero(row.descuento),
+      neto: acc.neto + numero(row.importeNeto),
+      considerado: acc.considerado + numero(row.importeConsiderado),
+      pagado: acc.pagado + pagoComputable,
+      saldo: acc.saldo + (esVigente ? numero(row.saldoPendiente) : 0)
+    };
+  }, { bruto: 0, descuento: 0, neto: 0, considerado: 0, pagado: 0, saldo: 0 });
   const excluidos = filas.filter((r) => numero(r.importeConsiderado) === 0 && numero(r.importeNeto) > 0).length;
-  const pagadoExcluido = moneda(filas.filter((r) => String(r.motivoExclusion).startsWith('pagado excluido:')).reduce((s, r) => s + numero(r.importePagado), 0));
+  const pagadoExcluido = moneda(filas.filter((r) => numero(r.importeConsiderado) === 0).reduce((s, r) => s + numero(r.importePagado), 0));
   filas.push({
     fecha: '', horaEmisionCertificadoC: '', sede: 'TOTAL VENTAS VIGENTES', operacion: '', placa: '', cliente: '', documento: '', tipoOperacion: '', servicio: '',
     descripcionEmitido: '', tipoCertificado: '', certificado: '', chip: '', productoAdicional: '', cantidad: '',
     tipoComprobante: '', comprobante: '', usuarioEmisorComprobante: '', usuarioEmisorCertificado: '', tieneSolicitudAnulacion: '', anulado: '', estadoSolicitudAnulacion: '', documentoAnulacion: '', fechaSolicitudAnulacion: '', estadoAnulacionFiscal: '', fechaConfirmacionAnulacion: '', motivoAnulacion: '', tieneNotaCredito: '', numeroNotaCredito: '', motivoNotaCredito: '', estadoNotaCredito: '', fechaEmisionNotaCredito: '', importeNotaCredito: '', tipoAfectacionNotaCredito: '', tipoPago: '', formaPago: '', cortesiaDescuento: '', importeBruto: moneda(totales.bruto),
-    descuento: moneda(totales.descuento), importeNeto: moneda(totales.neto), importeConsiderado: moneda(totales.considerado), motivoExclusion: excluidos ? `${excluidos} op(s) exclificadas` : '', importePagado: moneda(totales.pagado),
+    descuento: moneda(totales.descuento), importeNeto: moneda(totales.neto), importeConsiderado: moneda(totales.considerado), motivoExclusion: excluidos ? `${excluidos} op(s) excluida(s)` : '', importePagado: moneda(totales.pagado),
     saldoPendiente: moneda(totales.saldo), estadoCertificado: '', estadoComprobante: ''
   });
   filas.push({
-    fecha: '', horaEmisionCertificadoC: '', sede: 'TOTAL PAGADO HISTÓRICO', operacion: '', placa: '', cliente: '', documento: '', tipoOperacion: '', servicio: '',
+    fecha: '', horaEmisionCertificadoC: '', sede: 'TOTAL PAGADO', operacion: '', placa: '', cliente: '', documento: '', tipoOperacion: '', servicio: '',
     descripcionEmitido: '', tipoCertificado: '', certificado: '', chip: '', productoAdicional: '', cantidad: '',
     tipoComprobante: '', comprobante: '', usuarioEmisorComprobante: '', usuarioEmisorCertificado: '', tieneSolicitudAnulacion: '', anulado: '', estadoSolicitudAnulacion: '', documentoAnulacion: '', fechaSolicitudAnulacion: '', estadoAnulacionFiscal: '', fechaConfirmacionAnulacion: '', motivoAnulacion: '', tieneNotaCredito: '', numeroNotaCredito: '', motivoNotaCredito: '', estadoNotaCredito: '', fechaEmisionNotaCredito: '', importeNotaCredito: '', tipoAfectacionNotaCredito: '', tipoPago: '', formaPago: '', cortesiaDescuento: '', importeBruto: '',
-    descuento: '', importeNeto: '', importeConsiderado: '', motivoExclusion: pagadoExcluido ? `pagado excluido: S/ ${pagadoExcluido.toFixed(2)}` : '', importePagado: moneda(totales.pagado),
+    descuento: '', importeNeto: '', importeConsiderado: '', motivoExclusion: pagadoExcluido ? `excluido de op(s) no vigentes: S/ ${pagadoExcluido.toFixed(2)}` : '', importePagado: moneda(totales.pagado),
     saldoPendiente: '', estadoCertificado: '', estadoComprobante: ''
   });
   return filas;

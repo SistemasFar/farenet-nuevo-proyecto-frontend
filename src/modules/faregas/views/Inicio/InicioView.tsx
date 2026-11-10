@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 
 import { useNavigate, useOutletContext } from 'react-router-dom';
@@ -24,6 +24,7 @@ export interface BorradorPanel {
   fechaCreacion?: string;
   fechaActualizacion?: string;
   fechaEmision?: string | null;
+  fechaHoraEmision?: string | null;
   fechaDocumentoFiscal?: string | null;
   facturacionId?: number | null;
   facturacionProveedor?: string | null;
@@ -140,6 +141,25 @@ const formatearFecha = (valor?: string) => {
   if (!valor) return '-';
   const fecha = new Date(valor);
   return Number.isNaN(fecha.getTime()) ? valor : fecha.toLocaleString('es-PE');
+};
+
+const formatearFechaHoraLima = (valor?: string | null): string => {
+  if (!valor) return '-';
+  const texto = String(valor).trim();
+  const fecha = new Date(texto);
+  if (Number.isNaN(fecha.getTime())) return texto;
+  const parts = new Intl.DateTimeFormat('es-PE', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(fecha);
+  const part = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value || '';
+  return `${part('day')}/${part('month')}/${part('year')}, ${part('hour')}:${part('minute')}:${part('second')}`;
 };
 
 const obtenerFechaLocal = () => {
@@ -938,8 +958,24 @@ export function InicioView() {
                           </>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-500" title={ins.estado === 'EMITIDO' ? 'Fecha de emisión del certificado' : 'Fecha de creación del registro'}>
-                        {ins.estado === 'EMITIDO' && ins.fechaEmision ? ins.fechaEmision : formatearFecha(ins.fechaCreacion)}
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500" title={ins.estado === 'EMITIDO' ? 'Fecha y hora de emisión del certificado' : 'Fecha de creación del registro'}>
+                        {ins.estado === 'EMITIDO' ? (
+                          ins.fechaHoraEmision ? (
+                            formatearFechaHoraLima(ins.fechaHoraEmision)
+                          ) : ins.fechaEmision ? (
+                            <span>
+                              {ins.fechaEmision}
+                              <span className="block text-[11px] text-slate-400">Hora sin registro</span>
+                            </span>
+                          ) : (
+                            '-'
+                          )
+                        ) : (
+                          <span>
+                            {formatearFecha(ins.fechaCreacion)}
+                            <span className="block text-[11px] text-slate-400">Creación</span>
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-bold whitespace-nowrap">
                         {normalizarTexto(ins.placa)}
@@ -1135,7 +1171,11 @@ export function InicioView() {
                          <div className="font-bold text-blue-700">Borrador #{ins.id}</div>
                        )}
                       {!tieneCertificadoDefinitivo(ins) && ins.numeroCertificado && <div className="text-xs text-slate-600">{ins.numeroCertificado}</div>}
-                      <div className="text-xs text-slate-500">{ins.estado === 'EMITIDO' && ins.fechaEmision ? ins.fechaEmision : formatearFecha(ins.fechaCreacion)}</div>
+                      <div className="text-xs text-slate-500">
+                        {ins.estado === 'EMITIDO'
+                          ? (ins.fechaHoraEmision ? formatearFechaHoraLima(ins.fechaHoraEmision) : (ins.fechaEmision || '-'))
+                          : formatearFecha(ins.fechaCreacion)}
+                      </div>
                     </div>
                     <BadgeEstado value={estadoCertificadoPanel(ins)} />
                     {notaCreditoExiste(ins) && (

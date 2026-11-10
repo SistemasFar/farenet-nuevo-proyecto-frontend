@@ -586,6 +586,8 @@ type DatosPago = {
   fechaInicioCredito?: string;
   fechaVencimientoCredito?: string;
   cuotas?: Array<{ numeroCuota: number; fechaPago: string; importe: string | number }>;
+  esCortesia?: boolean;
+  autorizaGratuidad?: boolean;
 };
 
 const redondearMoneda = (valor: number) => Math.round((valor + Number.EPSILON) * 100) / 100;
@@ -631,11 +633,28 @@ export const validarPasoPago = ({
   fechaInicioCredito,
   fechaVencimientoCredito,
   cuotas = [],
+  esCortesia = false,
+  autorizaGratuidad = false,
 }: DatosPago): ErroresCampo => {
   const totalPagado = redondearMoneda(pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0));
   const esCredito = condicionPago === 'CREDITO';
   const saldo = redondearMoneda(Math.max(0, precioTotal - totalPagado));
   const errores: ErroresCampo = {};
+
+  if (!['BOLETA', 'FACTURA'].includes(String(tipoComprobante || '').toUpperCase())) {
+    errores.tipoDocFac = 'Debe seleccionar BOLETA o FACTURA para continuar.';
+    return errores;
+  }
+
+  if (esCortesia || autorizaGratuidad) {
+    if (pagos.length > 0 && totalPagado > 0) {
+      errores.pagos = 'Una operación de cortesía es gratuita y no admite pagos registrados.';
+    }
+    if (esCredito) {
+      errores.pagos = 'Una operación de cortesía no admite condición a crédito.';
+    }
+    return errores;
+  }
 
   if (String(tipoComprobante || '').toUpperCase() === 'BOLETA' && esCredito) {
     errores.pagos = 'La boleta sólo admite condición de pago CONTADO.';
@@ -725,7 +744,7 @@ export const validarDatosFacturacionCampos = (
   const email = String(facturacion.emailFac || '').trim();
 
   if (!['BOLETA', 'FACTURA'].includes(tipoComprobante)) {
-    errores.tipoDocFac = 'Seleccione el tipo de comprobante en Titulares y Datos de Facturación.';
+    errores.tipoDocFac = 'Debe seleccionar BOLETA o FACTURA para continuar.';
   }
   if (!['DNI', 'RUC', 'CARNETEXTRANJERIA'].includes(tipoDocumento)) {
     errores.tipoDocumentoFac = 'Seleccione el tipo de documento de identidad.';

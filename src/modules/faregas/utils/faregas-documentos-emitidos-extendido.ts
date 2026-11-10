@@ -48,16 +48,34 @@ const datosDinamicos = (input: unknown): Record<string, ExcelCellValue> => {
   return salida;
 };
 
+export const MAPA_TARJETAS: Record<string, string> = {
+  '3': 'VISA',
+  '4': 'MASTERCARD',
+  '5': 'CUPONIDAD',
+  '6': 'PAGO WEB',
+  '7': 'YAPE',
+  '8': 'PLIN'
+};
+
 /**
  * Clasificación de pagos (criterio único Datos + Consolidado).
- * Devuelve TIPO (EFECTIVO/TARJETA/BANCO) y FORMA (EFECTIVO/CUPONIDAD/
- * MASTERCARD/PAGO WEB/PLIN/VISA/YAPE/BANCO) sin inventar.
+ * Devuelve TIPO (EFECTIVO/TARJETA/BANCO/CRÉDITO) y FORMA (EFECTIVO/CUPONIDAD/
+ * MASTERCARD/PAGO WEB/PLIN/VISA/YAPE/BANCO/N CUOTAS) sin inventar.
  */
 export function clasificarPagos(
   pagos: Array<Record<string, any>>,
   importeNeto: number,
-  importePagado: number
+  importePagado: number,
+  creditoInfo?: { esCredito?: boolean; cuotasCount?: number; esCortesia?: boolean }
 ): { tipoPago: string; formaPago: string } {
+  if (creditoInfo?.esCortesia) {
+    return { tipoPago: 'CORTESÍA', formaPago: 'CORTESÍA' };
+  }
+  if (creditoInfo?.esCredito) {
+    const cuotas = Number(creditoInfo.cuotasCount || 0);
+    const forma = cuotas > 1 ? `${cuotas} CUOTAS` : '1 CUOTA';
+    return { tipoPago: 'CRÉDITO', formaPago: forma };
+  }
   const confirmar = pagos.filter((p) => ['CAN', 'CONFIRMADO', 'PAGADO'].includes(String(p?.estado || '').toUpperCase()));
   if (!confirmar.length) {
     if (importeNeto <= 0 && importePagado <= 0) return { tipoPago: 'NO APLICA', formaPago: 'NO APLICA' };
@@ -73,7 +91,8 @@ export function clasificarPagos(
     return 'SIN IDENTIFICAR';
   }))];
   const formas = [...new Set(confirmar.map((p) => {
-    const f = String(p.tipo_tarjeta || p.tarjeta_key || p.modalidad_tarjeta || '').trim().toUpperCase();
+    const rawF = String(p.tipo_tarjeta || p.tarjeta_key || p.modalidad_tarjeta || '').trim().toUpperCase();
+    const f = MAPA_TARJETAS[rawF] || rawF;
     const t = String(p.tipocontado_key || p.medio_pago || '').trim().toUpperCase();
     if (t.includes('EFECTIVO')) return 'EFECTIVO';
     if (t.includes('BANCO') && !f) return 'BANCO';
@@ -91,7 +110,7 @@ export function horaEmisionExtendida(doc: Record<string, any>): string {
   if (estadoCert && !['EMITIDO', 'ANULADO'].includes(estadoCert)) return 'NO EMITIDO';
   if (!doc.certificado_id && !(doc as any).certificados) return '';
   // FASE 3: única fuente confiable = fecha_hora_emision (timestamptz).
-  const rawHora = (doc as any).fecha_hora_emision;
+  const rawHora = (doc as any).fecha_hora_emision ?? (doc as any).hora_emision_certificado;
   if (!rawHora) return 'SIN REGISTRO';
   const texto = String(rawHora).trim();
   if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(texto) && !/Z$|[+-]\d{2}:?\d{2}$/.test(texto)) {
@@ -143,6 +162,23 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
     const esRechazada = String((doc as any).estado_solicitud_anulacion || '').toUpperCase() === 'RECHAZADO';
     const anulacionConfirmada = esVerdaderoLocal((doc as any).aceptada_anulacion_sunat) && (doc as any).fecha_anulacion_confirmacion;
     const estadoAnulacionUI = anulacionConfirmada ? 'ANULADO' : esPendiente && doc.documento_anulacion ? 'SOLICITUD PENDIENTE' : esRechazada ? 'RECHAZADA' : doc.documento_anulacion ? String((doc as any).estado_solicitud_anulacion || 'PENDIENTE') : 'SIN SOLICITUD';
+    const esCreditoDoc = String((doc as any).condicion_pago || '').toUpperCase() === 'CREDITO';
+    const cuotasDoc = Number((doc as any).cuotas_count || (doc as any).max_cuota || 0);
+    const formaPagoCredito = cuotasDoc > 1 ? `${cuotasDoc} CUOTAS` : '1 CUOTA';
+    const rawForma = String((doc as any).forma_pago || '').trim();
+    const formaNormalizada = rawForma.split(' + ').map((item) => MAPA_TARJETAS[item.trim()] || item.trim()).join(' + ');
+    const esCortesiaDoc = Boolean(
+      (doc as any).es_cortesia
+      || String((doc as any).tipo_pago || '').toUpperCase() === 'CORTESÍA'
+      || String((doc as any).tipo_pago || '').toUpperCase() === 'CORTESIA'
+      || String((doc as any).forma_pago || '').toUpperCase() === 'CORTESÍA'
+      || String((doc as any).forma_pago || '').toUpperCase() === 'CORTESIA'
+      || (Number(doc.importe_total || 0) === 0 && String(doc.tipo_descuento || '').includes('CONVENIO'))
+      || (Number(doc.importe_total || 0) === 0 && JSON.stringify(doc.campos_dinamicos || '').includes('1002'))
+    );
+    const tipoPagoExtendido = esCortesiaDoc ? 'CORTESÍA' : esCreditoDoc ? 'CRÉDITO' : ((doc as any).tipo_pago || '');
+    const formaPagoExtendido = esCortesiaDoc ? 'CORTESÍA' : esCreditoDoc ? formaPagoCredito : (formaNormalizada || '');
+    const montoPagoExtendido = esCortesiaDoc ? 0 : (doc.monto_pagado === null || doc.monto_pagado === undefined ? '' : decimal(doc.monto_pagado));
     return {
       issuerKey: issuerKeyFor(doc),
       docId: String(doc.id_documento || ''), fuenteFecha: doc.fecha_emision_fuente || '', tipo: doc.tipo_comprobante || '', numeroDocumento: serial(doc), fechaEmision: doc.fecha_emision ? fechaLocal(doc.fecha_emision) : '',
@@ -154,7 +190,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
       fechaReferencia: fechaLocal(doc.fecha_referencia) || extra('fecha_referencia') || '', tipoReferencia: doc.tipo_referencia || extra('tipo_referencia') || '', numeroReferencia: doc.referencia_afectada || extra('numero_referencia') || '',
       usuario: doc.usuario_emisor || (doc as any).usuario_creacion || '', tieneSolicitudAnulacion: (doc as any).documento_anulacion ? 'SÍ' : 'NO', estadoSolicitudAnulacion: estadoAnulacionUI, estado: [doc.estado || '', doc.entorno_facturador ? `ENTORNO: ${doc.entorno_facturador}` : 'ENTORNO NO INFORMADO', doc.proveedor ? `PROVEEDOR: ${doc.proveedor}` : '', doc.aceptada_sunat === true && String(doc.entorno_facturador).toUpperCase() === 'PRODUCCION' ? 'SUNAT: ACEPTADO PRODUCCIÓN' : doc.sunat_responsecode ? `SUNAT: ${doc.sunat_responsecode}` : 'SUNAT: SIN ACEPTACIÓN VERIFICABLE'].filter(Boolean).join(' | '), anulado: indicadorAnulacionComprobante(doc as any) ? 'Sí' : 'No',
       documentoAnulacion: doc.documento_anulacion || '', fechaAnulacionSolicitud: (doc as any).fecha_anulacion_solicitud ? fechaLocal((doc as any).fecha_anulacion_solicitud) : (doc as any).fecha_anulacion ? fechaLocal((doc as any).fecha_anulacion) : '', estadoAnulacionFiscal: anulacionConfirmada ? 'ANULADO' : esRechazada ? 'RECHAZADA' : doc.documento_anulacion ? 'PENDIENTE' : 'SIN SOLICITUD', fechaAnulacionConfirmada: (doc as any).fecha_anulacion_confirmacion ? fechaLocal((doc as any).fecha_anulacion_confirmacion) : '', ticketAnulacion: (doc as any).ticket_anulacion || '', motivoAnulacion: doc.motivo_anulacion || motivoFiscal,
-      origen: doc.origen_peticion || '', tipoPago: (doc as any).tipo_pago || '', formaPago: (doc as any).forma_pago || '', metodoPago: doc.medios_pago || '', montoPago: doc.monto_pagado === null || doc.monto_pagado === undefined ? '' : decimal(doc.monto_pagado),
+      origen: doc.origen_peticion || '', tipoPago: tipoPagoExtendido, formaPago: formaPagoExtendido, montoPago: montoPagoExtendido,
       referenciaPago: doc.referencia_pago || '', detraccionPorcentaje: extra('detraccion_porcentaje'), detraccionNeto: extra('detraccion_neto'), detraccionImporte: extra('detraccion_importe'),
       tieneNC: doc.notas_credito ? 'Sí' : 'No', cantidadNC: doc.cantidad_notas_credito ?? 0, tieneND: doc.notas_debito ? 'Sí' : 'No', cantidadND: doc.cantidad_notas_debito ?? 0,
       items: relatedLines.length, codigoItem: uniqueLine?.codigo_producto || '', descripcion: uniqueLine?.producto || '', unidad: uniqueLine?.unidad || '',
@@ -197,7 +233,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
     // D. IMPORTES Y DESCUENTOS
     ['subtotal','SUBTOTAL'],['descuentos','DESCUENTOS'],['igv','IGV'],['total','IMPORTE TOTAL'],['moneda','MONEDA'],['fechaDocumento','FECHA DEL DOCUMENTO'],['fechaVencimiento','FECHA DE VENCIMIENTO'],
     // E. PAGOS
-    ['tipoPago','TIPO DE PAGO'],['formaPago','FORMA DE PAGO'],['metodoPago','MÉTODO DE PAGO'],['montoPago','MONTO PAGO'],['referenciaPago','REFERENCIA DE PAGO'],['origen','ORIGEN PETICIÓN'],['detraccionPorcentaje','DETRACCIÓN (%)'],['detraccionNeto','DETRACCIÓN / IMPORTE NETO'],['detraccionImporte','DETRACCIÓN / IMPORTE'],['referenciaPagoExtra','Referencia de pago (ND ,BV ,FT ,NC)'],
+    ['tipoPago','TIPO DE PAGO'],['formaPago','FORMA DE PAGO'],['montoPago','MONTO PAGO'],['referenciaPago','REFERENCIA DE PAGO'],['origen','ORIGEN PETICIÓN'],['detraccionPorcentaje','DETRACCIÓN (%)'],['detraccionNeto','DETRACCIÓN / IMPORTE NETO'],['detraccionImporte','DETRACCIÓN / IMPORTE'],['referenciaPagoExtra','Referencia de pago (ND ,BV ,FT ,NC)'],
     // F. ANULACIONES Y NOTAS DE CRÉDITO
     ['estadoSolicitudAnulacion','ESTADO DE SOLICITUD DE ANULACIÓN'],['tieneSolicitudAnulacion','¿TIENE SOLICITUD DE ANULACIÓN?'],['documentoAnulacion','NRO. DOCUMENTO ANULACIÓN'],['fechaAnulacionSolicitud','FECHA DE SOLICITUD DE ANULACIÓN'],['estadoAnulacionFiscal','ESTADO DE ANULACIÓN FISCAL'],['fechaAnulacionConfirmada','FECHA DE ANULACIÓN CONFIRMADA'],['ticketAnulacion','TICKET SUNAT ANULACIÓN'],['anulado','ANULACIÓN / NC REGISTRADA'],['motivoAnulacion','MOTIVO DE ANULACIÓN / RECHAZO'],['tieneNC','TIENE NOTA DE CRÉDITO?'],['cantidadNC','# NOTAS DE CRÉDITO'],['tieneND','TIENE NOTA DE DÉBITO?'],['cantidadND','# NOTAS DE DÉBITO'],['fechaReferencia','FECHA DE REF. DEL COMPROBANTE DE PAGO O DOCUMENTO MODIFICADO'],['tipoReferencia','TIPO DE REF. DEL COMPROBANTE DE PAGO O DOCUMENTO MODIFICADO'],['numeroReferencia','NÚMERO DE DOCUMENTO DE REF. DEL COMPROBANTE DE PAGO O DOCUMENTO MODIFICADO'],
     // G. PRODUCTOS Y DETALLE FISCAL
@@ -210,9 +246,9 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
     { header: 'B. CLIENTE Y EMISOR', start: 10, end: 12 },
     { header: 'C. CERTIFICADO / VEHÍCULO', start: 13, end: 19 },
     { header: 'D. IMPORTES Y DESCUENTOS', start: 20, end: 26 },
-    { header: 'E. PAGOS', start: 27, end: 36 },
-    { header: 'F. ANULACIONES Y NOTAS DE CRÉDITO', start: 37, end: 58 },
-    { header: 'G. PRODUCTOS Y DETALLE FISCAL', start: 59, end: headerSpecs.length }
+    { header: 'E. PAGOS', start: 27, end: 35 },
+    { header: 'F. ANULACIONES Y NOTAS DE CRÉDITO', start: 36, end: 57 },
+    { header: 'G. PRODUCTOS Y DETALLE FISCAL', start: 58, end: headerSpecs.length }
   ];
 
   const issuerGroups = new Map<string, typeof data.cabeceras>();

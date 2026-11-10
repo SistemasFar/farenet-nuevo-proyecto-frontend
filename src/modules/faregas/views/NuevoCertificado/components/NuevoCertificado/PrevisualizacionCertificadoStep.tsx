@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Eye, Loader2, PencilLine } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
+import { asegurarCentradoHtml } from '../../../../services/faregas-comprobante-visor.service';
 import {
   faregasRectificacionesApi,
   type DatosPropuestosRectificacion,
@@ -30,6 +31,7 @@ export function PrevisualizacionCertificadoStep({
 }: PrevisualizacionCertificadoStepProps) {
   const [isLoading, setIsLoading] = useState(Boolean(certificadoId));
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const htmlCentrado = useMemo(() => asegurarCentradoHtml(previewHtml), [previewHtml]);
   const [error, setError] = useState('');
   const [resultado, setResultado] = useState<PrevisualizacionRectificacion | null>(null);
   const datosSerializados = datosPropuestos ? JSON.stringify(datosPropuestos) : '';
@@ -174,9 +176,9 @@ export function PrevisualizacionCertificadoStep({
               </span>
             )}
           </div>
-          <div className="flex-1 overflow-hidden bg-slate-100 p-4">
+          <div className="flex-1 overflow-auto bg-slate-100 p-4">
             <iframe
-              srcDoc={previewHtml}
+              srcDoc={htmlCentrado}
               className="h-[72vh] w-full rounded-xl border border-slate-300 bg-white shadow-inner"
               title="Previsualización de Certificado FAREGAS"
             />

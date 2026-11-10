@@ -526,7 +526,7 @@ export function VehiculoStep({
       {tipoCertificado === 'GNV_ANUAL' && (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-seccion-gnv="facturacion">
           <DatosFacturacion
-            titulares={titulares}
+            titulares={[]}
             formFacturacion={formFacturacion}
             setFormFacturacion={setFormFacturacion}
             erroresCampo={erroresCampo}
@@ -1459,6 +1459,7 @@ export function VehiculoStep({
                     <input
                       name="caracteristicaRegistrable"
                       aria-label="Característica registrable"
+                      placeholder="Ej. RECTIFICACIÓN DE COLOR / MODELO"
                       value={formConformidad.caracteristicaRegistrable || ''}
                       onChange={handleConformidad}
                       maxLength={300}

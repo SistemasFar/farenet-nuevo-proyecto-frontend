@@ -17,9 +17,11 @@ describe('Documentos emitidos — Extendido', () => {
   it('conserva la estructura de 56 campos y un solo total por comprobante', () => {
     const [cabeceras, lineas] = construirHojasDocumentosEmitidosExtendido(sample, '2026-10-01', '2026-10-31');
     expect(cabeceras.name).toBe('Datos');
-    expect(cabeceras.columns).toHaveLength(68);
+    expect(cabeceras.columns).toHaveLength(67);
     expect(cabeceras.rows).toHaveLength(2);
-    expect(cabeceras.rows[0]).toMatchObject({ numeroDocumento: 'F001-20', total: 118, descuentos: 5, metodoPago: 'Visa', montoPago: 118, items: 2, descripcion: '' });
+    expect(cabeceras.rows[0]).toMatchObject({ numeroDocumento: 'F001-20', total: 118, descuentos: 5, montoPago: 118, items: 2, descripcion: '' });
+    expect(cabeceras.columns.map((c) => c.key)).not.toContain('metodoPago');
+    expect(cabeceras.columns.map((c) => c.header)).not.toContain('MÉTODO DE PAGO');
     expect(lineas.rows).toHaveLength(2);
     expect(lineas.rows[0]).toMatchObject({ documento: 'F001-20', totalLinea: 118 });
     expect(cabeceras.title).toContain('Registro de comprobantes');
@@ -61,10 +63,165 @@ describe('Documentos emitidos — Extendido', () => {
     } as unknown as ReporteFinancieroResponse;
     const unificadas = construirHojasUnificadas(sample, consolidado, '2026-10-01', '2026-10-31');
     expect(unificadas.some((h) => h.name.includes('Consolidado'))).toBe(true);
-    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(68);
+    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(67);
     // Horas: certificado con hora explícita → HH:mm:ss
     const conHora = { ...sample, cabeceras: [{ ...sample.cabeceras[0], fecha_hora_emision: '2026-10-08T13:15:32Z' }] };
     const [cab] = construirHojasDocumentosEmitidosExtendido(conHora);
     expect(cab.rows[0]).toMatchObject({ horaEmisionCertificado: '08:15:32' });
+  });
+
+  it('FUSIÓN COMPLETA: genera las 4 hojas XLSX válidas sin columnas prohibidas y con bytes XLSX', async () => {
+    const { crearExcelVariasHojasBytes } = await import('./exportar-excel');
+    const consolidadoCompleto: ReporteFinancieroResponse = {
+      metadatos: { desde: '2026-10-01', hasta: '2026-10-31', fechaGeneracion: '2026-10-31T12:00:00Z', usuarioExportador: 'tester', plantas: ['ATE'], razonSocialEmisor: 'FAREGAS SAC', rucEmisor: '20123456789' },
+      sedes: [{ planta_key: 'ATE', planta_nombre: 'ATE' }],
+      operaciones: [
+        { id: 10, planta_key: 'ATE', planta_nombre: 'ATE', fecha_creacion: '2026-10-08T10:00:00Z', estado: 'FACTURADO', placa: 'ABC123', importe_total: 100, nombre_cliente_snapshot: 'CLIENTE 1', tipo_documento_cliente_snapshot: 'DNI', documento_cliente_snapshot: '08123456' },
+        { id: 20, planta_key: 'ATE', planta_nombre: 'ATE', fecha_creacion: '2026-10-09T10:00:00Z', estado: 'FACTURADO', placa: 'XYZ789', importe_total: 50, nombre_cliente_snapshot: 'CLIENTE 2', tipo_documento_cliente_snapshot: 'RUC', documento_cliente_snapshot: '20500000001' }
+      ],
+      lineas: [
+        // 1. Certificado vendido
+        { id: 101, operacion_id: 10, tipo_item: 'SERVICIO', certificado_id: 501, codigo_producto: 'GNV-01', producto: 'CERTIFICADO GNV ANUAL', cantidad: 1, precio_unitario: 100, importe_total: 100, numero_certificado: 'DG-41-000501', tipo_certificado_clave: 'GNV_ANUAL', certificado_estado: 'EMITIDO', numero_chip: 'CHIP999' },
+        // 2. Duplicado vendido
+        { id: 201, operacion_id: 20, tipo_item: 'DUPLICADO', duplicado_id: 701, duplicado_tipo_nombre: 'DUPLICADO GLP', duplicado_precio: 50, codigo_producto: 'DUP-01', producto: 'DUPLICADO DE CERTIFICADO', cantidad: 1, precio_unitario: 50, importe_total: 50, numero_certificado: 'DG-41-000501', tipo_certificado_clave: 'GLP_ANUAL', certificado_estado: 'EMITIDO' }
+      ],
+      // 3. Venta independiente de inventario (venta directa)
+      ventasDirectas: [
+        { id: 30, planta_key: 'ATE', planta_nombre: 'ATE', creado_en: '2026-10-10T12:00:00Z', estado: 'PAGADA', cliente_nombre: 'CLIENTE DIRECTO', cliente_tipo_documento: 'DNI', cliente_nro_documento: '12345678', importe_total: 30, base_imponible: 25.42, igv: 4.58, detalle_id: 301, producto: 'CHIP ADICIONAL', codigo_producto: 'CHIP-AD', cantidad: 1, precio_unitario: 30, importe_detalle: 30 }
+      ],
+      comprobantes: [
+        { id: 1, operacion_id: 10, tipo_comprobante: 'BOLETA', serie: 'BBB1', numero: 1, nro_comprobante: 'BBB1-00000001', fecha_documento: '2026-10-08', estado: 'ACEPTADO', aceptada_sunat: true, importe_total: 100 },
+        { id: 2, operacion_id: 20, tipo_comprobante: 'FACTURA', serie: 'FFF1', numero: 1, nro_comprobante: 'FFF1-00000001', fecha_documento: '2026-10-09', estado: 'ACEPTADO', aceptada_sunat: true, importe_total: 50 },
+        { id: 3, venta_id: 30, tipo_comprobante: 'BOLETA', serie: 'BBB1', numero: 2, nro_comprobante: 'BBB1-00000002', fecha_documento: '2026-10-10', estado: 'ACEPTADO', aceptada_sunat: true, importe_total: 30 }
+      ],
+      ordenes: [
+        { id: 11, operacion_id: 10, importe_total: 100 },
+        { id: 21, operacion_id: 20, importe_total: 50 },
+        { id: 31, venta_id: 30, importe_total: 30 }
+      ],
+      pagos: [
+        { id: 111, orden_pago_id: 11, estado: 'CAN', tipocontado_key: 'EFECTIVO', importe: 100 },
+        { id: 211, orden_pago_id: 21, estado: 'CAN', tipocontado_key: 'TARJETA', tipo_tarjeta: 'VISA', importe: 50 },
+        { id: 311, orden_pago_id: 31, estado: 'CAN', tipocontado_key: 'TARJETA', tipo_tarjeta: 'YAPE', importe: 30 }
+      ],
+      descuentos: [],
+      ajustes: []
+    };
+
+    const unificadas = construirHojasUnificadas(sample, consolidadoCompleto, '2026-10-01', '2026-10-31');
+    const nombresHojas = unificadas.map((h) => h.name);
+
+    // 1. Las cuatro hojas deben existir
+    expect(nombresHojas).toEqual(['Datos', 'Líneas de productos', 'Trazabilidad', 'Consolidado_Datos']);
+
+    // 2. NO reincorporar "Precio unitario" ni "Subtotal registrado" a Consolidado_Datos
+    const hojaConsolidado = unificadas.find((h) => h.name === 'Consolidado_Datos')!;
+    const keysColumnas = hojaConsolidado.columns.map((c) => c.key);
+    const headersColumnas = hojaConsolidado.columns.map((c) => c.header.toLowerCase());
+
+    expect(keysColumnas).not.toContain('precioUnitario');
+    expect(keysColumnas).not.toContain('subtotalRegistrado');
+    expect(headersColumnas.some((h) => h.includes('precio unitario'))).toBe(false);
+    expect(headersColumnas.some((h) => h.includes('subtotal registrado'))).toBe(false);
+
+    // 3. Generación real de bytes XLSX
+    const bytes = await crearExcelVariasHojasBytes(unificadas);
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(1000);
+    // Verificación de firma ZIP (PK.. -> 0x50, 0x4B, 0x03, 0x04)
+    expect(bytes[0]).toBe(0x50);
+    expect(bytes[1]).toBe(0x4B);
+    expect(bytes[2]).toBe(0x03);
+    expect(bytes[3]).toBe(0x04);
+  });
+
+  it('clasifica facturas a crédito con N cuotas en hoja Datos (Fase 3)', () => {
+    const dataCredito: DocumentosEmitidosExtendidoResponse = {
+      cabeceras: [
+        // Factura 2 cuotas (caso FFF1-23)
+        {
+          id_documento: 'F-1044', fecha_emision: '2026-11-10T05:00:00Z', empresa_emisora: 'I.T.V. CAMBRIDGE S.A.C.',
+          ruc_emisor: '20600444531', sede: 'SURCO', tipo_comprobante: 'FACTURA', serie: 'FFF1', numero: 23,
+          cliente: 'ELDER', tipo_documento: 'RUC', numero_documento: '20552103816', moneda: 'PEN',
+          base_imponible: 152.54, igv: 27.46, importe_total: 180, estado: 'ACEPTADO', proveedor: 'NUBEFACT',
+          aceptada_sunat: true, condicion_pago: 'CREDITO', cuotas_count: 2, max_cuota: 2,
+          tipo_pago: 'CRÉDITO', forma_pago: '2 CUOTAS'
+        },
+        // Factura 1 cuota
+        {
+          id_documento: 'F-593', fecha_emision: '2026-11-10T05:00:00Z', empresa_emisora: 'I.T.V. CAMBRIDGE S.A.C.',
+          ruc_emisor: '20600444531', sede: 'SURCO', tipo_comprobante: 'FACTURA', serie: 'FFF1', numero: 7,
+          cliente: 'CLIENTE 1C', tipo_documento: 'RUC', numero_documento: '20552103816', moneda: 'PEN',
+          base_imponible: 76.27, igv: 13.73, importe_total: 90, estado: 'ACEPTADO', proveedor: 'NUBEFACT',
+          aceptada_sunat: true, condicion_pago: 'CREDITO', cuotas_count: 1, max_cuota: 1
+        },
+        // Factura 3 cuotas
+        {
+          id_documento: 'F-630', fecha_emision: '2026-11-10T05:00:00Z', empresa_emisora: 'I.T.V. CAMBRIDGE S.A.C.',
+          ruc_emisor: '20600444531', sede: 'SURCO', tipo_comprobante: 'FACTURA', serie: 'FFF1', numero: 11,
+          cliente: 'CLIENTE 3C', tipo_documento: 'RUC', numero_documento: '20552103816', moneda: 'PEN',
+          base_imponible: 76.27, igv: 13.73, importe_total: 90, estado: 'ACEPTADO', proveedor: 'NUBEFACT',
+          aceptada_sunat: true, condicion_pago: 'CREDITO', cuotas_count: 3, max_cuota: 3
+        }
+      ],
+      lineas: []
+    };
+
+    const [datos] = construirHojasDocumentosEmitidosExtendido(dataCredito, '2026-11-01', '2026-11-30');
+    expect(datos.rows).toHaveLength(3);
+
+    // Caso FFF1-23 / F-1044: 2 cuotas
+    expect(datos.rows[0]).toMatchObject({
+      numeroDocumento: 'FFF1-23',
+      tipoPago: 'CRÉDITO',
+      formaPago: '2 CUOTAS',
+      total: 180
+    });
+
+    // Caso 1 cuota: 1 CUOTA
+    expect(datos.rows[1]).toMatchObject({
+      numeroDocumento: 'FFF1-7',
+      tipoPago: 'CRÉDITO',
+      formaPago: '1 CUOTA',
+      total: 90
+    });
+
+    // Caso 3 cuotas: 3 CUOTAS
+    expect(datos.rows[2]).toMatchObject({
+      numeroDocumento: 'FFF1-11',
+      tipoPago: 'CRÉDITO',
+      formaPago: '3 CUOTAS',
+      total: 90
+    });
+  });
+
+  it('clasifica FFF1-26 con TARJETA / PLIN y no muestra código 8 ni MÉTODO DE PAGO', () => {
+    const dataTarjeta: DocumentosEmitidosExtendidoResponse = {
+      cabeceras: [
+        {
+          id_documento: 'F-1055', fecha_emision: '2026-11-10T05:00:00Z', empresa_emisora: 'I.T.V. CAMBRIDGE S.A.C.',
+          ruc_emisor: '20600444531', sede: 'SURCO', tipo_comprobante: 'FACTURA', serie: 'FFF1', numero: 26,
+          cliente: 'HIMAN', tipo_documento: 'RUC', numero_documento: '10310424710', moneda: 'PEN',
+          base_imponible: 84.75, igv: 15.25, importe_total: 100, estado: 'ACEPTADO', proveedor: 'NUBEFACT',
+          aceptada_sunat: true, condicion_pago: 'CONTADO', tipo_pago: 'TARJETA', forma_pago: '8',
+          monto_pagado: 100, referencia_pago: '1235'
+        }
+      ],
+      lineas: []
+    };
+
+    const [datos] = construirHojasDocumentosEmitidosExtendido(dataTarjeta, '2026-11-01', '2026-11-30');
+    expect(datos.columns.map((c) => c.key)).not.toContain('metodoPago');
+    expect(datos.columns.map((c) => c.header)).not.toContain('MÉTODO DE PAGO');
+
+    const fila26 = datos.rows[0];
+    expect(fila26).toMatchObject({
+      numeroDocumento: 'FFF1-26',
+      tipoPago: 'TARJETA',
+      formaPago: 'PLIN',
+      montoPago: 100,
+      referenciaPago: '1235'
+    });
+    expect(fila26.formaPago).not.toBe('8');
   });
 });

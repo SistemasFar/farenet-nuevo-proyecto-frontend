@@ -1,12 +1,12 @@
 
-import { forwardRef, useState, useEffect, useImperativeHandle, useRef, type RefObject } from 'react';
+import { forwardRef, useState, useEffect, useMemo, useImperativeHandle, useRef, type RefObject } from 'react';
 import { CheckCircle2, AlertCircle, Loader2, XCircle, FileCheck2, Printer, RefreshCw, Eye, Download } from 'lucide-react';
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
 import { ejecutarEmisionCertificado, esComprobanteOperable, type ResultadoEmisionCertificado } from '../../faregas-emision';
 import Swal from 'sweetalert2';
 import type { FacturacionFaregas } from '../../../../types/faregas-api';
-import { descargarCertificadoFaregas } from '../../../../services/faregas-comprobante-visor.service';
+import { descargarCertificadoFaregas, asegurarCentradoHtml } from '../../../../services/faregas-comprobante-visor.service';
 
 const mensajePrevisualizacion = (error: unknown): string => {
   const mensaje = error instanceof Error ? error.message : '';
@@ -49,7 +49,7 @@ export interface VerificacionStepHandle {
   cargarDocumento: () => Promise<void>;
 }
 
-function PreviewCertificadoCompacto({
+export function PreviewCertificadoCompacto({
   html,
   loading,
   error,
@@ -73,6 +73,7 @@ function PreviewCertificadoCompacto({
   /** Altura del iframe. Sólo presentación: el contenido no cambia. */
   altoPreview?: string;
 }) {
+  const htmlCentrado = useMemo(() => asegurarCentradoHtml(html), [html]);
   return (
     // El certificado es el único visor de esta pantalla (la boleta ya no se
     // incrusta), así que ocupa todo el ancho disponible del contenedor.
@@ -101,7 +102,7 @@ function PreviewCertificadoCompacto({
       </div>
       {loading && <div className="flex min-h-[260px] items-center justify-center gap-2 bg-slate-100 text-xs font-semibold text-slate-600"><Loader2 className="h-5 w-5 animate-spin text-[#052a79]" /> Cargando documento...</div>}
       {!loading && error && <div className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">No se pudo cargar el documento: {error}</div>}
-      {!loading && html && <div className="bg-slate-100 p-3"><iframe ref={frameRef} srcDoc={html} title={emitted ? 'Certificado FAREGAS emitido' : 'Previsualización del certificado FAREGAS'} className={`${altoPreview} w-full rounded-lg border border-slate-300 bg-white shadow-inner`} /></div>}
+      {!loading && html && <div className="bg-slate-100 p-3"><iframe ref={frameRef} srcDoc={htmlCentrado} title={emitted ? 'Certificado FAREGAS emitido' : 'Previsualización del certificado FAREGAS'} className={`${altoPreview} w-full rounded-lg border border-slate-300 bg-white shadow-inner`} /></div>}
       {!loading && !html && !error && <div className="p-6 text-center text-xs font-semibold text-slate-600">No hay un documento disponible por ahora.</div>}
       {!emitted && !loading && html && <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-bold text-amber-800">PREVISUALIZACIÓN · PENDIENTE DE EMISIÓN</div>}
     </section>
@@ -137,6 +138,7 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
   const [isEmitting, setIsEmitting] = useState(false);
   const [emisionResult, setEmisionResult] = useState<{ numero_certificado: string; fecha_emision: string; estado: string } | null>(null);
   const [certificadoHtml, setCertificadoHtml] = useState<string | null>(null);
+  const certHtmlCentrado = useMemo(() => asegurarCentradoHtml(certificadoHtml), [certificadoHtml]);
   const [isLoadingCertificado, setIsLoadingCertificado] = useState(certificadoEstado === 'EMITIDO');
   const [certificadoError, setCertificadoError] = useState('');
   const [isDownloadingCertificado, setIsDownloadingCertificado] = useState(false);
@@ -499,7 +501,7 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
             <div className="bg-slate-100 p-4">
               <iframe
                 ref={certificadoFrameRef}
-                srcDoc={certificadoHtml}
+                srcDoc={certHtmlCentrado}
                 title="Certificado de inspección emitido"
                 className="h-[75vh] w-full rounded-xl border border-slate-300 bg-white shadow-inner"
               />
@@ -644,7 +646,7 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
           <div className="bg-slate-100 p-4">
             <iframe
               ref={certificadoFrameRef}
-              srcDoc={certificadoHtml}
+              srcDoc={certHtmlCentrado}
               title="Previsualización del certificado FAREGAS"
               className="h-[60vh] w-full rounded-xl border border-slate-300 bg-white shadow-inner"
             />

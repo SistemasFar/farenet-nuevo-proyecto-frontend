@@ -45,8 +45,9 @@ export function DatosFacturacion({
 }: DatosFacturacionProps) {
   const [buscando, setBuscando] = useState(false);
   const [errorDocumentoConsulta, setErrorDocumentoConsulta] = useState<string | null>(null);
+  const titularPrincipal = titulares.find((t: any) => t.esPrincipal) || titulares[0] || null;
   const facturarAlTitular = Boolean(titulares.length > 0 && formFacturacion.usarTitularPrincipalFac);
-  const tipoDocumentoSeleccionado = normalizarTipoDocumento(formFacturacion.tipoDocumentoFac || 'DNI');
+  const tipoDocumentoSeleccionado = normalizarTipoDocumento(formFacturacion.tipoDocumentoFac || (formFacturacion.tipoDocFac === 'FACTURA' ? 'RUC' : 'DNI'));
   const atributosNumeroDocumento = atributosDocumento(claveCatalogoDocumento(tipoDocumentoSeleccionado));
 
   const handleFacturacionChange = (field: keyof FormFacturacionState, value: string | boolean) => {
@@ -75,7 +76,16 @@ export function DatosFacturacion({
     onCorregirCampo?.('tipoDocFac');
     onCorregirCampo?.('tipoDocumentoFac');
 
+    if (!comprobanteNormalizado) {
+      setFormFacturacion((prev) => ({
+        ...prev,
+        tipoDocFac: '',
+      }));
+      return;
+    }
+
     if (comprobanteNormalizado === 'FACTURA') {
+      const titularEsRuc = titularPrincipal?.tipoDocumento === 'RUC';
       const eraIncompatible = tipoDocumentoSeleccionado !== 'RUC';
       if (eraIncompatible) {
         onCorregirCampo?.('nroDocFac');
@@ -87,6 +97,7 @@ export function DatosFacturacion({
         ...prev,
         tipoDocFac: 'FACTURA',
         tipoDocumentoFac: 'RUC',
+        usarTitularPrincipalFac: titularEsRuc ? prev.usarTitularPrincipalFac : false,
         nroDocFac: eraIncompatible ? '' : prev.nroDocFac,
         razonSocialFac: eraIncompatible ? '' : prev.razonSocialFac,
         direccionFac: eraIncompatible ? '' : prev.direccionFac,
@@ -95,6 +106,9 @@ export function DatosFacturacion({
     }
 
     if (comprobanteNormalizado === 'BOLETA') {
+      const titularEsDniOCe = Boolean(
+        titularPrincipal?.tipoDocumento && titularPrincipal.tipoDocumento !== 'RUC'
+      );
       const eraIncompatible = tipoDocumentoSeleccionado === 'RUC';
       if (eraIncompatible) {
         onCorregirCampo?.('nroDocFac');
@@ -106,6 +120,7 @@ export function DatosFacturacion({
         ...prev,
         tipoDocFac: 'BOLETA',
         tipoDocumentoFac: eraIncompatible ? 'DNI' : (prev.tipoDocumentoFac || 'DNI'),
+        usarTitularPrincipalFac: titularEsDniOCe ? prev.usarTitularPrincipalFac : false,
         nroDocFac: eraIncompatible ? '' : prev.nroDocFac,
         razonSocialFac: eraIncompatible ? '' : prev.razonSocialFac,
         direccionFac: eraIncompatible ? '' : prev.direccionFac,
@@ -137,10 +152,15 @@ export function DatosFacturacion({
     }
     setErrorDocumentoConsulta(null);
 
+    const titularEsCompatible = tipoNormalizado === 'RUC'
+      ? titularPrincipal?.tipoDocumento === 'RUC'
+      : Boolean(titularPrincipal?.tipoDocumento && titularPrincipal.tipoDocumento !== 'RUC');
+
     setFormFacturacion((prev) => ({
       ...prev,
       tipoDocumentoFac: tipoNormalizado,
       tipoDocFac: nuevoComprobante,
+      usarTitularPrincipalFac: titularEsCompatible ? prev.usarTitularPrincipalFac : false,
       nroDocFac: eraIncompatible ? '' : prev.nroDocFac,
       razonSocialFac: eraIncompatible ? '' : prev.razonSocialFac,
       direccionFac: eraIncompatible ? '' : prev.direccionFac,
@@ -175,27 +195,28 @@ export function DatosFacturacion({
       const response = await faregasClientesApi.consultarDocumento(tipoDocumento, docNormalizado);
       if (response && response.encontrado && response.data) {
         const cliente = response.data;
-        const tipoComprobante = tipoDocumento === 'RUC' ? 'FACTURA' : 'BOLETA';
 
-        onCorregirCampo?.('tipoDocFac');
         onCorregirCampo?.('nroDocFac');
         onCorregirCampo?.('razonSocialFac');
         onCorregirCampo?.('direccionFac');
         onCorregirCampo?.('emailFac');
         onCorregirCampo?.('telefonoFac');
 
-        setFormFacturacion((prev) => ({
-          ...prev,
-          tipoDocFac: tipoComprobante,
-          tipoDocumentoFac: tipoDocumento,
-          razonSocialFac: cliente.nombreRazonSocial || prev.razonSocialFac,
-          direccionFac: cliente.direccion || prev.direccionFac,
-          emailFac: cliente.correo || cliente.email || prev.emailFac,
-          telefonoFac: cliente.telefono || prev.telefonoFac,
-          condicionPagoFac: tipoComprobante === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
-          fechaVencimientoFac: tipoComprobante === 'BOLETA' ? '' : prev.fechaVencimientoFac,
-          cuotasFac: tipoComprobante === 'BOLETA' ? [] : prev.cuotasFac,
-        }));
+        setFormFacturacion((prev) => {
+          const tipoComprobante = tipoDocumento === 'RUC' ? 'FACTURA' : (prev.tipoDocFac || '');
+          return {
+            ...prev,
+            tipoDocFac: tipoComprobante,
+            tipoDocumentoFac: tipoDocumento,
+            razonSocialFac: cliente.nombreRazonSocial || prev.razonSocialFac,
+            direccionFac: cliente.direccion || prev.direccionFac,
+            emailFac: cliente.correo || cliente.email || prev.emailFac,
+            telefonoFac: cliente.telefono || prev.telefonoFac,
+            condicionPagoFac: tipoComprobante === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
+            fechaVencimientoFac: tipoComprobante === 'BOLETA' ? '' : prev.fechaVencimientoFac,
+            cuotasFac: tipoComprobante === 'BOLETA' ? [] : prev.cuotasFac,
+          };
+        });
 
         const textoOrigen = response.origen === 'FAREGAS'
           ? 'Datos recuperados de Faregas.'
@@ -270,7 +291,7 @@ export function DatosFacturacion({
   return (
     <div
       className="overflow-hidden rounded-xl border-2 border-blue-200 bg-white"
-      data-seccion-facturacion={dataSeccion || undefined}
+      data-seccion-facturacion={dataSeccion || 'datos-facturacion'}
     >
       <div className="flex flex-col gap-3 border-b border-blue-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
@@ -296,10 +317,14 @@ export function DatosFacturacion({
         )}
 
         <div>
-          <label className="mb-1 block text-xs font-bold text-slate-500">TIPO DE COMPROBANTE</label>
+          <label htmlFor="tipoDocFac" className="mb-1 block text-xs font-bold text-slate-500">
+            TIPO DE COMPROBANTE <span className="text-red-500" aria-hidden="true">*</span>
+          </label>
           <select
+            id="tipoDocFac"
+            name="tipoDocFac"
             value={formFacturacion.tipoDocFac}
-            disabled={facturarAlTitular || soloLectura}
+            disabled={soloLectura}
             onChange={(event) => handleTipoComprobanteChange(event.target.value)}
             className={claseConError(
               'h-[42px] w-full rounded-lg border-2 border-slate-200 px-3 font-semibold text-slate-800 focus:border-[#f59e0b] disabled:bg-slate-100 disabled:text-slate-500',
@@ -309,7 +334,7 @@ export function DatosFacturacion({
             aria-invalid={erroresCampo['tipoDocFac'] ? true : undefined}
             aria-describedby={erroresCampo['tipoDocFac'] ? 'error-tipoDocFac' : undefined}
           >
-            <option value="">-- SELECCIONAR --</option>
+            <option value="">Seleccione BOLETA o FACTURA</option>
             <option value="BOLETA">BOLETA</option>
             <option value="FACTURA">FACTURA</option>
           </select>

@@ -39,11 +39,25 @@ export const esComprobanteOperable = (
   if (modoFacturacion === 'SIMULACION') return true;
 
   const entorno = String(facturacion.entornoFacturador || '').trim().toUpperCase();
-  const generadoEnDemo = entorno === 'DEMO'
-    && facturacion.estado === 'PENDIENTE_SUNAT'
-    && Boolean(facturacion.nroComprobante)
-    && Boolean(facturacion.enlacePdf || facturacion.enlaceXml);
-  const aceptadoEnProduccion = facturacion.estado === 'ACEPTADO'
+  const estado = String(facturacion.estado || '').trim().toUpperCase();
+  const tieneIdentidad = Boolean(
+    facturacion.nroComprobante
+    && facturacion.serie
+    && facturacion.numero !== null
+    && facturacion.numero !== undefined,
+  );
+  const tieneArtefacto = Boolean(facturacion.enlacePdf || facturacion.enlaceXml || facturacion.codigoHash);
+  const estadoCompatibleDemo = ['PENDIENTE_SUNAT', 'ACEPTADO', 'BORRADOR'].includes(estado)
+    && estado !== 'RECHAZADO'
+    && estado !== 'ANULADO'
+    && estado !== 'ERROR';
+
+  const generadoEnDemo = (entorno === 'DEMO' || !entorno)
+    && estadoCompatibleDemo
+    && tieneIdentidad
+    && tieneArtefacto;
+
+  const aceptadoEnProduccion = estado === 'ACEPTADO'
     && facturacion.aceptadaSunat === true;
 
   return generadoEnDemo || aceptadoEnProduccion;
@@ -51,7 +65,9 @@ export const esComprobanteOperable = (
 
 /** Un comprobante en cualquiera de estos estados no debe volver a Nubefact. */
 export const esComprobanteYaEmitido = (facturacion: FacturacionFaregas | null): boolean =>
-  facturacion?.estado === 'ACEPTADO' || facturacion?.estado === 'PENDIENTE_SUNAT';
+  facturacion?.estado === 'ACEPTADO'
+  || facturacion?.estado === 'PENDIENTE_SUNAT'
+  || Boolean(facturacion?.nroComprobante && (facturacion?.codigoHash || facturacion?.enlacePdf));
 
 /**
  * Estados en los que el contenido fiscal ya fue emitido o ya tiene una
@@ -59,7 +75,8 @@ export const esComprobanteYaEmitido = (facturacion: FacturacionFaregas | null): 
  * no se permite volver al wizard y alterar los datos asociados.
  */
 export const esComprobanteFiscalBloqueado = (facturacion: FacturacionFaregas | null): boolean =>
-  ['ACEPTADO', 'PENDIENTE_SUNAT', 'PENDIENTE', 'ERROR'].includes(String(facturacion?.estado || ''));
+  ['ACEPTADO', 'PENDIENTE_SUNAT', 'PENDIENTE', 'ERROR'].includes(String(facturacion?.estado || ''))
+  || Boolean(facturacion?.nroComprobante && (facturacion?.codigoHash || facturacion?.enlacePdf));
 
 export const puedeRetrocederWizard = (
   certificadoEstado: string | undefined,

@@ -82,20 +82,15 @@ export function TitularesList({
     }
 
     const tipoDocumentoFac = String(titularPrincipal.tipoDocumento || 'DNI').trim().toUpperCase();
-    const tipoDocFac = tipoDocumentoFac === 'RUC' ? 'FACTURA' : 'BOLETA';
-    ['tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac']
+    ['tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac']
       .forEach((campo) => onCorregirCampo?.(campo));
     setFormFacturacion((prev) => ({
       ...prev,
       usarTitularPrincipalFac: true,
-      tipoDocFac,
       tipoDocumentoFac,
       nroDocFac: titularPrincipal.nroDocumento,
       razonSocialFac: titularPrincipal.nombreRazonSocial,
       direccionFac: titularPrincipal.direccion,
-      condicionPagoFac: tipoDocFac === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
-      fechaVencimientoFac: tipoDocFac === 'BOLETA' ? '' : prev.fechaVencimientoFac,
-      cuotasFac: tipoDocFac === 'BOLETA' ? [] : prev.cuotasFac,
     }));
   };
   
