@@ -31,7 +31,7 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { resolverCuotasCredito, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
+import { resolverCuotasCredito, resolverTipoComprobantePorDocumento, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { useErroresPaso, PanelResumenErroresWizard, estructurarErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual, puedeRetrocederWizard } from './faregas-emision';
@@ -544,7 +544,7 @@ function NuevoCertificadoWizard() {
 
   // Form State (Facturación)
   const [formFacturacion, setFormFacturacion] = useState<FormFacturacionState>({
-    tipoDocFac: '', tipoDocumentoFac: 'DNI', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
+    tipoDocFac: 'BOLETA', tipoDocumentoFac: 'DNI', nroDocFac: '', razonSocialFac: '', nombresFac: '', apellidosFac: '',
     paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '', direccionFac: '',
     emailFac: '', telefonoFac: '', usarTitularPrincipalFac: false,
     condicionPagoFac: 'CONTADO', fechaInicioCreditoFac: fechaLocalIso(), fechaVencimientoFac: '',
@@ -638,22 +638,29 @@ function NuevoCertificadoWizard() {
 
     const tipoDocumentoFac = String(titularPrincipal.tipoDocumento || 'DNI').trim().toUpperCase();
 
-    // El documento, nombre y dirección deben reflejarse en el mismo clic. La
-    // consulta remota sólo completa contacto y nunca bloquea el checkbox.
-    // El tipo de comprobante (tipoDocFac) NO se modifica automáticamente por el
-    // titular; la elección entre BOLETA y FACTURA siempre corresponde al usuario.
+    // El documento, nombre, dirección y comprobante compatible deben reflejarse
+    // en el mismo clic. La consulta remota sólo completa contacto.
     setFormFacturacion((prev) => {
+      const tipoDocFac = resolverTipoComprobantePorDocumento(tipoDocumentoFac, prev.tipoDocFac);
       const sincronizada = {
         ...prev,
+        tipoDocFac,
         tipoDocumentoFac,
         nroDocFac: titularPrincipal.nroDocumento,
         razonSocialFac: titularPrincipal.nombreRazonSocial,
         direccionFac: titularPrincipal.direccion,
+        condicionPagoFac: tipoDocFac === 'BOLETA' ? 'CONTADO' as const : prev.condicionPagoFac,
+        fechaVencimientoFac: tipoDocFac === 'BOLETA' ? '' : prev.fechaVencimientoFac,
+        cuotasFac: tipoDocFac === 'BOLETA' ? [] : prev.cuotasFac,
       };
-      const sinCambios = prev.tipoDocumentoFac === sincronizada.tipoDocumentoFac
+      const sinCambios = prev.tipoDocFac === sincronizada.tipoDocFac
+        && prev.tipoDocumentoFac === sincronizada.tipoDocumentoFac
         && prev.nroDocFac === sincronizada.nroDocFac
         && prev.razonSocialFac === sincronizada.razonSocialFac
-        && prev.direccionFac === sincronizada.direccionFac;
+        && prev.direccionFac === sincronizada.direccionFac
+        && prev.condicionPagoFac === sincronizada.condicionPagoFac
+        && prev.fechaVencimientoFac === sincronizada.fechaVencimientoFac
+        && prev.cuotasFac === sincronizada.cuotasFac;
       return sinCambios ? prev : sincronizada;
     });
 
@@ -931,26 +938,30 @@ function NuevoCertificadoWizard() {
             const facturacionRes = await faregasCertificadosApi.obtenerFacturacion(certificadoId);
             const fac = facturacionRes.data?.facturacion;
             if (fac) {
-              setFormFacturacion(prev => ({
-                ...prev,
-                tipoDocFac: fac.tipoComprobante || '',
-                tipoDocumentoFac: fac.tipoDocumentoCliente || (String(fac.nroDocumento || '').length === 11 ? 'RUC' : 'DNI'),
-                nroDocFac: fac.nroDocumento || '',
-                razonSocialFac: fac.nombreRazonSocial || '',
-                direccionFac: fac.direccion || '',
-                emailFac: fac.email || '',
-                telefonoFac: fac.telefono || '',
-                usarTitularPrincipalFac: fac.facturarAlDuenoPrincipal === true,
-                condicionPagoFac: fac.tipoComprobante === 'BOLETA' ? 'CONTADO' : (fac.condicionPago || 'CONTADO'),
-                fechaInicioCreditoFac: String(fac.fechaInicioCredito || prev.fechaInicioCreditoFac || fechaLocalIso()).slice(0, 10),
-                fechaVencimientoFac: fac.tipoComprobante === 'BOLETA' ? '' : String(fac.fechaVencimiento || '').slice(0, 10),
-                medioPagoFac: fac.medioPago || '',
-                cuotasFac: fac.tipoComprobante === 'BOLETA' ? [] : (fac.cuotas || []).map((cuota: any) => ({
-                  numeroCuota: Number(cuota.numeroCuota),
-                  fechaPago: String(cuota.fechaPago || '').slice(0, 10),
-                  importe: String(cuota.importe)
-                }))
-              }));
+              setFormFacturacion(prev => {
+                const tipoDocumentoFac = fac.tipoDocumentoCliente || (String(fac.nroDocumento || '').length === 11 ? 'RUC' : 'DNI');
+                const tipoDocFac = resolverTipoComprobantePorDocumento(tipoDocumentoFac, fac.tipoComprobante);
+                return {
+                  ...prev,
+                  tipoDocFac,
+                  tipoDocumentoFac,
+                  nroDocFac: fac.nroDocumento || '',
+                  razonSocialFac: fac.nombreRazonSocial || '',
+                  direccionFac: fac.direccion || '',
+                  emailFac: fac.email || '',
+                  telefonoFac: fac.telefono || '',
+                  usarTitularPrincipalFac: fac.facturarAlDuenoPrincipal === true,
+                  condicionPagoFac: tipoDocFac === 'BOLETA' ? 'CONTADO' : (fac.condicionPago || 'CONTADO'),
+                  fechaInicioCreditoFac: String(fac.fechaInicioCredito || prev.fechaInicioCreditoFac || fechaLocalIso()).slice(0, 10),
+                  fechaVencimientoFac: tipoDocFac === 'BOLETA' ? '' : String(fac.fechaVencimiento || '').slice(0, 10),
+                  medioPagoFac: fac.medioPago || '',
+                  cuotasFac: tipoDocFac === 'BOLETA' ? [] : (fac.cuotas || []).map((cuota: any) => ({
+                    numeroCuota: Number(cuota.numeroCuota),
+                    fechaPago: String(cuota.fechaPago || '').slice(0, 10),
+                    importe: String(cuota.importe)
+                  }))
+                };
+              });
               setFacturacion(fac);
             }
           } catch (e) {

@@ -1,10 +1,22 @@
 import type { DocumentosEmitidosExtendidoResponse, ReporteFinancieroResponse } from '../services/faregas-dashboard.api';
 import { exportarExcelVariasHojas, type ExcelCellValue, type ExcelColumn, type ExcelSheetDefinition } from './exportar-excel';
-import { construirHojaConsolidado, construirHojaHistorial, construirHojasReporteFinanciero } from './faregas-reporte-financiero';
+import {
+  construirHojaConsolidado,
+  construirHojaAnulados,
+  construirHojaNotasCredito,
+  construirHojaHistorial,
+  construirHojasReporteFinanciero
+} from './faregas-reporte-financiero';
 
 // FUSIÓN SIN PÉRDIDA: este módulo es el único generador de descarga.
 // Re-exporta el consolidado para que la vista llame una sola función.
-export { construirHojaConsolidado, construirHojaHistorial, construirHojasReporteFinanciero };
+export {
+  construirHojaConsolidado,
+  construirHojaAnulados,
+  construirHojaNotasCredito,
+  construirHojaHistorial,
+  construirHojasReporteFinanciero
+};
 
 const numero = (value: unknown) => Number(value || 0);
 const decimal = (value: unknown) => Number(numero(value).toFixed(2));
@@ -158,6 +170,49 @@ export function resolverTipoProductoLinea(line: Record<string, any>): string {
   return 'COMPLEMENTARIO VENTA DE PRODUCTO';
 }
 
+export function resolverUnidadMedidaSunatLine(line: Record<string, any>): string {
+  const desc = String(line.producto || line.descripcion || line.codigo_producto || line.codigoProducto || '').trim().toUpperCase();
+  const tipoProd = String(line.tipo_producto || line.tipoProducto || '').trim().toUpperCase();
+  const unidadOriginal = String(line.unidad || '').trim().toUpperCase();
+
+  // 1. Duplicados de certificados -> ZZ (cobro de servicio)
+  if (line.duplicado_id || /DUPLICADO/i.test(tipoProd) || /DUPLICADO/i.test(desc)) {
+    return 'ZZ';
+  }
+
+  // 2. CHIP y PORTA CHIP vendidos como bienes físicos -> NIU
+  if (/PORTA\s*CHIP/i.test(desc) || /PORTACHIP/i.test(desc) || /\bCHIP\b/i.test(desc) || /CHIP/i.test(desc)) {
+    return 'NIU';
+  }
+
+  // 3. Certificados anuales GLP / GNV / Conformidad / Servicios / Inspecciones -> ZZ
+  if (
+    line.certificado_id ||
+    line.certificado ||
+    /GLP/i.test(tipoProd) ||
+    /GNV/i.test(tipoProd) ||
+    /CONFORMIDAD/i.test(tipoProd) ||
+    /CERTIFIC/i.test(tipoProd) ||
+    /INSPECC/i.test(tipoProd) ||
+    /SERVICIO/i.test(tipoProd) ||
+    /GLP/i.test(desc) ||
+    /GNV/i.test(desc) ||
+    /CONFORMIDAD/i.test(desc) ||
+    /CERTIFIC/i.test(desc) ||
+    /INSPECC/i.test(desc) ||
+    /SERVICIO/i.test(desc) ||
+    /ANUAL/i.test(desc)
+  ) {
+    return 'ZZ';
+  }
+
+  // 4. Bienes físicos u otros: respetar unidad física existente si no es ZZ, de lo contrario NIU
+  if (unidadOriginal && unidadOriginal !== 'ZZ') {
+    return unidadOriginal;
+  }
+  return 'NIU';
+}
+
 export function resolverTipoCertificadoDoc(doc: Record<string, any>): string {
   const raw = String(doc.tipos_producto || '').trim();
   if (raw === 'COMPLEMENTARIO DUPLICADO' || raw === 'COMPLEMENTARIO VENTA DE PRODUCTO') return raw;
@@ -222,7 +277,13 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
     );
     const tipoPagoExtendido = esCortesiaDoc ? 'CORTESÍA' : esCreditoDoc ? 'CRÉDITO' : ((doc as any).tipo_pago || '');
     const formaPagoExtendido = esCortesiaDoc ? 'CORTESÍA' : esCreditoDoc ? formaPagoCredito : (formaNormalizada || '');
-    const montoPagoExtendido = esCortesiaDoc ? 0 : (doc.monto_pagado === null || doc.monto_pagado === undefined ? '' : decimal(doc.monto_pagado));
+    const montoPagoExtendido = ((): string | number => {
+      if (esCortesiaDoc) return 'S/ 0.00';
+      if ((doc as any).desglose_pagos) return (doc as any).desglose_pagos;
+      if (doc.monto_pagado === null || doc.monto_pagado === undefined) return 'S/ 0.00';
+      const m = decimal(doc.monto_pagado);
+      return m > 0 ? m : 'S/ 0.00';
+    })();
     return {
       issuerKey: issuerKeyFor(doc),
       docId: String(doc.id_documento || ''), fuenteFecha: doc.fecha_emision_fuente || '', tipo: doc.tipo_comprobante || '', numeroDocumento: serial(doc), fechaEmision: doc.fecha_emision ? fechaLocal(doc.fecha_emision) : '',
@@ -238,7 +299,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
       origen: doc.origen_peticion || '', tipoPago: tipoPagoExtendido, formaPago: formaPagoExtendido, montoPago: montoPagoExtendido,
       referenciaPago: doc.referencia_pago || '', detraccionPorcentaje: extra('detraccion_porcentaje'), detraccionNeto: extra('detraccion_neto'), detraccionImporte: extra('detraccion_importe'),
       tieneNC: doc.notas_credito ? 'Sí' : 'No', cantidadNC: doc.cantidad_notas_credito ?? 0, tieneND: doc.notas_debito ? 'Sí' : 'No', cantidadND: doc.cantidad_notas_debito ?? 0,
-      items: relatedLines.length, codigoItem: uniqueLine?.codigo_producto || '', descripcion: uniqueLine?.producto || '', unidad: uniqueLine?.unidad || '',
+      items: relatedLines.length, codigoItem: uniqueLine?.codigo_producto || '', descripcion: uniqueLine?.producto || '', unidad: uniqueLine ? resolverUnidadMedidaSunatLine(uniqueLine) : '',
       cantidad: uniqueLine ? numero(uniqueLine.cantidad) : '', codigoAfectacion: uniqueLine?.codigo_afectacion_igv || '', valorUnitario: uniqueLine ? decimal(uniqueLine.precio_unitario) : '',
       valorReferencia: uniqueLine?.valor_referencial_unitario == null ? '' : decimal(uniqueLine.valor_referencial_unitario), subtotalItem: uniqueLine?.base_imponible == null ? '' : decimal(uniqueLine.base_imponible), descuentosItem: '', rc: '', totalItem: uniqueLine?.importe_total == null ? '' : decimal(uniqueLine.importe_total),
       ejecutivo: extra('ejecutivo'), marca: extra('marca') || doc.marca_vehiculo || '', modelo: extra('modelo') || doc.modelo_vehiculo || '', motor: extra('motor') || doc.motor_vehiculo || '', certificado: doc.certificados || '',
@@ -258,7 +319,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
     tipoProducto: resolverTipoProductoLinea(line),
     codigoProducto: line.codigo_producto || '',
     producto: line.producto || '',
-    unidad: line.unidad || '',
+    unidad: resolverUnidadMedidaSunatLine(line),
     cantidad: numero(line.cantidad),
     precioUnitario: decimal(line.precio_unitario),
     base: line.base_imponible === null ? '' : decimal(line.base_imponible),
@@ -329,11 +390,12 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
 }
 
 /**
- * FUSIÓN SIN PÉRDIDA — REESTRUCTURACIÓN EN 4 HOJAS:
+ * REESTRUCTURACIÓN DEFINITIVA EN 5 HOJAS:
  * 1. Datos (o Datos_<emisor>)
  * 2. Líneas de productos (13 columnas sin IDs técnicos)
- * 3. Historial (copia completa sin filtros de vigencia y sin sumatorias)
- * 4. Consolidado_Datos (ingresos comerciales vigentes + sumatorias calculadas sobre filas visibles)
+ * 3. Consolidado_Datos (ingresos comerciales vigentes + cortesías con neto 0)
+ * 4. Anulados (operaciones con anulación activa, baja fiscal o certificado anulado)
+ * 5. Notas de credito (operaciones con incidencias de nota de crédito)
  */
 export function construirHojasUnificadas(
   extendido: DocumentosEmitidosExtendidoResponse,
@@ -344,9 +406,10 @@ export function construirHojasUnificadas(
   if (!consolidado || !Array.isArray((consolidado as any).operaciones) || !Array.isArray((consolidado as any).comprobantes)) {
     return hojasExtendido;
   }
-  const hojaHistorial = construirHojaHistorial(consolidado, 'Historial');
   const hojaConsolidado = construirHojaConsolidado(consolidado, 'Consolidado_Datos');
-  return [...hojasExtendido, hojaHistorial, hojaConsolidado];
+  const hojaAnulados = construirHojaAnulados(consolidado, 'Anulados');
+  const hojaNotasCredito = construirHojaNotasCredito(consolidado, 'Notas de credito');
+  return [...hojasExtendido, hojaConsolidado, hojaAnulados, hojaNotasCredito];
 }
 
 export function exportarDocumentosEmitidosExtendido(data: DocumentosEmitidosExtendidoResponse, desde: string, hasta: string, consolidado?: ReporteFinancieroResponse | null) {

@@ -87,6 +87,33 @@ export function formatearHoraLima(raw: unknown): string {
 }
 
 /** Clasificación de pagos compartida (Datos + Consolidado). Sin inventar. */
+export function formatearDesglosePagos(
+  pagos: Row[],
+  esCortesia: boolean
+): { importePagadoTexto: string | number; importePagadoNumerico: number } {
+  if (esCortesia) {
+    return { importePagadoTexto: 'S/ 0.00', importePagadoNumerico: 0 };
+  }
+  const confirmados = pagos.filter(pagoConfirmado);
+  if (!confirmados.length) {
+    return { importePagadoTexto: 'S/ 0.00', importePagadoNumerico: 0 };
+  }
+  const totalNumerico = moneda(confirmados.reduce((sum, p) => sum + numero(p.importe), 0));
+  if (confirmados.length === 1) {
+    return {
+      importePagadoTexto: moneda(confirmados[0].importe),
+      importePagadoNumerico: totalNumerico
+    };
+  }
+  const desgloseTexto = confirmados
+    .map((p) => `S/ ${moneda(p.importe).toFixed(2)}`)
+    .join(' + ');
+  return {
+    importePagadoTexto: desgloseTexto,
+    importePagadoNumerico: totalNumerico
+  };
+}
+
 export function clasificarMediosPago(
   pagos: Row[],
   importeNeto: number,
@@ -314,16 +341,32 @@ export function construirFilasReporteFinancieroBase(data: ReporteFinancieroRespo
         || (Number(doc.importe_total || 0) === 0 && JSON.stringify(doc.campos_dinamicos || '').includes('1002'))
       ))
     );
-    const importePagadoReporte = esCortesiaVenta ? 0 : importePagado;
+    let descuentoCalculado = descuento;
+    let brutoCalculado = importeBruto;
+    if (esCortesiaVenta) {
+      if (descuentoCalculado === 0 && totalBase > 0) {
+        descuentoCalculado = totalBase;
+        brutoCalculado = totalBase;
+      } else if (totalBase === 0 && descuentoCalculado > 0) {
+        brutoCalculado = descuentoCalculado;
+      } else if (totalBase === 0 && descuentoCalculado === 0) {
+        const precioRef = lineasVigentes.reduce((sum, l) => sum + numero(l.precio_unitario || l.valor_unitario || l.valor_referencial_unitario), 0);
+        if (precioRef > 0) {
+          brutoCalculado = moneda(precioRef);
+          descuentoCalculado = moneda(precioRef);
+        }
+      }
+    }
+    const { importePagadoTexto, importePagadoNumerico } = formatearDesglosePagos(pagos, esCortesiaVenta);
     const { tipoPago: tipoPagoCons, formaPago: formaPagoCons } = clasificarMediosPago(
       pagos,
-      importeNeto,
-      importePagadoReporte,
+      esCortesiaVenta ? 0 : importeNeto,
+      importePagadoNumerico,
       { esCredito, cuotasCount, esCortesia: esCortesiaVenta }
     );
     const tiposPago = esCortesiaVenta ? 'CORTESÍA' : tipoPagoCons;
     const formasPago = esCortesiaVenta ? 'CORTESÍA' : formaPagoCons;
-    const saldoPendiente = esCortesiaVenta ? 0 : moneda(Math.max(0, importeNeto - importePagadoReporte));
+    const saldoPendiente = esCortesiaVenta ? 0 : moneda(Math.max(0, (esCortesiaVenta ? 0 : importeNeto) - importePagadoNumerico));
     const docCliente = docsVigentes.map((doc) => limpiarDocumentoCliente(doc.tipo_documento_cliente, doc.nro_documento)).find(Boolean);
     const productosAdicionales = lineasVigentes.filter((linea) => estado(linea.tipo_item) === 'PRODUCTO'
       || (!linea.certificado_id && !linea.numero_certificado && !linea.duplicado_id));
@@ -455,7 +498,14 @@ export function construirFilasReporteFinancieroBase(data: ReporteFinancieroRespo
         return det;
       })(),
       tipoPago: tiposPago, formaPago: formasPago, cortesiaDescuento: esCortesiaVenta ? 'CORTESÍA' : etiquetaDescuento(descuentos),
-      importeBruto, descuento, importeNeto, importeConsiderado, motivoExclusion, importePagado: importePagadoReporte, saldoPendiente,
+      importeBruto: brutoCalculado,
+      descuento: descuentoCalculado,
+      importeNeto: esCortesiaVenta ? 0 : importeNeto,
+      importeConsiderado: esCortesiaVenta ? 0 : importeConsiderado,
+      motivoExclusion: esCortesiaVenta ? 'CORTESÍA' : motivoExclusion,
+      importePagado: importePagadoTexto,
+      importePagadoNumerico,
+      saldoPendiente,
       estadoCertificado: textoUnico(lineasVigentes.map((linea) => linea.certificado_estado)) || '-',
       estadoComprobante: textoUnico(docsVigentes.map(estadoFiscal)) || 'Sin comprobante'
     });
@@ -466,25 +516,27 @@ export function construirFilasReporteFinancieroBase(data: ReporteFinancieroRespo
 }
 
 /**
- * REGLA DE EXCLUSIÓN INMEDIATA COMPLETA para Consolidado_Datos:
- * Toda operación con cortesía, anulación activa o nota de crédito activa (incluso NC parcial)
- * o con certificado anulado o importe neto <= 0 DESAPARECE COMPLETAMENTE.
- * Única excepción: anulación o NC explícitamente RECHAZADA.
+ * REGLAS DE CONSOLIDADO_DATOS:
+ * 1. Cortesías: DEBEN APARECER con neto S/ 0.00, pagado S/ 0.00, saldo S/ 0.00, importeConsiderado = 0 (no inflan ingresos).
+ * 2. Exclusiones obligatorias:
+ *    - Anulaciones activas o pendientes y bajas fiscales.
+ *    - Certificados anulados.
+ *    - Notas de crédito (totales o parciales) pendientes o emitidas.
+ *    - Borradores.
+ *    - Si una solicitud de anulación o NC fue RECHAZADA y no existe otra causa de exclusión, la venta original permanece.
  */
 export function esVentaComercialVigente(row: Record<string, ExcelCellValue>): boolean {
-  // 1. Cortesía / Gratuidad
   const esCortesia = String(row.cortesiaDescuento || '').toUpperCase().includes('CORTES')
     || String(row.tipoPago || '').toUpperCase().includes('CORTES')
     || String(row.formaPago || '').toUpperCase().includes('CORTES')
     || row.motivoExclusion === 'CORTESÍA';
-  if (esCortesia) return false;
 
-  // 2. Certificado anulado
+  // 1. Certificado anulado
   const certAnulado = String(row.estadoCertificado || '').toUpperCase().includes('ANULADO')
     || row.motivoExclusion === 'CERTIFICADO ANULADO';
   if (certAnulado) return false;
 
-  // 3. Solicitud de anulación activa (salvo si está explícitamente RECHAZADA)
+  // 2. Solicitud de anulación o baja fiscal activa (salvo si está explícitamente RECHAZADA)
   if (row.tieneSolicitudAnulacion === 'SÍ' || Boolean(row.documentoAnulacion)) {
     const estSol = String(row.estadoSolicitudAnulacion || '').toUpperCase();
     const estFisc = String(row.estadoAnulacionFiscal || '').toUpperCase();
@@ -492,7 +544,7 @@ export function esVentaComercialVigente(row: Record<string, ExcelCellValue>): bo
     if (!esRechazada) return false;
   }
 
-  // 4. Nota de crédito (total o parcial, salvo si está explícitamente RECHAZADA)
+  // 3. Nota de crédito (total o parcial, salvo si está explícitamente RECHAZADA)
   const tieneNC = row.tieneNotaCredito === 'SÍ'
     || Boolean(row.numeroNotaCredito)
     || Number(row.importeNotaCredito || 0) > 0
@@ -504,27 +556,36 @@ export function esVentaComercialVigente(row: Record<string, ExcelCellValue>): bo
     if (!esRechazadaNC) return false;
   }
 
-  // 5. Motivo de exclusión activo o importe neto <= 0
-  if (row.motivoExclusion && !['RECHAZADA', 'RECHAZADO'].includes(String(row.motivoExclusion).toUpperCase())) {
+  // 4. Motivo de exclusión activo (que no sea RECHAZADA ni CORTESÍA)
+  if (row.motivoExclusion && !['RECHAZADA', 'RECHAZADO', 'CORTESÍA', 'CORTESIA'].includes(String(row.motivoExclusion).toUpperCase())) {
     return false;
   }
+
+  // 5. Las cortesías son válidas con importe neto 0. El resto requiere importeNeto > 0.
+  if (esCortesia) return true;
   if (Number(row.importeNeto || 0) <= 0) return false;
 
   return true;
 }
 
 export function construirFilasConsolidadoVigente(filasBase: Array<Record<string, ExcelCellValue>>): Array<Record<string, ExcelCellValue>> {
-  const vigentes = filasBase.filter(esVentaComercialVigente).map((r) => ({
-    ...r,
-    importeConsiderado: r.importeNeto,
-    motivoExclusion: ''
-  }));
+  const vigentes = filasBase.filter(esVentaComercialVigente).map((r) => {
+    const esCortesia = String(r.cortesiaDescuento || '').toUpperCase().includes('CORTES')
+      || String(r.tipoPago || '').toUpperCase().includes('CORTES')
+      || String(r.formaPago || '').toUpperCase().includes('CORTES')
+      || r.motivoExclusion === 'CORTESÍA';
+    return {
+      ...r,
+      importeConsiderado: esCortesia ? 0 : r.importeNeto,
+      motivoExclusion: esCortesia ? 'CORTESÍA' : ''
+    };
+  });
 
   const totales = vigentes.reduce<{ bruto: number; descuento: number; neto: number; pagado: number; saldo: number }>((acc, row) => ({
     bruto: acc.bruto + numero(row.importeBruto),
     descuento: acc.descuento + numero(row.descuento),
     neto: acc.neto + numero(row.importeNeto),
-    pagado: acc.pagado + numero(row.importePagado),
+    pagado: acc.pagado + numero((row as any).importePagadoNumerico ?? row.importePagado),
     saldo: acc.saldo + numero(row.saldoPendiente)
   }), { bruto: 0, descuento: 0, neto: 0, pagado: 0, saldo: 0 });
 
@@ -547,6 +608,7 @@ export function construirFilasConsolidadoVigente(filasBase: Array<Record<string,
     importeConsiderado: moneda(totales.neto),
     motivoExclusion: '',
     importePagado: moneda(totales.pagado),
+    importePagadoNumerico: moneda(totales.pagado),
     saldoPendiente: moneda(totales.saldo),
     estadoCertificado: '', estadoComprobante: ''
   };
@@ -567,17 +629,130 @@ export function construirFilasConsolidadoVigente(filasBase: Array<Record<string,
     importeBruto: '', descuento: '', importeNeto: '', importeConsiderado: '',
     motivoExclusion: '',
     importePagado: moneda(totales.pagado),
+    importePagadoNumerico: moneda(totales.pagado),
     saldoPendiente: '', estadoCertificado: '', estadoComprobante: ''
   };
 
   return [...vigentes, filaTotalVentas, filaTotalPagado];
 }
 
+/**
+ * REGLAS PARA HOJA ANULADOS:
+ * - Operaciones con solicitud de anulación activa o pendiente.
+ * - Operaciones con baja fiscal pendiente o confirmada.
+ * - Certificado u operación anulada.
+ * - NO incluir notas de crédito puras.
+ * - NO incluir borradores ni solicitudes rechazadas sin anulación activa.
+ */
+export function esFilaAnulados(row: Record<string, ExcelCellValue>): boolean {
+  const estCert = String(row.estadoCertificado || '').toUpperCase();
+  const estComp = String(row.estadoComprobante || '').toUpperCase();
+  if (estCert === 'BORRADOR' || estComp === 'BORRADOR') return false;
+
+  const tieneSolAnulacion = row.tieneSolicitudAnulacion === 'SÍ' || Boolean(row.documentoAnulacion);
+  const estSol = String(row.estadoSolicitudAnulacion || '').toUpperCase();
+  const estFisc = String(row.estadoAnulacionFiscal || '').toUpperCase();
+  const solRechazada = estSol === 'RECHAZADA' || estSol === 'RECHAZADO' || estFisc === 'RECHAZADA' || estFisc === 'RECHAZADO';
+
+  if (tieneSolAnulacion && !solRechazada) {
+    return true;
+  }
+
+  if (estFisc === 'ANULADO' || estFisc === 'PENDIENTE') {
+    return true;
+  }
+
+  if (
+    estCert.includes('ANULADO') ||
+    estComp.includes('ANULADO') ||
+    row.motivoExclusion === 'CERTIFICADO ANULADO' ||
+    row.motivoExclusion === 'ANULACIÓN ACEPTADA' ||
+    row.motivoExclusion === 'ANULACIÓN PENDIENTE'
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * REGLAS PARA HOJA NOTAS DE CRÉDITO:
+ * - Solicitudes de NC activas, pendientes o aprobadas.
+ * - Notas de crédito en proceso o emitidas.
+ * - Estados técnicos activos (error, incierto).
+ * - NO incluir solicitudes de NC rechazadas.
+ * - NO incluir borradores.
+ */
+export function esFilaNotasCredito(row: Record<string, ExcelCellValue>): boolean {
+  const estCert = String(row.estadoCertificado || '').toUpperCase();
+  const estComp = String(row.estadoComprobante || '').toUpperCase();
+  if (estCert === 'BORRADOR' || estComp === 'BORRADOR') return false;
+
+  const tieneNC = row.tieneNotaCredito === 'SÍ'
+    || Boolean(row.numeroNotaCredito)
+    || Number(row.importeNotaCredito || 0) > 0
+    || Boolean(row.tipoAfectacionNotaCredito)
+    || Boolean(row.motivoExclusion && String(row.motivoExclusion).toUpperCase().includes('NC'));
+
+  if (!tieneNC) return false;
+
+  const estNC = String(row.estadoNotaCredito || '').toUpperCase();
+  if (estNC === 'RECHAZADA' || estNC === 'RECHAZADO') return false;
+
+  return true;
+}
+
+export function construirHojaAnulados(
+  data: ReporteFinancieroResponse,
+  nombre = 'Anulados'
+): ExcelSheetDefinition {
+  const sedes = (data.sedes || []).map((sede) => sede.planta_nombre || sede.planta_key).filter(Boolean);
+  const filasBase = construirFilasReporteFinancieroBase(data);
+  const filasAnulados = filasBase.filter(esFilaAnulados);
+  return {
+    name: nombre.slice(0, 31),
+    title: 'OPERACIONES CON ANULACIÓN O BAJA FISCAL',
+    metadata: [
+      ['Fecha desde', data.metadatos?.desde || ''],
+      ['Fecha hasta', data.metadatos?.hasta || ''],
+      ['Sede', sedes.length ? textoUnico(sedes) : (data.metadatos?.plantas || []).join(', ')],
+      ['Generado por', data.metadatos?.usuarioExportador || 'Usuario']
+    ],
+    headerRow: 7,
+    totalsRow: false,
+    columns: obtenerColumnasReporteFinanciero(),
+    rows: filasAnulados
+  };
+}
+
+export function construirHojaNotasCredito(
+  data: ReporteFinancieroResponse,
+  nombre = 'Notas de credito'
+): ExcelSheetDefinition {
+  const sedes = (data.sedes || []).map((sede) => sede.planta_nombre || sede.planta_key).filter(Boolean);
+  const filasBase = construirFilasReporteFinancieroBase(data);
+  const filasNC = filasBase.filter(esFilaNotasCredito);
+  return {
+    name: nombre.slice(0, 31),
+    title: 'OPERACIONES CON NOTA DE CRÉDITO',
+    metadata: [
+      ['Fecha desde', data.metadatos?.desde || ''],
+      ['Fecha hasta', data.metadatos?.hasta || ''],
+      ['Sede', sedes.length ? textoUnico(sedes) : (data.metadatos?.plantas || []).join(', ')],
+      ['Generado por', data.metadatos?.usuarioExportador || 'Usuario']
+    ],
+    headerRow: 7,
+    totalsRow: false,
+    columns: obtenerColumnasReporteFinanciero(),
+    rows: filasNC
+  };
+}
+
 export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse): Array<Record<string, ExcelCellValue>> {
   const filas = construirFilasReporteFinancieroBase(data);
   const totales = filas.reduce<{ bruto: number; descuento: number; neto: number; considerado: number; pagado: number; saldo: number }>((acc, row) => {
     const esVigente = numero(row.importeConsiderado) > 0;
-    const pagoComputable = esVigente ? Math.min(numero(row.importePagado), numero(row.importeConsiderado)) : 0;
+    const pagoComputable = esVigente ? Math.min(numero((row as any).importePagadoNumerico ?? row.importePagado), numero(row.importeConsiderado)) : 0;
     return {
       bruto: acc.bruto + numero(row.importeBruto),
       descuento: acc.descuento + numero(row.descuento),
@@ -588,12 +763,13 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
     };
   }, { bruto: 0, descuento: 0, neto: 0, considerado: 0, pagado: 0, saldo: 0 });
   const excluidos = filas.filter((r) => numero(r.importeConsiderado) === 0 && numero(r.importeNeto) > 0).length;
-  const pagadoExcluido = moneda(filas.filter((r) => numero(r.importeConsiderado) === 0).reduce((s, r) => s + numero(r.importePagado), 0));
+  const pagadoExcluido = moneda(filas.filter((r) => numero(r.importeConsiderado) === 0).reduce((s, r) => s + numero((r as any).importePagadoNumerico ?? r.importePagado), 0));
   filas.push({
     fecha: '', horaEmisionCertificadoC: '', horaEmisionComprobanteC: '', sede: 'TOTAL VENTAS VIGENTES', operacion: '', placa: '', cliente: '', documento: '', tipoOperacion: '', servicio: '',
     descripcionEmitido: '', tipoCertificado: '', certificado: '', chip: '', productoAdicional: '', cantidad: '',
     tipoComprobante: '', comprobante: '', usuarioEmisorComprobante: '', usuarioEmisorCertificado: '', tieneSolicitudAnulacion: '', anulado: '', estadoSolicitudAnulacion: '', documentoAnulacion: '', fechaSolicitudAnulacion: '', estadoAnulacionFiscal: '', fechaConfirmacionAnulacion: '', motivoAnulacion: '', tieneNotaCredito: '', numeroNotaCredito: '', motivoNotaCredito: '', estadoNotaCredito: '', fechaEmisionNotaCredito: '', importeNotaCredito: '', tipoAfectacionNotaCredito: '', tipoPago: '', formaPago: '', cortesiaDescuento: '', importeBruto: moneda(totales.bruto),
     descuento: moneda(totales.descuento), importeNeto: moneda(totales.neto), importeConsiderado: moneda(totales.considerado), motivoExclusion: excluidos ? `${excluidos} op(s) excluida(s)` : '', importePagado: moneda(totales.pagado),
+    importePagadoNumerico: moneda(totales.pagado),
     saldoPendiente: moneda(totales.saldo), estadoCertificado: '', estadoComprobante: ''
   });
   filas.push({
@@ -601,13 +777,14 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
     descripcionEmitido: '', tipoCertificado: '', certificado: '', chip: '', productoAdicional: '', cantidad: '',
     tipoComprobante: '', comprobante: '', usuarioEmisorComprobante: '', usuarioEmisorCertificado: '', tieneSolicitudAnulacion: '', anulado: '', estadoSolicitudAnulacion: '', documentoAnulacion: '', fechaSolicitudAnulacion: '', estadoAnulacionFiscal: '', fechaConfirmacionAnulacion: '', motivoAnulacion: '', tieneNotaCredito: '', numeroNotaCredito: '', motivoNotaCredito: '', estadoNotaCredito: '', fechaEmisionNotaCredito: '', importeNotaCredito: '', tipoAfectacionNotaCredito: '', tipoPago: '', formaPago: '', cortesiaDescuento: '', importeBruto: '',
     descuento: '', importeNeto: '', importeConsiderado: '', motivoExclusion: pagadoExcluido ? `excluido de op(s) no vigentes: S/ ${pagadoExcluido.toFixed(2)}` : '', importePagado: moneda(totales.pagado),
+    importePagadoNumerico: moneda(totales.pagado),
     saldoPendiente: '', estadoCertificado: '', estadoComprobante: ''
   });
   return filas;
 }
 
 export function obtenerColumnasReporteFinanciero(): ExcelColumn[] {
-  return columnas(
+  const cols = columnas(
     ['fecha', 'Fecha de emisión / operación', 21, 'date'], ['horaEmisionCertificadoC', 'Hora de emisión del certificado', 18, 'text'], ['horaEmisionComprobanteC', 'Hora de emisión del comprobante', 18, 'text'], ['sede', 'Sede', 20],
     ['placa', 'Placa', 13, 'text'], ['cliente', 'Cliente / razón social', 30], ['documento', 'Documento del cliente', 20, 'text'],
     ['tipoOperacion', 'Tipo de operación', 26], ['servicio', 'Servicio / producto vendido', 36],
@@ -620,32 +797,26 @@ export function obtenerColumnasReporteFinanciero(): ExcelColumn[] {
     ['tipoComprobante', 'Tipo de comprobante', 20], ['comprobante', 'Código del comprobante', 22, 'text'], ['usuarioEmisorCertificado', 'Usuario emisor del certificado', 22, 'text'], ['usuarioEmisorComprobante', 'Usuario emisor del comprobante', 22, 'text'],
     ['tieneSolicitudAnulacion', '¿Tiene solicitud de anulación?', 18], ['anulado', 'ANULACIÓN / NC REGISTRADA', 18], ['estadoSolicitudAnulacion', 'Estado de solicitud de anulación', 22], ['documentoAnulacion', 'Documento de anulación', 20], ['fechaSolicitudAnulacion', 'Fecha de solicitud de anulación', 22, 'text'], ['estadoAnulacionFiscal', 'Estado de anulación fiscal', 20], ['fechaConfirmacionAnulacion', 'Fecha de confirmación de anulación', 22, 'text'], ['motivoAnulacion', 'Motivo de anulación', 30],
     ['tieneNotaCredito', '¿Tiene nota de crédito?', 18], ['numeroNotaCredito', 'Número de nota de crédito', 22], ['motivoNotaCredito', 'Motivo de nota de crédito', 26], ['estadoNotaCredito', 'Estado de nota de crédito', 22], ['fechaEmisionNotaCredito', 'Fecha de emisión de nota de crédito', 22, 'text'], ['importeNotaCredito', 'Importe de nota de crédito (S/)', 22, 'currency'], ['tipoAfectacionNotaCredito', 'Tipo de afectación (TOTAL/PARCIAL/CORRECCIÓN)', 24],
-    ['tipoPago', 'Tipo de pago', 20], ['formaPago', 'Forma de pago', 20], ['importePagado', 'Importe pagado (S/)', 20, 'currency'],
+    ['tipoPago', 'Tipo de pago', 20], ['formaPago', 'Forma de pago', 20], ['importePagado', 'Importe pagado (S/)', 24],
     ['saldoPendiente', 'Saldo pendiente (S/)', 21, 'currency'],
     ['estadoCertificado', 'Estado del certificado', 21], ['estadoComprobante', 'Estado técnico / fiscal', 25]
   );
+  cols.push({
+    key: 'importePagadoNumerico',
+    header: 'Importe pagado numérico',
+    width: 15,
+    format: 'currency',
+    hidden: true
+  });
+  return cols;
 }
 
+/** @deprecated Sustituido por construirHojaAnulados. Mantenido por compatibilidad retroactiva. */
 export function construirHojaHistorial(
   data: ReporteFinancieroResponse,
   nombre = 'Historial'
 ): ExcelSheetDefinition {
-  const sedes = (data.sedes || []).map((sede) => sede.planta_nombre || sede.planta_key).filter(Boolean);
-  const filasBase = construirFilasReporteFinancieroBase(data);
-  return {
-    name: nombre.slice(0, 31),
-    title: 'HISTORIAL DE OPERACIONES COMERCIALES',
-    metadata: [
-      ['Fecha desde', data.metadatos?.desde || ''],
-      ['Fecha hasta', data.metadatos?.hasta || ''],
-      ['Sede', sedes.length ? textoUnico(sedes) : (data.metadatos?.plantas || []).join(', ')],
-      ['Generado por', data.metadatos?.usuarioExportador || 'Usuario']
-    ],
-    headerRow: 7,
-    totalsRow: false,
-    columns: obtenerColumnasReporteFinanciero(),
-    rows: filasBase
-  };
+  return construirHojaAnulados(data, nombre);
 }
 
 export function construirHojaConsolidado(

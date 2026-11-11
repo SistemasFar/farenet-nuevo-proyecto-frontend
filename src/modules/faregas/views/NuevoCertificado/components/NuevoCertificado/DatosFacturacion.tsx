@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, ReceiptText, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
@@ -6,6 +6,7 @@ import type { TitularState } from './TitularesList';
 import { MensajeError, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
 import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
 import { atributosDocumento, REGLAS_DOCUMENTO, validarDocumento } from '../../../Usuarios/usuariosValidacion';
+import { resolverTipoComprobantePorDocumento } from '../../faregas-wizard.validation';
 
 const TIPOS_DOCUMENTO_FACTURACION = [
   { value: 'DNI', catalogKey: 'dni', label: 'DNI' },
@@ -49,6 +50,20 @@ export function DatosFacturacion({
   const facturarAlTitular = Boolean(titulares.length > 0 && formFacturacion.usarTitularPrincipalFac);
   const tipoDocumentoSeleccionado = normalizarTipoDocumento(formFacturacion.tipoDocumentoFac || (formFacturacion.tipoDocFac === 'FACTURA' ? 'RUC' : 'DNI'));
   const atributosNumeroDocumento = atributosDocumento(claveCatalogoDocumento(tipoDocumentoSeleccionado));
+
+  useEffect(() => {
+    setFormFacturacion((prev) => {
+      const tipoDocFac = resolverTipoComprobantePorDocumento(prev.tipoDocumentoFac, prev.tipoDocFac);
+      if (!tipoDocFac || tipoDocFac === prev.tipoDocFac) return prev;
+      return {
+        ...prev,
+        tipoDocFac,
+        condicionPagoFac: tipoDocFac === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
+        fechaVencimientoFac: tipoDocFac === 'BOLETA' ? '' : prev.fechaVencimientoFac,
+        cuotasFac: tipoDocFac === 'BOLETA' ? [] : prev.cuotasFac,
+      };
+    });
+  }, [formFacturacion.tipoDocumentoFac, setFormFacturacion]);
 
   const handleFacturacionChange = (field: keyof FormFacturacionState, value: string | boolean) => {
     onCorregirCampo?.(String(field));
@@ -203,7 +218,7 @@ export function DatosFacturacion({
         onCorregirCampo?.('telefonoFac');
 
         setFormFacturacion((prev) => {
-          const tipoComprobante = tipoDocumento === 'RUC' ? 'FACTURA' : (prev.tipoDocFac || '');
+          const tipoComprobante = resolverTipoComprobantePorDocumento(tipoDocumento, prev.tipoDocFac);
           return {
             ...prev,
             tipoDocFac: tipoComprobante,

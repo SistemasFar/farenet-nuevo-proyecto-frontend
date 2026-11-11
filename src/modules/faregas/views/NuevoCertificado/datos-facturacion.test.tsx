@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Swal from 'sweetalert2';
 import { DatosFacturacion } from './components/NuevoCertificado/DatosFacturacion';
-import { validarFormularioVehiculoVisible, validarPasoPago, validarDatosFacturacionCampos } from './faregas-wizard.validation';
+import { resolverTipoComprobantePorDocumento, validarFormularioVehiculoVisible, validarPasoPago, validarDatosFacturacionCampos } from './faregas-wizard.validation';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import type { FormFacturacionState } from './NuevoCertificadoView';
 import type { TitularState } from './components/NuevoCertificado/TitularesList';
@@ -1115,7 +1115,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
     });
   });
 
-  describe('FAREGAS — VERIFICACIÓN GLOBAL OBLIGATORIA (16 CASOS): TIPO DE COMPROBANTE INICIA VACÍO', () => {
+  describe('FAREGAS — SELECCIÓN AUTOMÁTICA DE COMPROBANTE SEGÚN DOCUMENTO', () => {
     const baseVacia: FormFacturacionState = {
       tipoDocFac: '',
       tipoDocumentoFac: 'DNI',
@@ -1144,8 +1144,9 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      await act(async () => {
-        root.render(
+      const Caso = () => {
+        const [estadoFacturacion, setEstadoFacturacion] = useState(facturacion);
+        return (
           <VehiculoStep
             tipoCertificado={tipo}
             modalidadCertificado={modalidad}
@@ -1162,78 +1163,74 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
             setFormConformidad={() => undefined}
             titulares={titulares}
             setTitulares={() => undefined}
-            formFacturacion={facturacion}
-            setFormFacturacion={() => undefined}
+            formFacturacion={estadoFacturacion}
+            setFormFacturacion={setEstadoFacturacion}
             categoriaVehicular="M1"
             categoriasVehiculares={[{ key: 'M1', nombre: 'M1' }]}
             onCategoriaVehicularChange={() => undefined}
           />
         );
-      });
+      };
+      await act(async () => root.render(<Caso />));
       const selector = contenedor.querySelector<HTMLSelectElement>('select[name="tipoDocFac"]')
         || contenedor.querySelector<HTMLSelectElement>('[data-seccion-facturacion] select:not([aria-label])');
       return { contenedor, selector, root };
     };
 
-    it('1. Nuevo GNV ANUAL -> selector vacío con placeholder "Seleccione BOLETA o FACTURA"', async () => {
+    it('1. Nuevo GNV ANUAL con DNI -> selecciona BOLETA', async () => {
       const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL');
       expect(selector).not.toBeNull();
-      expect(selector?.value).toBe('');
-      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      expect(selector?.value).toBe('BOLETA');
       await act(async () => root.unmount());
     });
 
-    it('2. Nuevo GNV PESADO -> selector vacío', async () => {
+    it('2. Nuevo GNV PESADO con DNI -> selecciona BOLETA', async () => {
       const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL');
-      expect(selector?.value).toBe('');
-      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      expect(selector?.value).toBe('BOLETA');
       await act(async () => root.unmount());
     });
 
-    it('3. Nuevo GNV INICIAL + CHIP -> selector vacío', async () => {
+    it('3. Nuevo GNV INICIAL + CHIP con DNI -> selecciona BOLETA', async () => {
       const { selector, root } = await renderConTipo('GNV_ANUAL', 'INICIAL');
-      expect(selector?.value).toBe('');
-      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      expect(selector?.value).toBe('BOLETA');
       await act(async () => root.unmount());
     });
 
-    it('4. Nuevo GLP -> selector vacío', async () => {
+    it('4. Nuevo GLP con DNI -> selecciona BOLETA', async () => {
       const { selector, root } = await renderConTipo('GLP_ANUAL', 'ANUAL');
-      expect(selector?.value).toBe('');
-      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      expect(selector?.value).toBe('BOLETA');
       await act(async () => root.unmount());
     });
 
-    it('5. Nuevo CONFORMIDAD -> selector vacío', async () => {
+    it('5. Nuevo CONFORMIDAD con DNI -> selecciona BOLETA', async () => {
       const { selector, root } = await renderConTipo('CONFORMIDAD', 'UNICA');
-      expect(selector?.value).toBe('');
-      expect(selector?.options[0]?.text).toBe('Seleccione BOLETA o FACTURA');
+      expect(selector?.value).toBe('BOLETA');
       await act(async () => root.unmount());
     });
 
-    it('6. DNI cargado en formulario -> no selecciona BOLETA automáticamente', async () => {
+    it('6. DNI cargado en formulario -> selecciona BOLETA automáticamente', async () => {
       const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL', [], {
         ...baseVacia,
         tipoDocumentoFac: 'DNI',
         nroDocFac: '74045612',
       });
-      expect(selector?.value).toBe('');
+      expect(selector?.value).toBe('BOLETA');
       await act(async () => root.unmount());
     });
 
-    it('7. RUC cargado en formulario -> no selecciona FACTURA automáticamente', async () => {
+    it('7. RUC cargado en formulario -> selecciona FACTURA automáticamente', async () => {
       const { selector, root } = await renderConTipo('GNV_ANUAL', 'ANUAL', [], {
         ...baseVacia,
         tipoDocumentoFac: 'RUC',
         nroDocFac: '20600444531',
       });
-      expect(selector?.value).toBe('');
+      expect(selector?.value).toBe('FACTURA');
       await act(async () => root.unmount());
     });
 
-    it('8. Titular histórico con DNI o RUC -> no selecciona comprobante en facturación', async () => {
+    it('8. Titular histórico y facturación DNI -> conserva BOLETA compatible', async () => {
       const { selector, root } = await renderConTipo('GLP_ANUAL', 'ANUAL', titularesMock);
-      expect(selector?.value).toBe('');
+      expect(selector?.value).toBe('BOLETA');
       await act(async () => root.unmount());
     });
 
@@ -1301,26 +1298,23 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       await act(async () => root.unmount());
     });
 
-    it('12. Guardar y recuperar borrador -> conserva elección explícita y no asigna BOLETA si no hubo elección', () => {
-      // Simula el mapeador de restauración de borradores
-      const resolverTipoComprobanteBorrador = (fac: any) => fac?.tipoComprobante || '';
-
-      expect(resolverTipoComprobanteBorrador({ tipoComprobante: 'FACTURA' })).toBe('FACTURA');
-      expect(resolverTipoComprobanteBorrador({ tipoComprobante: 'BOLETA' })).toBe('BOLETA');
-      expect(resolverTipoComprobanteBorrador({ tipoComprobante: null })).toBe('');
-      expect(resolverTipoComprobanteBorrador({})).toBe('');
+    it('12. Guardar y recuperar borrador -> conserva selección válida y corrige ausencia o incompatibilidad', () => {
+      expect(resolverTipoComprobantePorDocumento('RUC', 'FACTURA')).toBe('FACTURA');
+      expect(resolverTipoComprobantePorDocumento('DNI', 'BOLETA')).toBe('BOLETA');
+      expect(resolverTipoComprobantePorDocumento('DNI', null)).toBe('BOLETA');
+      expect(resolverTipoComprobantePorDocumento('RUC', 'BOLETA')).toBe('FACTURA');
+      expect(resolverTipoComprobantePorDocumento('CARNETEXTRANJERIA', 'BOLETA')).toBe('BOLETA');
     });
 
-    it('13. Autosave / snapshot -> no asigna BOLETA automáticamente cuando tipoDocFac está vacío', () => {
+    it('13. Autosave / snapshot -> normaliza DNI a BOLETA antes de persistir', () => {
       const payloadVacio = {
-        tipoComprobante: baseVacia.tipoDocFac || '',
+        tipoComprobante: resolverTipoComprobantePorDocumento(baseVacia.tipoDocumentoFac, baseVacia.tipoDocFac),
         nroDocumento: baseVacia.nroDocFac,
       };
-      expect(payloadVacio.tipoComprobante).toBe('');
-      expect(payloadVacio.tipoComprobante).not.toBe('BOLETA');
+      expect(payloadVacio.tipoComprobante).toBe('BOLETA');
     });
 
-    it('14. Cambiar de paso -> conserva el estado de selección vacía sin forzar BOLETA', async () => {
+    it('14. Cambiar de paso -> conserva BOLETA automática sin perder los demás datos', async () => {
       const contenedor = document.createElement('div');
       document.body.appendChild(contenedor);
       contenedores.push(contenedor);
@@ -1336,12 +1330,13 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       await act(async () => root.render(<Caso />));
       const selector = contenedor.querySelector<HTMLSelectElement>('select[name="tipoDocFac"]')
         || contenedor.querySelector<HTMLSelectElement>('[data-seccion-facturacion] select:not([aria-label])');
-      expect(selector?.value).toBe('');
+      expect(selector?.value).toBe('BOLETA');
 
       // Simular cambio de paso (re-render)
       await act(async () => root.render(<Caso />));
-      expect(estadoActual.tipoDocFac).toBe('');
-      expect(selector?.value).toBe('');
+      expect(estadoActual.tipoDocFac).toBe('BOLETA');
+      expect(estadoActual.tipoDocumentoFac).toBe('DNI');
+      expect(selector?.value).toBe('BOLETA');
 
       await act(async () => root.unmount());
     });

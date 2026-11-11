@@ -54,6 +54,10 @@ interface SinLeerRespuesta {
 const POLL_INTERVAL_VISIBLE_MS = 5_000;
 const POLL_INTERVAL_HIDDEN_MS = 30_000;
 const TOAST_MS = 2_000;
+const SOCKET_URL_RESUELTA = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+  : window.location.origin;
+const SOCKET_URL = SOCKET_URL_RESUELTA || window.location.origin;
 
 /**
  * Rutas internas permitidas para el botón IR.
@@ -93,7 +97,7 @@ const textoEstado = (leida: boolean): string => (leida ? 'Leída' : 'Nueva');
 
 export function FaregasNotificationBell({
   user,
-  plantaSeleccionada,
+  plantaSeleccionada: _plantaSeleccionada,
 }: {
   user: { username: string } | null;
   plantaSeleccionada: string;
@@ -104,7 +108,7 @@ export function FaregasNotificationBell({
   const [panelOpen, setPanelOpen] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toastMostrado, setToastMostrado] = useState<string[]>([]);
+  const [toastMostrado, setToastMostrado] = useState<number[]>([]);
   const mountedRef = useRef(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
@@ -120,7 +124,7 @@ export function FaregasNotificationBell({
     setCargando(true);
     setError(null);
     try {
-      const res = await faregasFetch<NotificacionesRespuesta>('/notificaciones', {
+      const res = await faregasFetch('/notificaciones', {
         method: 'GET',
         headers,
       });
@@ -136,7 +140,7 @@ export function FaregasNotificationBell({
       const nuevas = ordenadas.filter((n) => !previasIds.has(n.id) && !n.leida);
       if (previas.length > 0 && nuevas.length > 0) {
         const idsMostrar = nuevas
-          .filter((n) => !toastMostrado.includes(String(n.id)))
+          .filter((n) => !toastMostrado.includes(n.id))
           .map((n) => n.id);
         if (idsMostrar.length > 0) {
           setToastMostrado((prev) => [...prev, ...idsMostrar]);
@@ -168,7 +172,7 @@ export function FaregasNotificationBell({
   const contarSinLeer = useCallback(async () => {
     if (!mountedRef.current) return;
     try {
-      const res = await faregasFetch<SinLeerRespuesta>('/notificaciones/sin-leer', {
+      const res = await faregasFetch('/notificaciones/sin-leer', {
         method: 'GET',
         headers,
       });
@@ -209,21 +213,24 @@ export function FaregasNotificationBell({
   }, [cargarNotificaciones, contarSinLeer]);
 
   const conectarSocket = useCallback(() => {
-    // Socket.IO deshabilitado temporalmente para evitar interferencia con tests
-    return null;
-  }, []);
+    if (socketRef.current || !user?.username) return;
+    const socket = io(SOCKET_URL, { withCredentials: true });
+    socket.on('notificacionActualizada', manejarEventoSocket);
+    socketRef.current = socket;
+  }, [manejarEventoSocket, user?.username]);
 
   const desconectarSocket = useCallback(() => {
     if (socketRef.current) {
+      socketRef.current.off('notificacionActualizada', manejarEventoSocket);
       socketRef.current.disconnect();
       socketRef.current = null;
     }
-  }, []);
+  }, [manejarEventoSocket]);
 
   const marcarLeida = useCallback(async (id: number) => {
     if (!mountedRef.current) return;
     try {
-      await faregasFetch<{ ok: boolean; marcada: boolean }>(
+      await faregasFetch(
         `/notificaciones/${id}/leer`,
         { method: 'PUT', headers }
       );
@@ -241,7 +248,7 @@ export function FaregasNotificationBell({
   const marcarTodasLeidas = useCallback(async () => {
     if (!mountedRef.current) return;
     try {
-      await faregasFetch<{ ok: boolean }>('/notificaciones/leer-todas', {
+      await faregasFetch('/notificaciones/leer-todas', {
         method: 'PUT',
         headers
       });
@@ -260,7 +267,8 @@ export function FaregasNotificationBell({
 
   const manejarIr = useCallback(
     (notificacion: NotificacionFaregas) => {
-      if (!esRutaPermitida(notificacion.destino_navegacion)) {
+      const destino = notificacion.destino_navegacion;
+      if (!esRutaPermitida(destino)) {
         void Swal.fire({
           icon: 'warning',
           title: 'Destino no permitido',
@@ -270,7 +278,7 @@ export function FaregasNotificationBell({
         });
         return;
       }
-      navigate(notificacion.destino_navegacion);
+      navigate(destino as string);
       void marcarLeida(notificacion.id);
       setPanelOpen(false);
     },
@@ -326,11 +334,6 @@ export function FaregasNotificationBell({
     document.addEventListener('mousedown', cerrarAlHacerClickFuera);
     return () => document.removeEventListener('mousedown', cerrarAlHacerClickFuera);
   }, []);
-
-  const noLeidasFiltradas = useMemo(
-    () => notificaciones.filter((n) => !n.leida),
-    [notificaciones]
-  );
 
   return (
     <>

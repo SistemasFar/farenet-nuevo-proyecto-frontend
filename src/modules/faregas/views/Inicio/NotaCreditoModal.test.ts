@@ -3,6 +3,7 @@ import {
   construirSolicitudNotaCredito,
   contextoPermiteEmitirNota,
   motivoRequiereSolicitud,
+  permiteOperacionEscrituraNotaCredito,
 } from './NotaCreditoModal';
 
 describe('NotaCreditoModal - construcción segura de la solicitud', () => {
@@ -16,6 +17,11 @@ describe('NotaCreditoModal - construcción segura de la solicitud', () => {
     expect(contextoPermiteEmitirNota({ puedeEmitir: true })).toBe(true);
     expect(contextoPermiteEmitirNota({ puedeEmitir: false })).toBe(false);
     expect(contextoPermiteEmitirNota(null)).toBe(false);
+  });
+
+  it('bloquea cualquier operación fiscal mientras el formulario usa la fecha simulada', () => {
+    expect(permiteOperacionEscrituraNotaCredito(true)).toBe(false);
+    expect(permiteOperacionEscrituraNotaCredito(false)).toBe(true);
   });
 
   it('envía el motivo 01 con la solicitud aprobada y sin importes fiscales', () => {

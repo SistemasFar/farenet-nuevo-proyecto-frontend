@@ -16,6 +16,7 @@ import {
   estadoComprobantePanel,
 } from '../../utils/documentos-electronicos';
 import { fechaFiscalEsAnteriorALima, fechaFiscalEsHoyLima, milisegundosHastaMedianocheLima, obtenerFechaHoyLima, parsearFechaFiscal } from '../../utils/fecha-fiscal-dia';
+import { resolverFechaEvaluacionNotaCreditoPanel, usaFechaSimuladaNotaCreditoDG41000444 } from './nota-credito-simulacion';
 
 interface FiltrosPanel { busqueda: string; estado: string; fechaDesde: string; fechaHasta: string; }
 
@@ -423,6 +424,7 @@ export function InicioView() {
     certificadoId: number;
     permitirMotivosAnulacion: boolean;
     motivoBloqueoNota?: string;
+    soloLecturaFechaSimulada?: boolean;
   } | null>(null);
 
   const [total, setTotal] = useState(0);
@@ -673,15 +675,17 @@ export function InicioView() {
   const crearNotaCredito = async (
     certificadoId: number,
     permitirMotivosAnulacion = true,
-    motivoBloqueoNota?: string
+    motivoBloqueoNota?: string,
+    fechaEvaluacion = obtenerFechaHoyLima(),
+    soloLecturaFechaSimulada = false,
   ) => {
     try {
       setAccionEnProceso(certificadoId);
       const facturacion = await comprobarComprobanteOperable(certificadoId);
       if (!facturacion) return;
-      const hoy = obtenerFechaHoyLima();
-      setHoyLima(hoy);
-      if (!fechaFiscalEsAnteriorALima(facturacion.fechaDocumento, hoy)) {
+      const hoyReal = obtenerFechaHoyLima();
+      setHoyLima(hoyReal);
+      if (!fechaFiscalEsAnteriorALima(facturacion.fechaDocumento, fechaEvaluacion)) {
         await Swal.fire('Acción no disponible', 'La nota de crédito se habilita desde el día siguiente a la fecha fiscal de emisión (hora de Perú).', 'warning');
         await cargarInspecciones(page, pageSize);
         return;
@@ -690,12 +694,30 @@ export function InicioView() {
         certificadoId,
         permitirMotivosAnulacion,
         motivoBloqueoNota,
+        soloLecturaFechaSimulada,
       });
     } catch (err) {
       await Swal.fire('No se pudo abrir la nota', err instanceof Error ? err.message : 'No se pudo cargar el comprobante.', 'error');
     } finally {
       setAccionEnProceso(null);
     }
+  };
+
+  const abrirNotaCreditoDesdePanel = async (
+    item: BorradorPanel,
+    permitirMotivosAnulacion = true,
+    motivoBloqueoNota?: string,
+  ) => {
+    const hoyReal = obtenerFechaHoyLima();
+    const usaFechaSimulada = usaFechaSimuladaNotaCreditoDG41000444(item, hoyReal);
+    const fechaEvaluacion = resolverFechaEvaluacionNotaCreditoPanel(item, hoyReal);
+    await crearNotaCredito(
+      item.id,
+      permitirMotivosAnulacion,
+      motivoBloqueoNota,
+      fechaEvaluacion,
+      usaFechaSimulada,
+    );
   };
 
   return (
@@ -924,9 +946,10 @@ export function InicioView() {
                   const anulacionBloqueadaPorImporte = certificadoAnulacionBloqueadaPorImporte(ins)
                     && certificadoEmitidoVisible(ins)
                     && puedeCrearSolicitudAnulacion(permisos);
-                  const puedeCrearNota = puedeCrearNotaCreditoPanel(ins, permisos, hoyLima) && !notaCreditoBloquea;
+                  const fechaEvaluacionNotaCredito = resolverFechaEvaluacionNotaCreditoPanel(ins, hoyLima);
+                  const puedeCrearNota = puedeCrearNotaCreditoPanel(ins, permisos, fechaEvaluacionNotaCredito) && !notaCreditoBloquea;
                   const motivoAccionFiscal = !puedeCrearNota && !puedeSolicitar
-                    ? motivoNotaCreditoNoDisponible(ins, permisos, hoyLima)
+                    ? motivoNotaCreditoNoDisponible(ins, permisos, fechaEvaluacionNotaCredito)
                     : null;
                   // Los controles permanecen visibles aunque el resumen todavía no se haya
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
@@ -1059,8 +1082,8 @@ export function InicioView() {
                             <button
                               type="button"
                               disabled={accionEnProceso === ins.id}
-                              onClick={() => void crearNotaCredito(
-                                ins.id,
+                              onClick={() => void abrirNotaCreditoDesdePanel(
+                                ins,
                                 !certificadoAnulacionBloqueadaPorImporte(ins),
                                 certificadoAnulacionBloqueadaPorImporte(ins)
                                   ? mensajeBloqueoAnulacionCertificado(ins)
@@ -1141,10 +1164,11 @@ export function InicioView() {
               const certificadoEditable = ins.estado === 'BORRADOR' && !accionesFiscalesCongeladas;
               const puedeVerComprobante = Boolean(ins.enlacePdf);
               const puedeVerNotaCredito = Boolean(ins.notaCreditoId && ins.notaCreditoPdfDisponible);
-              const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos, hoyLima) && !notaCreditoBloquea;
+              const fechaEvaluacionNotaCredito = resolverFechaEvaluacionNotaCreditoPanel(ins, hoyLima);
+              const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos, fechaEvaluacionNotaCredito) && !notaCreditoBloquea;
               const puedeSolicitar = puedeSolicitarAnulacionCertificado(ins, permisos, hoyLima);
               const motivoAccionFiscal = !puedeCrearNotaCredito && !puedeSolicitar
-                ? motivoNotaCreditoNoDisponible(ins, permisos, hoyLima)
+                ? motivoNotaCreditoNoDisponible(ins, permisos, fechaEvaluacionNotaCredito)
                 : null;
               const anulacionBloqueadaPorImporte = certificadoAnulacionBloqueadaPorImporte(ins)
                 && certificadoEmitidoVisible(ins)
@@ -1263,8 +1287,8 @@ export function InicioView() {
                         <button
                           type="button"
                           disabled={accionEnProceso === ins.id}
-                          onClick={() => void crearNotaCredito(
-                                ins.id,
+                          onClick={() => void abrirNotaCreditoDesdePanel(
+                                ins,
                                 !certificadoAnulacionBloqueadaPorImporte(ins),
                                 certificadoAnulacionBloqueadaPorImporte(ins)
                                   ? mensajeBloqueoAnulacionCertificado(ins)
@@ -1373,9 +1397,10 @@ export function InicioView() {
         certificadoId={notaCreditoModal?.certificadoId || null}
         permitirMotivosAnulacion={notaCreditoModal?.permitirMotivosAnulacion}
         motivoBloqueoAnulacion={notaCreditoModal?.motivoBloqueoNota}
+        soloLecturaFechaSimulada={notaCreditoModal?.soloLecturaFechaSimulada}
         onCerrar={() => setNotaCreditoModal(null)}
         onProcesada={() => cargarInspecciones(page, pageSize)}
-        onSolicitarAutorizacion={(motivoCodigo, itemIndice, descripcionCorregida) => {
+        onSolicitarAutorizacion={notaCreditoModal?.soloLecturaFechaSimulada ? undefined : (motivoCodigo, itemIndice, descripcionCorregida) => {
           const certificadoId = notaCreditoModal?.certificadoId || null;
           setNotaCreditoModal(null);
           setSolicitudSolicitadaId(null);

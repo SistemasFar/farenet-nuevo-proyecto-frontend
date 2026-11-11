@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import { MensajeError, claseConError, type ErroresCampo } from '../../faregas-wizard-errores';
 import { faregasClientesApi } from '../../../../services/faregas-clientes.api';
+import { resolverTipoComprobantePorDocumento } from '../../faregas-wizard.validation';
 
 /** Clase original de los campos de titular; el error sólo cambia el color. */
 const CLASE_CAMPO = 'w-full h-[42px] px-3 border-2 border-slate-200 rounded-lg text-slate-800 font-semibold focus:border-[#f59e0b] focus:ring-0 capitalize transition-colors';
@@ -82,16 +83,23 @@ export function TitularesList({
     }
 
     const tipoDocumentoFac = String(titularPrincipal.tipoDocumento || 'DNI').trim().toUpperCase();
-    ['tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac']
+    ['tipoDocFac', 'tipoDocumentoFac', 'nroDocFac', 'razonSocialFac', 'direccionFac']
       .forEach((campo) => onCorregirCampo?.(campo));
-    setFormFacturacion((prev) => ({
-      ...prev,
-      usarTitularPrincipalFac: true,
-      tipoDocumentoFac,
-      nroDocFac: titularPrincipal.nroDocumento,
-      razonSocialFac: titularPrincipal.nombreRazonSocial,
-      direccionFac: titularPrincipal.direccion,
-    }));
+    setFormFacturacion((prev) => {
+      const tipoDocFac = resolverTipoComprobantePorDocumento(tipoDocumentoFac, prev.tipoDocFac);
+      return {
+        ...prev,
+        usarTitularPrincipalFac: true,
+        tipoDocFac,
+        tipoDocumentoFac,
+        nroDocFac: titularPrincipal.nroDocumento,
+        razonSocialFac: titularPrincipal.nombreRazonSocial,
+        direccionFac: titularPrincipal.direccion,
+        condicionPagoFac: tipoDocFac === 'BOLETA' ? 'CONTADO' : prev.condicionPagoFac,
+        fechaVencimientoFac: tipoDocFac === 'BOLETA' ? '' : prev.fechaVencimientoFac,
+        cuotasFac: tipoDocFac === 'BOLETA' ? [] : prev.cuotasFac,
+      };
+    });
   };
   
   const handleAdd = () => {

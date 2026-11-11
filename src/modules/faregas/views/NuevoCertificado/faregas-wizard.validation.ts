@@ -26,6 +26,17 @@ type DatosAsistente = {
 
 const vacio = (valor: unknown) => valor === null || valor === undefined || String(valor).trim() === '';
 
+export const resolverTipoComprobantePorDocumento = (
+  tipoDocumento: unknown,
+  tipoComprobanteActual: unknown = ''
+): string => {
+  const documento = String(tipoDocumento || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+  const comprobante = String(tipoComprobanteActual || '').trim().toUpperCase();
+  if (documento === 'DNI') return 'BOLETA';
+  if (documento === 'RUC') return 'FACTURA';
+  return ['BOLETA', 'FACTURA'].includes(comprobante) ? comprobante : '';
+};
+
 export const validarFormularioFormatoDinamico = (
   campos: CampoFormatoDinamicoFaregas[],
   valores: Record<string, string>

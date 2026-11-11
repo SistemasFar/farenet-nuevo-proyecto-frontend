@@ -5,6 +5,7 @@ export interface ExcelColumn {
   header: string;
   width?: number;
   format?: 'text' | 'decimal2' | 'date' | 'currency';
+  hidden?: boolean;
 }
 
 interface ZipEntry {
@@ -154,7 +155,8 @@ function generarWorksheetXml(sheet: ExcelSheetDefinition) {
   const filterLastRow = Math.max(headerRowIndex, lastRow - (sheet.totalsRow && rows.length ? 1 : 0));
   const columnDefinitions = columns.map((column, index) => {
     const width = Math.min(Math.max(column.width || column.header.length + 2, 10), 60);
-    return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"/>`;
+    const hiddenAttr = column.hidden ? ' hidden="1"' : '';
+    return `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"${hiddenAttr}/>`;
   }).join('');
   const preamble: string[] = [];
   if (sheet.title) preamble.push(`<row r="1">${cellXml(sheet.title, 'A1', 1)}</row>`);

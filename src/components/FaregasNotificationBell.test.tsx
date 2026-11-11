@@ -1,12 +1,23 @@
 // @vitest-environment jsdom
-import React, { act } from 'react';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import { FaregasNotificationBell } from './FaregasNotificationBell';
 import Swal from 'sweetalert2';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const socketOn = vi.fn();
+const socketOff = vi.fn();
+const socketDisconnect = vi.fn();
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(() => ({
+    on: socketOn,
+    off: socketOff,
+    disconnect: socketDisconnect,
+  })),
+}));
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockUser = { username: 'jromani', perfilId: 'PERFIL_OPERADOR' };
 
@@ -125,7 +136,7 @@ describe('FaregasNotificationBell', () => {
   });
 
   it('6. muestra punto rojo cuando hay notificaciones sin leer', async () => {
-    vi.mocked(fetch).mockImplementation((url: string) => {
+    vi.mocked(fetch).mockImplementation((url: RequestInfo | URL) => {
       const u = String(url);
       if (u.includes('/sin-leer')) {
         return Promise.resolve(mockFetchResponse({ ok: true, count: 1 }));

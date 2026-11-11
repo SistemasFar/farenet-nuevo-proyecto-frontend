@@ -26,6 +26,7 @@ import {
   mensajeBloqueoAnulacionCertificado,
   type BorradorPanel,
 } from './InicioView';
+import { esSimulacionNotaCreditoDG41000444, resolverFechaEvaluacionNotaCreditoPanel, usaFechaSimuladaNotaCreditoDG41000444 } from './nota-credito-simulacion';
 import { esMotivoAnulacionNotaCredito } from '../../utils/documentos-electronicos';
 import { fechaFiscalEsAnteriorALima, fechaFiscalEsHoyLima } from '../../utils/fecha-fiscal-dia';
 
@@ -336,5 +337,45 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     expect(inicioViewCode).toContain('Ver / Descargar nota de crédito');
     expect(inicioViewCode).toContain('border-orange-300 bg-orange-50');
     expect(inicioViewCode).toContain('puedeVerNotaCredito && ins.notaCreditoId');
+  });
+});
+
+describe('InicioView - simulación temporal y aislada de Nota de Crédito', () => {
+  const objetivo: BorradorPanel = {
+    id: 808,
+    numeroCertificado: 'DG-41-000444',
+    facturacionId: 1132,
+    estado: 'EMITIDO',
+    fechaDocumentoFiscal: '2026-11-11',
+    estadoFacturacion: 'PENDIENTE_SUNAT',
+    aceptadaSunat: null,
+    entornoFacturador: 'DEMO',
+    facturacionProveedor: 'NUBEFACT',
+    facturacionSerie: 'BBB1',
+    facturacionNumero: 320,
+    nroComprobante: 'BBB1-00000320',
+    enlacePdf: 'pdf-demo',
+    enlaceXml: 'xml-demo',
+  };
+  const activaDesarrollo = { habilitada: true, modoDesarrollo: true };
+
+  it('habilita visualmente solo el certificado objetivo usando la fecha simulada', () => {
+    const fecha = resolverFechaEvaluacionNotaCreditoPanel(objetivo, '2026-11-11', activaDesarrollo);
+    expect(fecha).toBe('2026-11-12');
+    expect(usaFechaSimuladaNotaCreditoDG41000444(objetivo, '2026-11-11', activaDesarrollo)).toBe(true);
+    expect(puedeCrearNotaCreditoPanel(objetivo, ['FAREGAS_NOTA_CREDITO'], fecha)).toBe(true);
+
+    const otro = { ...objetivo, id: 809, numeroCertificado: 'DG-41-000445', facturacionId: 1133 };
+    expect(resolverFechaEvaluacionNotaCreditoPanel(otro, '2026-11-11', activaDesarrollo)).toBe('2026-11-11');
+    expect(puedeCrearNotaCreditoPanel(otro, ['FAREGAS_NOTA_CREDITO'], '2026-11-11')).toBe(false);
+    expect(resolverFechaEvaluacionNotaCreditoPanel(objetivo, '2026-11-12', activaDesarrollo)).toBe('2026-11-12');
+    expect(usaFechaSimuladaNotaCreditoDG41000444(objetivo, '2026-11-12', activaDesarrollo)).toBe(false);
+  });
+
+  it('permanece desactivada por defecto, en producción y para usuarios sin permiso', () => {
+    expect(esSimulacionNotaCreditoDG41000444(objetivo, { habilitada: false, modoDesarrollo: true })).toBe(false);
+    expect(esSimulacionNotaCreditoDG41000444(objetivo, { habilitada: true, modoDesarrollo: false })).toBe(false);
+    const fecha = resolverFechaEvaluacionNotaCreditoPanel(objetivo, '2026-11-11', activaDesarrollo);
+    expect(puedeCrearNotaCreditoPanel(objetivo, [], fecha)).toBe(false);
   });
 });

@@ -85,6 +85,10 @@ export const contextoPermiteEmitirNota = (
   contexto: Pick<ContextoNotaCreditoFaregas, 'puedeEmitir'> | null,
 ) => contexto?.puedeEmitir === true;
 
+export const permiteOperacionEscrituraNotaCredito = (soloLecturaFechaSimulada: boolean): boolean => (
+  !soloLecturaFechaSimulada
+);
+
 export const construirSolicitudNotaCredito = (
   formulario: FormularioNotaCredito,
 ): SolicitudEmisionNotaCredito => {
@@ -116,6 +120,7 @@ interface Props {
   certificadoId: number | null;
   permitirMotivosAnulacion?: boolean;
   motivoBloqueoAnulacion?: string;
+  soloLecturaFechaSimulada?: boolean;
   onCerrar: () => void;
   onProcesada?: () => void | Promise<void>;
   onSolicitarAutorizacion?: (motivoCodigo: '01' | '02' | '03', itemIndice?: number | null, descripcionCorregida?: string) => void;
@@ -142,6 +147,7 @@ export function NotaCreditoModal({
   certificadoId,
   permitirMotivosAnulacion = true,
   motivoBloqueoAnulacion,
+  soloLecturaFechaSimulada = false,
   onCerrar,
   onProcesada,
   onSolicitarAutorizacion,
@@ -243,6 +249,7 @@ export function NotaCreditoModal({
   }, [contexto]);
 
   const puedeEmitir = useMemo(() => {
+    if (!permiteOperacionEscrituraNotaCredito(soloLecturaFechaSimulada)) return false;
     if (!contexto) return false;
     if (procesando) return false;
     if (!implementado) return false;
@@ -262,9 +269,10 @@ export function NotaCreditoModal({
     if (motivoEmitidoOpendiente) return false;
 
     return true;
-  }, [contexto, procesando, implementado, requiereSolicitud, tienePermisoEmitir, solicitudSeleccionada, modificaDescripcion, itemIndice, descripcionCorregida, motivoEmitidoOpendiente]);
+  }, [soloLecturaFechaSimulada, contexto, procesando, implementado, requiereSolicitud, tienePermisoEmitir, solicitudSeleccionada, modificaDescripcion, itemIndice, descripcionCorregida, motivoEmitidoOpendiente]);
 
   const motivoNoPuedeEmitirTexto = useMemo(() => {
+    if (soloLecturaFechaSimulada) return 'Prueba temporal con fecha de referencia 12/11/2026: puede revisar el formulario completo, pero la emisión y las solicitudes administrativas están bloqueadas hasta que la fecha real de Lima lo permita.';
     if (!contexto) return 'Cargando contexto fiscal…';
     if (!implementado) return `El motivo ${motivoCodigo} est\u00e1 pendiente de implementaci\u00f3n fiscal.`;
     if (requiereSolicitud) {
@@ -282,9 +290,10 @@ export function NotaCreditoModal({
       return `Existe una nota ${motivoEmitidoOpendiente.estado.toLowerCase()} para este motivo. Consulte su estado antes de emitir otra.`;
     }
     return null;
-  }, [contexto, implementado, motivoCodigo, requiereSolicitud, tienePermisoEmitir, solicitudSeleccionada, modificaDescripcion, itemIndice, descripcionCorregida, motivoEmitidoOpendiente]);
+  }, [soloLecturaFechaSimulada, contexto, implementado, motivoCodigo, requiereSolicitud, tienePermisoEmitir, solicitudSeleccionada, modificaDescripcion, itemIndice, descripcionCorregida, motivoEmitidoOpendiente]);
 
   const emitir = async () => {
+    if (!permiteOperacionEscrituraNotaCredito(soloLecturaFechaSimulada)) return;
     if (!certificadoId || !contexto || !puedeEmitir) return;
     const confirmacion = await Swal.fire({
       icon: 'warning',
@@ -325,6 +334,7 @@ export function NotaCreditoModal({
   };
 
   const consultarNota = async (nota: NotaElectronicaFaregas) => {
+    if (!permiteOperacionEscrituraNotaCredito(soloLecturaFechaSimulada)) return;
     if (!certificadoId || consultandoId !== null) return;
     setConsultandoId(nota.id);
     setError('');
@@ -436,7 +446,7 @@ export function NotaCreditoModal({
             <section className="rounded-xl border border-slate-200">
               <div className="flex items-center justify-between border-b px-4 py-3"><div><h3 className="font-black text-slate-800">Historial de notas</h3><p className="text-xs text-slate-500">Consultar no vuelve a emitir el documento.</p></div><button type="button" disabled={cargando} onClick={() => void cargar()} className="rounded-lg border p-2 text-blue-700 disabled:opacity-40" title="Actualizar"><RefreshCw className={`h-4 w-4 ${cargando ? 'animate-spin' : ''}`} /></button></div>
               <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3">NOTA</th><th className="p-3">MOTIVO</th><th className="p-3">ESTADO</th><th className="p-3">DOCUMENTOS</th><th className="p-3">ACCIÓN</th></tr></thead><tbody>
-                {notas.map((nota) => <tr key={nota.id} className="border-t"><td className="p-3 font-bold">{nota.nroComprobante || `Reserva #${nota.id}`}<p className="mt-1 font-normal text-slate-500">{fecha(nota.fechaEmision)} · {nota.usuarioEmisor || '—'}</p></td><td className="p-3">{nota.motivoCodigo} · {nota.sustento}</td><td className="p-3"><span className="rounded-full bg-slate-100 px-2 py-1 font-bold">{nota.estado}</span>{nota.sunatDescription && <p className="mt-1 max-w-xs text-slate-500">{nota.sunatDescription}</p>}</td><td className="p-3"><div className="flex gap-2">{nota.enlacePdf && <a href={nota.enlacePdf} target="_blank" rel="noreferrer" className="font-bold text-blue-700">PDF</a>}{nota.enlaceXml && <a href={nota.enlaceXml} target="_blank" rel="noreferrer" className="font-bold text-blue-700">XML</a>}{nota.enlaceCdr && <a href={nota.enlaceCdr} target="_blank" rel="noreferrer" className="font-bold text-blue-700">CDR</a>}</div></td><td className="p-3">{['PENDIENTE', 'ERROR'].includes(nota.estado) && <button type="button" disabled={consultandoId !== null} onClick={() => void consultarNota(nota)} className="flex items-center gap-1 font-bold text-blue-700 disabled:opacity-40">{consultandoId === nota.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Consultar</button>}</td></tr>)}
+                {notas.map((nota) => <tr key={nota.id} className="border-t"><td className="p-3 font-bold">{nota.nroComprobante || `Reserva #${nota.id}`}<p className="mt-1 font-normal text-slate-500">{fecha(nota.fechaEmision)} · {nota.usuarioEmisor || '—'}</p></td><td className="p-3">{nota.motivoCodigo} · {nota.sustento}</td><td className="p-3"><span className="rounded-full bg-slate-100 px-2 py-1 font-bold">{nota.estado}</span>{nota.sunatDescription && <p className="mt-1 max-w-xs text-slate-500">{nota.sunatDescription}</p>}</td><td className="p-3"><div className="flex gap-2">{nota.enlacePdf && <a href={nota.enlacePdf} target="_blank" rel="noreferrer" className="font-bold text-blue-700">PDF</a>}{nota.enlaceXml && <a href={nota.enlaceXml} target="_blank" rel="noreferrer" className="font-bold text-blue-700">XML</a>}{nota.enlaceCdr && <a href={nota.enlaceCdr} target="_blank" rel="noreferrer" className="font-bold text-blue-700">CDR</a>}</div></td><td className="p-3">{['PENDIENTE', 'ERROR'].includes(nota.estado) && <button type="button" disabled={soloLecturaFechaSimulada || consultandoId !== null} onClick={() => void consultarNota(nota)} className="flex items-center gap-1 font-bold text-blue-700 disabled:opacity-40">{consultandoId === nota.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />} Consultar</button>}</td></tr>)}
                 {notas.length === 0 && <tr><td colSpan={5} className="p-5 text-center text-slate-500">No hay notas de crédito registradas.</td></tr>}
               </tbody></table></div>
             </section>

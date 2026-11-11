@@ -67,7 +67,7 @@ describe('Reporte financiero consolidado', () => {
     expect(row.importeBruto).toBe(90);
     expect(row.descuento).toBe(10);
     expect(row.importeNeto).toBe(80);
-    expect(row.importePagado).toBe(80);
+    expect(row.importePagado).toBe('S/ 30.00 + S/ 50.00');
     expect(row.saldoPendiente).toBe(0);
     expect(row.tipoOperacion).toBe('CERTIFICADO');
     expect(row.tipoCertificado).toBe('GNV_ANUAL');
@@ -79,7 +79,7 @@ describe('Reporte financiero consolidado', () => {
     expect(rows.some((item) => item.operacion === 'OP-2')).toBe(false);
     expect(rows.some((item) => item.operacion === 'OP-3')).toBe(false);
     expect(rows.some((item) => item.operacion === 'OP-4')).toBe(false);
-    expect(rows.find((item) => item.operacion === 'OP-5')).toMatchObject({ importeNeto: 80, importePagado: 0, saldoPendiente: 80 });
+    expect(rows.find((item) => item.operacion === 'OP-5')).toMatchObject({ importeNeto: 80, importePagado: 'S/ 0.00', saldoPendiente: 80 });
     expect(rows.find((item) => item.operacion === 'OP-6')?.estadoComprobante).toBe('Pendiente SUNAT');
     expect(rows.filter((item) => item.operacion === 'OP-5')).toHaveLength(1);
   });
@@ -93,7 +93,7 @@ describe('Reporte financiero consolidado', () => {
     expect(typeof sheets[0].rows[0].fecha).toBe('number');
     const xmlZip = new TextDecoder().decode(crearExcelVariasHojasBytes(sheets));
     expect((xmlZip.match(/<sheet name=/g) || [])).toHaveLength(1);
-    expect(xmlZip).toContain('<autoFilter ref="A7:AT');
+    expect(xmlZip).toContain('<autoFilter ref="A7:AU');
     expect(xmlZip).toContain('REPORTE FINANCIERO CONSOLIDADO');
     expect(sheets[0].columns.map((c) => c.key)).toContain('horaEmisionComprobanteC');
     expect(sheets[0].columns.map((c) => c.header)).toContain('Hora de emisión del comprobante');
@@ -116,7 +116,7 @@ describe('Reporte financiero consolidado', () => {
 
   it('combina pagos divididos sin duplicar la operación', () => {
     const rows = construirFilasReporteFinanciero(fixture());
-    expect(rows.filter((item) => item.operacion === 'OP-1')).toMatchObject([{ tipoPago: 'EFECTIVO + TARJETA', formaPago: 'EFECTIVO + YAPE', importePagado: 80 }]);
+    expect(rows.filter((item) => item.operacion === 'OP-1')).toMatchObject([{ tipoPago: 'EFECTIVO + TARJETA', formaPago: 'EFECTIVO + YAPE', importePagado: 'S/ 30.00 + S/ 50.00' }]);
   });
 
   it('usa el código comercial del certificado', () => {
@@ -155,7 +155,7 @@ describe('Reporte financiero consolidado', () => {
 
   it('conserva una nota parcial sin convertirla en venta ni inventar cobros', () => {
     expect(construirFilasReporteFinanciero(fixture()).find((item) => item.operacion === 'OP-5')).toMatchObject({
-      importeNeto: 80, importePagado: 0, saldoPendiente: 80
+      importeNeto: 80, importePagado: 'S/ 0.00', saldoPendiente: 80
     });
   });
 
@@ -168,7 +168,7 @@ describe('Reporte financiero consolidado', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       tipoOperacion: 'CERTIFICADO + PRODUCTOS', servicio: 'SERVICIO A, CHIP + PORTACHIP',
-      productoAdicional: 'CHIP + PORTACHIP', cantidad: 2, importePagado: 0
+      productoAdicional: 'CHIP + PORTACHIP', cantidad: 2, importePagado: 'S/ 0.00'
     });
     expect(rows[0].descripcionEmitido).toContain('CHIP + PORTACHIP [CHIP-PORTA]');
   });
@@ -190,7 +190,7 @@ describe('Reporte financiero consolidado', () => {
   it('muestra cero y medios sin identificar cuando no hay pagos confirmados', () => {
     const data = fixture(); data.pagos = [];
     expect(construirFilasReporteFinanciero(data).find((item) => item.operacion === 'OP-1')).toMatchObject({
-      tipoPago: 'SIN PAGO', formaPago: 'SIN PAGO', importePagado: 0
+      tipoPago: 'SIN PAGO', formaPago: 'SIN PAGO', importePagado: 'S/ 0.00'
     });
   });
 
@@ -202,7 +202,7 @@ describe('Reporte financiero consolidado', () => {
     data.ordenes.push({ id: 302, operacion_id: 6, importe_total: 0 });
     data.descuentos.push({ id: 502, orden_pago_id: 302, estado: 'APLICADO', codigo: 'CORTESIA_FAREGAS', nombre_descuento: 'CORTESÍA FAREGAS', tipo_descuento: 'CORTESIA', importe_descuento: 350 });
     expect(construirFilasReporteFinanciero(data).find((item) => item.operacion === 'OP-6')).toMatchObject({
-      importeBruto: 350, descuento: 350, importeNeto: 0, importePagado: 0, saldoPendiente: 0,
+      importeBruto: 350, descuento: 350, importeNeto: 0, importePagado: 'S/ 0.00', saldoPendiente: 0,
       tipoPago: 'CORTESÍA', formaPago: 'CORTESÍA', cortesiaDescuento: 'CORTESÍA'
     });
   });
@@ -258,7 +258,7 @@ describe('Reporte financiero consolidado', () => {
       expect(fila.importeBruto).toBe(180);
       expect(fila.importeNeto).toBe(180);
       expect(fila.importeConsiderado).toBe(180);
-      expect(fila.importePagado).toBe(0);
+      expect(fila.importePagado).toBe('S/ 0.00');
       expect(fila.saldoPendiente).toBe(180);
       expect(fila.comprobante).toBe('FFF1-00000023');
     });
@@ -297,12 +297,13 @@ describe('Reporte financiero consolidado', () => {
       expect(filaParcial.importePagado).toBe(90);
       expect(filaParcial.saldoPendiente).toBe(90);
 
-      // Pago completo de la segunda cuota
+      // Pago completo de la segunda cuota (pagos mixtos: EFECTIVO 90 + BANCO 90)
       data.pagos.push({ id: 8002, orden_pago_id: 8000, estado: 'CAN', tipocontado_key: 'BANCO', importe: 90 });
       const filaTotal = construirFilasReporteFinanciero(data).find((item) => item.operacion === 'OP-800')!;
       expect(filaTotal.tipoPago).toBe('CRÉDITO');
       expect(filaTotal.formaPago).toBe('2 CUOTAS');
-      expect(filaTotal.importePagado).toBe(180);
+      expect(filaTotal.importePagado).toBe('S/ 90.00 + S/ 90.00');
+      expect((filaTotal as any).importePagadoNumerico).toBe(180);
       expect(filaTotal.saldoPendiente).toBe(0);
     });
 
@@ -385,7 +386,7 @@ describe('Reporte financiero consolidado', () => {
       const filas = construirFilasReporteFinanciero(data);
       const fila = filas.find((f) => f.operacion === 'OP-610')!;
       expect(fila.importeConsiderado).toBe(90);
-      expect(fila.importePagado).toBe(0);
+      expect(fila.importePagado).toBe('S/ 0.00');
       expect(fila.saldoPendiente).toBe(90);
       expect(fila.tipoPago).toBe('CRÉDITO');
       expect(fila.formaPago).toBe('2 CUOTAS');

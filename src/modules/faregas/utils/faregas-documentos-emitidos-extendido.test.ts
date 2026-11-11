@@ -127,10 +127,12 @@ describe('Documentos emitidos — Extendido', () => {
     const unificadas = construirHojasUnificadas(sample, consolidadoCompleto, '2026-10-01', '2026-10-31');
     const nombresHojas = unificadas.map((h) => h.name);
 
-    // 1. Las cuatro hojas deben existir (Datos, Líneas de productos, Historial, Consolidado_Datos)
-    // Trazabilidad fue eliminada
-    expect(nombresHojas).toEqual(['Datos', 'Líneas de productos', 'Historial', 'Consolidado_Datos']);
+    // 1. Las cinco hojas deben existir exactamente en este orden:
+    // Datos, Líneas de productos, Consolidado_Datos, Anulados, Notas de credito
+    // Historial y Trazabilidad fueron eliminadas
+    expect(nombresHojas).toEqual(['Datos', 'Líneas de productos', 'Consolidado_Datos', 'Anulados', 'Notas de credito']);
     expect(nombresHojas).not.toContain('Trazabilidad');
+    expect(nombresHojas).not.toContain('Historial');
 
     // 2. Líneas de productos tiene 13 columnas y no contiene IDs técnicos
     const hojaLineas = unificadas.find((h) => h.name === 'Líneas de productos')!;
@@ -141,12 +143,14 @@ describe('Documentos emitidos — Extendido', () => {
     expect(lineCols).not.toContain('operacion');
     expect(lineCols).not.toContain('venta');
 
-    // 3. Historial tiene las 46 columnas y NO tiene filas de sumatorias
-    const hojaHistorial = unificadas.find((h) => h.name === 'Historial')!;
-    expect(hojaHistorial.columns).toHaveLength(46);
-    expect(hojaHistorial.totalsRow).toBe(false);
-    expect(hojaHistorial.rows.some((r) => r.sede === 'TOTAL VENTAS VIGENTES')).toBe(false);
-    expect(hojaHistorial.rows.some((r) => r.sede === 'TOTAL PAGADO')).toBe(false);
+    // 3. Anulados y Notas de credito existen y no tienen filas de sumatorias
+    const hojaAnulados = unificadas.find((h) => h.name === 'Anulados')!;
+    expect(hojaAnulados.totalsRow).toBe(false);
+    expect(hojaAnulados.rows.some((r) => r.sede === 'TOTAL VENTAS VIGENTES')).toBe(false);
+    expect(hojaAnulados.rows.some((r) => r.sede === 'TOTAL PAGADO')).toBe(false);
+
+    const hojaNotasCredito = unificadas.find((h) => h.name === 'Notas de credito')!;
+    expect(hojaNotasCredito.totalsRow).toBe(false);
 
     // 4. Consolidado_Datos NO reincorpora "Precio unitario" ni "Subtotal registrado"
     const hojaConsolidado = unificadas.find((h) => h.name === 'Consolidado_Datos')!;
