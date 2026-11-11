@@ -1,10 +1,10 @@
 import type { DocumentosEmitidosExtendidoResponse, ReporteFinancieroResponse } from '../services/faregas-dashboard.api';
 import { exportarExcelVariasHojas, type ExcelCellValue, type ExcelColumn, type ExcelSheetDefinition } from './exportar-excel';
-import { construirHojasReporteFinanciero } from './faregas-reporte-financiero';
+import { construirHojaConsolidado, construirHojaHistorial, construirHojasReporteFinanciero } from './faregas-reporte-financiero';
 
 // FUSIÓN SIN PÉRDIDA: este módulo es el único generador de descarga.
 // Re-exporta el consolidado para que la vista llame una sola función.
-export { construirHojasReporteFinanciero };
+export { construirHojaConsolidado, construirHojaHistorial, construirHojasReporteFinanciero };
 
 const numero = (value: unknown) => Number(value || 0);
 const decimal = (value: unknown) => Number(numero(value).toFixed(2));
@@ -126,6 +126,51 @@ export function horaEmisionExtendida(doc: Record<string, any>): string {
   return 'SIN REGISTRO';
 }
 
+export function horaEmisionComprobanteExtendida(doc: Record<string, any>): string {
+  const estadoComp = String((doc as any).estado || '').toUpperCase();
+  if (estadoComp === 'BORRADOR') return 'NO EMITIDO';
+  const rawHora = (doc as any).fecha_hora_emision_comprobante ?? (doc as any).hora_emision_comprobante;
+  if (!rawHora) return 'SIN REGISTRO';
+  const texto = String(rawHora).trim();
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(texto) && !/Z$|[+-]\d{2}:?\d{2}$/.test(texto)) {
+    const m = texto.match(/(\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (m) return `${m[1]}:${m[2]}:${m[3] || '00'}`;
+  }
+  const fh = new Date(texto);
+  if (!Number.isNaN(fh.getTime())) {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(fh);
+    const part = (t: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === t)?.value || '';
+    return `${part('hour')}:${part('minute')}:${part('second')}`;
+  }
+  return 'SIN REGISTRO';
+}
+
+export function resolverTipoProductoLinea(line: Record<string, any>): string {
+  const raw = String(line.tipo_producto || '').trim();
+  if (raw === 'COMPLEMENTARIO DUPLICADO' || raw === 'COMPLEMENTARIO VENTA DE PRODUCTO') return raw;
+  if (line.duplicado_id || /DUPLICADO/i.test(String(line.producto || line.codigo_producto || ''))) {
+    return 'COMPLEMENTARIO DUPLICADO';
+  }
+  if (/CHIP/i.test(String(line.producto || line.codigo_producto || '')) || (!line.certificado && !line.placa && !line.operacion_id && line.venta_id)) {
+    return 'COMPLEMENTARIO VENTA DE PRODUCTO';
+  }
+  if (raw && !raw.startsWith('COMPLEMENTARIO')) return raw;
+  return 'COMPLEMENTARIO VENTA DE PRODUCTO';
+}
+
+export function resolverTipoCertificadoDoc(doc: Record<string, any>): string {
+  const raw = String(doc.tipos_producto || '').trim();
+  if (raw === 'COMPLEMENTARIO DUPLICADO' || raw === 'COMPLEMENTARIO VENTA DE PRODUCTO') return raw;
+  if (raw && raw !== 'COMPLEMENTARIO') return raw;
+  if (doc.duplicado_id || /DUPLICADO/i.test(String(doc.certificados || doc.tipo_comprobante || ''))) {
+    return 'COMPLEMENTARIO DUPLICADO';
+  }
+  if (!doc.certificados || /CHIP/i.test(String(doc.descripcion || doc.producto || ''))) {
+    return 'COMPLEMENTARIO VENTA DE PRODUCTO';
+  }
+  return raw || 'COMPLEMENTARIO VENTA DE PRODUCTO';
+}
+
 export function indicadorAnulacionComprobante(doc: Record<string, any>): boolean {
   if (!doc) return false;
   const estados = [String((doc as any).estado_solicitud_anulacion || '').toUpperCase(),
@@ -173,7 +218,6 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
       || String((doc as any).tipo_pago || '').toUpperCase() === 'CORTESIA'
       || String((doc as any).forma_pago || '').toUpperCase() === 'CORTESÍA'
       || String((doc as any).forma_pago || '').toUpperCase() === 'CORTESIA'
-      || (Number(doc.importe_total || 0) === 0 && String(doc.tipo_descuento || '').includes('CONVENIO'))
       || (Number(doc.importe_total || 0) === 0 && JSON.stringify(doc.campos_dinamicos || '').includes('1002'))
     );
     const tipoPagoExtendido = esCortesiaDoc ? 'CORTESÍA' : esCreditoDoc ? 'CRÉDITO' : ((doc as any).tipo_pago || '');
@@ -183,6 +227,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
       issuerKey: issuerKeyFor(doc),
       docId: String(doc.id_documento || ''), fuenteFecha: doc.fecha_emision_fuente || '', tipo: doc.tipo_comprobante || '', numeroDocumento: serial(doc), fechaEmision: doc.fecha_emision ? fechaLocal(doc.fecha_emision) : '',
       horaEmisionCertificado: horaEmisionExtendida(doc as any),
+      horaEmisionComprobante: horaEmisionComprobanteExtendida(doc as any),
       fechaEmisionCertificado: (doc as any).fecha_emision_certificado ? fechaLocal((doc as any).fecha_emision_certificado) : '',
       fechaDocumento: doc.fecha_documento ? fechaLocal(doc.fecha_documento) : '', fechaVencimiento: doc.fecha_vencimiento ? fechaLocal(doc.fecha_vencimiento) : '',
       tipoDocCliente: doc.tipo_documento || '', numeroDocCliente: doc.numero_documento ? limpiarDoc(doc.numero_documento) : '', cliente: doc.cliente || '',
@@ -198,7 +243,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
       valorReferencia: uniqueLine?.valor_referencial_unitario == null ? '' : decimal(uniqueLine.valor_referencial_unitario), subtotalItem: uniqueLine?.base_imponible == null ? '' : decimal(uniqueLine.base_imponible), descuentosItem: '', rc: '', totalItem: uniqueLine?.importe_total == null ? '' : decimal(uniqueLine.importe_total),
       ejecutivo: extra('ejecutivo'), marca: extra('marca') || doc.marca_vehiculo || '', modelo: extra('modelo') || doc.modelo_vehiculo || '', motor: extra('motor') || doc.motor_vehiculo || '', certificado: doc.certificados || '',
       ordenTrabajo: '', placa: doc.placas || '', referenciaPagoExtra: doc.referencia_pago || '', telefono: doc.telefono_cliente || extra('telefono') || '',
-      tipoCertificado: doc.tipos_producto || '', empresaEmisora: doc.empresa_emisora || '', rucEmisor: doc.ruc_emisor || '',
+      tipoCertificado: resolverTipoCertificadoDoc(doc as any), empresaEmisora: doc.empresa_emisora || '', rucEmisor: doc.ruc_emisor || '',
       tipoDescuento: doc.tipo_descuento || extra('tipo_descuento'), tipoVehiculo: extra('tipo_vehiculo') || doc.tipo_vehiculo || ''
     };
   });
@@ -210,7 +255,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
     operacion: line.operacion_id || '',
     venta: line.venta_id || '',
     sede: line.sede || line.planta_key || '',
-    tipoProducto: line.tipo_producto || '',
+    tipoProducto: resolverTipoProductoLinea(line),
     codigoProducto: line.codigo_producto || '',
     producto: line.producto || '',
     unidad: line.unidad || '',
@@ -225,7 +270,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
 
   const headerSpecs: Array<[string, string]> = [
     // A. IDENTIFICACIÓN DEL DOCUMENTO
-    ['tipo','TIPO DE DOCUMENTO'],['numeroDocumento','NÚMERO DE DOCUMENTO'],['fechaEmision','FECHA DE EMISIÓN'],['fechaEmisionCertificado','FECHA DE EMISIÓN DEL CERTIFICADO'],['horaEmisionCertificado','HORA DE EMISIÓN DEL CERTIFICADO'],['usuario','USUARIO EMISOR DEL COMPROBANTE'],['estado','ESTADO'],['empresaEmisora','EMPRESA EMISORA'],['rucEmisor','RUC EMISOR'],
+    ['tipo','TIPO DE DOCUMENTO'],['numeroDocumento','NÚMERO DE DOCUMENTO'],['fechaEmision','FECHA DE EMISIÓN'],['fechaEmisionCertificado','FECHA DE EMISIÓN DEL CERTIFICADO'],['horaEmisionCertificado','HORA DE EMISIÓN DEL CERTIFICADO'],['horaEmisionComprobante','HORA DE EMISIÓN DEL COMPROBANTE'],['usuario','USUARIO EMISOR DEL COMPROBANTE'],['estado','ESTADO'],['empresaEmisora','EMPRESA EMISORA'],['rucEmisor','RUC EMISOR'],
     // B. CLIENTE Y EMISOR (cont.)
     ['tipoDocCliente','TIPO DOC. IDENTIDAD CLIENTE'],['numeroDocCliente','NÚMERO DOC. IDENTIDAD CLIENTE'],['cliente','APELLIDOS Y NOMBRES DENOMINACIÓN O RAZÓN SOCIAL'],
     // C. CERTIFICADO / VEHÍCULO
@@ -242,13 +287,13 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
   const columnasCabecera = headerSpecs.map(([key, header]) => ({ key, header, width: Math.max(16, Math.min(header.length + 2, 42)), ...(['subtotal','descuentos','igv','total','montoPago','detraccionNeto','detraccionImporte','valorUnitario','valorReferencia','subtotalItem','descuentosItem','rc','totalItem'].includes(key) ? { format: 'decimal2' as const } : {}) }));
   // Agrupación visual por bloques (1-indexed, encadenada sin huecos).
   const groupHeaders = [
-    { header: 'A. IDENTIFICACIÓN DEL DOCUMENTO', start: 1, end: 9 },
-    { header: 'B. CLIENTE Y EMISOR', start: 10, end: 12 },
-    { header: 'C. CERTIFICADO / VEHÍCULO', start: 13, end: 19 },
-    { header: 'D. IMPORTES Y DESCUENTOS', start: 20, end: 26 },
-    { header: 'E. PAGOS', start: 27, end: 35 },
-    { header: 'F. ANULACIONES Y NOTAS DE CRÉDITO', start: 36, end: 57 },
-    { header: 'G. PRODUCTOS Y DETALLE FISCAL', start: 58, end: headerSpecs.length }
+    { header: 'A. IDENTIFICACIÓN DEL DOCUMENTO', start: 1, end: 10 },
+    { header: 'B. CLIENTE Y EMISOR', start: 11, end: 13 },
+    { header: 'C. CERTIFICADO / VEHÍCULO', start: 14, end: 20 },
+    { header: 'D. IMPORTES Y DESCUENTOS', start: 21, end: 27 },
+    { header: 'E. PAGOS', start: 28, end: 36 },
+    { header: 'F. ANULACIONES Y NOTAS DE CRÉDITO', start: 37, end: 58 },
+    { header: 'G. PRODUCTOS Y DETALLE FISCAL', start: 59, end: headerSpecs.length }
   ];
 
   const issuerGroups = new Map<string, typeof data.cabeceras>();
@@ -267,41 +312,28 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
       return issuerGroups.size === 1 && issuerDocs.some((doc) => String(row.documento || '').split(', ').includes(serial(doc)));
     });
     const suffix = issuerGroups.size > 1 ? `_${issuerKey}` : '';
-    const traceRows = issuerDocs.map((doc) => ({ id: doc.id_documento || '', ruc: doc.ruc_emisor || '', comprobante: serial(doc), tipo: doc.tipo_comprobante || '',
-      fecha: doc.fecha_emision ? fechaLocal(doc.fecha_emision) : '', fechaAceptacion: doc.fecha_aceptacion ? fechaLocal(doc.fecha_aceptacion) : '',
-      fuente: doc.fecha_emision_fuente || '', sede: doc.sede || doc.planta_key || '' }));
     const common: Pick<ExcelSheetDefinition, 'title' | 'metadata' | 'headerRow' | 'groupHeaders'> = {
       title: 'Registro de comprobantes electrónicos emitidos - Extendido - Campos Extra',
       metadata: [['Empresa', [issuerDocs[0]?.ruc_emisor || '', issuerDocs[0]?.empresa_emisora || ''].filter(Boolean).join(' - ')], ['Fecha de Emisión / Inicio', desde], ['Fecha de Emisión / Fin', hasta], ['Fecha Reporte', new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })]], headerRow: 7, groupHeaders
     };
     sheets.push({ name: `Datos${suffix}`.slice(0, 31), columns: columnasCabecera, rows: docRows, ...common });
     sheets.push({ name: (issuerGroups.size > 1 ? `Líneas_${issuerKey}` : 'Líneas de productos').slice(0, 31), columns: columnas(
-      ['documento', 'Documentos asociados', 26], ['documentIds', 'ID(s) documento FAREGAS', 24, 'text'], ['idDetalle', 'ID línea comercial', 18], ['operacion', 'ID de operación', 16],
-      ['venta', 'ID de venta', 14], ['sede', 'Sede', 24], ['tipoProducto', 'Tipo de producto', 26], ['codigoProducto', 'Código de producto', 22, 'text'],
+      ['documento', 'Documentos asociados', 26],
+      ['sede', 'Sede', 24], ['tipoProducto', 'Tipo de producto', 26], ['codigoProducto', 'Código de producto', 22, 'text'],
       ['producto', 'Producto o servicio', 38], ['unidad', 'Unidad', 14], ['cantidad', 'Cantidad', 14], ['precioUnitario', 'Precio unitario', 18, 'decimal2'],
       ['base', 'Base imponible', 18, 'decimal2'], ['igv', 'IGV', 14, 'decimal2'], ['totalLinea', 'Total de línea', 18, 'decimal2'],
       ['certificado', 'Certificado relacionado', 26], ['placa', 'Placa', 18]
     ), rows: lineRows });
-    sheets.push({ name: `Trazabilidad${suffix}`.slice(0, 31), columns: columnas(
-      ['id', 'ID DOCUMENTO FAREGAS', 24, 'text'], ['ruc', 'RUC EMISOR', 16, 'text'], ['comprobante', 'NÚMERO DOCUMENTO', 24, 'text'],
-      ['tipo', 'TIPO', 22], ['fecha', 'FECHA DE EMISIÓN REGISTRADA', 28], ['fechaAceptacion', 'FECHA DE ACEPTACIÓN', 24], ['fuente', 'FUENTE / NOTA DE FECHA', 44], ['sede', 'SEDE', 24]
-    ), rows: traceRows });
   }
   return sheets;
 }
 
 /**
- * FUSIÓN SIN PÉRDIDA (1 archivo: DOCUMENTOS EMITIDOS — EXTENDIDO).
- * Construye TODAS las hojas: extendido (56+2 nuevas) + detalle consolidado
- * financiero. Columnas y filas de ambos generadores se conservan íntegras;
- * no se duplican importes (cada hoja conserva su lógica de totales).
- *
- * Cobertura (resumen en docs/FAREGAS_FUSION_COBERTURA.md):
- * - Extendido: 56 columnas fiscales/comerciales intactas + HORA/FECHA certificado.
- * - Consolidado: fecha/hora, sede, placa, cliente, documento limpio, tipo op.,
- *   servicio, descripción, tipo/código certificado, chip, producto adicional,
- *   cant/precio/subtotal, bruto/descuento/neto, tipo/código comprobante,
- *   tipo/forma pago, pagado/saldo, estados cert/comprobante + TOTALES.
+ * FUSIÓN SIN PÉRDIDA — REESTRUCTURACIÓN EN 4 HOJAS:
+ * 1. Datos (o Datos_<emisor>)
+ * 2. Líneas de productos (13 columnas sin IDs técnicos)
+ * 3. Historial (copia completa sin filtros de vigencia y sin sumatorias)
+ * 4. Consolidado_Datos (ingresos comerciales vigentes + sumatorias calculadas sobre filas visibles)
  */
 export function construirHojasUnificadas(
   extendido: DocumentosEmitidosExtendidoResponse,
@@ -312,11 +344,9 @@ export function construirHojasUnificadas(
   if (!consolidado || !Array.isArray((consolidado as any).operaciones) || !Array.isArray((consolidado as any).comprobantes)) {
     return hojasExtendido;
   }
-  const hojasConsolidado = construirHojasReporteFinanciero(consolidado as ReporteFinancieroResponse);
-  return [...hojasExtendido, ...hojasConsolidado.map((hoja) => ({
-    ...hoja,
-    name: `Consolidado${hojasExtendido.length ? `_${hojasExtendido[0].name}` : ''}`.slice(0, 31)
-  }))];
+  const hojaHistorial = construirHojaHistorial(consolidado, 'Historial');
+  const hojaConsolidado = construirHojaConsolidado(consolidado, 'Consolidado_Datos');
+  return [...hojasExtendido, hojaHistorial, hojaConsolidado];
 }
 
 export function exportarDocumentosEmitidosExtendido(data: DocumentosEmitidosExtendidoResponse, desde: string, hasta: string, consolidado?: ReporteFinancieroResponse | null) {

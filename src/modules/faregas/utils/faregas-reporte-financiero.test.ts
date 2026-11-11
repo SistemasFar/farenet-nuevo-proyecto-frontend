@@ -93,8 +93,10 @@ describe('Reporte financiero consolidado', () => {
     expect(typeof sheets[0].rows[0].fecha).toBe('number');
     const xmlZip = new TextDecoder().decode(crearExcelVariasHojasBytes(sheets));
     expect((xmlZip.match(/<sheet name=/g) || [])).toHaveLength(1);
-    expect(xmlZip).toContain('<autoFilter ref="A7:AS');
+    expect(xmlZip).toContain('<autoFilter ref="A7:AT');
     expect(xmlZip).toContain('REPORTE FINANCIERO CONSOLIDADO');
+    expect(sheets[0].columns.map((c) => c.key)).toContain('horaEmisionComprobanteC');
+    expect(sheets[0].columns.map((c) => c.header)).toContain('Hora de emisión del comprobante');
   });
 
   it('muestra una boleta con su código completo', () => {
@@ -192,16 +194,16 @@ describe('Reporte financiero consolidado', () => {
     });
   });
 
-  it('usa NO APLICA para una cortesía del 100 % sin importe exigible', () => {
+  it('usa CORTESÍA cuando existe la modalidad persistida y no hay importe exigible', () => {
     const data = fixture();
     const operacion = data.operaciones.find((item) => item.id === 6)!;
     const linea = data.lineas.find((item) => item.operacion_id === 6)!;
     operacion.importe_total = 0; linea.precio_unitario = 0; linea.importe_total = 0;
     data.ordenes.push({ id: 302, operacion_id: 6, importe_total: 0 });
-    data.descuentos.push({ id: 502, orden_pago_id: 302, estado: 'APLICADO', nombre_descuento: 'DESCUENTO CERTIFICADO TALLER', tipo_descuento: 'CONVENIO', importe_descuento: 350 });
+    data.descuentos.push({ id: 502, orden_pago_id: 302, estado: 'APLICADO', codigo: 'CORTESIA_FAREGAS', nombre_descuento: 'CORTESÍA FAREGAS', tipo_descuento: 'CORTESIA', importe_descuento: 350 });
     expect(construirFilasReporteFinanciero(data).find((item) => item.operacion === 'OP-6')).toMatchObject({
       importeBruto: 350, descuento: 350, importeNeto: 0, importePagado: 0, saldoPendiente: 0,
-      tipoPago: 'NO APLICA', formaPago: 'NO APLICA', cortesiaDescuento: 'DESCUENTO CERTIFICADO TALLER'
+      tipoPago: 'CORTESÍA', formaPago: 'CORTESÍA', cortesiaDescuento: 'CORTESÍA'
     });
   });
 

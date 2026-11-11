@@ -39,7 +39,6 @@ interface PagoStepProps {
   certificadoId?: number;
   descuentoActual?: ConsultaDescuentoResult | null;
   onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
-  esTaller?: boolean;
 }
 
 export function PagoStep({
@@ -71,7 +70,6 @@ export function PagoStep({
   certificadoId,
   descuentoActual = null,
   onDescuentoChange,
-  esTaller = false,
 }: PagoStepProps) {
 
   const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
@@ -222,7 +220,6 @@ export function PagoStep({
               certificadoId={certificadoId}
               descuentoActual={descuentoActual}
               onDescuentoChange={onDescuentoChange}
-              esTaller={esTaller}
               tienePagosRegistrados={pagosAgregados.length > 0}
             />
           </div>
@@ -233,7 +230,7 @@ export function PagoStep({
                 <AlertCircle className="w-5 h-5 text-emerald-600 shrink-0" />
                 <div>
                   <p className="text-xs font-black text-emerald-900 uppercase">CORTESÍA — Operación gratuita. No requiere registrar pagos.</p>
-                  <p className="text-[11px] font-semibold text-emerald-700">Esta certificación de taller no genera deuda ni requiere registrar pagos en efectivo, tarjeta ni banco.</p>
+                  <p className="text-[11px] font-semibold text-emerald-700">Esta certificación no genera deuda ni requiere registrar pagos en efectivo, tarjeta ni banco.</p>
                 </div>
               </div>
             )}

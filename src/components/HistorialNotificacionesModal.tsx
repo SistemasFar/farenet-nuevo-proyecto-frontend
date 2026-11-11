@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { X, Loader2, Search, Filter } from 'lucide-react';
+import { X, Loader2, Search, Filter, Download } from 'lucide-react';
 import { faregasFetch } from '../modules/faregas/services/faregas-http-client';
+import { exportarExcel } from '../modules/faregas/utils/exportar-excel';
 import {
   ESTADOS_CON_DECISION,
   etiquetaEstadoNotificacion,
@@ -32,6 +33,36 @@ interface FiltrosAplicados {
   fechaHasta: string;
 }
 
+interface CortesiaExportada extends Record<string, string | number> {
+  fecha: string;
+  hora: string;
+  usuario: string;
+  sede: string;
+  tipo_certificado: string;
+  numero: string;
+  titular: string;
+  valor_referencial: number;
+  importe_cortesia: number;
+  total_cobrado: number;
+  comprobante: string;
+  estado: string;
+}
+
+const mesActualLima = () => {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const valor = (tipo: Intl.DateTimeFormatPartTypes) => partes.find((p) => p.type === tipo)?.value || '';
+  const anio = valor('year');
+  const mes = valor('month');
+  const ultimo = String(new Date(Date.UTC(Number(anio), Number(mes), 0)).getUTCDate()).padStart(2, '0');
+  return { desde: `${anio}-${mes}-01`, hasta: `${anio}-${mes}-${ultimo}` };
+};
+
+const rangoMismoMes = (desde: string, hasta: string) => Boolean(
+  desde && hasta && desde <= hasta && desde.slice(0, 7) === hasta.slice(0, 7)
+);
+
 const formatearFechaHora = (valor: string): string => {
   try {
     const fecha = new Date(valor);
@@ -54,15 +85,17 @@ export function HistorialNotificacionesModal({ abierto, onCerrar, onIr }: Props)
 }
 
 function HistorialNotificacionesContenido({ onCerrar, onIr }: Omit<Props, 'abierto'>) {
+  const rangoInicial = mesActualLima();
   const [notificaciones, setNotificaciones] = useState<NotificacionHistorial[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
+  const [fechaDesde, setFechaDesde] = useState(rangoInicial.desde);
+  const [fechaHasta, setFechaHasta] = useState(rangoInicial.hasta);
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [total, setTotal] = useState(0);
+  const [exportando, setExportando] = useState(false);
   const [filtrosAplicados, setFiltrosAplicados] = useState<FiltrosAplicados>({
     busqueda: '',
     fechaDesde: '',
@@ -104,10 +137,10 @@ function HistorialNotificacionesContenido({ onCerrar, onIr }: Omit<Props, 'abier
 
   useEffect(() => {
     const temporizador = window.setTimeout(() => {
-      void cargar({ pagina: 1 });
+      void cargar({ fechaDesde: rangoInicial.desde, fechaHasta: rangoInicial.hasta, pagina: 1 });
     }, 0);
     return () => window.clearTimeout(temporizador);
-  }, [cargar]);
+  }, [cargar, rangoInicial.desde, rangoInicial.hasta]);
 
   useEffect(() => {
     const cerrarConEscape = (event: KeyboardEvent) => {
@@ -126,12 +159,48 @@ function HistorialNotificacionesContenido({ onCerrar, onIr }: Omit<Props, 'abier
     void cargar({ busqueda, fechaDesde, fechaHasta, pagina: 1 });
   };
 
+  const exportarCortesias = async () => {
+    if (!rangoMismoMes(fechaDesde, fechaHasta)) {
+      setError('La exportación de cortesías admite como máximo un mes calendario.');
+      return;
+    }
+    setExportando(true);
+    setError(null);
+    try {
+      const q = new URLSearchParams({ fechaDesde, fechaHasta });
+      if (busqueda.trim()) q.set('busqueda', busqueda.trim());
+      const respuesta = await faregasFetch(
+        `/notificaciones/cortesias/exportar?${q.toString()}`
+      ) as unknown as { ok: boolean; data: CortesiaExportada[] };
+      const filas = respuesta.data || [];
+      exportarExcel('cortesias_faregas', 'Cortesías', [
+        { key: 'fecha', header: 'Fecha', width: 12, format: 'text' },
+        { key: 'hora', header: 'Hora', width: 10, format: 'text' },
+        { key: 'usuario', header: 'Usuario', width: 26 },
+        { key: 'sede', header: 'Sede', width: 18 },
+        { key: 'tipo_certificado', header: 'Tipo de certificado', width: 24 },
+        { key: 'numero', header: 'Número', width: 20, format: 'text' },
+        { key: 'titular', header: 'Titular', width: 32 },
+        { key: 'valor_referencial', header: 'Valor referencial', width: 18, format: 'currency' },
+        { key: 'importe_cortesia', header: 'Importe de cortesía', width: 20, format: 'currency' },
+        { key: 'total_cobrado', header: 'Total cobrado', width: 16, format: 'currency' },
+        { key: 'comprobante', header: 'Comprobante', width: 20, format: 'text' },
+        { key: 'estado', header: 'Estado', width: 24 },
+      ], filas);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'No se pudo exportar el historial de cortesías.');
+    } finally {
+      setExportando(false);
+    }
+  };
+
   const limpiar = () => {
+    const mes = mesActualLima();
     setBusqueda('');
-    setFechaDesde('');
-    setFechaHasta('');
+    setFechaDesde(mes.desde);
+    setFechaHasta(mes.hasta);
     setPagina(1);
-    void cargar({ pagina: 1 });
+    void cargar({ fechaDesde: mes.desde, fechaHasta: mes.hasta, pagina: 1 });
   };
 
   const cambiarPagina = (nuevaPagina: number) => {
@@ -205,6 +274,15 @@ function HistorialNotificacionesContenido({ onCerrar, onIr }: Omit<Props, 'abier
                 className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
               >
                 Limpiar
+              </button>
+              <button
+                type="button"
+                onClick={() => void exportarCortesias()}
+                disabled={cargando || exportando}
+                className="flex items-center gap-1 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                EXPORTAR CORTESÍAS
               </button>
             </div>
           </div>

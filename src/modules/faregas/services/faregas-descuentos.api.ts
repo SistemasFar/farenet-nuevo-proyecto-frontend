@@ -4,7 +4,7 @@ export type TipoCampana = 'CAMPANA' | 'ALIANZA' | 'CONVENIO' | 'PROMOCION';
 
 export interface ConsultaDescuentoResult {
   descuentoId: number;
-  descuentoClienteId: number;
+  descuentoClienteId?: number | null;
   codigo: string;
   nombre: string;
   tipo: TipoCampana;
@@ -16,11 +16,14 @@ export interface ConsultaDescuentoResult {
   importeDescuento: number;
   importeFinal: number;
   fechaFin: string;
-  usosDisponibles: number;
+  usosDisponibles?: number;
+  beneficio?: string;
+  autorizaGratuidad: boolean;
 }
 
 export interface DescuentoDisponible {
   id: number;
+  codigo?: string;
   nombre: string;
   tipo: string;
   empresaAliada?: string;
@@ -161,9 +164,9 @@ export const faregasDescuentosAdminApi = {
 };
 
 export const listarDescuentosDisponibles = async (certificadoId: number): Promise<DescuentoDisponible[]> => {
-  const res = await faregasFetch<{ success: boolean; descuentos: DescuentoDisponible[] }>(
+  const res = await faregasFetch(
     `/descuentos/borradores/${certificadoId}/disponibles`
-  );
+  ) as unknown as { success: boolean; descuentos: DescuentoDisponible[] };
   return res?.descuentos || [];
 };
 

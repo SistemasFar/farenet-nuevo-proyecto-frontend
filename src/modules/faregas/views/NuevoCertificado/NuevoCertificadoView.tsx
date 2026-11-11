@@ -2993,7 +2993,6 @@ function NuevoCertificadoWizard() {
               certificadoId={certificadoId}
               descuentoActual={descuentoAplicado}
               onDescuentoChange={onDescuentoChange}
-              esTaller={formCaja.tipo_flujo === 'TALLER_INSPECCION'}
               onCondicionPagoChange={(condicionPago) => {
                 if (formFacturacion.tipoDocFac === 'BOLETA' && condicionPago === 'CREDITO') return;
                 limpiarErrorCampo('pagos');

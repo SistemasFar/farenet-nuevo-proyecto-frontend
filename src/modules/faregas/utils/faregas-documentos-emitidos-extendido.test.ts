@@ -17,11 +17,19 @@ describe('Documentos emitidos — Extendido', () => {
   it('conserva la estructura de 56 campos y un solo total por comprobante', () => {
     const [cabeceras, lineas] = construirHojasDocumentosEmitidosExtendido(sample, '2026-10-01', '2026-10-31');
     expect(cabeceras.name).toBe('Datos');
-    expect(cabeceras.columns).toHaveLength(67);
+    expect(cabeceras.columns).toHaveLength(68);
     expect(cabeceras.rows).toHaveLength(2);
     expect(cabeceras.rows[0]).toMatchObject({ numeroDocumento: 'F001-20', total: 118, descuentos: 5, montoPago: 118, items: 2, descripcion: '' });
     expect(cabeceras.columns.map((c) => c.key)).not.toContain('metodoPago');
     expect(cabeceras.columns.map((c) => c.header)).not.toContain('MÉTODO DE PAGO');
+    expect(cabeceras.columns.map((c) => c.key)).toContain('horaEmisionComprobante');
+    expect(cabeceras.columns.map((c) => c.header)).toContain('HORA DE EMISIÓN DEL COMPROBANTE');
+    expect(lineas.columns).toHaveLength(13);
+    const lineKeys = lineas.columns.map((c) => c.key);
+    expect(lineKeys).not.toContain('documentIds');
+    expect(lineKeys).not.toContain('idDetalle');
+    expect(lineKeys).not.toContain('operacion');
+    expect(lineKeys).not.toContain('venta');
     expect(lineas.rows).toHaveLength(2);
     expect(lineas.rows[0]).toMatchObject({ documento: 'F001-20', totalLinea: 118 });
     expect(cabeceras.title).toContain('Registro de comprobantes');
@@ -33,8 +41,6 @@ describe('Documentos emitidos — Extendido', () => {
     const [cabeceras] = construirHojasDocumentosEmitidosExtendido(sample);
     expect(cabeceras.rows[1]).toMatchObject({ tipo: 'NOTA DE CRÉDITO', numeroReferencia: 'Afecta F001-20 (Facturación 20)' });
     expect(cabeceras.rows[1].fechaVencimiento).toBe('');
-    const trace = construirHojasDocumentosEmitidosExtendido(sample)[2];
-    expect(trace.rows[1]).toMatchObject({ fecha: '', fechaAceptacion: expect.any(String), fuente: 'EMISIÓN NO REGISTRADA; PERÍODO SEGÚN ACEPTACIÓN' });
   });
 
   it('separa emisores distintos sin mezclar cabeceras ni líneas', () => {
@@ -48,12 +54,12 @@ describe('Documentos emitidos — Extendido', () => {
         { id_detalle: 2, documentos_ids: 'F-2', documentos_asociados: 'F001-1', producto: 'B', importe_total: 2 }
       ]
     });
-    expect(sheets).toHaveLength(6);
+    expect(sheets).toHaveLength(4);
     expect(sheets[0].name).toBe('Datos_20111111111');
     expect(sheets[0].rows).toHaveLength(1);
     expect(sheets[1].rows).toHaveLength(1);
-    expect(sheets[3].name).toBe('Datos_20222222222');
-    expect(sheets[4].rows).toHaveLength(1);
+    expect(sheets[2].name).toBe('Datos_20222222222');
+    expect(sheets[3].rows).toHaveLength(1);
   });
 
   it('FUSIÓN: incluye hoja consolidada sin perder columnas extendido', () => {
@@ -63,11 +69,21 @@ describe('Documentos emitidos — Extendido', () => {
     } as unknown as ReporteFinancieroResponse;
     const unificadas = construirHojasUnificadas(sample, consolidado, '2026-10-01', '2026-10-31');
     expect(unificadas.some((h) => h.name.includes('Consolidado'))).toBe(true);
-    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(67);
-    // Horas: certificado con hora explícita → HH:mm:ss
-    const conHora = { ...sample, cabeceras: [{ ...sample.cabeceras[0], fecha_hora_emision: '2026-10-08T13:15:32Z' }] };
+    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(68);
+    // Horas: certificado y comprobante con hora explícita → HH:mm:ss
+    const conHora = {
+      ...sample,
+      cabeceras: [{
+        ...sample.cabeceras[0],
+        fecha_hora_emision: '2026-10-08T13:15:32Z',
+        fecha_hora_emision_comprobante: '2026-10-08T14:20:10Z'
+      }]
+    };
     const [cab] = construirHojasDocumentosEmitidosExtendido(conHora);
-    expect(cab.rows[0]).toMatchObject({ horaEmisionCertificado: '08:15:32' });
+    expect(cab.rows[0]).toMatchObject({
+      horaEmisionCertificado: '08:15:32',
+      horaEmisionComprobante: '09:20:10'
+    });
   });
 
   it('FUSIÓN COMPLETA: genera las 4 hojas XLSX válidas sin columnas prohibidas y con bytes XLSX', async () => {
@@ -111,10 +127,28 @@ describe('Documentos emitidos — Extendido', () => {
     const unificadas = construirHojasUnificadas(sample, consolidadoCompleto, '2026-10-01', '2026-10-31');
     const nombresHojas = unificadas.map((h) => h.name);
 
-    // 1. Las cuatro hojas deben existir
-    expect(nombresHojas).toEqual(['Datos', 'Líneas de productos', 'Trazabilidad', 'Consolidado_Datos']);
+    // 1. Las cuatro hojas deben existir (Datos, Líneas de productos, Historial, Consolidado_Datos)
+    // Trazabilidad fue eliminada
+    expect(nombresHojas).toEqual(['Datos', 'Líneas de productos', 'Historial', 'Consolidado_Datos']);
+    expect(nombresHojas).not.toContain('Trazabilidad');
 
-    // 2. NO reincorporar "Precio unitario" ni "Subtotal registrado" a Consolidado_Datos
+    // 2. Líneas de productos tiene 13 columnas y no contiene IDs técnicos
+    const hojaLineas = unificadas.find((h) => h.name === 'Líneas de productos')!;
+    expect(hojaLineas.columns).toHaveLength(13);
+    const lineCols = hojaLineas.columns.map((c) => c.key);
+    expect(lineCols).not.toContain('documentIds');
+    expect(lineCols).not.toContain('idDetalle');
+    expect(lineCols).not.toContain('operacion');
+    expect(lineCols).not.toContain('venta');
+
+    // 3. Historial tiene las 46 columnas y NO tiene filas de sumatorias
+    const hojaHistorial = unificadas.find((h) => h.name === 'Historial')!;
+    expect(hojaHistorial.columns).toHaveLength(46);
+    expect(hojaHistorial.totalsRow).toBe(false);
+    expect(hojaHistorial.rows.some((r) => r.sede === 'TOTAL VENTAS VIGENTES')).toBe(false);
+    expect(hojaHistorial.rows.some((r) => r.sede === 'TOTAL PAGADO')).toBe(false);
+
+    // 4. Consolidado_Datos NO reincorpora "Precio unitario" ni "Subtotal registrado"
     const hojaConsolidado = unificadas.find((h) => h.name === 'Consolidado_Datos')!;
     const keysColumnas = hojaConsolidado.columns.map((c) => c.key);
     const headersColumnas = hojaConsolidado.columns.map((c) => c.header.toLowerCase());
@@ -123,8 +157,9 @@ describe('Documentos emitidos — Extendido', () => {
     expect(keysColumnas).not.toContain('subtotalRegistrado');
     expect(headersColumnas.some((h) => h.includes('precio unitario'))).toBe(false);
     expect(headersColumnas.some((h) => h.includes('subtotal registrado'))).toBe(false);
+    expect(hojaConsolidado.totalsRow).toBe(true);
 
-    // 3. Generación real de bytes XLSX
+    // 5. Generación real de bytes XLSX
     const bytes = await crearExcelVariasHojasBytes(unificadas);
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(bytes.length).toBeGreaterThan(1000);
@@ -223,5 +258,81 @@ describe('Documentos emitidos — Extendido', () => {
       referenciaPago: '1235'
     });
     expect(fila26.formaPago).not.toBe('8');
+  });
+
+  it('verifica las horas independientes de certificado y comprobante para los casos del 11/11/2026', () => {
+    const dataCasos11: DocumentosEmitidosExtendidoResponse = {
+      cabeceras: [
+        {
+          id_documento: 'F-1076', serie: 'BBB1', numero: 306, tipo_comprobante: 'BOLETA',
+          certificado_id: 782, certificados: '000782',
+          fecha_hora_emision: '2026-11-11T14:49:30.544Z',
+          fecha_hora_emision_comprobante: '2026-11-11T14:49:30.435Z',
+          estado: 'ACEPTADO', certificado_estado: 'EMITIDO'
+        },
+        {
+          id_documento: 'F-1078', serie: 'BBB1', numero: 307, tipo_comprobante: 'BOLETA',
+          certificado_id: 783, certificados: '000783',
+          fecha_hora_emision: '2026-11-11T14:51:06.958Z',
+          fecha_hora_emision_comprobante: '2026-11-11T14:51:06.874Z',
+          estado: 'ACEPTADO', certificado_estado: 'EMITIDO'
+        },
+        {
+          id_documento: 'F-1081', serie: 'BBB1', numero: 308, tipo_comprobante: 'BOLETA',
+          certificado_id: 785, certificados: '000785',
+          fecha_hora_emision: '2026-11-11T16:14:55.317Z',
+          fecha_hora_emision_comprobante: '2026-11-11T16:14:55.230Z',
+          estado: 'ACEPTADO', certificado_estado: 'EMITIDO'
+        },
+        {
+          id_documento: 'F-1086', serie: 'FFF1', numero: 30, tipo_comprobante: 'FACTURA',
+          certificado_id: null, certificados: '000684-DUP',
+          fecha_hora_emision: null,
+          fecha_hora_emision_comprobante: '2026-11-11T16:17:50.114Z',
+          estado: 'ACEPTADO'
+        },
+        {
+          id_documento: 'F-1085', serie: 'BBB1', numero: 309, tipo_comprobante: 'BOLETA',
+          certificado_id: null, certificados: null,
+          fecha_hora_emision: null,
+          fecha_hora_emision_comprobante: '2026-11-11T16:17:12.863Z',
+          estado: 'ACEPTADO'
+        }
+      ],
+      lineas: []
+    };
+
+    const [datos] = construirHojasDocumentosEmitidosExtendido(dataCasos11, '2026-11-11', '2026-11-11');
+    const porDoc = new Map(datos.rows.map((r) => [r.numeroDocumento, r]));
+
+    // BBB1-306
+    expect(porDoc.get('BBB1-306')).toMatchObject({
+      horaEmisionCertificado: '09:49:30',
+      horaEmisionComprobante: '09:49:30'
+    });
+
+    // BBB1-307
+    expect(porDoc.get('BBB1-307')).toMatchObject({
+      horaEmisionCertificado: '09:51:06',
+      horaEmisionComprobante: '09:51:06'
+    });
+
+    // BBB1-308
+    expect(porDoc.get('BBB1-308')).toMatchObject({
+      horaEmisionCertificado: '11:14:55',
+      horaEmisionComprobante: '11:14:55'
+    });
+
+    // FFF1-30: duplicado, certificado histórico sin hora registrada, comprobante emitido a las 11:17:50
+    expect(porDoc.get('FFF1-30')).toMatchObject({
+      horaEmisionCertificado: 'SIN REGISTRO',
+      horaEmisionComprobante: '11:17:50'
+    });
+
+    // BBB1-309: venta de chip (sin certificado), comprobante emitido a las 11:17:12
+    expect(porDoc.get('BBB1-309')).toMatchObject({
+      horaEmisionCertificado: '',
+      horaEmisionComprobante: '11:17:12'
+    });
   });
 });

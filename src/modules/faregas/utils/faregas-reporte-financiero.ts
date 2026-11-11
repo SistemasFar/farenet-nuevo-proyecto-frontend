@@ -54,6 +54,14 @@ export function horaEmisionCertificado(
   return 'SIN REGISTRO';
 }
 
+export function horaEmisionComprobante(doc: Row): string {
+  const estadoComp = estado(doc.estado);
+  if (estadoComp === 'BORRADOR') return 'NO EMITIDO';
+  const rawHora = (doc as any).fecha_hora_emision_comprobante ?? (doc as any).hora_emision_comprobante;
+  if (rawHora) return formatearHoraLima(rawHora);
+  return 'SIN REGISTRO';
+}
+
 /** Formatea un timestamptz a HH:mm:ss en America/Lima (solo si es timestamp real, nunca DATE). */
 export function formatearHoraLima(raw: unknown): string {
   const texto = String(raw || '').trim();
@@ -166,7 +174,7 @@ const estadoFiscal = (doc: Row) => {
   return String(doc.estado || 'Pendiente de confirmación');
 };
 
-export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse): Array<Record<string, ExcelCellValue>> {
+export function construirFilasReporteFinancieroBase(data: ReporteFinancieroResponse): Array<Record<string, ExcelCellValue>> {
   const operaciones = (data.operaciones || []).map((row) => ({ ...row, key: `OP-${row.id}`, idOperacion: `OP-${row.id}` }));
   const directasPorId = new Map<string, Row>();
   (data.ventasDirectas || []).forEach((row) => {
@@ -206,21 +214,21 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
   const pagosPorOrden = new Map<string, Row[]>();
   (data.pagos || []).forEach((pago) => pagosPorOrden.set(String(pago.orden_pago_id), [...(pagosPorOrden.get(String(pago.orden_pago_id)) || []), pago]));
 
-    const descuentosPorVenta = new Map<string, Row[]>();
-    const operacionPorCertificado = new Map<string, string>();
-    (data.lineas || []).forEach((linea) => linea.certificado_id && operacionPorCertificado.set(String(linea.certificado_id), `OP-${linea.operacion_id}`));
-    const ordenPorId = new Map((data.ordenes || []).map((orden) => [String(orden.id), orden]));
-    const docPorId = new Map((data.comprobantes || []).map((doc) => [String(doc.id), doc]));
-    (data.descuentos || []).filter((item) => estado(item.estado) === 'APLICADO').forEach((item) => {
-      const orden = item.orden_pago_id ? ordenPorId.get(String(item.orden_pago_id)) : undefined;
-      const doc = item.facturacion_id
-        ? docPorId.get(String(item.facturacion_id))
-        : undefined;
-      const key = orden?.operacion_id ? `OP-${orden.operacion_id}` : orden?.venta_id ? `VD-${orden.venta_id}`
-        : doc?.operacion_id ? `OP-${doc.operacion_id}` : doc?.venta_id ? `VD-${doc.venta_id}`
-          : operacionPorCertificado.get(String(item.certificado_id)) || '';
-      if (key) descuentosPorVenta.set(key, [...(descuentosPorVenta.get(key) || []), item]);
-    });
+  const descuentosPorVenta = new Map<string, Row[]>();
+  const operacionPorCertificado = new Map<string, string>();
+  (data.lineas || []).forEach((linea) => linea.certificado_id && operacionPorCertificado.set(String(linea.certificado_id), `OP-${linea.operacion_id}`));
+  const ordenPorId = new Map((data.ordenes || []).map((orden) => [String(orden.id), orden]));
+  const docPorId = new Map((data.comprobantes || []).map((doc) => [String(doc.id), doc]));
+  (data.descuentos || []).filter((item) => estado(item.estado) === 'APLICADO').forEach((item) => {
+    const orden = item.orden_pago_id ? ordenPorId.get(String(item.orden_pago_id)) : undefined;
+    const doc = item.facturacion_id
+      ? docPorId.get(String(item.facturacion_id))
+      : undefined;
+    const key = orden?.operacion_id ? `OP-${orden.operacion_id}` : orden?.venta_id ? `VD-${orden.venta_id}`
+      : doc?.operacion_id ? `OP-${doc.operacion_id}` : doc?.venta_id ? `VD-${doc.venta_id}`
+        : operacionPorCertificado.get(String(item.certificado_id)) || '';
+    if (key) descuentosPorVenta.set(key, [...(descuentosPorVenta.get(key) || []), item]);
+  });
 
   const filas: Array<Record<string, ExcelCellValue>> = [];
   for (const venta of ventas) {
@@ -240,15 +248,12 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
 
     if (lineasConCert.length > 0 && !esDup) {
       const estadosCert = lineasConCert.map((l) => estado(l.certificado_estado));
-      // Si todos los certificados están en BORRADOR (o vacíos) -> EXCLUIR DEFINITIVAMENTE (ej. OC 604)
       const todosBorradores = estadosCert.every((e) => e === 'BORRADOR' || !e);
       if (todosBorradores) continue;
 
-      // Si todos los certificados están ANULADOS -> EXCLUIR
       const todosAnulados = estadosCert.every((e) => e === 'ANULADO');
       if (todosAnulados) continue;
 
-      // Certificados emitidos sin comprobante fiscal válido Y sin pagos confirmados -> EXCLUIR si la operación comercial no está confirmada (ej. OC 603 con PENDIENTE_PAGO)
       const tieneComprobanteValido = docsVigentes.length > 0;
       const tienePagoConfirmado = importePagado > 0;
       const ventaConfirmada = ['PAGADO', 'FACTURADO'].includes(estado(venta.estado));
@@ -298,30 +303,30 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
     const esCredito = Boolean(docCredito || ordenCredito);
     const cuotasCount = docCredito ? Number(docCredito.cuotas_count || docCredito.max_cuota || 0) : 0;
     const esCortesiaVenta = Boolean(
-      descuentos.some((d) => String(d.codigo || d.nombre_descuento || '').toUpperCase().includes('DESCUENTO_TALLER') || String(d.tipo_descuento || '').toUpperCase() === 'CONVENIO')
+      descuentos.some((d) => ['CORTESIA_FAREGAS', 'DESCUENTO_TALLER', 'D_CONVENIO_A88137BB742F4157'].includes(String(d.codigo || '').trim().toUpperCase())
+        || Number((d as any).descuento_id || (d as any).descuentoId) === 17
+        || String(d.nombre_descuento || '').trim().toUpperCase() === 'DESCUENTO CERTIFICADO TALLER'
+        || Boolean(d.autorizaGratuidad))
       || docsVigentes.some((doc) => Boolean(
         (doc as any).es_cortesia
         || String((doc as any).tipo_pago || '').toUpperCase() === 'CORTESÍA'
         || String((doc as any).forma_pago || '').toUpperCase() === 'CORTESÍA'
         || (Number(doc.importe_total || 0) === 0 && JSON.stringify(doc.campos_dinamicos || '').includes('1002'))
       ))
-      || (totalBase === 0 && importeBruto > 0 && descuento === importeBruto)
     );
-    // Mismo criterio que Datos (sin inventar; CRÉDITO + N CUOTAS, o CON_PAGO real o NO APLICA/SIN PAGO).
+    const importePagadoReporte = esCortesiaVenta ? 0 : importePagado;
     const { tipoPago: tipoPagoCons, formaPago: formaPagoCons } = clasificarMediosPago(
       pagos,
       importeNeto,
-      importePagado,
+      importePagadoReporte,
       { esCredito, cuotasCount, esCortesia: esCortesiaVenta }
     );
     const tiposPago = esCortesiaVenta ? 'CORTESÍA' : tipoPagoCons;
     const formasPago = esCortesiaVenta ? 'CORTESÍA' : formaPagoCons;
-    const saldoPendiente = esCortesiaVenta ? 0 : moneda(Math.max(0, importeNeto - importePagado));
+    const saldoPendiente = esCortesiaVenta ? 0 : moneda(Math.max(0, importeNeto - importePagadoReporte));
     const docCliente = docsVigentes.map((doc) => limpiarDocumentoCliente(doc.tipo_documento_cliente, doc.nro_documento)).find(Boolean);
     const productosAdicionales = lineasVigentes.filter((linea) => estado(linea.tipo_item) === 'PRODUCTO'
       || (!linea.certificado_id && !linea.numero_certificado && !linea.duplicado_id));
-    // Hora por certificado: si hay varios, se conserva cada una (unión por línea).
-    // Si no hay hora real, SIN REGISTRO / NO EMITIDO (nunca fecha_modificacion).
     const horasCertificados = textoUnico(
       lineasVigentes
         .filter((linea) => linea.certificado_id || linea.numero_certificado)
@@ -329,7 +334,11 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
       ' | '
     ) || '';
 
-    // TOTAL DE VENTAS VIGENTES: prioridad determinista para anulación y NC.
+    const docsParaHora = docsVigentes.length > 0 ? docsVigentes : docsOriginales;
+    const horasComprobantes = docsParaHora.length > 0
+      ? (textoUnico(docsParaHora.map(horaEmisionComprobante), ' | ') || 'SIN REGISTRO')
+      : '';
+
     const tienePendienteAnulacion = docsVigentes.some((doc) => {
       const est = String((doc as any).estado_solicitud_anulacion || '').toUpperCase();
       return Boolean((doc as any).documento_anulacion) && est !== 'RECHAZADO'
@@ -366,7 +375,6 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
       motivoExclusion = 'CERTIFICADO ANULADO';
       importeConsiderado = 0;
     } else if (notaCreditoParcial > 0) {
-      // El importeNeto ya descuenta la nota de crédito parcial; no restar dos veces.
       importeConsiderado = moneda(importeNeto);
       if (importeConsiderado === 0) {
         motivoExclusion = 'NC TOTAL ACEPTADA';
@@ -374,7 +382,6 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
     }
 
     const anulacionNcRegistrada = ((): string => {
-      // Marca administrativa (no fiscal): Sí si hay solicitud vigente o NC vigente.
       const haySolicitudActiva = docsVigentes.some((doc) => Boolean((doc as any).documento_anulacion)
         && String((doc as any).estado_solicitud_anulacion || '').toUpperCase() !== 'RECHAZADO');
       const hayNcVigente = docsVigentes.some((doc) => Number((doc as any).cantidad_notas_credito || 0) > 0
@@ -382,16 +389,28 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
         || ['PENDIENTE', 'ACEPTADO', 'ACEPTADA', 'CONFIRMADO'].includes(String((doc as any).estado_nota_credito || '').toUpperCase()));
       return haySolicitudActiva || hayNcVigente ? 'Sí' : 'No';
     })();
+
+    const tipoCertificadoCalculado = ((): string => {
+      const raw = textoUnico(lineasVigentes.map((linea) => linea.duplicado_tipo_nombre || linea.tipo_certificado_clave));
+      if (raw && raw !== 'COMPLEMENTARIO') return raw;
+      if (esDup) return 'COMPLEMENTARIO DUPLICADO';
+      const esVentaProducto = venta.key.startsWith('VD-')
+        || (lineasVigentes.length > 0 && lineasVigentes.every((l) => estado(l.tipo_item) === 'PRODUCTO' || (!l.certificado_id && !l.numero_certificado && !l.duplicado_id)));
+      if (esVentaProducto) return 'COMPLEMENTARIO VENTA DE PRODUCTO';
+      return raw || 'CERTIFICADO';
+    })();
+
     filas.push({
       fecha: fechaExcel(docsVigentes.find((doc) => doc.fecha_documento)?.fecha_documento || venta.fecha_creacion),
       horaEmisionCertificadoC: horasCertificados,
+      horaEmisionComprobanteC: horasComprobantes,
       sede: venta.planta_nombre || venta.planta_key || '', operacion: venta.idOperacion, placa: venta.placa || '',
       cliente: textoUnico(docsVigentes.map((doc) => doc.nombre_razon_social)) || venta.nombre_cliente_snapshot || '',
       documento: docCliente || limpiarDocumentoCliente(venta.tipo_documento_cliente_snapshot, venta.documento_cliente_snapshot),
       tipoOperacion: tipoOperacion(lineasVigentes, venta.key.startsWith('VD-')),
       servicio: textoUnico(lineasVigentes.map((linea) => linea.producto || linea.tipo_certificado_clave || linea.categoria)) || 'Operación comercial',
       descripcionEmitido: textoUnico(lineasVigentes.map(descripcionLinea), '; '),
-      tipoCertificado: textoUnico(lineasVigentes.map((linea) => linea.duplicado_tipo_nombre || linea.tipo_certificado_clave)),
+      tipoCertificado: tipoCertificadoCalculado,
       certificado: textoUnico(lineasVigentes.map((linea) => linea.numero_certificado)),
       chip: textoUnico(lineasVigentes.map((linea) => linea.numero_chip)),
       productoAdicional: textoUnico(productosAdicionales.map((linea) => linea.producto || linea.descripcion_snapshot || linea.codigo_producto)),
@@ -436,13 +455,126 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
         return det;
       })(),
       tipoPago: tiposPago, formaPago: formasPago, cortesiaDescuento: esCortesiaVenta ? 'CORTESÍA' : etiquetaDescuento(descuentos),
-       importeBruto, descuento, importeNeto, importeConsiderado, motivoExclusion, importePagado, saldoPendiente,
-       estadoCertificado: textoUnico(lineasVigentes.map((linea) => linea.certificado_estado)) || '-',
-       estadoComprobante: textoUnico(docsVigentes.map(estadoFiscal)) || 'Sin comprobante'
+      importeBruto, descuento, importeNeto, importeConsiderado, motivoExclusion, importePagado: importePagadoReporte, saldoPendiente,
+      estadoCertificado: textoUnico(lineasVigentes.map((linea) => linea.certificado_estado)) || '-',
+      estadoComprobante: textoUnico(docsVigentes.map(estadoFiscal)) || 'Sin comprobante'
     });
   }
 
   filas.sort((a, b) => numero(a.fecha) - numero(b.fecha) || String(a.operacion).localeCompare(String(b.operacion)));
+  return filas;
+}
+
+/**
+ * REGLA DE EXCLUSIÓN INMEDIATA COMPLETA para Consolidado_Datos:
+ * Toda operación con cortesía, anulación activa o nota de crédito activa (incluso NC parcial)
+ * o con certificado anulado o importe neto <= 0 DESAPARECE COMPLETAMENTE.
+ * Única excepción: anulación o NC explícitamente RECHAZADA.
+ */
+export function esVentaComercialVigente(row: Record<string, ExcelCellValue>): boolean {
+  // 1. Cortesía / Gratuidad
+  const esCortesia = String(row.cortesiaDescuento || '').toUpperCase().includes('CORTES')
+    || String(row.tipoPago || '').toUpperCase().includes('CORTES')
+    || String(row.formaPago || '').toUpperCase().includes('CORTES')
+    || row.motivoExclusion === 'CORTESÍA';
+  if (esCortesia) return false;
+
+  // 2. Certificado anulado
+  const certAnulado = String(row.estadoCertificado || '').toUpperCase().includes('ANULADO')
+    || row.motivoExclusion === 'CERTIFICADO ANULADO';
+  if (certAnulado) return false;
+
+  // 3. Solicitud de anulación activa (salvo si está explícitamente RECHAZADA)
+  if (row.tieneSolicitudAnulacion === 'SÍ' || Boolean(row.documentoAnulacion)) {
+    const estSol = String(row.estadoSolicitudAnulacion || '').toUpperCase();
+    const estFisc = String(row.estadoAnulacionFiscal || '').toUpperCase();
+    const esRechazada = estSol === 'RECHAZADA' || estSol === 'RECHAZADO' || estFisc === 'RECHAZADA' || estFisc === 'RECHAZADO';
+    if (!esRechazada) return false;
+  }
+
+  // 4. Nota de crédito (total o parcial, salvo si está explícitamente RECHAZADA)
+  const tieneNC = row.tieneNotaCredito === 'SÍ'
+    || Boolean(row.numeroNotaCredito)
+    || Number(row.importeNotaCredito || 0) > 0
+    || Boolean(row.tipoAfectacionNotaCredito)
+    || Boolean(row.motivoExclusion && String(row.motivoExclusion).toUpperCase().includes('NC'));
+  if (tieneNC) {
+    const estNC = String(row.estadoNotaCredito || '').toUpperCase();
+    const esRechazadaNC = estNC === 'RECHAZADA' || estNC === 'RECHAZADO';
+    if (!esRechazadaNC) return false;
+  }
+
+  // 5. Motivo de exclusión activo o importe neto <= 0
+  if (row.motivoExclusion && !['RECHAZADA', 'RECHAZADO'].includes(String(row.motivoExclusion).toUpperCase())) {
+    return false;
+  }
+  if (Number(row.importeNeto || 0) <= 0) return false;
+
+  return true;
+}
+
+export function construirFilasConsolidadoVigente(filasBase: Array<Record<string, ExcelCellValue>>): Array<Record<string, ExcelCellValue>> {
+  const vigentes = filasBase.filter(esVentaComercialVigente).map((r) => ({
+    ...r,
+    importeConsiderado: r.importeNeto,
+    motivoExclusion: ''
+  }));
+
+  const totales = vigentes.reduce<{ bruto: number; descuento: number; neto: number; pagado: number; saldo: number }>((acc, row) => ({
+    bruto: acc.bruto + numero(row.importeBruto),
+    descuento: acc.descuento + numero(row.descuento),
+    neto: acc.neto + numero(row.importeNeto),
+    pagado: acc.pagado + numero(row.importePagado),
+    saldo: acc.saldo + numero(row.saldoPendiente)
+  }), { bruto: 0, descuento: 0, neto: 0, pagado: 0, saldo: 0 });
+
+  const filaTotalVentas: Record<string, ExcelCellValue> = {
+    fecha: '', horaEmisionCertificadoC: '', horaEmisionComprobanteC: '',
+    sede: 'TOTAL VENTAS VIGENTES', operacion: '', placa: '', cliente: '',
+    documento: '', tipoOperacion: '', servicio: '', descripcionEmitido: '',
+    tipoCertificado: '', certificado: '', chip: '', productoAdicional: '',
+    cantidad: '', tipoComprobante: '', comprobante: '',
+    usuarioEmisorComprobante: '', usuarioEmisorCertificado: '',
+    tieneSolicitudAnulacion: '', anulado: '', estadoSolicitudAnulacion: '',
+    documentoAnulacion: '', fechaSolicitudAnulacion: '', estadoAnulacionFiscal: '',
+    fechaConfirmacionAnulacion: '', motivoAnulacion: '', tieneNotaCredito: '',
+    numeroNotaCredito: '', motivoNotaCredito: '', estadoNotaCredito: '',
+    fechaEmisionNotaCredito: '', importeNotaCredito: '', tipoAfectacionNotaCredito: '',
+    tipoPago: '', formaPago: '', cortesiaDescuento: '',
+    importeBruto: moneda(totales.bruto),
+    descuento: moneda(totales.descuento),
+    importeNeto: moneda(totales.neto),
+    importeConsiderado: moneda(totales.neto),
+    motivoExclusion: '',
+    importePagado: moneda(totales.pagado),
+    saldoPendiente: moneda(totales.saldo),
+    estadoCertificado: '', estadoComprobante: ''
+  };
+
+  const filaTotalPagado: Record<string, ExcelCellValue> = {
+    fecha: '', horaEmisionCertificadoC: '', horaEmisionComprobanteC: '',
+    sede: 'TOTAL PAGADO', operacion: '', placa: '', cliente: '',
+    documento: '', tipoOperacion: '', servicio: '', descripcionEmitido: '',
+    tipoCertificado: '', certificado: '', chip: '', productoAdicional: '',
+    cantidad: '', tipoComprobante: '', comprobante: '',
+    usuarioEmisorComprobante: '', usuarioEmisorCertificado: '',
+    tieneSolicitudAnulacion: '', anulado: '', estadoSolicitudAnulacion: '',
+    documentoAnulacion: '', fechaSolicitudAnulacion: '', estadoAnulacionFiscal: '',
+    fechaConfirmacionAnulacion: '', motivoAnulacion: '', tieneNotaCredito: '',
+    numeroNotaCredito: '', motivoNotaCredito: '', estadoNotaCredito: '',
+    fechaEmisionNotaCredito: '', importeNotaCredito: '', tipoAfectacionNotaCredito: '',
+    tipoPago: '', formaPago: '', cortesiaDescuento: '',
+    importeBruto: '', descuento: '', importeNeto: '', importeConsiderado: '',
+    motivoExclusion: '',
+    importePagado: moneda(totales.pagado),
+    saldoPendiente: '', estadoCertificado: '', estadoComprobante: ''
+  };
+
+  return [...vigentes, filaTotalVentas, filaTotalPagado];
+}
+
+export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse): Array<Record<string, ExcelCellValue>> {
+  const filas = construirFilasReporteFinancieroBase(data);
   const totales = filas.reduce<{ bruto: number; descuento: number; neto: number; considerado: number; pagado: number; saldo: number }>((acc, row) => {
     const esVigente = numero(row.importeConsiderado) > 0;
     const pagoComputable = esVigente ? Math.min(numero(row.importePagado), numero(row.importeConsiderado)) : 0;
@@ -458,20 +590,85 @@ export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse)
   const excluidos = filas.filter((r) => numero(r.importeConsiderado) === 0 && numero(r.importeNeto) > 0).length;
   const pagadoExcluido = moneda(filas.filter((r) => numero(r.importeConsiderado) === 0).reduce((s, r) => s + numero(r.importePagado), 0));
   filas.push({
-    fecha: '', horaEmisionCertificadoC: '', sede: 'TOTAL VENTAS VIGENTES', operacion: '', placa: '', cliente: '', documento: '', tipoOperacion: '', servicio: '',
+    fecha: '', horaEmisionCertificadoC: '', horaEmisionComprobanteC: '', sede: 'TOTAL VENTAS VIGENTES', operacion: '', placa: '', cliente: '', documento: '', tipoOperacion: '', servicio: '',
     descripcionEmitido: '', tipoCertificado: '', certificado: '', chip: '', productoAdicional: '', cantidad: '',
     tipoComprobante: '', comprobante: '', usuarioEmisorComprobante: '', usuarioEmisorCertificado: '', tieneSolicitudAnulacion: '', anulado: '', estadoSolicitudAnulacion: '', documentoAnulacion: '', fechaSolicitudAnulacion: '', estadoAnulacionFiscal: '', fechaConfirmacionAnulacion: '', motivoAnulacion: '', tieneNotaCredito: '', numeroNotaCredito: '', motivoNotaCredito: '', estadoNotaCredito: '', fechaEmisionNotaCredito: '', importeNotaCredito: '', tipoAfectacionNotaCredito: '', tipoPago: '', formaPago: '', cortesiaDescuento: '', importeBruto: moneda(totales.bruto),
     descuento: moneda(totales.descuento), importeNeto: moneda(totales.neto), importeConsiderado: moneda(totales.considerado), motivoExclusion: excluidos ? `${excluidos} op(s) excluida(s)` : '', importePagado: moneda(totales.pagado),
     saldoPendiente: moneda(totales.saldo), estadoCertificado: '', estadoComprobante: ''
   });
   filas.push({
-    fecha: '', horaEmisionCertificadoC: '', sede: 'TOTAL PAGADO', operacion: '', placa: '', cliente: '', documento: '', tipoOperacion: '', servicio: '',
+    fecha: '', horaEmisionCertificadoC: '', horaEmisionComprobanteC: '', sede: 'TOTAL PAGADO', operacion: '', placa: '', cliente: '', documento: '', tipoOperacion: '', servicio: '',
     descripcionEmitido: '', tipoCertificado: '', certificado: '', chip: '', productoAdicional: '', cantidad: '',
     tipoComprobante: '', comprobante: '', usuarioEmisorComprobante: '', usuarioEmisorCertificado: '', tieneSolicitudAnulacion: '', anulado: '', estadoSolicitudAnulacion: '', documentoAnulacion: '', fechaSolicitudAnulacion: '', estadoAnulacionFiscal: '', fechaConfirmacionAnulacion: '', motivoAnulacion: '', tieneNotaCredito: '', numeroNotaCredito: '', motivoNotaCredito: '', estadoNotaCredito: '', fechaEmisionNotaCredito: '', importeNotaCredito: '', tipoAfectacionNotaCredito: '', tipoPago: '', formaPago: '', cortesiaDescuento: '', importeBruto: '',
     descuento: '', importeNeto: '', importeConsiderado: '', motivoExclusion: pagadoExcluido ? `excluido de op(s) no vigentes: S/ ${pagadoExcluido.toFixed(2)}` : '', importePagado: moneda(totales.pagado),
     saldoPendiente: '', estadoCertificado: '', estadoComprobante: ''
   });
   return filas;
+}
+
+export function obtenerColumnasReporteFinanciero(): ExcelColumn[] {
+  return columnas(
+    ['fecha', 'Fecha de emisión / operación', 21, 'date'], ['horaEmisionCertificadoC', 'Hora de emisión del certificado', 18, 'text'], ['horaEmisionComprobanteC', 'Hora de emisión del comprobante', 18, 'text'], ['sede', 'Sede', 20],
+    ['placa', 'Placa', 13, 'text'], ['cliente', 'Cliente / razón social', 30], ['documento', 'Documento del cliente', 20, 'text'],
+    ['tipoOperacion', 'Tipo de operación', 26], ['servicio', 'Servicio / producto vendido', 36],
+    ['descripcionEmitido', 'Descripción de lo emitido', 55], ['tipoCertificado', 'Tipo de certificado', 24],
+    ['certificado', 'Código del certificado', 22, 'text'], ['chip', 'Código del chip', 20, 'text'],
+    ['productoAdicional', 'Producto adicional', 32], ['cantidad', 'Cantidad', 12, 'decimal2'],
+    ['importeBruto', 'Importe bruto original (S/)', 23, 'currency'], ['cortesiaDescuento', 'Cortesía / Descuento', 28],
+    ['descuento', 'Importe descontado (S/)', 23, 'currency'], ['importeNeto', 'Importe neto (S/)', 19, 'currency'],
+    ['importeConsiderado', 'Importe considerado en total (S/)', 22, 'currency'], ['motivoExclusion', 'Motivo de exclusión del total', 24],
+    ['tipoComprobante', 'Tipo de comprobante', 20], ['comprobante', 'Código del comprobante', 22, 'text'], ['usuarioEmisorCertificado', 'Usuario emisor del certificado', 22, 'text'], ['usuarioEmisorComprobante', 'Usuario emisor del comprobante', 22, 'text'],
+    ['tieneSolicitudAnulacion', '¿Tiene solicitud de anulación?', 18], ['anulado', 'ANULACIÓN / NC REGISTRADA', 18], ['estadoSolicitudAnulacion', 'Estado de solicitud de anulación', 22], ['documentoAnulacion', 'Documento de anulación', 20], ['fechaSolicitudAnulacion', 'Fecha de solicitud de anulación', 22, 'text'], ['estadoAnulacionFiscal', 'Estado de anulación fiscal', 20], ['fechaConfirmacionAnulacion', 'Fecha de confirmación de anulación', 22, 'text'], ['motivoAnulacion', 'Motivo de anulación', 30],
+    ['tieneNotaCredito', '¿Tiene nota de crédito?', 18], ['numeroNotaCredito', 'Número de nota de crédito', 22], ['motivoNotaCredito', 'Motivo de nota de crédito', 26], ['estadoNotaCredito', 'Estado de nota de crédito', 22], ['fechaEmisionNotaCredito', 'Fecha de emisión de nota de crédito', 22, 'text'], ['importeNotaCredito', 'Importe de nota de crédito (S/)', 22, 'currency'], ['tipoAfectacionNotaCredito', 'Tipo de afectación (TOTAL/PARCIAL/CORRECCIÓN)', 24],
+    ['tipoPago', 'Tipo de pago', 20], ['formaPago', 'Forma de pago', 20], ['importePagado', 'Importe pagado (S/)', 20, 'currency'],
+    ['saldoPendiente', 'Saldo pendiente (S/)', 21, 'currency'],
+    ['estadoCertificado', 'Estado del certificado', 21], ['estadoComprobante', 'Estado técnico / fiscal', 25]
+  );
+}
+
+export function construirHojaHistorial(
+  data: ReporteFinancieroResponse,
+  nombre = 'Historial'
+): ExcelSheetDefinition {
+  const sedes = (data.sedes || []).map((sede) => sede.planta_nombre || sede.planta_key).filter(Boolean);
+  const filasBase = construirFilasReporteFinancieroBase(data);
+  return {
+    name: nombre.slice(0, 31),
+    title: 'HISTORIAL DE OPERACIONES COMERCIALES',
+    metadata: [
+      ['Fecha desde', data.metadatos?.desde || ''],
+      ['Fecha hasta', data.metadatos?.hasta || ''],
+      ['Sede', sedes.length ? textoUnico(sedes) : (data.metadatos?.plantas || []).join(', ')],
+      ['Generado por', data.metadatos?.usuarioExportador || 'Usuario']
+    ],
+    headerRow: 7,
+    totalsRow: false,
+    columns: obtenerColumnasReporteFinanciero(),
+    rows: filasBase
+  };
+}
+
+export function construirHojaConsolidado(
+  data: ReporteFinancieroResponse,
+  nombre = 'Consolidado_Datos'
+): ExcelSheetDefinition {
+  const sedes = (data.sedes || []).map((sede) => sede.planta_nombre || sede.planta_key).filter(Boolean);
+  const filasBase = construirFilasReporteFinancieroBase(data);
+  const filasVigentes = construirFilasConsolidadoVigente(filasBase);
+  return {
+    name: nombre.slice(0, 31),
+    title: 'REPORTE FINANCIERO CONSOLIDADO — INGRESOS VIGENTES',
+    metadata: [
+      ['Fecha desde', data.metadatos?.desde || ''],
+      ['Fecha hasta', data.metadatos?.hasta || ''],
+      ['Sede', sedes.length ? textoUnico(sedes) : (data.metadatos?.plantas || []).join(', ')],
+      ['Generado por', data.metadatos?.usuarioExportador || 'Usuario']
+    ],
+    headerRow: 7,
+    totalsRow: true,
+    columns: obtenerColumnasReporteFinanciero(),
+    rows: filasVigentes
+  };
 }
 
 export function construirHojasReporteFinanciero(data: ReporteFinancieroResponse): ExcelSheetDefinition[] {
@@ -481,23 +678,8 @@ export function construirHojasReporteFinanciero(data: ReporteFinancieroResponse)
     metadata: [['Fecha desde', data.metadatos.desde], ['Fecha hasta', data.metadatos.hasta],
       ['Sede', sedes.length ? textoUnico(sedes) : data.metadatos.plantas.join(', ')], ['Generado por', data.metadatos.usuarioExportador || 'Usuario']],
     headerRow: 7, totalsRow: true,
-    columns: columnas(
-      ['fecha', 'Fecha de emisión / operación', 21, 'date'], ['horaEmisionCertificadoC', 'Hora de emisión del certificado', 18, 'text'], ['sede', 'Sede', 20],
-      ['placa', 'Placa', 13, 'text'], ['cliente', 'Cliente / razón social', 30], ['documento', 'Documento del cliente', 20, 'text'],
-      ['tipoOperacion', 'Tipo de operación', 26], ['servicio', 'Servicio / producto vendido', 36],
-      ['descripcionEmitido', 'Descripción de lo emitido', 55], ['tipoCertificado', 'Tipo de certificado', 24],
-      ['certificado', 'Código del certificado', 22, 'text'], ['chip', 'Código del chip', 20, 'text'],
-      ['productoAdicional', 'Producto adicional', 32], ['cantidad', 'Cantidad', 12, 'decimal2'],
-      ['importeBruto', 'Importe bruto original (S/)', 23, 'currency'], ['cortesiaDescuento', 'Cortesía / Descuento', 28],
-      ['descuento', 'Importe descontado (S/)', 23, 'currency'], ['importeNeto', 'Importe neto (S/)', 19, 'currency'],
-      ['importeConsiderado', 'Importe considerado en total (S/)', 22, 'currency'], ['motivoExclusion', 'Motivo de exclusión del total', 24],
-      ['tipoComprobante', 'Tipo de comprobante', 20], ['comprobante', 'Código del comprobante', 22, 'text'],       ['usuarioEmisorCertificado', 'Usuario emisor del certificado', 22, 'text'], ['usuarioEmisorComprobante', 'Usuario emisor del comprobante', 22, 'text'],
-      ['tieneSolicitudAnulacion', '¿Tiene solicitud de anulación?', 18], ['anulado', 'ANULACIÓN / NC REGISTRADA', 18], ['estadoSolicitudAnulacion', 'Estado de solicitud de anulación', 22], ['documentoAnulacion', 'Documento de anulación', 20], ['fechaSolicitudAnulacion', 'Fecha de solicitud de anulación', 22, 'text'], ['estadoAnulacionFiscal', 'Estado de anulación fiscal', 20], ['fechaConfirmacionAnulacion', 'Fecha de confirmación de anulación', 22, 'text'], ['motivoAnulacion', 'Motivo de anulación', 30],
-      ['tieneNotaCredito', '¿Tiene nota de crédito?', 18], ['numeroNotaCredito', 'Número de nota de crédito', 22], ['motivoNotaCredito', 'Motivo de nota de crédito', 26], ['estadoNotaCredito', 'Estado de nota de crédito', 22], ['fechaEmisionNotaCredito', 'Fecha de emisión de nota de crédito', 22, 'text'], ['importeNotaCredito', 'Importe de nota de crédito (S/)', 22, 'currency'], ['tipoAfectacionNotaCredito', 'Tipo de afectación (TOTAL/PARCIAL/CORRECCIÓN)', 24],
-      ['tipoPago', 'Tipo de pago', 20], ['formaPago', 'Forma de pago', 20], ['importePagado', 'Importe pagado (S/)', 20, 'currency'],
-      ['saldoPendiente', 'Saldo pendiente (S/)', 21, 'currency'],
-      ['estadoCertificado', 'Estado del certificado', 21], ['estadoComprobante', 'Estado técnico / fiscal', 25]
-    ), rows: construirFilasReporteFinanciero(data)
+    columns: obtenerColumnasReporteFinanciero(),
+    rows: construirFilasReporteFinanciero(data)
   }];
 }
 

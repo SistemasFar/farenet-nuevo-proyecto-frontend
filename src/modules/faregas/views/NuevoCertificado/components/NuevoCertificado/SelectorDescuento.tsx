@@ -15,7 +15,6 @@ interface SelectorDescuentoProps {
   certificadoId?: number;
   descuentoActual?: ConsultaDescuentoResult | null;
   onDescuentoChange?: (descuento: ConsultaDescuentoResult | null) => void;
-  esTaller?: boolean;
   tienePagosRegistrados?: boolean;
 }
 
@@ -25,7 +24,6 @@ export function SelectorDescuento({
   certificadoId,
   descuentoActual,
   onDescuentoChange,
-  esTaller = false,
   tienePagosRegistrados = false,
 }: SelectorDescuentoProps) {
   const [descuentosDisponibles, setDescuentosDisponibles] = useState<DescuentoDisponible[]>([]);
@@ -152,22 +150,18 @@ export function SelectorDescuento({
     setAplicando(true);
 
     try {
-      // Buscar el descuento con autorizaGratuidad configurado para taller o aplicar DESCUENTO_TALLER
+      // La API devuelve la modalidad de cortesía disponible para cualquier certificado.
       const descGratuito = descuentosDisponibles.find(
-        (d) => d.autorizaGratuidad || d.codigo === 'DESCUENTO_TALLER'
+        (d) => d.autorizaGratuidad || d.id === 17 || String(d.codigo || '').toUpperCase() === 'CORTESIA_FAREGAS'
       );
-      let resultado: ConsultaDescuentoResult;
-      if (descGratuito) {
-        resultado = await aplicarDescuentoDirecto(certificadoId, descGratuito.id);
-      } else {
-        resultado = await aplicarDescuentoDirecto(certificadoId, 17); // ID canónico DESCUENTO CERTIFICADO TALLER
-      }
+      const cortesiaId = descGratuito ? descGratuito.id : 17;
+      const resultado: ConsultaDescuentoResult = await aplicarDescuentoDirecto(certificadoId, cortesiaId);
       setDescuentoAplicado(resultado);
       onChangeRef.current?.(resultado);
       Swal.fire({
         icon: 'success',
         title: 'Cortesía Aplicada',
-        text: 'Se aplicó cortesía de taller (Operación Gratuita).',
+        text: 'Se aplicó la cortesía (Operación Gratuita).',
         timer: 1800,
         showConfirmButton: false,
       });
@@ -242,8 +236,7 @@ export function SelectorDescuento({
             />
             <span className="text-sm font-bold text-slate-700">CON DESCUENTO</span>
           </label>
-          {esTaller && (
-            <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 name="tipoDescuento"
@@ -255,8 +248,7 @@ export function SelectorDescuento({
                 <Sparkles className="h-3.5 w-3.5" />
                 CORTESÍA
               </span>
-            </label>
-          )}
+          </label>
         </div>
 
         {modoDescuento === 'con' && cargandoLista ? (

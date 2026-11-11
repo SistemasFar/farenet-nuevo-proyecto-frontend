@@ -3,7 +3,7 @@ import { validarPasoPago } from './faregas-wizard.validation';
 import { clasificarPagos, construirHojasDocumentosEmitidosExtendido } from '../../utils/faregas-documentos-emitidos-extendido';
 import { clasificarMediosPago, construirHojasReporteFinanciero } from '../../utils/faregas-reporte-financiero';
 
-describe('FAREGAS — Modalidad CORTESÍA exclusiva para certificados de taller', () => {
+describe('FAREGAS — Modalidad CORTESÍA para todos los certificados', () => {
   it('1. validarPasoPago: admite operación gratuita de cortesía con totalPagado = 0 y precioTotal = 0', () => {
     const errores = validarPasoPago({
       tipoComprobante: 'FACTURA',
@@ -153,9 +153,9 @@ describe('FAREGAS — Modalidad CORTESÍA exclusiva para certificados de taller'
         {
           operacion_id: 500,
           certificado_id: 888,
-          codigo: 'DESCUENTO_TALLER',
-          nombre_descuento: 'DESCUENTO CERTIFICADO TALLER',
-          tipo_descuento: 'CONVENIO',
+          codigo: 'CORTESIA_FAREGAS',
+          nombre_descuento: 'CORTESÍA FAREGAS',
+          tipo_descuento: 'PROMOCION',
           importe_descuento: 350,
           estado: 'APLICADO',
         }
@@ -175,5 +175,20 @@ describe('FAREGAS — Modalidad CORTESÍA exclusiva para certificados de taller'
     expect(filaOp.importeConsiderado).toBe(0);
     expect(filaOp.cortesiaDescuento).toBe('CORTESÍA');
     expect(filaOp.motivoExclusion).toBe('CORTESÍA');
+  });
+
+  it('8. no clasifica como cortesía un descuento ordinario del 100 %', () => {
+    const reporteMock: any = {
+      metadatos: { desde: '2026-11-10', hasta: '2026-11-10', plantas: ['SURCO'], usuarioExportador: 'Tester' },
+      ventasDirectas: [],
+      operaciones: [{ id: 1, key: 'OP-1', planta_key: 'SURCO', importe_total: 0, estado: 'FACTURADO' }],
+      lineas: [{ operacion_id: 1, importe_total: 0, precio_unitario: 80, cantidad: 1 }],
+      comprobantes: [{ id: 1, operacion_id: 1, importe_total: 0, condicion_pago: 'CONTADO' }],
+      ordenes: [{ id: 1, operacion_id: 1, importe_total: 0, importe_pagado: 0, saldo_pendiente: 0 }],
+      pagos: [],
+      descuentos: [{ operacion_id: 1, codigo: 'PROMO_100', importe_descuento: 80 }]
+    };
+    const fila = construirHojasReporteFinanciero(reporteMock)[0].rows[0];
+    expect(fila.cortesiaDescuento).not.toBe('CORTESÍA');
   });
 });

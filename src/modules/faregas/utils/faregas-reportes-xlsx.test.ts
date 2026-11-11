@@ -37,7 +37,7 @@ describe('XLSX de reportes financieros FAREGAS', () => {
     const docs = build(construirHojasDocumentosEmitidosExtendido({ cabeceras: [], lineas: [] }, '2026-11-01', '2026-11-30'));
     expect(docs.get('xl/workbook.xml')).toContain('name="Datos"');
     expect(docs.get('xl/workbook.xml')).toContain('name="Líneas de productos"');
-    expect(docs.get('xl/workbook.xml')).toContain('name="Trazabilidad"');
+    expect(docs.get('xl/workbook.xml')).not.toContain('name="Trazabilidad"');
     expect(cellCount(docs.get('xl/worksheets/sheet1.xml') || '', 7)).toBeGreaterThanOrEqual(56);
     expect(docs.get('xl/worksheets/sheet1.xml')).toContain('TIPO DE DOCUMENTO');
 

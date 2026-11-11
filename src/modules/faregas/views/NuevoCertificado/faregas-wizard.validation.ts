@@ -643,7 +643,6 @@ export const validarPasoPago = ({
 
   if (!['BOLETA', 'FACTURA'].includes(String(tipoComprobante || '').toUpperCase())) {
     errores.tipoDocFac = 'Debe seleccionar BOLETA o FACTURA para continuar.';
-    return errores;
   }
 
   if (esCortesia || autorizaGratuidad) {
@@ -667,7 +666,7 @@ export const validarPasoPago = ({
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaVencimientoCredito || '')) {
       errores.fechaVencimientoCredito = 'Seleccione la fecha de vencimiento del crédito.';
-    } else if (fechaInicioCredito && fechaVencimientoCredito < fechaInicioCredito) {
+    } else if (fechaInicioCredito && fechaVencimientoCredito && fechaVencimientoCredito < fechaInicioCredito) {
       errores.fechaVencimientoCredito = 'La fecha de vencimiento no puede ser anterior a la fecha de inicio.';
     }
   }

@@ -59,7 +59,7 @@ const TOAST_MS = 2_000;
  * Rutas internas permitidas para el botón IR.
  * Se valida estrictamente el destino_navegacion recibido del backend.
  */
-const RUTAS_PERMITIDAS = ['/faregas/solicitudes-operacion'];
+const RUTAS_PERMITIDAS = ['/faregas/solicitudes-operacion', '/faregas/certificados'];
 
 const esRutaPermitida = (destino: string | null): boolean => {
   if (!destino || typeof destino !== 'string') return false;
