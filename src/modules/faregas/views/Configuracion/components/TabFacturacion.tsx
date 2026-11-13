@@ -4,44 +4,32 @@ import type { MainLayoutContext } from '../../Dashboard/MainLayout';
 import TabSeries from './TabSeries';
 import TabDocumentosFacturacion from './TabDocumentosFacturacion';
 import TabClientesFacturacion from './TabClientesFacturacion';
-import NubefactReadinessPanel from './NubefactReadinessPanel';
 
 /**
- * Facturación: un módulo, cuatro pestañas gobernadas por submódulos.
- *
- * Series sigue siendo un solo módulo con UNA sola tabla: la tabla reúne las
- * series Nubefact y las DMS/Legacy de `fg_serie_comprobante`, y la columna Origen
- * dice de qué conjunto es cada fila además de habilitar sus acciones.
- *
- * La jerarquía es la de Chips: MENU_FACTURACION da el módulo y cada
- * MENU_FACTURACION_* da su pestaña (PREPARACION, SERIES, DOCUMENTOS, CLIENTES). Un perfil
- * CONTADOR con sólo Comprobantes ve una sola pestaña y entra directamente en
- * ella; nunca queda seleccionado un tab que no tiene.
+ * Facturación electrónica: 3 pestañas gobernadas por submódulos (SERIES, COMPROBANTES, CLIENTES).
+ * La pestaña inicial es SERIES.
  */
-type VistaFacturacion = 'PREPARACION' | 'SERIES' | 'DOCUMENTOS' | 'CLIENTES';
+type VistaFacturacion = 'SERIES' | 'DOCUMENTOS' | 'CLIENTES';
 
 const PESTANAS: ReadonlyArray<{ id: VistaFacturacion; permiso: string; label: string }> = [
-  { id: 'PREPARACION', permiso: 'MENU_FACTURACION_PREPARACION', label: 'PREPARACIÓN' },
   { id: 'SERIES', permiso: 'MENU_FACTURACION_SERIES', label: 'SERIES' },
   { id: 'DOCUMENTOS', permiso: 'MENU_FACTURACION_COMPROBANTES', label: 'COMPROBANTES' },
   { id: 'CLIENTES', permiso: 'MENU_FACTURACION_CLIENTES', label: 'CLIENTES' }
 ];
 
-export default function TabFacturacion({ plantaKey, plantaNombre }: { plantaKey: string; plantaNombre: string }) {
+export default function TabFacturacion({ plantaKey: _plantaKey, plantaNombre: _plantaNombre }: { plantaKey: string; plantaNombre: string }) {
   const { permisos } = useOutletContext<MainLayoutContext>();
   const lista = Array.isArray(permisos) ? permisos : [];
 
-  // Sólo se pintan las pestañas que el perfil tiene, en el orden de siempre.
+  // Sólo se pintan las pestañas que el perfil tiene, en orden definido
   const visibles = PESTANAS.filter((p) => lista.includes(p.permiso));
   const permitidas = visibles.map((p) => p.id);
 
-  // `PREPARACION` era la pestaña fija inicial. Con submódulos puede no existir, y
-  // los permisos llegan de forma asíncrona desde el contexto, así que el estado
-  // se corrige cada vez que cambia el conjunto autorizado.
-  const [vistaSeleccionada, setVistaSeleccionada] = useState<VistaFacturacion>('PREPARACION');
+  // La pestaña inicial es SERIES por defecto
+  const [vistaSeleccionada, setVistaSeleccionada] = useState<VistaFacturacion>('SERIES');
   const vista = permitidas.includes(vistaSeleccionada)
     ? vistaSeleccionada
-    : (permitidas[0] ?? 'DOCUMENTOS');
+    : (permitidas[0] ?? 'SERIES');
 
   const pestana = (id: VistaFacturacion, label: string) => (
     <button
@@ -60,7 +48,6 @@ export default function TabFacturacion({ plantaKey, plantaNombre }: { plantaKey:
         {visibles.map((p) => pestana(p.id, p.label))}
       </div>
     </div>
-    {vista === 'PREPARACION' && <NubefactReadinessPanel plantaKey={plantaKey} plantaNombre={plantaNombre} />}
     {vista === 'SERIES' && <TabSeries />}
     {vista === 'DOCUMENTOS' && <TabDocumentosFacturacion />}
     {vista === 'CLIENTES' && <TabClientesFacturacion />}

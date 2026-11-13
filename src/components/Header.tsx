@@ -223,18 +223,20 @@ export function Header({
                 </div>
 
                 <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
-                  {!isFaregas && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        setPasswordModalOpen(true);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition px-4 py-2.5 text-xs font-bold"
-                    >
-                      Cambiar Contraseña
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      setPasswordModalOpen(true);
+                    }}
+                    className={`w-full flex items-center justify-center gap-2 rounded-xl transition px-4 py-2.5 text-xs font-bold ${
+                      isFaregas
+                        ? 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200/60'
+                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                    }`}
+                  >
+                    Cambiar Contraseña
+                  </button>
                   <button
                     type="button"
                     onClick={onLogout}
@@ -253,6 +255,8 @@ export function Header({
         isOpen={passwordModalOpen}
         onClose={() => setPasswordModalOpen(false)}
         username={user?.username || ''}
+        isFaregas={isFaregas}
+        onSuccessLogout={onLogout}
       />
     </header>
   );

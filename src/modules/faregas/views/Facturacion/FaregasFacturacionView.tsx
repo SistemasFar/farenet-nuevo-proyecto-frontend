@@ -10,7 +10,7 @@ export function FaregasFacturacionView() {
       <header className="mb-4 sm:mb-6">
         <h1 className="text-xl font-bold text-gray-800">Facturación electrónica</h1>
         <p className="text-sm text-gray-500">
-          Preparación de NubeFact, administración de series y seguimiento de comprobantes.
+          Administración de series, emisión de comprobantes y gestión de clientes.
         </p>
       </header>
 

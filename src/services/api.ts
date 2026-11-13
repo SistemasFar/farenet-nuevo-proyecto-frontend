@@ -1368,5 +1368,31 @@ export const authFaregasApi = {
       throw new Error(error);
     }
     return response.json();
+  },
+  cambiarContrasenaAsync: async (
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const token = sessionStorage.getItem('faregasAccessToken') || sessionStorage.getItem('accessToken');
+    if (!token) throw new Error('No hay sesión activa en FAREGAS.');
+
+    const response = await fetchWithTimeout(`${BASE_URL}/faregas/auth/cambiar-contrasena`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+        confirmPassword
+      })
+    });
+    if (!response.ok) {
+      const error = await getErrorMessage(response, 'Error al cambiar contraseña en FAREGAS');
+      throw new Error(error);
+    }
+    return response.json();
   }
 };
