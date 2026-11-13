@@ -124,9 +124,11 @@ describe('FAREGAS — Estructura definitiva de 5 hojas del reporte financiero ex
     // Ambas hojas tienen las columnas financieras estándar
     expect(hojaAnulados.columns.some((c) => c.key === 'comprobante')).toBe(true);
     expect(hojaAnulados.columns.some((c) => c.key === 'importePagado')).toBe(true);
+    expect(hojaAnulados.columns.some((c) => c.key === 'autorizadorAnulacion')).toBe(true);
     expect(hojaNC.columns.some((c) => c.key === 'comprobante')).toBe(true);
     expect(hojaNC.columns.some((c) => c.key === 'numeroNotaCredito')).toBe(true);
     expect(hojaNC.columns.some((c) => c.key === 'tipoAfectacionNotaCredito')).toBe(true);
+    expect(hojaNC.columns.some((c) => c.key === 'autorizadorNotaCredito')).toBe(true);
   });
 
   it('9. CAMBIO 5 — Desglose de pagos y columna auxiliar oculta importePagadoNumerico', () => {
@@ -140,7 +142,46 @@ describe('FAREGAS — Estructura definitiva de 5 hojas del reporte financiero ex
     expect(colPagado).toBeDefined();
   });
 
-  it('10. Genera archivo XLSX binario válido con las 5 hojas', async () => {
+  it('10. Una nota de crédito rechazada sale de Consolidado_Datos y aparece en Notas de credito con su estado real', () => {
+    const consolidadoConNcRechazada = structuredClone(consolidado);
+    const comprobante = consolidadoConNcRechazada.comprobantes.find((doc: Record<string, unknown>) => doc.operacion_id);
+    expect(comprobante).toBeDefined();
+    Object.assign(comprobante, {
+      notas_credito: 'FFF1-2',
+      cantidad_notas_credito: 1,
+      motivo_nota_credito: '03',
+      estado_nota_credito: 'RECHAZADO',
+      fecha_emision_nota_credito: '2026-11-13T14:27:37.994Z',
+      fecha_hora_emision_nota_credito: '2026-11-13T14:27:37.994Z',
+      usuario_autorizador_nota_credito: 'GRACE IBARRA',
+      importe_nota_credito: comprobante.importe_total,
+      tipo_afectacion_nota_credito: 'CORRECCIÓN'
+    });
+
+    const hojas = construirHojasUnificadas(extendido, consolidadoConNcRechazada, '2026-11-11', '2026-11-11');
+    const hojaConsolidado = hojas.find((h) => h.name === 'Consolidado_Datos')!;
+    const hojaNotasCredito = hojas.find((h) => h.name === 'Notas de credito')!;
+
+    expect(hojaConsolidado.rows.some((row) => row.numeroNotaCredito === 'FFF1-2')).toBe(false);
+    const incidencia = hojaNotasCredito.rows.find((row) => row.numeroNotaCredito === 'FFF1-2');
+    expect(incidencia).toBeDefined();
+    expect(incidencia?.estadoNotaCredito).toBe('RECHAZADO');
+    expect(incidencia?.motivoNotaCredito).toBe('03');
+    expect(incidencia?.horaEmisionNotaCreditoC).toBe('09:27:37');
+    expect(incidencia?.autorizadorNotaCredito).toBe('GRACE IBARRA');
+    expect(hojaNotasCredito.columns[0]).toMatchObject({
+      key: 'fechaNotaCreditoC',
+      header: 'Fecha de emisión de la nota de crédito'
+    });
+    expect(hojaNotasCredito.columns[1]).toMatchObject({
+      key: 'horaEmisionNotaCreditoC',
+      header: 'Hora de emisión de la nota de crédito'
+    });
+    expect(hojaNotasCredito.columns.some((columna) => columna.key === 'horaEmisionComprobanteC')).toBe(false);
+    expect(hojaNotasCredito.columns.some((columna) => columna.key === 'horaEmisionCertificadoC')).toBe(false);
+  });
+
+  it('11. Genera archivo XLSX binario válido con las 5 hojas', async () => {
     const bytes = await crearExcelVariasHojasBytes(unificadas);
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(bytes.length).toBeGreaterThan(5000);

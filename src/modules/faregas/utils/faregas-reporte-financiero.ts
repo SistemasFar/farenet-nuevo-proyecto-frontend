@@ -62,6 +62,13 @@ export function horaEmisionComprobante(doc: Row): string {
   return 'SIN REGISTRO';
 }
 
+/** Hora del primer intento EMITIR de la nota; nunca reutiliza la hora del comprobante original. */
+export function horaEmisionNotaCredito(doc: Row): string {
+  const rawHora = (doc as any).fecha_hora_emision_nota_credito;
+  if (rawHora) return formatearHoraLima(rawHora);
+  return 'SIN REGISTRO';
+}
+
 /** Formatea un timestamptz a HH:mm:ss en America/Lima (solo si es timestamp real, nunca DATE). */
 export function formatearHoraLima(raw: unknown): string {
   const texto = String(raw || '').trim();
@@ -483,11 +490,17 @@ export function construirFilasReporteFinancieroBase(data: ReporteFinancieroRespo
       })(),
       fechaConfirmacionAnulacion: (() => { const v = docsVigentes.map((d) => (d as any).fecha_anulacion_confirmacion).find(Boolean); return v ? fechaLima(v) : ''; })(),
       motivoAnulacion: textoUnico(docsVigentes.map((doc) => (doc as any).motivo_anulacion).filter(Boolean)),
+      autorizadorAnulacion: textoUnico(docsVigentes.map((doc) => (doc as any).usuario_autorizador_anulacion).filter(Boolean)) || 'SIN REGISTRO',
       tieneNotaCredito: textoUnico(docsVigentes.map((doc) => (doc as any).notas_credito).filter(Boolean)) ? 'SÍ' : (docsVigentes.some((doc) => Number((doc as any).cantidad_notas_credito || 0) > 0) ? 'SÍ' : 'NO'),
       numeroNotaCredito: textoUnico(docsVigentes.map((doc) => (doc as any).notas_credito).filter(Boolean)),
       motivoNotaCredito: textoUnico(docsVigentes.map((doc) => (doc as any).motivo_nota_credito).filter(Boolean)),
       estadoNotaCredito: textoUnico(docsVigentes.map((doc) => (doc as any).estado_nota_credito).filter(Boolean)),
       fechaEmisionNotaCredito: textoUnico(docsVigentes.map((doc) => (doc as any).fecha_emision_nota_credito ? fechaLima((doc as any).fecha_emision_nota_credito) : '').filter(Boolean)),
+      horaEmisionNotaCreditoC: (() => {
+        const doc = docsVigentes.find((item) => Boolean((item as any).fecha_hora_emision_nota_credito));
+        return doc ? horaEmisionNotaCredito(doc) : 'SIN REGISTRO';
+      })(),
+      autorizadorNotaCredito: textoUnico(docsVigentes.map((doc) => (doc as any).usuario_autorizador_nota_credito).filter(Boolean)) || 'SIN REGISTRO',
       importeNotaCredito: (() => { const v = docsVigentes.reduce((s, d) => s + Number((d as any).importe_nota_credito || 0), 0); return v ? moneda(v) : ''; })(),
       tipoAfectacionNotaCredito: (() => {
         const det = docsVigentes.map((d) => String((d as any).tipo_afectacion_nota_credito || '')).filter(Boolean).join(',');
@@ -521,9 +534,9 @@ export function construirFilasReporteFinancieroBase(data: ReporteFinancieroRespo
  * 2. Exclusiones obligatorias:
  *    - Anulaciones activas o pendientes y bajas fiscales.
  *    - Certificados anulados.
- *    - Notas de crédito (totales o parciales) pendientes o emitidas.
+ *    - Notas de crédito registradas (pendientes, aceptadas, rechazadas o con error).
  *    - Borradores.
- *    - Si una solicitud de anulación o NC fue RECHAZADA y no existe otra causa de exclusión, la venta original permanece.
+ *    - Una solicitud administrativa rechazada sin nota emitida no excluye la venta.
  */
 export function esVentaComercialVigente(row: Record<string, ExcelCellValue>): boolean {
   const esCortesia = String(row.cortesiaDescuento || '').toUpperCase().includes('CORTES')
@@ -544,17 +557,14 @@ export function esVentaComercialVigente(row: Record<string, ExcelCellValue>): bo
     if (!esRechazada) return false;
   }
 
-  // 3. Nota de crédito (total o parcial, salvo si está explícitamente RECHAZADA)
+  // 3. Toda nota de crédito ya registrada sale del consolidado comercial.
+  // El estado fiscal se conserva en la hoja "Notas de credito", incluido RECHAZADO.
   const tieneNC = row.tieneNotaCredito === 'SÍ'
     || Boolean(row.numeroNotaCredito)
     || Number(row.importeNotaCredito || 0) > 0
     || Boolean(row.tipoAfectacionNotaCredito)
     || Boolean(row.motivoExclusion && String(row.motivoExclusion).toUpperCase().includes('NC'));
-  if (tieneNC) {
-    const estNC = String(row.estadoNotaCredito || '').toUpperCase();
-    const esRechazadaNC = estNC === 'RECHAZADA' || estNC === 'RECHAZADO';
-    if (!esRechazadaNC) return false;
-  }
+  if (tieneNC) return false;
 
   // 4. Motivo de exclusión activo (que no sea RECHAZADA ni CORTESÍA)
   if (row.motivoExclusion && !['RECHAZADA', 'RECHAZADO', 'CORTESÍA', 'CORTESIA'].includes(String(row.motivoExclusion).toUpperCase())) {
@@ -569,7 +579,7 @@ export function esVentaComercialVigente(row: Record<string, ExcelCellValue>): bo
 }
 
 export function construirFilasConsolidadoVigente(filasBase: Array<Record<string, ExcelCellValue>>): Array<Record<string, ExcelCellValue>> {
-  const vigentes = filasBase.filter(esVentaComercialVigente).map((r) => {
+  const vigentes: Array<Record<string, ExcelCellValue>> = filasBase.filter(esVentaComercialVigente).map((r): Record<string, ExcelCellValue> => {
     const esCortesia = String(r.cortesiaDescuento || '').toUpperCase().includes('CORTES')
       || String(r.tipoPago || '').toUpperCase().includes('CORTES')
       || String(r.formaPago || '').toUpperCase().includes('CORTES')
@@ -678,9 +688,9 @@ export function esFilaAnulados(row: Record<string, ExcelCellValue>): boolean {
 /**
  * REGLAS PARA HOJA NOTAS DE CRÉDITO:
  * - Solicitudes de NC activas, pendientes o aprobadas.
- * - Notas de crédito en proceso o emitidas.
- * - Estados técnicos activos (error, incierto).
- * - NO incluir solicitudes de NC rechazadas.
+ * - Notas de crédito en proceso, aceptadas, rechazadas o con error.
+ * - El rechazo se muestra como incidencia fiscal; no se oculta ni se considera aceptado.
+ * - NO incluir solicitudes administrativas rechazadas que nunca generaron una nota.
  * - NO incluir borradores.
  */
 export function esFilaNotasCredito(row: Record<string, ExcelCellValue>): boolean {
@@ -695,9 +705,6 @@ export function esFilaNotasCredito(row: Record<string, ExcelCellValue>): boolean
     || Boolean(row.motivoExclusion && String(row.motivoExclusion).toUpperCase().includes('NC'));
 
   if (!tieneNC) return false;
-
-  const estNC = String(row.estadoNotaCredito || '').toUpperCase();
-  if (estNC === 'RECHAZADA' || estNC === 'RECHAZADO') return false;
 
   return true;
 }
@@ -720,7 +727,7 @@ export function construirHojaAnulados(
     ],
     headerRow: 7,
     totalsRow: false,
-    columns: obtenerColumnasReporteFinanciero(),
+    columns: obtenerColumnasAnulados(),
     rows: filasAnulados
   };
 }
@@ -731,7 +738,11 @@ export function construirHojaNotasCredito(
 ): ExcelSheetDefinition {
   const sedes = (data.sedes || []).map((sede) => sede.planta_nombre || sede.planta_key).filter(Boolean);
   const filasBase = construirFilasReporteFinancieroBase(data);
-  const filasNC = filasBase.filter(esFilaNotasCredito);
+  const filasNC = filasBase.filter(esFilaNotasCredito).map((row) => ({
+    ...row,
+    fechaNotaCreditoC: fechaExcel(row.fechaEmisionNotaCredito),
+    horaEmisionNotaCreditoC: row.horaEmisionNotaCreditoC || 'SIN REGISTRO'
+  }));
   return {
     name: nombre.slice(0, 31),
     title: 'OPERACIONES CON NOTA DE CRÉDITO',
@@ -743,9 +754,43 @@ export function construirHojaNotasCredito(
     ],
     headerRow: 7,
     totalsRow: false,
-    columns: obtenerColumnasReporteFinanciero(),
+    columns: obtenerColumnasNotasCredito(),
     rows: filasNC
   };
+}
+
+/** Columnas propias de la hoja NC: fecha/hora de la nota, no del documento original. */
+export function obtenerColumnasNotasCredito(): ExcelColumn[] {
+  const columnasComunes = obtenerColumnasReporteFinanciero().filter((columna) => ![
+    'fecha',
+    'horaEmisionCertificadoC',
+    'horaEmisionComprobanteC',
+    'fechaEmisionNotaCredito'
+  ].includes(columna.key));
+  const columnasNC: ExcelColumn[] = [
+    { key: 'fechaNotaCreditoC', header: 'Fecha de emisión de la nota de crédito', width: 22, format: 'date' },
+    { key: 'horaEmisionNotaCreditoC', header: 'Hora de emisión de la nota de crédito', width: 20, format: 'text' },
+    ...columnasComunes
+  ];
+  const indiceEstado = columnasNC.findIndex((columna) => columna.key === 'estadoNotaCredito');
+  columnasNC.splice(indiceEstado + 1, 0, {
+    key: 'autorizadorNotaCredito',
+    header: 'Persona que autorizó la nota de crédito',
+    width: 30
+  });
+  return columnasNC;
+}
+
+/** La hoja de anulaciones expone al decisor administrativo del flujo de autorización. */
+export function obtenerColumnasAnulados(): ExcelColumn[] {
+  const columnasAnulados = [...obtenerColumnasReporteFinanciero()];
+  const indiceEstado = columnasAnulados.findIndex((columna) => columna.key === 'estadoSolicitudAnulacion');
+  columnasAnulados.splice(indiceEstado + 1, 0, {
+    key: 'autorizadorAnulacion',
+    header: 'Persona que autorizó la anulación',
+    width: 30
+  });
+  return columnasAnulados;
 }
 
 export function construirFilasReporteFinanciero(data: ReporteFinancieroResponse): Array<Record<string, ExcelCellValue>> {

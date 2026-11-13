@@ -17,7 +17,7 @@ describe('Documentos emitidos — Extendido', () => {
   it('conserva la estructura de 56 campos y un solo total por comprobante', () => {
     const [cabeceras, lineas] = construirHojasDocumentosEmitidosExtendido(sample, '2026-10-01', '2026-10-31');
     expect(cabeceras.name).toBe('Datos');
-    expect(cabeceras.columns).toHaveLength(68);
+    expect(cabeceras.columns).toHaveLength(67);
     expect(cabeceras.rows).toHaveLength(2);
     expect(cabeceras.rows[0]).toMatchObject({ numeroDocumento: 'F001-20', total: 118, descuentos: 5, montoPago: 118, items: 2, descripcion: '' });
     expect(cabeceras.columns.map((c) => c.key)).not.toContain('metodoPago');
@@ -69,7 +69,7 @@ describe('Documentos emitidos — Extendido', () => {
     } as unknown as ReporteFinancieroResponse;
     const unificadas = construirHojasUnificadas(sample, consolidado, '2026-10-01', '2026-10-31');
     expect(unificadas.some((h) => h.name.includes('Consolidado'))).toBe(true);
-    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(68);
+    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(67);
     // Horas: certificado y comprobante con hora explícita → HH:mm:ss
     const conHora = {
       ...sample,
@@ -151,6 +151,9 @@ describe('Documentos emitidos — Extendido', () => {
 
     const hojaNotasCredito = unificadas.find((h) => h.name === 'Notas de credito')!;
     expect(hojaNotasCredito.totalsRow).toBe(false);
+
+    const hojaDatos = unificadas.find((h) => h.name === 'Datos')!;
+    expect(hojaDatos.columns.some((columna) => columna.key === 'telefono')).toBe(false);
 
     // 4. Consolidado_Datos NO reincorpora "Precio unitario" ni "Subtotal registrado"
     const hojaConsolidado = unificadas.find((h) => h.name === 'Consolidado_Datos')!;
