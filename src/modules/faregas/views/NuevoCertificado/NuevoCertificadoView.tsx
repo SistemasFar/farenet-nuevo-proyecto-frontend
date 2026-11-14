@@ -31,7 +31,7 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { resolverCuotasCredito, resolverTipoComprobantePorDocumento, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
+import { evaluarSpotWizard, resolverCuotasCredito, resolverTipoComprobantePorDocumento, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { useErroresPaso, PanelResumenErroresWizard, estructurarErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual, puedeRetrocederWizard } from './faregas-emision';
@@ -559,12 +559,14 @@ function NuevoCertificadoWizard() {
   const cuotasCreditoResueltas = React.useMemo(
     () => resolverCuotasCredito({
       condicionPago: formFacturacion.condicionPagoFac,
+      tipoComprobante: formFacturacion.tipoDocFac,
       pagos: pagosAgregados,
       precioTotal,
       fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
       cuotas: formFacturacion.cuotasFac,
+      esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
     }).map((cuota) => ({ ...cuota, importe: String(cuota.importe) })),
-    [formFacturacion.condicionPagoFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal]
+    [formFacturacion.condicionPagoFac, formFacturacion.tipoDocFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal, descuentoAplicado]
   );
 
   const titularPrincipal = React.useMemo(
@@ -1714,6 +1716,7 @@ function NuevoCertificadoWizard() {
   const guardarPasoPagos = async (idBorrador: number) => {
     const response = await faregasCertificadosApi.guardarPagos(idBorrador, {
       importeTotal: precioTotal,
+      tipoComprobante: formFacturacion.tipoDocFac,
       condicionPago: formFacturacion.condicionPagoFac,
       fechaInicioCredito: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.fechaInicioCreditoFac : null,
       fechaVencimientoCredito: formFacturacion.condicionPagoFac === 'CREDITO' ? formFacturacion.fechaVencimientoFac : null,
@@ -2435,7 +2438,14 @@ function NuevoCertificadoWizard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const montoPendiente = Math.max(0, precioTotal - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
+  const evaluacionSpotActual = React.useMemo(() => evaluarSpotWizard({
+    tipoComprobante: formFacturacion.tipoDocFac,
+    total: precioTotal,
+    esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
+  }), [formFacturacion.tipoDocFac, precioTotal, descuentoAplicado]);
+
+  const totalExigibleCaja = descuentoAplicado?.autorizaGratuidad ? 0 : evaluacionSpotActual.netoCobrar;
+  const montoPendiente = Math.max(0, totalExigibleCaja - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
 
   // Efecto para inyectar automticamente el pago de Cuponidad
   useEffect(() => {

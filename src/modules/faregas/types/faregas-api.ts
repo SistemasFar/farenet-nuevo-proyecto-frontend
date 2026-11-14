@@ -69,6 +69,7 @@ export interface PagoFaregasRequest {
 
 export interface GuardarPagosFaregasRequest {
   importeTotal: number | string;
+  tipoComprobante?: 'BOLETA' | 'FACTURA' | string;
   condicionPago: 'CONTADO' | 'CREDITO';
   fechaInicioCredito?: NullableText;
   fechaVencimientoCredito?: NullableText;

@@ -603,16 +603,101 @@ type DatosPago = {
 
 const redondearMoneda = (valor: number) => Math.round((valor + Number.EPSILON) * 100) / 100;
 
+export interface EvaluacionSpotWizard {
+  aplica: boolean;
+  porcentaje: number;
+  codigoSpot: string;
+  descripcionSpot: string;
+  totalComprobante: number;
+  montoDetraccion: number;
+  netoCobrar: number;
+  motivoExclusion?: string;
+}
+
+export const evaluarSpotWizard = ({
+  tipoComprobante,
+  total,
+  esCortesia = false,
+}: {
+  tipoComprobante?: string;
+  total: number;
+  esCortesia?: boolean;
+}): EvaluacionSpotWizard => {
+  const totalRedondeado = redondearMoneda(total);
+  const esFactura = String(tipoComprobante || '').toUpperCase() === 'FACTURA';
+
+  if (esCortesia || totalRedondeado <= 0) {
+    return {
+      aplica: false,
+      porcentaje: 0,
+      codigoSpot: '',
+      descripcionSpot: '',
+      totalComprobante: totalRedondeado,
+      montoDetraccion: 0,
+      netoCobrar: totalRedondeado,
+      motivoExclusion: 'TRANSFERENCIA_GRATUITA',
+    };
+  }
+
+  if (!esFactura) {
+    return {
+      aplica: false,
+      porcentaje: 0,
+      codigoSpot: '',
+      descripcionSpot: '',
+      totalComprobante: totalRedondeado,
+      montoDetraccion: 0,
+      netoCobrar: totalRedondeado,
+      motivoExclusion: 'BOLETA_VENTA_CONSUMIDOR_FINAL_NO_SUJETA',
+    };
+  }
+
+  if (totalRedondeado <= 700.00) {
+    return {
+      aplica: false,
+      porcentaje: 0,
+      codigoSpot: '',
+      descripcionSpot: '',
+      totalComprobante: totalRedondeado,
+      montoDetraccion: 0,
+      netoCobrar: totalRedondeado,
+      motivoExclusion: 'IMPORTE_MENOR_O_IGUAL_A_700',
+    };
+  }
+
+  const porcentaje = 12;
+  const montoDetraccion = Math.round((totalRedondeado * porcentaje) / 100);
+  const netoCobrar = redondearMoneda(totalRedondeado - montoDetraccion);
+
+  return {
+    aplica: true,
+    porcentaje,
+    codigoSpot: '037',
+    descripcionSpot: 'Demás servicios gravados con el IGV',
+    totalComprobante: totalRedondeado,
+    montoDetraccion,
+    netoCobrar,
+  };
+};
+
 export const resolverCuotasCredito = ({
   condicionPago,
+  tipoComprobante = 'FACTURA',
   pagos,
   precioTotal,
   fechaVencimientoCredito,
   cuotas = [],
-}: Pick<DatosPago, 'condicionPago' | 'pagos' | 'precioTotal' | 'fechaVencimientoCredito' | 'cuotas'>) => {
+  esCortesia = false,
+}: Pick<DatosPago, 'condicionPago' | 'tipoComprobante' | 'pagos' | 'precioTotal' | 'fechaVencimientoCredito' | 'cuotas' | 'esCortesia'>) => {
   if (condicionPago !== 'CREDITO') return [];
+  const evaluacionSpot = evaluarSpotWizard({
+    tipoComprobante,
+    total: precioTotal,
+    esCortesia,
+  });
+  const exigibleCaja = esCortesia ? 0 : evaluacionSpot.netoCobrar;
   const totalPagado = redondearMoneda(pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0));
-  const saldo = redondearMoneda(precioTotal - totalPagado);
+  const saldo = redondearMoneda(Math.max(0, exigibleCaja - totalPagado));
   if (saldo <= 0) return [];
 
   // Si ya existen cuotas (1, 2 o 3), conservamos las cuotas editadas por el usuario.
@@ -633,8 +718,8 @@ export const resolverCuotasCredito = ({
 
 /**
  * Reglas de pago ya existentes en el asistente, expresadas por campo.
- * CONTADO exige el total completo; CRÉDITO debe conservar saldo para
- * distribuirlo en cuotas (de 1 a 3 cuotas como máximo).
+ * CONTADO exige el total exigible en caja (neto SPOT cuando aplica FACTURA > 700);
+ * CRÉDITO debe conservar saldo para distribuirlo en cuotas (de 1 a 3 cuotas como máximo).
  */
 export const validarPasoPago = ({
   condicionPago,
@@ -649,7 +734,13 @@ export const validarPasoPago = ({
 }: DatosPago): ErroresCampo => {
   const totalPagado = redondearMoneda(pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0));
   const esCredito = condicionPago === 'CREDITO';
-  const saldo = redondearMoneda(Math.max(0, precioTotal - totalPagado));
+  const evaluacionSpot = evaluarSpotWizard({
+    tipoComprobante,
+    total: precioTotal,
+    esCortesia: esCortesia || autorizaGratuidad,
+  });
+  const exigibleCaja = esCortesia || autorizaGratuidad ? 0 : evaluacionSpot.netoCobrar;
+  const saldo = redondearMoneda(Math.max(0, exigibleCaja - totalPagado));
   const errores: ErroresCampo = {};
 
   if (!['BOLETA', 'FACTURA'].includes(String(tipoComprobante || '').toUpperCase())) {
@@ -682,10 +773,11 @@ export const validarPasoPago = ({
     }
   }
 
-  if (!esCredito && Math.abs(totalPagado - precioTotal) > 0.009) {
-    errores.pagos = `El pago debe completar S/ ${precioTotal.toFixed(2)}. Saldo pendiente: S/ ${saldo.toFixed(2)}.`;
+  if (!esCredito && Math.abs(totalPagado - exigibleCaja) > 0.009) {
+    const sufijoSpot = evaluacionSpot.aplica ? ` (Neto sujeto a SPOT ${evaluacionSpot.porcentaje}%)` : '';
+    errores.pagos = `El pago debe completar S/ ${exigibleCaja.toFixed(2)}${sufijoSpot}. Saldo pendiente: S/ ${saldo.toFixed(2)}.`;
   }
-  if (esCredito && totalPagado >= precioTotal - 0.009) {
+  if (esCredito && totalPagado >= exigibleCaja - 0.009) {
     errores.pagos = 'Una venta a crédito debe conservar un saldo pendiente. Cambie la condición a CONTADO o reduzca el pago inicial.';
   } else if (esCredito) {
     if (cuotas.length === 0) {

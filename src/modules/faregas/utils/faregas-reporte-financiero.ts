@@ -511,6 +511,16 @@ export function construirFilasReporteFinancieroBase(data: ReporteFinancieroRespo
         return det;
       })(),
       tipoPago: tiposPago, formaPago: formasPago, cortesiaDescuento: esCortesiaVenta ? 'CORTESÍA' : etiquetaDescuento(descuentos),
+      detraccionSujeto: docsVigentes.some((d) => Boolean((d as any).sujeto_detraccion || (d as any).sujetoDetraccion)) ? 'SÍ' : 'NO',
+      detraccionCodigo: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion) || docsVigentes[0]; return d ? ((d as any).detraccion_codigo || (d as any).detraccionCodigo || '') : ''; })(),
+      detraccionDescripcion: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion) || docsVigentes[0]; return d ? ((d as any).detraccion_descripcion || (d as any).detraccionDescripcion || '') : ''; })(),
+      detraccionPorcentaje: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion); return d ? Number((d as any).detraccion_porcentaje ?? (d as any).detraccionPorcentaje ?? 12) : ''; })(),
+      detraccionBase: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion); return d ? moneda(Number((d as any).detraccion_base ?? (d as any).detraccionBase ?? (d as any).importe_total ?? 0)) : ''; })(),
+      detraccionMonto: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion); return d ? moneda(Number((d as any).detraccion_monto ?? (d as any).detraccionMonto ?? 0)) : ''; })(),
+      detraccionNeto: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion); return d ? moneda(Number((d as any).detraccion_neto ?? (d as any).detraccionNeto ?? 0)) : ''; })(),
+      detraccionEstadoDeposito: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion); return d ? ((d as any).detraccion_estado_deposito || (d as any).detraccionEstadoDeposito || 'PENDIENTE') : 'NO_APLICA'; })(),
+      detraccionConstanciaNro: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion); return d ? ((d as any).detraccion_constancia_nro || (d as any).detraccionConstanciaNro || '') : ''; })(),
+      detraccionConstanciaFecha: (() => { const d = docsVigentes.find((x) => (x as any).sujeto_detraccion || (x as any).sujetoDetraccion); const f = d ? ((d as any).detraccion_constancia_fecha || (d as any).detraccionConstanciaFecha) : null; return f ? fechaLima(f) : ''; })(),
       importeBruto: brutoCalculado,
       descuento: descuentoCalculado,
       importeNeto: esCortesiaVenta ? 0 : importeNeto,
@@ -591,13 +601,16 @@ export function construirFilasConsolidadoVigente(filasBase: Array<Record<string,
     };
   });
 
-  const totales = vigentes.reduce<{ bruto: number; descuento: number; neto: number; pagado: number; saldo: number }>((acc, row) => ({
+  const totales = vigentes.reduce<{ bruto: number; descuento: number; neto: number; pagado: number; saldo: number; detraccionBase: number; detraccionMonto: number; detraccionNeto: number }>((acc, row) => ({
     bruto: acc.bruto + numero(row.importeBruto),
     descuento: acc.descuento + numero(row.descuento),
     neto: acc.neto + numero(row.importeNeto),
     pagado: acc.pagado + numero((row as any).importePagadoNumerico ?? row.importePagado),
-    saldo: acc.saldo + numero(row.saldoPendiente)
-  }), { bruto: 0, descuento: 0, neto: 0, pagado: 0, saldo: 0 });
+    saldo: acc.saldo + numero(row.saldoPendiente),
+    detraccionBase: acc.detraccionBase + numero(row.detraccionBase),
+    detraccionMonto: acc.detraccionMonto + numero(row.detraccionMonto),
+    detraccionNeto: acc.detraccionNeto + numero(row.detraccionNeto)
+  }), { bruto: 0, descuento: 0, neto: 0, pagado: 0, saldo: 0, detraccionBase: 0, detraccionMonto: 0, detraccionNeto: 0 });
 
   const filaTotalVentas: Record<string, ExcelCellValue> = {
     fecha: '', horaEmisionCertificadoC: '', horaEmisionComprobanteC: '',
@@ -620,6 +633,11 @@ export function construirFilasConsolidadoVigente(filasBase: Array<Record<string,
     importePagado: moneda(totales.pagado),
     importePagadoNumerico: moneda(totales.pagado),
     saldoPendiente: moneda(totales.saldo),
+    detraccionSujeto: '', detraccionCodigo: '', detraccionDescripcion: '', detraccionPorcentaje: '',
+    detraccionBase: totales.detraccionBase ? moneda(totales.detraccionBase) : '',
+    detraccionMonto: totales.detraccionMonto ? moneda(totales.detraccionMonto) : '',
+    detraccionNeto: totales.detraccionNeto ? moneda(totales.detraccionNeto) : '',
+    detraccionEstadoDeposito: '', detraccionConstanciaNro: '', detraccionConstanciaFecha: '',
     estadoCertificado: '', estadoComprobante: ''
   };
 
@@ -640,7 +658,10 @@ export function construirFilasConsolidadoVigente(filasBase: Array<Record<string,
     motivoExclusion: '',
     importePagado: moneda(totales.pagado),
     importePagadoNumerico: moneda(totales.pagado),
-    saldoPendiente: '', estadoCertificado: '', estadoComprobante: ''
+    saldoPendiente: '', estadoCertificado: '', estadoComprobante: '',
+    detraccionSujeto: '', detraccionCodigo: '', detraccionDescripcion: '', detraccionPorcentaje: '',
+    detraccionBase: '', detraccionMonto: '', detraccionNeto: '',
+    detraccionEstadoDeposito: '', detraccionConstanciaNro: '', detraccionConstanciaFecha: ''
   };
 
   return [...vigentes, filaTotalVentas, filaTotalPagado];
@@ -843,6 +864,16 @@ export function obtenerColumnasReporteFinanciero(): ExcelColumn[] {
     ['tieneSolicitudAnulacion', '¿Tiene solicitud de anulación?', 18], ['anulado', 'ANULACIÓN / NC REGISTRADA', 18], ['estadoSolicitudAnulacion', 'Estado de solicitud de anulación', 22], ['documentoAnulacion', 'Documento de anulación', 20], ['fechaSolicitudAnulacion', 'Fecha de solicitud de anulación', 22, 'text'], ['estadoAnulacionFiscal', 'Estado de anulación fiscal', 20], ['fechaConfirmacionAnulacion', 'Fecha de confirmación de anulación', 22, 'text'], ['motivoAnulacion', 'Motivo de anulación', 30],
     ['tieneNotaCredito', '¿Tiene nota de crédito?', 18], ['numeroNotaCredito', 'Número de nota de crédito', 22], ['motivoNotaCredito', 'Motivo de nota de crédito', 26], ['estadoNotaCredito', 'Estado de nota de crédito', 22], ['fechaEmisionNotaCredito', 'Fecha de emisión de nota de crédito', 22, 'text'], ['importeNotaCredito', 'Importe de nota de crédito (S/)', 22, 'currency'], ['tipoAfectacionNotaCredito', 'Tipo de afectación (TOTAL/PARCIAL/CORRECCIÓN)', 24],
     ['tipoPago', 'Tipo de pago', 20], ['formaPago', 'Forma de pago', 20], ['importePagado', 'Importe pagado (S/)', 24],
+    ['detraccionSujeto', 'Sujeto a detracción (SÍ/NO)', 22],
+    ['detraccionCodigo', 'Código SPOT', 16, 'text'],
+    ['detraccionDescripcion', 'Descripción operación SPOT', 35],
+    ['detraccionPorcentaje', 'Porcentaje detracción (%)', 20, 'decimal2'],
+    ['detraccionBase', 'Base detracción (S/)', 20, 'currency'],
+    ['detraccionMonto', 'Importe detracción (S/)', 20, 'currency'],
+    ['detraccionNeto', 'Neto tras detracción (S/)', 20, 'currency'],
+    ['detraccionEstadoDeposito', 'Estado depósito detracción', 22],
+    ['detraccionConstanciaNro', 'Número de constancia SPOT', 22, 'text'],
+    ['detraccionConstanciaFecha', 'Fecha depósito detracción', 22, 'date'],
     ['saldoPendiente', 'Saldo pendiente (S/)', 21, 'currency'],
     ['estadoCertificado', 'Estado del certificado', 21], ['estadoComprobante', 'Estado técnico / fiscal', 25]
   );

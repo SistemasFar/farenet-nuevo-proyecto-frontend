@@ -7,6 +7,7 @@ import type { ConsultaDescuentoResult } from '../../../../services/faregas-descu
 import { SelectorDescuento } from './SelectorDescuento';
 import { MensajeError, type ErroresCampo } from '../../faregas-wizard-errores';
 import { GestorCuotasCredito, type CuotaCreditoItem } from '../../../components/GestorCuotasCredito';
+import { evaluarSpotWizard } from '../../faregas-wizard.validation';
 
 type TipoPago = PagoAgregado['tipo'];
 
@@ -74,9 +75,15 @@ export function PagoStep({
 
   const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
   const esCortesia = Boolean(descuentoActual?.autorizaGratuidad);
+  const evaluacionSpot = evaluarSpotWizard({
+    tipoComprobante,
+    total: totalPagar,
+    esCortesia,
+  });
+  const totalExigible = esCortesia ? 0 : evaluacionSpot.netoCobrar;
   const totalPagarCalculado = esCortesia ? 0 : totalPagar;
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
-  const pendiente = esCortesia ? 0 : (totalPagarCalculado - pagado);
+  const pendiente = esCortesia ? 0 : (totalExigible - pagado);
   const descuentoVisual = esCortesia ? tarifaOriginal : descuento;
   const cuentaFaregas = maestrosPago?.cuentasCorrientes?.[0];
   const entidadFaregas = maestrosPago?.entidadesFinancieras?.find(
@@ -453,26 +460,43 @@ export function PagoStep({
               )}
               {resumenComercial?.requiereChip && <div className="h-px bg-slate-200" />}
               <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-semibold">Total a pagar:</span>
+                <span className="text-slate-500 font-semibold">Total comprobante:</span>
                 <span className="text-slate-800 font-black text-xl">S/ {totalPagarCalculado.toFixed(2)}</span>
               </div>
+              {evaluacionSpot.aplica && (
+                <div className="space-y-1.5 rounded-xl bg-amber-50/90 p-2.5 border border-amber-200">
+                  <div className="flex justify-between items-center text-amber-800 font-semibold text-xs">
+                    <span>Detracción SPOT ({evaluacionSpot.porcentaje}%):</span>
+                    <span className="font-bold">- S/ {evaluacionSpot.montoDetraccion.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-amber-200/60 pt-1">
+                    <span className="text-slate-700 font-bold text-xs">Neto a pagar ordinario:</span>
+                    <span className="font-black text-slate-900 text-base">S/ {evaluacionSpot.netoCobrar.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-semibold">Pagado:</span>
+                <span className="text-slate-500 font-semibold">Pagado en caja:</span>
                 <span className="text-green-600 font-bold text-lg">S/ {pagado.toFixed(2)}</span>
               </div>
               <div className={`h-px bg-slate-200 ${compact ? 'my-3' : 'my-4'}`} />
               <div className="flex justify-between items-center">
                 <span className="text-slate-600 font-bold capitalize text-sm">Falta Pagar:</span>
-                <span className={`font-black text-2xl ${pendiente <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <span className={`font-black text-2xl ${pendiente <= 0.009 ? 'text-green-600' : 'text-red-600'}`}>
                   S/ {Math.max(0, pendiente).toFixed(2)}
                 </span>
               </div>
             </div>
+            {evaluacionSpot.aplica && (
+              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-center text-xs font-semibold text-amber-900 leading-tight">
+                Operación sujeta a Detracción SPOT ({evaluacionSpot.porcentaje}%). El cliente retiene S/ {evaluacionSpot.montoDetraccion.toFixed(2)} para depositarlo en el Banco de la Nación.
+              </div>
+            )}
             {esCortesia ? (
               <div className={`${compact ? 'mt-4' : 'mt-6'} rounded-lg border border-emerald-300 bg-emerald-100 p-3 text-center text-xs font-bold text-emerald-800`}>
                 Cortesía aplicada. Puede continuar sin registrar pagos.
               </div>
-            ) : pendiente > 0 ? (
+            ) : pendiente > 0.009 ? (
               <p className={`text-xs font-bold text-center capitalize ${compact ? 'mt-4' : 'mt-6'} ${condicionPago === 'CREDITO' ? 'text-blue-600' : 'text-red-500'}`}>
                 {condicionPago === 'CREDITO'
                   ? 'El saldo pendiente se registrará en cuotas'

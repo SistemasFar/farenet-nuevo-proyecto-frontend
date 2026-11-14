@@ -297,7 +297,17 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
       usuario: doc.usuario_emisor || (doc as any).usuario_creacion || '', tieneSolicitudAnulacion: (doc as any).documento_anulacion ? 'SÍ' : 'NO', estadoSolicitudAnulacion: estadoAnulacionUI, estado: [doc.estado || '', doc.entorno_facturador ? `ENTORNO: ${doc.entorno_facturador}` : 'ENTORNO NO INFORMADO', doc.proveedor ? `PROVEEDOR: ${doc.proveedor}` : '', doc.aceptada_sunat === true && String(doc.entorno_facturador).toUpperCase() === 'PRODUCCION' ? 'SUNAT: ACEPTADO PRODUCCIÓN' : doc.sunat_responsecode ? `SUNAT: ${doc.sunat_responsecode}` : 'SUNAT: SIN ACEPTACIÓN VERIFICABLE'].filter(Boolean).join(' | '), anulado: indicadorAnulacionComprobante(doc as any) ? 'Sí' : 'No',
       documentoAnulacion: doc.documento_anulacion || '', fechaAnulacionSolicitud: (doc as any).fecha_anulacion_solicitud ? fechaLocal((doc as any).fecha_anulacion_solicitud) : (doc as any).fecha_anulacion ? fechaLocal((doc as any).fecha_anulacion) : '', estadoAnulacionFiscal: anulacionConfirmada ? 'ANULADO' : esRechazada ? 'RECHAZADA' : doc.documento_anulacion ? 'PENDIENTE' : 'SIN SOLICITUD', fechaAnulacionConfirmada: (doc as any).fecha_anulacion_confirmacion ? fechaLocal((doc as any).fecha_anulacion_confirmacion) : '', ticketAnulacion: (doc as any).ticket_anulacion || '', motivoAnulacion: doc.motivo_anulacion || motivoFiscal,
       origen: doc.origen_peticion || '', tipoPago: tipoPagoExtendido, formaPago: formaPagoExtendido, montoPago: montoPagoExtendido,
-      referenciaPago: doc.referencia_pago || '', detraccionPorcentaje: extra('detraccion_porcentaje'), detraccionNeto: extra('detraccion_neto'), detraccionImporte: extra('detraccion_importe'),
+      referenciaPago: doc.referencia_pago || '',
+      sujetoDetraccion: (doc as any).sujeto_detraccion ? 'SÍ' : 'NO',
+      detraccionCodigo: (doc as any).detraccion_codigo || '',
+      detraccionDescripcion: (doc as any).detraccion_descripcion || '',
+      detraccionPorcentaje: (doc as any).sujeto_detraccion ? Number((doc as any).detraccion_porcentaje ?? 12) : '',
+      detraccionBase: (doc as any).sujeto_detraccion ? decimal((doc as any).detraccion_base ?? doc.importe_total) : '',
+      detraccionImporte: (doc as any).sujeto_detraccion ? decimal((doc as any).detraccion_monto) : '',
+      detraccionNeto: (doc as any).sujeto_detraccion ? decimal((doc as any).detraccion_neto) : '',
+      detraccionEstadoDeposito: (doc as any).sujeto_detraccion ? ((doc as any).detraccion_estado_deposito || 'PENDIENTE') : 'NO_APLICA',
+      detraccionConstanciaNro: (doc as any).detraccion_constancia_nro || '',
+      detraccionConstanciaFecha: (doc as any).detraccion_constancia_fecha ? fechaLocal((doc as any).detraccion_constancia_fecha) : '',
       tieneNC: doc.notas_credito ? 'Sí' : 'No', cantidadNC: doc.cantidad_notas_credito ?? 0, tieneND: doc.notas_debito ? 'Sí' : 'No', cantidadND: doc.cantidad_notas_debito ?? 0,
       items: relatedLines.length, codigoItem: uniqueLine?.codigo_producto || '', descripcion: uniqueLine?.producto || '', unidad: uniqueLine ? resolverUnidadMedidaSunatLine(uniqueLine) : '',
       cantidad: uniqueLine ? numero(uniqueLine.cantidad) : '', codigoAfectacion: uniqueLine?.codigo_afectacion_igv || '', valorUnitario: uniqueLine ? decimal(uniqueLine.precio_unitario) : '',
@@ -325,6 +335,8 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
     base: line.base_imponible === null ? '' : decimal(line.base_imponible),
     igv: line.igv === null ? '' : decimal(line.igv),
     totalLinea: decimal(line.importe_total),
+    sujetoSpot: (line as any).sujeto_spot ? 'SÍ' : 'NO',
+    codigoSpot: (line as any).codigo_spot || '',
     certificado: line.certificado || '',
     placa: line.placa || ''
   }));
@@ -339,22 +351,33 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
     // D. IMPORTES Y DESCUENTOS
     ['subtotal','SUBTOTAL'],['descuentos','DESCUENTOS'],['igv','IGV'],['total','IMPORTE TOTAL'],['moneda','MONEDA'],['fechaDocumento','FECHA DEL DOCUMENTO'],['fechaVencimiento','FECHA DE VENCIMIENTO'],
     // E. PAGOS
-    ['tipoPago','TIPO DE PAGO'],['formaPago','FORMA DE PAGO'],['montoPago','MONTO PAGO'],['referenciaPago','REFERENCIA DE PAGO'],['origen','ORIGEN PETICIÓN'],['detraccionPorcentaje','DETRACCIÓN (%)'],['detraccionNeto','DETRACCIÓN / IMPORTE NETO'],['detraccionImporte','DETRACCIÓN / IMPORTE'],['referenciaPagoExtra','Referencia de pago (ND ,BV ,FT ,NC)'],
+    ['tipoPago','TIPO DE PAGO'],['formaPago','FORMA DE PAGO'],['montoPago','MONTO PAGO'],['referenciaPago','REFERENCIA DE PAGO'],['origen','ORIGEN PETICIÓN'],
+    ['sujetoDetraccion','SUJETO A DETRACCIÓN'],
+    ['detraccionCodigo','CÓDIGO SPOT'],
+    ['detraccionDescripcion','DESCRIPCIÓN OPERACIÓN SPOT'],
+    ['detraccionPorcentaje','DETRACCIÓN (%)'],
+    ['detraccionBase','BASE DETRACCIÓN (S/)'],
+    ['detraccionImporte','MONTO DETRACCIÓN (S/)'],
+    ['detraccionNeto','NETO TRAS DETRACCIÓN (S/)'],
+    ['detraccionEstadoDeposito','ESTADO DEPÓSITO DETRACCIÓN'],
+    ['detraccionConstanciaNro','NRO. CONSTANCIA DEPÓSITO'],
+    ['detraccionConstanciaFecha','FECHA DEPÓSITO DETRACCIÓN'],
+    ['referenciaPagoExtra','Referencia de pago (ND ,BV ,FT ,NC)'],
     // F. ANULACIONES Y NOTAS DE CRÉDITO
     ['estadoSolicitudAnulacion','ESTADO DE SOLICITUD DE ANULACIÓN'],['tieneSolicitudAnulacion','¿TIENE SOLICITUD DE ANULACIÓN?'],['documentoAnulacion','NRO. DOCUMENTO ANULACIÓN'],['fechaAnulacionSolicitud','FECHA DE SOLICITUD DE ANULACIÓN'],['estadoAnulacionFiscal','ESTADO DE ANULACIÓN FISCAL'],['fechaAnulacionConfirmada','FECHA DE ANULACIÓN CONFIRMADA'],['ticketAnulacion','TICKET SUNAT ANULACIÓN'],['anulado','ANULACIÓN / NC REGISTRADA'],['motivoAnulacion','MOTIVO DE ANULACIÓN / RECHAZO'],['tieneNC','TIENE NOTA DE CRÉDITO?'],['cantidadNC','# NOTAS DE CRÉDITO'],['tieneND','TIENE NOTA DE DÉBITO?'],['cantidadND','# NOTAS DE DÉBITO'],['fechaReferencia','FECHA DE REF. DEL COMPROBANTE DE PAGO O DOCUMENTO MODIFICADO'],['tipoReferencia','TIPO DE REF. DEL COMPROBANTE DE PAGO O DOCUMENTO MODIFICADO'],['numeroReferencia','NÚMERO DE DOCUMENTO DE REF. DEL COMPROBANTE DE PAGO O DOCUMENTO MODIFICADO'],
     // G. PRODUCTOS Y DETALLE FISCAL
     ['items','ITEMS'],['codigoItem','CÓDIGO DE ITEM'],['descripcion','DESCRIPCIÓN'],['unidad','UNIDAD'],['cantidad','CANTIDAD'],['codigoAfectacion','CÓDIGO AFECT. IGV'],['valorUnitario','VALOR UNITARIO'],['valorReferencia','VALOR REF. UNITARIO'],['subtotalItem','SUBTOTAL'],['descuentosItem','DESCUENTOS'],['rc','RC'],['totalItem','TOTAL ITEM'],['ejecutivo','Ejecutivo (FT ,BV)'],['ordenTrabajo','Orden Trabajo (ND ,NC ,FT ,BV)'],['tipoDescuento','Tipo Descuento (BV ,FT)']
   ];
-  const columnasCabecera = headerSpecs.map(([key, header]) => ({ key, header, width: Math.max(16, Math.min(header.length + 2, 42)), ...(['subtotal','descuentos','igv','total','montoPago','detraccionNeto','detraccionImporte','valorUnitario','valorReferencia','subtotalItem','descuentosItem','rc','totalItem'].includes(key) ? { format: 'decimal2' as const } : {}) }));
+  const columnasCabecera = headerSpecs.map(([key, header]) => ({ key, header, width: Math.max(16, Math.min(header.length + 2, 42)), ...(['subtotal','descuentos','igv','total','montoPago','detraccionNeto','detraccionImporte','detraccionBase','valorUnitario','valorReferencia','subtotalItem','descuentosItem','rc','totalItem'].includes(key) ? { format: 'decimal2' as const } : {}) }));
   // Agrupación visual por bloques (1-indexed, encadenada sin huecos).
   const groupHeaders = [
     { header: 'A. IDENTIFICACIÓN DEL DOCUMENTO', start: 1, end: 10 },
     { header: 'B. CLIENTE Y EMISOR', start: 11, end: 13 },
     { header: 'C. CERTIFICADO / VEHÍCULO', start: 14, end: 20 },
     { header: 'D. IMPORTES Y DESCUENTOS', start: 21, end: 27 },
-    { header: 'E. PAGOS', start: 28, end: 36 },
-    { header: 'F. ANULACIONES Y NOTAS DE CRÉDITO', start: 37, end: 58 },
-    { header: 'G. PRODUCTOS Y DETALLE FISCAL', start: 59, end: headerSpecs.length }
+    { header: 'E. PAGOS Y DETRACCIONES SPOT', start: 28, end: 43 },
+    { header: 'F. ANULACIONES Y NOTAS DE CRÉDITO', start: 44, end: 65 },
+    { header: 'G. PRODUCTOS Y DETALLE FISCAL', start: 66, end: headerSpecs.length }
   ];
 
   const issuerGroups = new Map<string, typeof data.cabeceras>();
@@ -383,6 +406,7 @@ export function construirHojasDocumentosEmitidosExtendido(data: DocumentosEmitid
       ['sede', 'Sede', 24], ['tipoProducto', 'Tipo de producto', 26], ['codigoProducto', 'Código de producto', 22, 'text'],
       ['producto', 'Producto o servicio', 38], ['unidad', 'Unidad', 14], ['cantidad', 'Cantidad', 14], ['precioUnitario', 'Precio unitario', 18, 'decimal2'],
       ['base', 'Base imponible', 18, 'decimal2'], ['igv', 'IGV', 14, 'decimal2'], ['totalLinea', 'Total de línea', 18, 'decimal2'],
+      ['sujetoSpot', 'Sujeto a SPOT', 16], ['codigoSpot', 'Código SPOT', 16, 'text'],
       ['certificado', 'Certificado relacionado', 26], ['placa', 'Placa', 18]
     ), rows: lineRows });
   }

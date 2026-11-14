@@ -36,6 +36,17 @@ export interface DocumentoFacturacionAdmin {
   intentos: number;
   fechaUltimoIntento: string | null;
   fechaCreacion: string;
+  sujetoDetraccion?: boolean;
+  detraccionCodigo?: string | null;
+  detraccionDescripcion?: string | null;
+  detraccionPorcentaje?: number | null;
+  detraccionBase?: number | null;
+  detraccionMonto?: number | null;
+  detraccionNeto?: number | null;
+  detraccionEstadoDeposito?: 'PENDIENTE' | 'DEPOSITADO' | 'NO_APLICA' | string | null;
+  detraccionConstanciaNro?: string | null;
+  detraccionConstanciaFecha?: string | null;
+  detraccionMotivoExclusion?: string | null;
 }
 
 export interface OperacionFacturacionAdmin {
@@ -86,5 +97,11 @@ export const faregasFacturacionAdminApi = {
     documento: DocumentoFacturacionAdmin;
     intentos: OperacionFacturacionAdmin[];
     operaciones: OperacionFacturacionAdmin[];
-  } }>(`/facturacion/admin/documentos/${id}`)
+  } }>(`/facturacion/admin/documentos/${id}`),
+  registrarConstanciaDetraccion: (id: number, data: { constanciaNro: string; constanciaFecha: string }) => {
+    return faregasFetch(`/certificados/facturacion/admin/documentos/${id}/detraccion-constancia`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }) as Promise<{ ok: boolean; data: DocumentoFacturacionAdmin; message: string }>;
+  }
 };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, FileSearch, Loader2, RefreshCw, X } from 'lucide-react';
+import { ExternalLink, FileSearch, Loader2, RefreshCw, X, Receipt } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { faregasCertificadosApi } from '../../../services/faregas-certificados.api';
@@ -237,7 +237,20 @@ export default function TabDocumentosFacturacion() {
               <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 text-xs">
                 <div className="col-span-2"><dt className="font-bold text-slate-400">CLIENTE</dt><dd className="mt-0.5 break-words font-semibold text-slate-700">{documento.cliente}</dd><dd className="text-slate-500">{documento.nroDocumento} · {documento.placa || 'Sin placa'}</dd></div>
                 <div><dt className="font-bold text-slate-400">EMPRESA / SEDE</dt><dd className="mt-0.5 break-words text-slate-700">{documento.empresaNombre}<br />{documento.plantaNombre}</dd></div>
-                <div><dt className="font-bold text-slate-400">TOTAL</dt><dd className="mt-0.5 text-base font-black text-[#052a79]">S/ {documento.importeTotal.toFixed(2)}</dd></div>
+                <div>
+                  <dt className="font-bold text-slate-400">TOTAL</dt>
+                  <dd className="mt-0.5 text-base font-black text-[#052a79]">S/ {documento.importeTotal.toFixed(2)}</dd>
+                  {documento.sujetoDetraccion && (
+                    <dd className="mt-1">
+                      <span className="inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">
+                        SPOT {documento.detraccionPorcentaje}%: S/ {documento.detraccionMonto?.toFixed(2)}
+                      </span>
+                      <span className={`block text-[10px] font-semibold mt-0.5 ${documento.detraccionEstadoDeposito === 'DEPOSITADO' ? 'text-green-700' : 'text-amber-700'}`}>
+                        {documento.detraccionEstadoDeposito === 'DEPOSITADO' ? `Depósito: ${documento.detraccionConstanciaNro || 'SÍ'}` : 'Depósito PENDIENTE'}
+                      </span>
+                    </dd>
+                  )}
+                </div>
                 <div className="col-span-2"><dt className="font-bold text-slate-400">ANULACIÓN</dt><dd className="mt-1"><span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold ${anulacion.clase}`}>{anulacion.texto}</span></dd></div>
               </dl>
               <div className="mt-4 border-t border-slate-100 pt-3">{accionesDocumento(documento)}</div>
@@ -260,7 +273,21 @@ export default function TabDocumentosFacturacion() {
                 <td className="p-3"><div className="font-bold">{documento.nroComprobante || 'SIN NÚMERO'}</div><div className="text-xs text-slate-500">{documento.tipoComprobante} · {documento.origen === 'VENTA_CHIP' ? `Venta de Chip · Op. ${documento.operacionId}` : documento.origen === 'CERTIFICADO' ? `Cert. ${documento.certificadoId}` : 'Operación'}</div></td>
                 <td className="p-3"><div className="font-semibold">{documento.cliente}</div><div className="text-xs text-slate-500">{documento.nroDocumento} · {documento.placa || 'Sin placa'}</div></td>
                 <td className="p-3"><div>{documento.empresaNombre}</div><div className="text-xs text-slate-500">{documento.plantaNombre}</div></td>
-                <td className="p-3 font-bold">S/ {documento.importeTotal.toFixed(2)}</td>
+                <td className="p-3">
+                  <div className="font-bold">S/ {documento.importeTotal.toFixed(2)}</div>
+                  {documento.sujetoDetraccion && (
+                    <div className="mt-1 space-y-0.5">
+                      <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">
+                        SPOT {documento.detraccionPorcentaje}%: S/ {documento.detraccionMonto?.toFixed(2)}
+                      </span>
+                      {documento.detraccionEstadoDeposito === 'DEPOSITADO' ? (
+                        <span className="block text-[10px] font-semibold text-green-700">Depósito: {documento.detraccionConstanciaNro || 'SÍ'}</span>
+                      ) : (
+                        <span className="block text-[10px] font-semibold text-amber-700">Depósito PENDIENTE</span>
+                      )}
+                    </div>
+                  )}
+                </td>
                 <td className="p-3"><span className={`rounded-full px-2 py-1 text-xs font-bold ${estadoClass(documento.estado)}`}>{documento.estado}</span><div className="mt-1 text-xs text-slate-500">{documento.intentos} intento(s)</div></td>
                 <td className="p-3"><span className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-bold ${anulacion.clase}`}>{anulacion.texto}</span>{documento.fechaSolicitudAnulacion && <div className="mt-1 text-xs text-slate-500">{fechaLocal(documento.fechaSolicitudAnulacion)}</div>}</td>
                 <td className="p-3">{accionesDocumento(documento)}</td>
@@ -288,14 +315,220 @@ export default function TabDocumentosFacturacion() {
         }}
       />
 
-      {detalle && <DetalleModal detalle={detalle} onClose={() => setDetalle(null)} />}
+      {detalle && <DetalleModal detalle={detalle} onClose={() => setDetalle(null)} onActualizado={() => { void cargar(); }} />}
     </div>
   );
 }
 
-function DetalleModal({ detalle, onClose }: { detalle: DetalleState; onClose: () => void }) {
+function DetalleModal({ detalle, onClose, onActualizado }: { detalle: DetalleState; onClose: () => void; onActualizado?: () => void }) {
+  const [constanciaNro, setConstanciaNro] = useState(detalle.documento.detraccionConstanciaNro || '');
+  const [constanciaFecha, setConstanciaFecha] = useState(detalle.documento.detraccionConstanciaFecha ? String(detalle.documento.detraccionConstanciaFecha).slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const [guardandoConstancia, setGuardandoConstancia] = useState(false);
+  const [docDetalle, setDocDetalle] = useState(detalle.documento);
+
+  const handleGuardarConstancia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!constanciaNro.trim()) {
+      await Swal.fire('Atención', 'Ingrese el número de constancia de depósito.', 'warning');
+      return;
+    }
+    setGuardandoConstancia(true);
+    try {
+      const resp = await faregasFacturacionAdminApi.registrarConstanciaDetraccion(docDetalle.id, {
+        constanciaNro: constanciaNro.trim(),
+        constanciaFecha
+      });
+      setDocDetalle(resp.data);
+      await Swal.fire('Éxito', 'Constancia de detracción registrada correctamente.', 'success');
+      if (onActualizado) onActualizado();
+    } catch (err: unknown) {
+      await Swal.fire('Error', err instanceof Error ? err.message : 'No se pudo registrar la constancia.', 'error');
+    } finally {
+      setGuardandoConstancia(false);
+    }
+  };
+
   const registros = [...detalle.operaciones, ...detalle.intentos]
     .sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime());
-  const anulacion = anulacionPresentacion(detalle.documento);
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-2xl"><div className="sticky top-0 flex items-center justify-between border-b bg-white p-5"><div><h3 className="flex items-center gap-2 text-lg font-black text-[#052a79]"><FileSearch className="h-5 w-5" /> {detalle.documento.nroComprobante || 'Comprobante sin número'}</h3><p className="text-sm text-slate-500">Historial técnico sin datos secretos</p></div><button onClick={onClose}><X /></button></div><div className="space-y-4 p-5"><div className="grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4"><div><span className="text-xs text-slate-500">Cliente</span><p className="font-bold">{detalle.documento.cliente}</p></div><div><span className="text-xs text-slate-500">Sede</span><p className="font-bold">{detalle.documento.plantaNombre}</p></div><div><span className="text-xs text-slate-500">Estado comprobante</span><p className="font-bold">{detalle.documento.estado}</p></div><div><span className="text-xs text-slate-500">Ambiente</span><p className="font-bold">{detalle.documento.entornoFacturador || '—'}</p></div></div>{detalle.documento.anulacionId && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm"><div className="flex flex-wrap items-center gap-2"><span className="font-black text-slate-800">Anulación #{detalle.documento.anulacionId}</span><span className={`rounded-full px-2 py-1 text-xs font-bold ${anulacion.clase}`}>{anulacion.texto}</span></div><p className="mt-2"><span className="font-semibold">Motivo:</span> {detalle.documento.motivoAnulacion || '—'}</p>{detalle.documento.descripcionAnulacion && <p className="mt-1 text-slate-600">{detalle.documento.descripcionAnulacion}</p>}<p className="mt-1 text-xs text-slate-500">Solicitada: {fechaLocal(detalle.documento.fechaSolicitudAnulacion)}{detalle.documento.ticketAnulacionSunat ? ` · Ticket SUNAT: ${detalle.documento.ticketAnulacionSunat}` : ''}</p></div>}{detalle.documento.mensajeSunat && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{detalle.documento.mensajeSunat}</div>}<div className="overflow-x-auto rounded-xl border"><table className="min-w-full text-sm"><thead className="bg-slate-100 text-left"><tr><th className="p-3">Fecha</th><th className="p-3">Operación</th><th className="p-3">Intento</th><th className="p-3">Estado</th><th className="p-3">HTTP / error</th></tr></thead><tbody>{registros.map((registro, index) => <tr key={`${registro.operacion || 'EMITIR'}-${registro.numero_intento}-${index}`} className="border-t"><td className="p-3">{fechaLocal(registro.fecha_creacion)}</td><td className="p-3">{registro.operacion || 'EMITIR'}</td><td className="p-3">{registro.numero_intento}</td><td className="p-3">{registro.estado}</td><td className="p-3">{registro.http_status || '—'} {registro.error ? `· ${registro.error}` : ''}</td></tr>)}{registros.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-500">Sin intentos registrados.</td></tr>}</tbody></table></div><div className="flex flex-wrap gap-3">{detalle.documento.enlacePdf && <a target="_blank" rel="noreferrer" href={detalle.documento.enlacePdf} className="rounded-lg bg-[#052a79] px-4 py-2 font-bold text-white">PDF</a>}{detalle.documento.enlaceXml && <a target="_blank" rel="noreferrer" href={detalle.documento.enlaceXml} className="rounded-lg border px-4 py-2 font-bold">XML</a>}{detalle.documento.enlaceCdr && <a target="_blank" rel="noreferrer" href={detalle.documento.enlaceCdr} className="rounded-lg border px-4 py-2 font-bold">CDR</a>}</div></div></div></div>;
+  const anulacion = anulacionPresentacion(docDetalle);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-2xl">
+        <div className="sticky top-0 flex items-center justify-between border-b bg-white p-5">
+          <div>
+            <h3 className="flex items-center gap-2 text-lg font-black text-[#052a79]">
+              <FileSearch className="h-5 w-5" /> {docDetalle.nroComprobante || 'Comprobante sin número'}
+            </h3>
+            <p className="text-sm text-slate-500">Historial técnico sin datos secretos</p>
+          </div>
+          <button onClick={onClose}><X /></button>
+        </div>
+        <div className="space-y-4 p-5">
+          <div className="grid gap-3 rounded-xl bg-slate-50 p-4 md:grid-cols-4">
+            <div><span className="text-xs text-slate-500">Cliente</span><p className="font-bold">{docDetalle.cliente}</p></div>
+            <div><span className="text-xs text-slate-500">Sede</span><p className="font-bold">{docDetalle.plantaNombre}</p></div>
+            <div><span className="text-xs text-slate-500">Estado comprobante</span><p className="font-bold">{docDetalle.estado}</p></div>
+            <div><span className="text-xs text-slate-500">Ambiente</span><p className="font-bold">{docDetalle.entornoFacturador || '—'}</p></div>
+          </div>
+
+          {/* Bloque Detracciones SPOT */}
+          <div className="rounded-xl border border-purple-200 bg-purple-50/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-purple-700" />
+                <h4 className="font-bold text-purple-900">Régimen de Detracciones SPOT (SUNAT)</h4>
+              </div>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                docDetalle.sujetoDetraccion 
+                  ? docDetalle.detraccionEstadoDeposito === 'DEPOSITADO'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-amber-100 text-amber-800'
+                  : 'bg-slate-100 text-slate-700'
+              }`}>
+                {docDetalle.sujetoDetraccion
+                  ? (docDetalle.detraccionEstadoDeposito === 'DEPOSITADO' ? 'DEPOSITADO' : 'PENDIENTE DE DEPÓSITO')
+                  : 'NO SUJETO A SPOT'}
+              </span>
+            </div>
+
+            {docDetalle.sujetoDetraccion ? (
+              <div className="mt-3 space-y-4 text-xs text-slate-700">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div>
+                    <span className="text-slate-500 font-medium">Código SPOT:</span>
+                    <p className="font-bold text-slate-900">{docDetalle.detraccionCodigo || '037'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Tasa / Porcentaje:</span>
+                    <p className="font-bold text-slate-900">{docDetalle.detraccionPorcentaje}%</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Base Imponible:</span>
+                    <p className="font-bold text-slate-900">S/ {docDetalle.detraccionBase?.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Monto Detracción (SUNAT):</span>
+                    <p className="font-bold text-purple-900">S/ {docDetalle.detraccionMonto?.toFixed(2)}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div>
+                    <span className="text-slate-500 font-medium">Neto a Cobrar:</span>
+                    <p className="font-bold text-blue-900">S/ {docDetalle.detraccionNeto?.toFixed(2)}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500 font-medium">Descripción Operación SPOT:</span>
+                    <p className="font-semibold text-slate-800">{docDetalle.detraccionDescripcion || 'Demás servicios gravados con el IGV'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Medio de Pago:</span>
+                    <p className="font-semibold text-slate-800">001 - Depósito Banco Nación</p>
+                  </div>
+                </div>
+
+                {docDetalle.detraccionEstadoDeposito === 'DEPOSITADO' ? (
+                  <div className="rounded-lg bg-green-50 border border-green-200 p-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-green-800 font-bold block">Constancia de Depósito Registrada</span>
+                      <span className="text-slate-600">N° Constancia: <strong>{docDetalle.detraccionConstanciaNro}</strong></span>
+                      {docDetalle.detraccionConstanciaFecha && (
+                        <span className="text-slate-600 ml-3">Fecha: <strong>{String(docDetalle.detraccionConstanciaFecha).slice(0, 10)}</strong></span>
+                      )}
+                    </div>
+                    <span className="text-xs bg-green-200 text-green-900 px-2 py-0.5 rounded font-bold">Verificado</span>
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-amber-900">Registrar Constancia de Depósito</span>
+                      <span className="text-[11px] text-amber-700">Pendiente de acreditación Banco de la Nación</span>
+                    </div>
+                    <form onSubmit={handleGuardarConstancia} className="flex flex-wrap items-end gap-2">
+                      <div className="flex-1 min-w-[140px]">
+                        <label className="text-[11px] text-slate-600 block mb-0.5">N° Constancia</label>
+                        <input
+                          type="text"
+                          required
+                          value={constanciaNro}
+                          onChange={(e) => setConstanciaNro(e.target.value)}
+                          placeholder="Ej. 12345678"
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div className="flex-1 min-w-[130px]">
+                        <label className="text-[11px] text-slate-600 block mb-0.5">Fecha Depósito</label>
+                        <input
+                          type="date"
+                          required
+                          value={constanciaFecha}
+                          onChange={(e) => setConstanciaFecha(e.target.value)}
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={guardandoConstancia}
+                        className="bg-purple-700 hover:bg-purple-800 text-white font-bold px-3 py-1.5 rounded text-xs transition disabled:opacity-50"
+                      >
+                        {guardandoConstancia ? 'Guardando...' : 'Registrar'}
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2 text-xs text-slate-600 flex items-center gap-2">
+                <span>Operación no sujeta a detracción SPOT</span>
+                {docDetalle.detraccionMotivoExclusion && (
+                  <span className="text-slate-400">({docDetalle.detraccionMotivoExclusion})</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {docDetalle.anulacionId && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-black text-slate-800">Anulación #{docDetalle.anulacionId}</span>
+                <span className={`rounded-full px-2 py-1 text-xs font-bold ${anulacion.clase}`}>{anulacion.texto}</span>
+              </div>
+              <p className="mt-2"><span className="font-semibold">Motivo:</span> {docDetalle.motivoAnulacion || '—'}</p>
+              {docDetalle.descripcionAnulacion && <p className="mt-1 text-slate-600">{docDetalle.descripcionAnulacion}</p>}
+              <p className="mt-1 text-xs text-slate-500">Solicitada: {fechaLocal(docDetalle.fechaSolicitudAnulacion)}{docDetalle.ticketAnulacionSunat ? ` · Ticket SUNAT: ${docDetalle.ticketAnulacionSunat}` : ''}</p>
+            </div>
+          )}
+
+          {docDetalle.mensajeSunat && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{docDetalle.mensajeSunat}</div>}
+
+          <div className="overflow-x-auto rounded-xl border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-100 text-left">
+                <tr><th className="p-3">Fecha</th><th className="p-3">Operación</th><th className="p-3">Intento</th><th className="p-3">Estado</th><th className="p-3">HTTP / error</th></tr>
+              </thead>
+              <tbody>
+                {registros.map((registro, index) => (
+                  <tr key={`${registro.operacion || 'EMITIR'}-${registro.numero_intento}-${index}`} className="border-t">
+                    <td className="p-3">{fechaLocal(registro.fecha_creacion)}</td>
+                    <td className="p-3">{registro.operacion || 'EMITIR'}</td>
+                    <td className="p-3">{registro.numero_intento}</td>
+                    <td className="p-3">{registro.estado}</td>
+                    <td className="p-3">{registro.http_status || '—'} {registro.error ? `· ${registro.error}` : ''}</td>
+                  </tr>
+                ))}
+                {registros.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-slate-500">Sin intentos registrados.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            {docDetalle.enlacePdf && <a target="_blank" rel="noreferrer" href={docDetalle.enlacePdf} className="rounded-lg bg-[#052a79] px-4 py-2 font-bold text-white">PDF</a>}
+            {docDetalle.enlaceXml && <a target="_blank" rel="noreferrer" href={docDetalle.enlaceXml} className="rounded-lg border px-4 py-2 font-bold">XML</a>}
+            {docDetalle.enlaceCdr && <a target="_blank" rel="noreferrer" href={docDetalle.enlaceCdr} className="rounded-lg border px-4 py-2 font-bold">CDR</a>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
