@@ -252,6 +252,10 @@ export interface ResultadoAprobarYEjecutar {
 }
 
 export const faregasSolicitudesOperacionApi = {
+  contextoNotaCredito: async (certificadoId: number): Promise<ContextoSolicitudOperacion> => {
+    const response = await faregasFetch(`/solicitudes-operacion/certificados/${certificadoId}/contexto?tipoOperacion=EMITIR_NOTA_CREDITO`);
+    return response.data;
+  },
   contexto: async (certificadoId: number): Promise<ContextoSolicitudOperacion> => {
     const respuesta = await faregasFetch(`/solicitudes-operacion/certificados/${certificadoId}/contexto`);
     return respuesta.data;

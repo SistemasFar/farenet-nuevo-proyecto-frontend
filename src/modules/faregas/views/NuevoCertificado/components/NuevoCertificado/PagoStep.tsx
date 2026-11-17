@@ -28,7 +28,7 @@ interface PagoStepProps {
   tipoComprobante: string;
   spotServicio?: { sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
   spotProducto?: { productoFacturacionId?: number | null; sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
-  tipoItemSpot?: 'PRODUCTO' | 'SERVICIO';
+  tipoItemSpot?: 'PRODUCTO' | 'SERVICIO' | 'MIXTO';
   condicionPago: 'CONTADO' | 'CREDITO';
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
   fechaInicioCredito: string;
@@ -42,7 +42,7 @@ interface PagoStepProps {
   onCorregirCampo?: (campo: string) => void;
   certificadoId?: number;
   descuentoActual?: ConsultaDescuentoResult | null;
-  onDescuentoChange: (descuento: ConsultaDescuentoResult | null) => void;
+  onDescuentoChange?: (descuento: ConsultaDescuentoResult | null) => void;
 }
 
 export function PagoStep({
@@ -76,7 +76,7 @@ export function PagoStep({
   onCorregirCampo,
   certificadoId,
   descuentoActual = null,
-  onDescuentoChange,
+  onDescuentoChange = () => undefined,
 }: PagoStepProps) {
 
   const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
@@ -87,6 +87,7 @@ export function PagoStep({
     esCortesia,
     servicio: tipoItemSpot === 'PRODUCTO' ? spotProducto : spotServicio,
     tipoItem: tipoItemSpot,
+    umbralComercial: maestrosPago?.politicaSpot?.umbralComercial,
   });
   const totalExigible = esCortesia ? 0 : evaluacionSpot.netoCobrar;
   const totalPagarCalculado = esCortesia ? 0 : totalPagar;
@@ -103,6 +104,16 @@ export function PagoStep({
   const nombreTarjetaSeleccionada = String(tarjetaSeleccionada?.nombre || '').toUpperCase();
   const esMedioAlternativo = ['YAPE', 'PLIN', 'CUPONIDAD'].some((nombre) => nombreTarjetaSeleccionada.includes(nombre));
   const esBoleta = String(tipoComprobante || '').toUpperCase() === 'BOLETA';
+  const prefijoEvaluacionSpot = evaluacionSpot.umbralComercialAlcanzado
+    ? `El importe cumple el umbral comercial de S/ ${evaluacionSpot.umbralComercial.toFixed(2)}`
+    : 'La evaluación legal del concepto confirma';
+  const mensajeSpotNoAplicado = evaluacionSpot.motivoExclusion === 'BIEN_MUEBLE_NO_SUJETO_A_SPOT'
+    ? `${prefijoEvaluacionSpot}, pero el producto está configurado como no sujeto a detracción. No se calcula SPOT y el total se mantiene en S/ ${totalPagarCalculado.toFixed(2)}.`
+    : evaluacionSpot.motivoExclusion === 'SERVICIO_EXCLUIDO_POR_CONFIGURACION'
+      ? `${prefijoEvaluacionSpot}, pero el servicio está configurado como no sujeto a detracción. No se calcula SPOT y el total se mantiene en S/ ${totalPagarCalculado.toFixed(2)}.`
+      : evaluacionSpot.motivoExclusion === 'IMPORTE_MENOR_O_IGUAL_A_700'
+        ? 'El concepto está clasificado como sujeto a SPOT, pero el importe no supera S/ 700.00; se conserva el total sin detracción.'
+        : `Importe bajo el umbral comercial de evaluación de S/ ${evaluacionSpot.umbralComercial.toFixed(2)}. No se aplica detracción y se conserva el total.`;
 
   useEffect(() => {
     if (pagoTab !== 'BANCO' || !cuentaFaregas) return;
@@ -507,17 +518,27 @@ export function PagoStep({
                 Boleta: no se aplica detracción por este comprobante. Por superar S/ 700, los datos de identificación del comprador deben constar en el comprobante.
               </p>
             )}
-            {tipoComprobante === 'FACTURA' && totalPagar > 700 && String(evaluacionSpot.motivoExclusion || '').startsWith('CLASIFICACION_SPOT_') && (
+            {tipoComprobante === 'FACTURA' && evaluacionSpot.requiereRevision && (
               <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-800">
-                {tipoItemSpot === 'PRODUCTO'
+                {evaluacionSpot.motivoExclusion === 'CONCEPTOS_MIXTOS_REQUIEREN_REVISION'
+                  ? 'Esta factura combina productos y servicios. El tratamiento SPOT de cada base no se puede inferir del total; revise los conceptos antes de emitir.'
+                  : tipoItemSpot === 'PRODUCTO'
                   ? `Producto fiscal #${spotProducto?.productoFacturacionId ?? 'sin vínculo'}: clasificación SPOT pendiente o incompleta. Revise este registro en Configuración → Productos antes de emitir.`
                   : 'No se puede verificar la clasificación SPOT de esta operación. Revise la clasificación fiscal del servicio en Configuración → Servicios antes de emitir.'}
               </div>
+            )}
+            {tipoComprobante === 'FACTURA' && !evaluacionSpot.aplica && !evaluacionSpot.requiereRevision && (
+              <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-700">
+                {mensajeSpotNoAplicado}
+              </p>
             )}
             {evaluacionSpot.aplica && (
               <div className="mt-2 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
                 <span>Estado del depósito de detracción</span><strong className="text-amber-700">PENDIENTE — constancia no registrada</strong>
               </div>
+            )}
+            {evaluacionSpot.aplica && (
+              <p className="mt-2 text-[11px] text-slate-600">Cuenta Banco de la Nación: se usa la cuenta vinculada al RUC emisor en la configuración de NubeFact del ambiente activo.</p>
             )}
             {excesoPagado > 0.009 && (
               <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-800">

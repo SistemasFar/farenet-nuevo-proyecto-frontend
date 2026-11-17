@@ -33,7 +33,7 @@ const request = async (
   }
 
   if (!response.ok) {
-    let message = 'Error en la peticion';
+    let message = `Error HTTP ${response.status} al completar la petición FAREGAS.`;
     let codigo: string | undefined;
     let detalles: unknown;
     try {

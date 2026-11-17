@@ -1,4 +1,4 @@
-import { faregasFetch as fetchWithToken } from './faregas-http-client';
+import { faregasFetch as fetchWithToken, faregasFetchWithStatus } from './faregas-http-client';
 import type {
   ActualizarPerfilFaregasRequest,
   ActualizarUsuarioFaregasRequest,
@@ -20,6 +20,10 @@ export const faregasUsuariosApi = {
   cambiarPassword: (username: string, password: string) => fetchWithToken(`/usuarios/${username}/password`, {
     method: 'PATCH',
     body: JSON.stringify({ password })
+  }),
+  restablecerCredencialesTemporales: (credenciales: Array<{ username: string; password: string }>) => faregasFetchWithStatus('/usuarios/credenciales/restablecer', {
+    method: 'POST',
+    body: JSON.stringify({ credenciales })
   }),
   eliminarUsuario: (username: string) => fetchWithToken(`/usuarios/${username}`, {
     method: 'DELETE'

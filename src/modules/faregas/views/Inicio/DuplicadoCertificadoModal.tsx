@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Copy, Download, F
 import Swal from 'sweetalert2';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import { faregasPagosApi } from '../../services/faregas-pagos.api';
+import { esRucValido } from '../NuevoCertificado/faregas-wizard.validation';
 import {
   faregasDuplicadosApi,
   type CandidatoDuplicado,
@@ -56,6 +57,32 @@ const textoFechaHora = (fecha?: string | null) => {
 const mensajeError = (error: unknown) => error instanceof Error
   ? error.message
   : 'No se pudo completar la operación.';
+
+const mapearErroresFacturacion = (error: unknown): Record<string, string> => {
+  const dato = error as { codigo?: string; detalles?: unknown };
+  if (dato?.codigo !== 'DATOS_FACTURACION_INVALIDOS') return {};
+  const detalles = Array.isArray(dato.detalles)
+    ? dato.detalles
+    : (dato.detalles && typeof dato.detalles === 'object' && Array.isArray((dato.detalles as { errores?: unknown }).errores)
+      ? (dato.detalles as { errores: unknown[] }).errores
+      : []);
+  const resultado: Record<string, string[]> = {};
+  for (const item of detalles) {
+    const texto = typeof item === 'string'
+      ? item
+      : String((item as { mensaje?: unknown })?.mensaje || '');
+    const normalizado = texto.toLocaleLowerCase('es-PE');
+    let campo: string | null = null;
+    if (/tipo de documento/.test(normalizado)) campo = 'tipoDocumento';
+    else if (/ruc|dni|documento|carnet/.test(normalizado)) campo = 'documento';
+    else if (/nombre|raz[oó]n social/.test(normalizado)) campo = 'nombre';
+    else if (/direcci[oó]n/.test(normalizado)) campo = 'direccion';
+    else if (/correo|email/.test(normalizado)) campo = 'email';
+    else if (/tel[eé]fono/.test(normalizado)) campo = 'telefono';
+    if (campo) (resultado[campo] ||= []).push(texto);
+  }
+  return Object.fromEntries(Object.entries(resultado).map(([campo, mensajes]) => [campo, mensajes.join(' ')]));
+};
 
 export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) {
   const [tipos, setTipos] = useState<TipoDuplicado[]>([]);
@@ -425,6 +452,8 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
       errores.documento = 'El DNI debe tener 8 dígitos numéricos.';
     } else if (tipoDocumento === 'RUC' && !/^\d{11}$/.test(docLimpio)) {
       errores.documento = 'El RUC debe tener 11 dígitos numéricos.';
+    } else if (tipoComprobante === 'FACTURA' && tipoDocumento === 'RUC' && !esRucValido(docLimpio)) {
+      errores.documento = 'El RUC no tiene un dígito verificador válido.';
     } else if (tipoDocumento === 'CARNETEXTRANJERIA' && !/^[A-Z0-9]{1,20}$/.test(docLimpio)) {
       errores.documento = 'El carnet de extranjería debe contener hasta 20 caracteres.';
     } else if (tipoComprobante === 'FACTURA' && tipoDocumento !== 'RUC') {
@@ -525,7 +554,17 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
       } catch {
         // Se conserva la solicitud local para permitir reintentar.
       }
-      setError(mensajeError(err));
+      const erroresFacturacion = mapearErroresFacturacion(err);
+      if (Object.keys(erroresFacturacion).length > 0) {
+        setErroresCampos(erroresFacturacion);
+        setError('');
+        if (erroresFacturacion.documento) document.getElementById('duplicado-documento')?.focus();
+        else if (erroresFacturacion.tipoDocumento) document.getElementById('duplicado-tipo-documento')?.focus();
+        else if (erroresFacturacion.nombre) document.getElementById('duplicado-nombre')?.focus();
+        else if (erroresFacturacion.direccion) document.getElementById('duplicado-direccion')?.focus();
+      } else {
+        setError(mensajeError(err));
+      }
     } finally {
       procesandoRef.current = false;
       setProcesando(false);
@@ -784,6 +823,11 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                   )}
                   <section className="rounded-xl border border-slate-200 p-4">
                     <h3 className="font-black text-slate-800">Datos del comprobante</h3>
+                    {tipoComprobante === 'FACTURA' && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Los datos precargados pertenecen al cliente asociado al certificado. Confirme o edite el RUC, nombre o razón social y dirección fiscal antes de emitir.
+                      </p>
+                    )}
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <div>
                         <label className="text-xs font-bold text-slate-600 block mb-1">COMPROBANTE</label>
@@ -795,8 +839,22 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                             setTipoComprobante(valor);
                             limpiarError('tipoComprobante');
                             if (valor === 'FACTURA') {
+                              if (tipoDocumento !== 'RUC') {
+                                setDocumento('');
+                                setNombre('');
+                                setDireccion('');
+                              }
                               setTipoDocumento('RUC');
                               limpiarError('tipoDocumento');
+                              limpiarError('documento');
+                            } else if (tipoDocumento === 'RUC') {
+                              // Al cambiar a boleta, se solicita el documento de identidad correspondiente.
+                              setTipoDocumento('DNI');
+                              setDocumento('');
+                              setNombre('');
+                              setDireccion('');
+                              limpiarError('tipoDocumento');
+                              limpiarError('documento');
                             }
                           }}
                           className={inputClase('tipoComprobante')}

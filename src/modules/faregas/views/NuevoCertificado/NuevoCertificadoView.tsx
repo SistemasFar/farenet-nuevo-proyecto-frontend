@@ -39,6 +39,7 @@ import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './fare
 import { descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { normalizarCombustibleGnvAnual } from './faregas-certificado-campos';
 import { ControlAutosave, crearSnapshotAutosave } from './autosave-control';
+import { esGlpInicial, normalizarCategoriaRecuperada, normalizarCombustibleRecuperado } from './normalizar-recuperacion-vehiculo';
 
 
 
@@ -72,6 +73,7 @@ export interface FormPagoState {
   entidadFinancieraKey: string;
   voucher?: string;
   nroOperacion?: string;
+  digitosTarjeta?: string;
   fechaOperacion?: string;
   cuentaCorrienteKey?: string;
   fechaDeposito?: string;
@@ -111,6 +113,13 @@ export interface FormVerificacionState {
 }
 
 const textValue = (value: unknown) => value === null || value === undefined ? '' : String(value);
+const mensajeErrorConEstadoHttp = (error: any, fallback: string) => {
+  const mensaje = String(error?.message || fallback).trim();
+  const status = Number(error?.status);
+  return Number.isInteger(status) && status > 0 && !/\bHTTP\s+\d{3}\b/i.test(mensaje)
+    ? `${mensaje} (HTTP ${status})`
+    : mensaje;
+};
 const normalizarPlacaWizard = (value: unknown) => textValue(value).trim().toUpperCase();
 const fechaLocalIso = (fecha = new Date()) => {
   const anio = fecha.getFullYear();
@@ -153,7 +162,7 @@ export { calcularVigenciaHasta };
 const enteroValue = (value: unknown, maximoDigitos: number) =>
   normalizarEnteroCertificado(textValue(value), maximoDigitos);
 
-const mapVehiculoBorrador = (vehiculo: any): Partial<FormVehiculoState> => ({
+const mapVehiculoBorrador = (vehiculo: any, limpiarCombustibleIncompatible = false): Partial<FormVehiculoState> => ({
   placaNueva: normalizarPlacaWizard(vehiculo.placa),
   clase: textValue(vehiculo.clase),
   marca: textValue(vehiculo.marca),
@@ -164,7 +173,7 @@ const mapVehiculoBorrador = (vehiculo: any): Partial<FormVehiculoState> => ({
   vin: textValue(vehiculo.vin),
   serieChasis: textValue(vehiculo.serie_chasis ?? vehiculo.serieChasis),
   numeroMotor: textValue(vehiculo.numero_motor ?? vehiculo.numeroMotor),
-  combustible: textValue(vehiculo.combustible),
+  combustible: normalizarCombustibleRecuperado(vehiculo.combustible, limpiarCombustibleIncompatible).valor,
   color: textValue(vehiculo.color),
   carroceria: textValue(vehiculo.carroceria),
   marcaCarroceria: textValue(vehiculo.marca_carroceria ?? vehiculo.marcaCarroceria),
@@ -243,10 +252,16 @@ const crearSnapshotVehiculo = (estado: EstadoVehiculoPersistible) => crearSnapsh
 const construirEstadoVehiculoRecuperado = (
   data: any,
   actual: EstadoVehiculoPersistible,
-  placaSolicitada: string
+  placaSolicitada: string,
+  categoriasDisponibles: Array<{ key: string; nombre: string }> = [],
 ): EstadoVehiculoPersistible => {
+  const limpiarCombustibleIncompatible = esGlpInicial(
+    actual.formCaja.tipoCertificado,
+    actual.formCaja.modalidadCertificado,
+  );
   const placa = normalizarPlacaWizard(data.placa) || placaSolicitada;
-  const categoria = textValue(data.categoriaKey ?? data.categoria) || actual.formCaja.categoria;
+  const categoriaRecuperada = normalizarCategoriaRecuperada(data.categoriaKey ?? data.categoria, categoriasDisponibles);
+  const categoria = categoriaRecuperada.valor || (categoriaRecuperada.valorOriginal ? '' : actual.formCaja.categoria);
   const titularesRecuperados = Array.isArray(data.titularesFaregas) && data.titularesFaregas.length > 0
     ? data.titularesFaregas.map((titular: any) => mapTitularBorrador({ ...titular, id: null }))
     : actual.titulares;
@@ -346,7 +361,7 @@ const construirEstadoVehiculoRecuperado = (
   return {
     ...actual,
     formCaja: { ...actual.formCaja, placa, categoria },
-    formVehiculo: { ...actual.formVehiculo, ...mapVehiculoBorrador(data), placaNueva: placa },
+    formVehiculo: { ...actual.formVehiculo, ...mapVehiculoBorrador(data, limpiarCombustibleIncompatible), placaNueva: placa },
     titulares: titularesRecuperados,
     formGlp,
     formGnv,
@@ -536,6 +551,7 @@ function NuevoCertificadoWizard() {
   const [catalogoVerificaciones, setCatalogoVerificaciones] = useState<any>({});
   const [isEmitido, setIsEmitido] = useState(false);
   const [vehiculoOrigen, setVehiculoOrigen] = useState<'FARENET' | 'FAREGAS' | 'MIXTO' | 'BORRADOR' | 'MANUAL'>('MANUAL');
+  const [advertenciaRecuperacion, setAdvertenciaRecuperacion] = useState('');
   const [expedienteError, setExpedienteError] = useState('');
   const [formVehiculo, setFormVehiculo] = useState<FormVehiculoState>({
     clase: '', marca: '', modelo: '', version: '', carroceria: '', marcaCarroceria: '', placaNueva: '',
@@ -554,6 +570,7 @@ function NuevoCertificadoWizard() {
     medioPagoFac: '', cuotasFac: []
   });
   const [facturacion, setFacturacion] = useState<FacturacionFaregas | null>(null);
+  const tipoItemSpotPago = resumenComercial?.requiereChip ? 'MIXTO' as const : 'SERVICIO' as const;
   const retrocesoBloqueadoPorEmision = !puedeRetrocederWizard(certificadoEstado, facturacion);
   const medioPagoCalculado = React.useMemo(
     () => calcularMedioPago(pagosAgregados),
@@ -569,8 +586,10 @@ function NuevoCertificadoWizard() {
       cuotas: formFacturacion.cuotasFac,
       esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
       spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+      tipoItemSpot: tipoItemSpotPago,
+      umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
     }).map((cuota) => ({ ...cuota, importe: String(cuota.importe) })),
-    [formFacturacion.condicionPagoFac, formFacturacion.tipoDocFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal, descuentoAplicado, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje]
+    [formFacturacion.condicionPagoFac, formFacturacion.tipoDocFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal, descuentoAplicado, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje, tipoItemSpotPago, maestrosPago?.politicaSpot?.umbralComercial]
   );
 
   const titularPrincipal = React.useMemo(
@@ -600,6 +619,10 @@ function NuevoCertificadoWizard() {
     fechaVencimiento: formFacturacion.fechaVencimientoFac,
     cuotas: cuotasCreditoResueltas,
   }), [pagosAgregados, precioTotal, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac, cuotasCreditoResueltas]);
+  const snapshotFacturacionAutosave = React.useMemo(
+    () => crearSnapshotAutosave(formFacturacion),
+    [formFacturacion],
+  );
 
   const snapshotsSeccionesVehiculo = (estado: EstadoVehiculoPersistible) => {
     const { componentes: glpComponentes, verificaciones: glpVerificaciones, ...glpCabecera } = estado.formGlp || {};
@@ -853,6 +876,21 @@ function NuevoCertificadoWizard() {
   }, [formCaja.placa]);
 
   useEffect(() => {
+    if (!advertenciaRecuperacion) return;
+    const requiereCombustiblePermitido = esGlpInicial(formCaja.tipoCertificado, formCaja.modalidadCertificado);
+    const combustibleValido = !requiereCombustiblePermitido
+      || ['GASOLINA', 'DIESEL'].includes(String(formVehiculo.combustible || '').trim().toUpperCase());
+    const categoriaValida = Boolean(formCaja.categoria)
+      && (maestros?.categorias || []).some((item) => String(item.key) === String(formCaja.categoria));
+    const tieneAdvertenciaCombustible = advertenciaRecuperacion.includes('combustible original');
+    const tieneAdvertenciaCategoria = advertenciaRecuperacion.includes('categoría recuperada');
+    if ((!tieneAdvertenciaCombustible || combustibleValido)
+      && (!tieneAdvertenciaCategoria || categoriaValida || !maestros?.categorias?.length)) {
+      setAdvertenciaRecuperacion('');
+    }
+  }, [advertenciaRecuperacion, formVehiculo.combustible, formCaja.categoria, formCaja.tipoCertificado, formCaja.modalidadCertificado, maestros?.categorias]);
+
+  useEffect(() => {
     const cargarBorrador = async () => {
       if (!certificadoId) return;
       try {
@@ -873,6 +911,15 @@ function NuevoCertificadoWizard() {
           setNumeroCertificadoOficial(res.data.numeroCertificado || res.data.numero_certificado || null);
           setIsEmitido(res.data.estado === 'EMITIDO');
           if (res.data.tipo?.clave) {
+            const categoriaRecuperada = normalizarCategoriaRecuperada(
+              res.data.vehiculo?.categoria_key ?? res.data.vehiculo?.categoria,
+              maestros?.categorias || [],
+            );
+            const combustibleRecuperado = normalizarCombustibleRecuperado(
+              res.data.vehiculo?.combustible,
+              esGlpInicial(res.data.tipo?.clave, res.data.servicio?.modalidad),
+            );
+            setAdvertenciaRecuperacion([categoriaRecuperada.advertencia, combustibleRecuperado.advertencia].filter(Boolean).join(' '));
             setFormCaja(prev => ({
               ...prev,
               tipoCertificado: res.data.tipo.clave,
@@ -882,7 +929,7 @@ function NuevoCertificadoWizard() {
               modalidadCertificado: res.data.servicio?.modalidad || prev.modalidadCertificado,
               tipo_flujo: res.data.servicio?.tipoFlujo || prev.tipo_flujo,
               tallerNombre: res.data.formatoDatosSnapshot?.taller?.nombre || prev.tallerNombre,
-              categoria: res.data.vehiculo?.categoria || prev.categoria,
+              categoria: categoriaRecuperada.valor || (categoriaRecuperada.valorOriginal ? '' : prev.categoria),
             }));
           }
 
@@ -905,8 +952,19 @@ function NuevoCertificadoWizard() {
           }
 
           if (res.data.vehiculo) {
+            const combustibleRecuperado = normalizarCombustibleRecuperado(
+              res.data.vehiculo.combustible,
+              esGlpInicial(res.data.tipo?.clave, res.data.servicio?.modalidad),
+            );
+            const categoriaRecuperada = normalizarCategoriaRecuperada(
+              res.data.vehiculo.categoria_key ?? res.data.vehiculo.categoria,
+              maestros?.categorias || [],
+            );
+            setAdvertenciaRecuperacion(
+              [categoriaRecuperada.advertencia, combustibleRecuperado.advertencia].filter(Boolean).join(' '),
+            );
             setFormVehiculo(prev => {
-              const datos = mapVehiculoBorrador(res.data.vehiculo);
+              const datos = mapVehiculoBorrador(res.data.vehiculo, esGlpInicial(res.data.tipo?.clave, res.data.servicio?.modalidad));
               return {
                 ...prev,
                 ...datos,
@@ -1226,14 +1284,31 @@ function NuevoCertificadoWizard() {
       // la respuesta pertenece a la placa anterior y no debe pisar la nueva.
       if (placaActualRef.current !== placaSolicitada) return null;
       if (response?.data) {
+        const limpiarCombustibleIncompatible = esGlpInicial(
+          estadoVehiculoActual.formCaja.tipoCertificado,
+          estadoVehiculoActual.formCaja.modalidadCertificado,
+        );
+        const combustibleRecuperado = normalizarCombustibleRecuperado(
+          response.data.combustible,
+          limpiarCombustibleIncompatible,
+        );
+        const categoriaRecuperada = normalizarCategoriaRecuperada(
+          response.data.categoriaKey ?? response.data.categoria,
+          maestros?.categorias || [],
+        );
+        const advertenciasRecuperacion = [categoriaRecuperada.advertencia, combustibleRecuperado.advertencia]
+          .filter(Boolean)
+          .join(' ');
+        setAdvertenciaRecuperacion(advertenciasRecuperacion);
         const estadoRecuperado = construirEstadoVehiculoRecuperado(
           response.data,
           estadoVehiculoActual,
-          placaSolicitada
+          placaSolicitada,
+          maestros?.categorias || [],
         );
         const placaEncontrada = normalizarPlacaWizard(response.data.placa) || placaSolicitada;
-        const categoriaEncontrada = textValue(response.data.categoriaKey ?? response.data.categoria);
-        setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(response.data), placaNueva: placaEncontrada }));
+        const categoriaEncontrada = categoriaRecuperada.valor;
+        setFormVehiculo(prev => ({ ...prev, ...mapVehiculoBorrador(response.data, limpiarCombustibleIncompatible), placaNueva: placaEncontrada }));
         setFormCaja((prev: any) => ({
           ...prev,
           placa: placaEncontrada,
@@ -1349,15 +1424,15 @@ function NuevoCertificadoWizard() {
         setFormConformidad(estadoRecuperado.formConformidad);
 
         Swal.fire({
-          icon: 'success',
-          title: 'Vehículo encontrado',
-          text: origen === 'FAREGAS'
+          icon: advertenciasRecuperacion ? 'warning' : 'success',
+          title: advertenciasRecuperacion ? 'Vehículo encontrado; revise los datos' : 'Vehículo encontrado',
+          text: advertenciasRecuperacion || (origen === 'FAREGAS'
             ? 'Los datos se recuperaron desde Faregas y pueden editarse.'
             : origen === 'MIXTO'
               ? 'Los datos de Faregas se completaron con información disponible en Farenet.'
-              : 'Los datos se autocompletaron desde Farenet y pueden editarse.',
-          timer: 1800,
-          showConfirmButton: false,
+              : 'Los datos se autocompletaron desde Farenet y pueden editarse.'),
+          confirmButtonColor: '#052A79',
+          ...(advertenciasRecuperacion ? {} : { timer: 1800, showConfirmButton: false }),
         });
         return estadoRecuperado;
       }
@@ -1368,7 +1443,7 @@ function NuevoCertificadoWizard() {
         Swal.fire({
           icon: 'warning',
           title: 'Consulta no disponible',
-          text: 'El borrador fue creado. Puede completar los datos del vehículo manualmente.',
+          text: `${mensajeErrorConEstadoHttp(e, 'Falló la consulta del vehículo.')} El borrador fue creado y puede completar los datos manualmente.`,
         });
       }
     }
@@ -1432,7 +1507,7 @@ function NuevoCertificadoWizard() {
       }
     } catch (e: any) {
       setIsConsultado(false);
-      setSaveError(e.message || 'No se pudieron consultar los datos iniciales.');
+      setSaveError(mensajeErrorConEstadoHttp(e, 'No se pudieron consultar los datos iniciales.'));
       if (e.codigo === 'CONFIGURACION_CHIP_INCOMPLETA') {
         const productoChipId = Number(e.detalles?.productoChipId || 0);
         const resultado = await Swal.fire({
@@ -1450,7 +1525,7 @@ function NuevoCertificadoWizard() {
         }
         return;
       }
-      Swal.fire('No se pudo consultar', e.message || 'Revise los datos ingresados.', 'error');
+      Swal.fire('No se pudo consultar', mensajeErrorConEstadoHttp(e, 'Revise los datos ingresados.'), 'error');
     } finally {
       setIsSavingStep(false);
     }
@@ -1753,6 +1828,8 @@ function NuevoCertificadoWizard() {
       cuotas,
       esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
       spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+      tipoItemSpot: tipoItemSpotPago,
+      umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
     });
     const erroresCliente = validarDatosFacturacionCampos(formFacturacion);
     const primerError = Object.values({ ...erroresCliente, ...erroresPago })[0];
@@ -1794,7 +1871,7 @@ function NuevoCertificadoWizard() {
           setLastSavedAt(new Date());
         } catch (e: any) {
           autosaveControlRef.current.fallar(bloque, snapshot);
-          setSaveError(e.message || 'No se pudieron sincronizar los cambios.');
+          setSaveError(mensajeErrorConEstadoHttp(e, 'No se pudieron sincronizar los cambios.'));
           throw e;
         } finally {
           setIsSavingStep(false);
@@ -1813,12 +1890,13 @@ function NuevoCertificadoWizard() {
       || loadingRegistro) return;
     autosaveControlRef.current.sembrar('VEHICULO', snapshotVehiculoAutosave);
     autosaveControlRef.current.sembrar('PAGO', snapshotPagoAutosave);
+    autosaveControlRef.current.sembrar('FACTURACION', snapshotFacturacionAutosave);
     sembrarSeccionesVehiculo(estadoVehiculoActual);
     sembrarAutosaveTrasCargaRef.current = false;
     // La siembra se ejecuta una sola vez por hidratación; la referencia mutable
     // evita convertirla en una escritura cada vez que se recrean los helpers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, loadingRegistro, snapshotPagoAutosave, snapshotVehiculoAutosave, estadoVehiculoActual]);
+  }, [certificadoId, loading, loadingRegistro, snapshotPagoAutosave, snapshotFacturacionAutosave, snapshotVehiculoAutosave, estadoVehiculoActual]);
 
   // Autosave por bloques, serializado y con debounce para no guardar por tecla.
   useEffect(() => {
@@ -2235,7 +2313,7 @@ function NuevoCertificadoWizard() {
           navigate(`/faregas/certificados/${idBorrador}/continuar`, { replace: true });
         }
       } catch (e: any) {
-        Swal.fire('Error', e.message || 'No se pudo crear el borrador', 'error');
+      Swal.fire('Error', mensajeErrorConEstadoHttp(e, 'No se pudo crear el borrador'), 'error');
       } finally {
         setIsSavingStep(false);
       }
@@ -2269,7 +2347,7 @@ function NuevoCertificadoWizard() {
           else await guardarPasoVehiculo(certificadoId, true);
           await persistirPaso(certificadoId, 'PREVISUALIZACION');
         } catch (e: any) {
-          Swal.fire('No se pudo guardar', e.message || 'Revise los datos del expediente técnico.', 'error');
+          Swal.fire('No se pudo guardar', mensajeErrorConEstadoHttp(e, 'Revise los datos del expediente técnico.'), 'error');
           return;
         } finally {
           setIsSavingStep(false);
@@ -2288,6 +2366,8 @@ function NuevoCertificadoWizard() {
           cuotas: cuotasCreditoResueltas,
           esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
           spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+          tipoItemSpot: tipoItemSpotPago,
+          umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
         }))) return;
         setIsSavingStep(true);
         try {
@@ -2326,7 +2406,7 @@ function NuevoCertificadoWizard() {
             }
             return;
           }
-          Swal.fire('No se pudo guardar el pago', e.message || 'Revise los medios de pago.', 'error');
+          Swal.fire('No se pudo guardar el pago', mensajeErrorConEstadoHttp(e, 'Revise los medios de pago.'), 'error');
           return;
         } finally {
           setIsSavingStep(false);
@@ -2362,7 +2442,7 @@ function NuevoCertificadoWizard() {
         if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
         else await guardarPasoVehiculo(certificadoId);
       } catch (e: any) {
-        Swal.fire('No se pudo guardar', e.message || 'No se cambió de paso para evitar perder información.', 'error');
+        Swal.fire('No se pudo guardar', mensajeErrorConEstadoHttp(e, 'No se cambió de paso para evitar perder información.'), 'error');
         return;
       } finally {
         setIsSavingStep(false);
@@ -2372,7 +2452,7 @@ function NuevoCertificadoWizard() {
       try {
         await guardarPasoPagoCompleto(certificadoId);
       } catch (e: any) {
-        Swal.fire('No se pudo guardar', e.message || 'No se cambió de paso para evitar perder los pagos.', 'error');
+        Swal.fire('No se pudo guardar', mensajeErrorConEstadoHttp(e, 'No se cambió de paso para evitar perder los pagos.'), 'error');
         return;
       } finally {
         setIsSavingStep(false);
@@ -2384,10 +2464,11 @@ function NuevoCertificadoWizard() {
         try {
           const payloadFact = construirPayloadFacturacion();
           await faregasCertificadosApi.guardarFacturacion(certificadoId, payloadFact);
+          autosaveControlRef.current.confirmar('FACTURACION', snapshotFacturacionAutosave);
         } catch (e: any) {
           const res = await Swal.fire({
             title: 'Facturación Incompleta',
-            text: (e.message || 'Los datos de facturación no son válidos.') + '\n\n¿Desea omitir el guardado y cambiar de paso?',
+            text: `${mensajeErrorConEstadoHttp(e, 'Los datos de facturación no son válidos.')}\n\n¿Desea omitir el guardado y cambiar de paso?`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Sí, cambiar sin guardar',
@@ -2449,7 +2530,9 @@ function NuevoCertificadoWizard() {
     total: precioTotal,
     esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
     servicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
-  }), [formFacturacion.tipoDocFac, precioTotal, descuentoAplicado, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje]);
+    tipoItem: tipoItemSpotPago,
+    umbralComercial: maestrosPago?.politicaSpot?.umbralComercial,
+  }), [formFacturacion.tipoDocFac, precioTotal, descuentoAplicado, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje, tipoItemSpotPago, maestrosPago?.politicaSpot?.umbralComercial]);
 
   const totalExigibleCaja = descuentoAplicado?.autorizaGratuidad ? 0 : evaluacionSpotActual.netoCobrar;
   const montoPendiente = Math.max(0, totalExigibleCaja - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
@@ -2597,25 +2680,83 @@ function NuevoCertificadoWizard() {
     setIsSavingStep(true);
     setSaveError('');
     try {
-      await autosaveQueueRef.current.catch(() => undefined);
-      if (currentStepIndex === indicePaso('DATOS_INICIALES')) {
-        await faregasCertificadosApi.actualizarBorrador(certificadoId, { tarifaCodigo: formCaja.tarifaCodigo });
-        if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
-          await faregasCertificadosApi.guardarTaller(certificadoId, { valores: { 'taller.nombre': formCaja.tallerNombre.trim() } });
-        } else {
-          await faregasCertificadosApi.guardarVehiculoBorrador(certificadoId, { placa: formCaja.placa, categoria: formCaja.categoria });
-        }
-      } else if (currentStepIndex === indicePaso('PAGO') && precioTotal > 0) {
-        await guardarPasoPagoCompleto(certificadoId);
-      } else if (currentStepIndex === indicePaso('VEHICULO')) {
-        if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
-        else await guardarPasoVehiculo(certificadoId);
+      try {
+        await autosaveQueueRef.current;
+      } catch {
+        // La escritura rechazada se reintentará con el snapshot actual si aún
+        // hay cambios. No se marca como guardado ni se oculta un fallo real.
+        autosaveQueueRef.current = Promise.resolve();
       }
-      setLastSavedAt(new Date());
-      navigate('/faregas/inicio');
-    } catch (e: any) {
-      setSaveError(e.message || 'No se pudieron guardar los cambios pendientes.');
-      Swal.fire('No se pudo salir', 'Los cambios pendientes no se guardaron. Reintente antes de abandonar el borrador.', 'error');
+
+      const bloqueActual = currentStepIndex === indicePaso('FACTURACION')
+        ? 'FACTURACION'
+        : currentStepIndex === indicePaso('PAGO') ? 'PAGO' : 'VEHICULO';
+      const snapshotActual = bloqueActual === 'FACTURACION'
+        ? snapshotFacturacionAutosave
+        : bloqueActual === 'PAGO' ? snapshotPagoAutosave : snapshotVehiculoAutosave;
+      const hayCambios = currentStepIndex <= indicePaso('VEHICULO')
+        ? autosaveControlRef.current.tieneCambiosPendientes('VEHICULO', snapshotVehiculoAutosave)
+        : currentStepIndex === indicePaso('PAGO')
+          ? autosaveControlRef.current.tieneCambiosPendientes('PAGO', snapshotPagoAutosave)
+          : currentStepIndex === indicePaso('FACTURACION')
+            ? autosaveControlRef.current.tieneCambiosPendientes('FACTURACION', snapshotFacturacionAutosave)
+          : false;
+
+      if (!hayCambios) {
+        setSaveError('');
+        navigate('/faregas/inicio');
+        return;
+      }
+
+      const guardarPasoActual = async () => {
+        if (currentStepIndex === indicePaso('DATOS_INICIALES')) {
+          await faregasCertificadosApi.actualizarBorrador(certificadoId, { tarifaCodigo: formCaja.tarifaCodigo });
+          if (formCaja.tipo_flujo === 'TALLER_INSPECCION') {
+            await faregasCertificadosApi.guardarTaller(certificadoId, { valores: { 'taller.nombre': formCaja.tallerNombre.trim() } });
+          } else {
+            await faregasCertificadosApi.guardarVehiculoBorrador(certificadoId, { placa: formCaja.placa, categoria: formCaja.categoria });
+          }
+        } else if (currentStepIndex === indicePaso('PAGO') && precioTotal > 0) {
+          await guardarPasoPagoCompleto(certificadoId);
+        } else if (currentStepIndex === indicePaso('FACTURACION')) {
+          await faregasCertificadosApi.guardarFacturacion(certificadoId, construirPayloadFacturacion());
+        } else if (currentStepIndex === indicePaso('VEHICULO')) {
+          if (formCaja.tipo_flujo === 'TALLER_INSPECCION') await guardarPasoTaller(certificadoId);
+          else await guardarPasoVehiculo(certificadoId);
+        }
+      };
+
+      while (true) {
+        try {
+          await guardarPasoActual();
+          autosaveControlRef.current.confirmar(bloqueActual, snapshotActual);
+          setLastSavedAt(new Date());
+          setSaveError('');
+          navigate('/faregas/inicio');
+          return;
+        } catch (e: any) {
+          const mensaje = mensajeErrorConEstadoHttp(e, 'No se pudieron guardar los cambios pendientes.');
+          setSaveError(mensaje);
+          autosaveControlRef.current.fallar(bloqueActual, snapshotActual);
+          const decision = await Swal.fire({
+            icon: 'error',
+            title: 'No se pudieron guardar los cambios',
+            text: `${mensaje} Puede reintentar, permanecer en el borrador o salir descartando únicamente los cambios locales no guardados.`,
+            showDenyButton: true,
+            showCancelButton: true,
+            confirmButtonText: 'Reintentar guardado',
+            denyButtonText: 'Salir descartando',
+            cancelButtonText: 'Permanecer',
+            confirmButtonColor: '#052A79',
+            denyButtonColor: '#b91c1c',
+          });
+          if (decision.isDenied) {
+            navigate('/faregas/inicio');
+            return;
+          }
+          if (!decision.isConfirmed) return;
+        }
+      }
     } finally {
       setIsSavingStep(false);
     }
@@ -2646,7 +2787,7 @@ function NuevoCertificadoWizard() {
       await Swal.fire('Borrador anulado', 'El certificado se conservó con estado ANULADO.', 'success');
       navigate('/faregas/inicio');
     } catch (e: any) {
-      await Swal.fire('No se pudo anular', e.message || 'No se pudo anular el certificado.', 'error');
+      await Swal.fire('No se pudo anular', mensajeErrorConEstadoHttp(e, 'No se pudo anular el certificado.'), 'error');
     } finally {
       setIsSavingStep(false);
     }
@@ -2798,6 +2939,11 @@ function NuevoCertificadoWizard() {
               Modo rectificación directa. Los cambios se aplicarán únicamente al confirmar. No se emitirá ningún comprobante,
               no se registrarán pagos y no se consumirá un correlativo DG.
             </p>
+          </div>
+        )}
+        {advertenciaRecuperacion && (
+          <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            {advertenciaRecuperacion}
           </div>
         )}
         <PanelResumenErroresWizard
@@ -3002,6 +3148,7 @@ function NuevoCertificadoWizard() {
               maestrosPago={maestrosPago}
               tipoComprobante={formFacturacion.tipoDocFac}
               spotServicio={{ sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje }}
+              tipoItemSpot={tipoItemSpotPago}
               condicionPago={formFacturacion.condicionPagoFac}
               fechaInicioCredito={formFacturacion.fechaInicioCreditoFac}
               fechaVencimientoCredito={formFacturacion.fechaVencimientoFac}

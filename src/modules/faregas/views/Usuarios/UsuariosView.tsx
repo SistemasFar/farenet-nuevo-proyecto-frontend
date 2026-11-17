@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
-import { Edit, Trash2 } from 'lucide-react';
+import { Download, Edit, KeyRound, Trash2 } from 'lucide-react';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 import type { MaestroUsuario } from '../../types/faregas-api';
 import {
@@ -10,6 +10,12 @@ import {
 import {
   perfilTieneAccesoGlobalSedes,
 } from './acceso-global-sedes';
+import {
+  descargarExcelCredencialesTemporales,
+  descargarExcelUsuariosFaregas,
+  type CredencialTemporalParaExportar,
+} from './usuarios-exportacion';
+import { generarContrasenaTemporal } from './contrasena-temporal';
 
 import {
   atributosDocumento,
@@ -81,6 +87,15 @@ export function UsuariosView() {
       <p className="mt-1 text-[11px] font-semibold text-red-600">{erroresCampo[campo]}</p>
     ) : null;
   const [saving, setSaving] = useState(false);
+  const [passwordTemporalGenerada, setPasswordTemporalGenerada] = useState(false);
+  // Secretos solo en memoria de esta pantalla; nunca se escriben en storage.
+  const [credencialesTemporales, setCredencialesTemporales] = useState<CredencialTemporalParaExportar[]>([]);
+  const [usuariosSeleccionados, setUsuariosSeleccionados] = useState<Set<string>>(() => new Set());
+  const [restablecimientoPendiente, setRestablecimientoPendiente] = useState<{
+    credenciales: Array<{ username: string; password: string }>;
+    usuarios: any[];
+  } | null>(null);
+  const [restableciendoCredenciales, setRestableciendoCredenciales] = useState(false);
 
   // Filtro de estado del listado de usuarios. Por defecto sólo los activos: los
   // inactivos se conservan (su auditoría es real) pero no se ven en el día a día.
@@ -140,7 +155,13 @@ export function UsuariosView() {
     sedes: Array<{ key: string; nombre: string }>;
   } | null>(null);
 
-  const currentUsername = JSON.parse(sessionStorage.getItem('faregasUser') || '{}').username;
+  const usuarioSesion = (() => {
+    try { return JSON.parse(sessionStorage.getItem('faregasUser') || '{}'); }
+    catch { return {}; }
+  })();
+  const currentUsername = usuarioSesion.username;
+  const puedeGestionarCredenciales = Array.isArray(usuarioSesion.permisos)
+    && usuarioSesion.permisos.includes('MENU_USUARIOS');
 
   const cargarDatos = async () => {
     setLoading(true);
@@ -173,6 +194,7 @@ export function UsuariosView() {
   const handleOpenUsuario = async (usuario?: any) => {
     setError('');
     if (usuario) {
+      setPasswordTemporalGenerada(false);
       setModalMode('editar');
       setSelectedUsername(usuario.username);
       
@@ -214,14 +236,21 @@ export function UsuariosView() {
         personaContacto: usuario.personaContacto || ''
       });
     } else {
+      let passwordTemporal = '';
+      try {
+        passwordTemporal = generarContrasenaTemporal();
+        setPasswordTemporalGenerada(true);
+      } catch {
+        setPasswordTemporalGenerada(false);
+      }
       setModalMode('crear');
       setDepartamentos([]);
       setProvincias([]);
       setDistritos([]);
       setFormData({
         username: '',
-        password: '',
-        confirmPassword: '',
+        password: passwordTemporal,
+        confirmPassword: passwordTemporal,
         perfil_id: perfiles.length > 0 ? perfiles[0].clave : '',
         sedes: [],
         estado: true,
@@ -320,10 +349,23 @@ export function UsuariosView() {
       }
       return;
     }
+    if (modalMode === 'crear' && !passwordTemporalGenerada) {
+      const mensaje = 'Genere una contraseña temporal aleatoria con el botón de seguridad antes de crear la cuenta.';
+      setErroresCampo((actuales) => ({ ...actuales, password: mensaje }));
+      refsCampos.current.password?.focus();
+      return;
+    }
+    if (modalMode === 'editar' && formData.password && !window.confirm(
+      `La contraseña actual de ${formData.username} dejará de funcionar y se revocarán sus sesiones activas. La nueva contraseña quedará disponible una sola vez para descargar. ¿Confirmar?`
+    )) return;
 
     setSaving(true);
     try {
       const payloadUsuario = { ...formData };
+      const passwordEntregable = formData.password;
+      const entregarCredencial = modalMode === 'crear'
+        ? passwordTemporalGenerada
+        : Boolean(formData.password);
       if (modalMode === 'crear') {
         // El backend aplica el valor canónico USER cuando no se envía user_type.
         delete payloadUsuario.user_type;
@@ -336,7 +378,34 @@ export function UsuariosView() {
           await faregasUsuariosApi.cambiarPassword(formData.username, formData.password);
         }
       }
+      if (entregarCredencial && passwordEntregable) {
+        const credencial: CredencialTemporalParaExportar = {
+          username: payloadUsuario.username,
+          tipoDocumentoKey: payloadUsuario.tipoDocumentoKey,
+          nombres: payloadUsuario.nombres,
+          apellidos: payloadUsuario.apellidos,
+          nombreRazonSocial: payloadUsuario.nombreRazonSocial,
+          email: payloadUsuario.email,
+          perfil_id: payloadUsuario.perfil_id,
+          sedes: (payloadUsuario.sedes || []).map((key: string) => ({
+            key,
+            nombre: plantas.find((planta) => planta.key === key)?.nombre || key,
+          })),
+          estado: payloadUsuario.estado === true || payloadUsuario.estado === 'true',
+          password: passwordEntregable,
+          resultado: modalMode === 'crear' ? 'Creado' : 'Restablecida',
+          observaciones: modalMode === 'crear'
+            ? 'Contraseña temporal generada para esta alta.'
+            : 'Contraseña restablecida explícitamente por un administrador.',
+        };
+        setCredencialesTemporales((actuales) => [
+          ...actuales.filter((item) => item.username !== credencial.username),
+          credencial,
+        ]);
+      }
       setShowModal(false);
+      setFormData((actual: Record<string, unknown>) => ({ ...actual, password: '', confirmPassword: '' }));
+      setPasswordTemporalGenerada(false);
       cargarDatos();
     } catch (e: any) {
       // El backend devuelve 400 con el detalle campo a campo; se marca igual que
@@ -347,6 +416,151 @@ export function UsuariosView() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const generarPasswordTemporalParaFormulario = () => {
+    try {
+      const password = generarContrasenaTemporal();
+      setFormData((actual: Record<string, unknown>) => ({
+        ...actual,
+        password,
+        confirmPassword: password,
+      }));
+      setPasswordTemporalGenerada(true);
+      setErroresCampo((actual) => {
+        const siguiente = { ...actual };
+        delete siguiente.password;
+        delete siguiente.confirmPassword;
+        return siguiente;
+      });
+      setError('');
+    } catch (e: any) {
+      setPasswordTemporalGenerada(false);
+      setError(e.message || 'No se pudo generar una contraseña segura.');
+    }
+  };
+
+  const descargarCredencialesPendientes = () => {
+    if (!credencialesTemporales.length) return;
+    const confirmar = window.confirm(
+      'Este Excel contiene contraseñas temporales y solo podrá descargarse una vez desde esta sesión. Guárdelo en una ubicación protegida y elimínelo después de entregar las credenciales. ¿Descargar ahora?'
+    );
+    if (!confirmar) return;
+    descargarExcelCredencialesTemporales(credencialesTemporales, perfiles);
+    setCredencialesTemporales([]);
+  };
+
+  const enviarRestablecimientoDeCredenciales = async (lote: {
+    credenciales: Array<{ username: string; password: string }>;
+    usuarios: any[];
+  }) => {
+    setRestableciendoCredenciales(true);
+    setError('');
+    try {
+      const respuesta = await faregasUsuariosApi.restablecerCredencialesTemporales(lote.credenciales);
+      const resultados = Array.isArray(respuesta?.resultados) ? respuesta.resultados : [];
+      const usernamesConfirmados = new Set(resultados.map((item: any) => item.username));
+      const usernamesEnviados = new Set(lote.credenciales.map((item) => item.username));
+      if (respuesta?.success !== true
+        || usernamesConfirmados.size !== usernamesEnviados.size
+        || [...usernamesEnviados].some((username) => !usernamesConfirmados.has(username))) {
+        throw Object.assign(new Error('El servidor no confirmó todas las cuentas del lote.'), { status: 500 });
+      }
+
+      const contrasenas = new Map(lote.credenciales.map((item) => [item.username, item.password]));
+      const filas = lote.usuarios.map((usuario: any) => ({
+        username: usuario.username,
+        tipoDocumentoKey: usuario.tipoDocumentoKey,
+        nombres: usuario.nombres,
+        apellidos: usuario.apellidos,
+        nombreRazonSocial: usuario.nombreRazonSocial,
+        email: usuario.email,
+        perfil_id: usuario.perfil_id,
+        sedes: (usuario.sedes || []).map((sede: any) => ({ key: sede.key, nombre: sede.nombre })),
+        estado: true,
+        password: contrasenas.get(usuario.username) || '',
+        resultado: 'Restablecida' as const,
+        observaciones: 'Contraseña temporal nueva. Se revocaron las sesiones anteriores; solicite cambio al primer inicio de sesión.',
+      }));
+      if (filas.some((fila) => !fila.password)) {
+        throw Object.assign(new Error('No se pudo relacionar la respuesta con todas las credenciales. Mantenga el lote en esta pantalla y reintente.'), { status: 500 });
+      }
+
+      setCredencialesTemporales((actuales) => [
+        ...actuales.filter((actual) => !usernamesEnviados.has(actual.username)),
+        ...filas,
+      ]);
+      setUsuariosSeleccionados(new Set());
+      setRestablecimientoPendiente(null);
+      setError('Contraseñas actualizadas y sesiones anteriores revocadas. Descargue ahora el Excel confidencial.');
+    } catch (e: any) {
+      const status = Number(e?.status || e?.statusCode || e?.response?.status);
+      if (status >= 400 && status < 500) {
+        setRestablecimientoPendiente(null);
+        setError(e.message || 'El servidor rechazó el lote; no se restablecieron sus contraseñas.');
+      } else {
+        // Se conserva el mismo lote solo en memoria para poder repetir exactamente
+        // los mismos valores si se perdió la respuesta después del COMMIT.
+        setRestablecimientoPendiente(lote);
+        setError('No se pudo confirmar la respuesta del servidor. El lote permanece solo en memoria; reintente el mismo envío antes de generar otras claves.');
+      }
+    } finally {
+      setRestableciendoCredenciales(false);
+    }
+  };
+
+  const prepararRestablecimientoCredenciales = async () => {
+    if (!puedeGestionarCredenciales || restablecimientoPendiente || restableciendoCredenciales) return;
+    const usernames = usuariosSeleccionados;
+    const seleccionados = usuarios.filter((usuario: any) => (
+      usernames.has(usuario.username) && usuario.estado === true
+    ));
+    if (!seleccionados.length) {
+      setError('Seleccione una o más cuentas activas para restablecer.');
+      return;
+    }
+
+    const detalle = seleccionados.map((usuario: any) => usuario.username).join(', ');
+    if (!window.confirm(
+      `Se reemplazarán las contraseñas actuales de ${seleccionados.length} cuenta(s): ${detalle}. Las claves anteriores dejarán de funcionar y se revocarán sus sesiones activas. Las nuevas claves se mostrarán una sola vez en un Excel confidencial. ¿Confirmar el restablecimiento?`
+    )) return;
+
+    try {
+      const usadas = new Set<string>();
+      const credenciales = seleccionados.map((usuario: any) => {
+        let password = '';
+        for (let intento = 0; intento < 100; intento += 1) {
+          const candidata = generarContrasenaTemporal(globalThis.crypto, usuario.username);
+          if (!usadas.has(candidata)) {
+            password = candidata;
+            usadas.add(candidata);
+            break;
+          }
+        }
+        if (!password) throw new Error('No se pudo generar un conjunto de claves únicas. Intente nuevamente.');
+        return { username: usuario.username, password };
+      });
+      const lote = { credenciales, usuarios: seleccionados };
+      setRestablecimientoPendiente(lote);
+      await enviarRestablecimientoDeCredenciales(lote);
+    } catch (e: any) {
+      setError(e.message || 'No se pudieron generar credenciales seguras.');
+    }
+  };
+
+  const reintentarRestablecimientoCredenciales = async () => {
+    if (!restablecimientoPendiente || restableciendoCredenciales) return;
+    if (!window.confirm('Se reenviarán las mismas contraseñas temporales de este lote. Si el primer intento ya se aplicó, se mantendrán estas mismas claves. ¿Reintentar?')) return;
+    await enviarRestablecimientoDeCredenciales(restablecimientoPendiente);
+  };
+
+  const alternarSeleccionUsuario = (username: string, seleccionado: boolean) => {
+    setUsuariosSeleccionados((actuales) => {
+      const siguiente = new Set(actuales);
+      if (seleccionado) siguiente.add(username);
+      else siguiente.delete(username);
+      return siguiente;
+    });
   };
 
   const toggleSede = (key: string) => {
@@ -375,7 +589,6 @@ export function UsuariosView() {
   };
 
   const SUBMODULOS_FACTURACION = [
-    'MENU_FACTURACION_PREPARACION',
     'MENU_FACTURACION_SERIES',
     'MENU_FACTURACION_COMPROBANTES',
     'MENU_FACTURACION_CLIENTES'
@@ -492,6 +705,12 @@ export function UsuariosView() {
   }, [totalPages, page]);
 
   const paginatedData = activeData.slice((page - 1) * limit, page * limit);
+  const usuariosActivosPagina = activeTab === 'usuarios'
+    ? paginatedData.filter((usuario: any) => usuario.estado === true)
+    : [];
+  const paginaSeleccionadaCompleta = usuariosActivosPagina.length > 0
+    && usuariosActivosPagina.every((usuario: any) => usuariosSeleccionados.has(usuario.username));
+  const cantidadSeleccionada = usuariosSeleccionados.size;
   const mostrandoInicio = totalRegistros === 0 ? 0 : (page - 1) * limit + 1;
   const mostrandoFin = Math.min(page * limit, totalRegistros);
 
@@ -571,9 +790,55 @@ export function UsuariosView() {
             {activeTab === 'usuarios' ? 'Usuarios registrados' : 'Perfiles registrados'}
           </span>
           {activeTab === 'usuarios' ? (
-            <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
-              + Crear Usuario
-            </button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => descargarExcelUsuariosFaregas(filteredUsuarios, perfiles, {
+                  estado: estadoFiltro,
+                  busqueda: searchQuery,
+                })}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#052A79] bg-white px-4 py-2 text-sm font-semibold text-[#052A79] disabled:opacity-50"
+              >
+                <Download size={16} /> EXPORTAR EXCEL
+              </button>
+              {credencialesTemporales.length > 0 && (
+                <button
+                  type="button"
+                  onClick={descargarCredencialesPendientes}
+                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900"
+                  title="Descarga de una sola vez; se borra al descargar o salir de esta pantalla"
+                >
+                  <KeyRound size={16} /> Credenciales temporales ({credencialesTemporales.length})
+                </button>
+              )}
+              {puedeGestionarCredenciales && (
+                <>
+                  <button
+                    type="button"
+                    onClick={prepararRestablecimientoCredenciales}
+                    disabled={cantidadSeleccionada === 0 || loading || restableciendoCredenciales || Boolean(restablecimientoPendiente)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Reemplaza las contraseñas de las cuentas activas seleccionadas y revoca sus sesiones"
+                  >
+                    <KeyRound size={16} /> GENERAR NUEVAS CREDENCIALES ({cantidadSeleccionada})
+                  </button>
+                  {restablecimientoPendiente && (
+                    <button
+                      type="button"
+                      onClick={reintentarRestablecimientoCredenciales}
+                      disabled={restableciendoCredenciales}
+                      className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 disabled:opacity-50"
+                    >
+                      {restableciendoCredenciales ? 'Confirmando…' : 'Reintentar el mismo envío'}
+                    </button>
+                  )}
+                </>
+              )}
+              <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
+                + Crear Usuario
+              </button>
+            </div>
           ) : (
             <button onClick={() => {
               setModalMode('crear');
@@ -593,7 +858,23 @@ export function UsuariosView() {
               <thead className="bg-gray-50 text-xs capitalize text-gray-500">
                 {activeTab === 'usuarios' ? (
                   <tr>
-                    <th className="px-4 py-3">Usuario</th>
+                    <th className="px-4 py-3">
+                      {puedeGestionarCredenciales && (
+                        <label className="mr-2 inline-flex items-center gap-1 text-[10px] normal-case">
+                          <input
+                            type="checkbox"
+                            aria-label="Seleccionar usuarios activos de esta página"
+                            checked={paginaSeleccionadaCompleta}
+                            disabled={usuariosActivosPagina.length === 0 || Boolean(restablecimientoPendiente) || restableciendoCredenciales}
+                            onChange={(event) => usuariosActivosPagina.forEach((usuario: any) => (
+                              alternarSeleccionUsuario(usuario.username, event.target.checked)
+                            ))}
+                          />
+                          Página
+                        </label>
+                      )}
+                      Usuario
+                    </th>
                     <th className="px-4 py-3 min-w-[200px]">Nombre/Razón Social</th>
                     <th className="px-4 py-3">Documento</th>
                     <th className="px-4 py-3">Tipo</th>
@@ -620,7 +901,19 @@ export function UsuariosView() {
                 ) : activeTab === 'usuarios' ? (
                   paginatedData.map((u: any) => (
                     <tr key={u.username} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-semibold text-gray-900">{u.username}</td>
+                      <td className="px-4 py-3 font-semibold text-gray-900">
+                        {puedeGestionarCredenciales && (
+                          <input
+                            type="checkbox"
+                            className="mr-2 align-middle"
+                            aria-label={`Seleccionar usuario ${u.username}`}
+                            checked={usuariosSeleccionados.has(u.username)}
+                            disabled={u.estado !== true || Boolean(restablecimientoPendiente) || restableciendoCredenciales}
+                            onChange={(event) => alternarSeleccionUsuario(u.username, event.target.checked)}
+                          />
+                        )}
+                        {u.username}
+                      </td>
                       <td className="px-4 py-3">
                           {esRuc(u.tipoDocumentoKey) ? u.nombreRazonSocial : `${u.nombres || ''} ${u.apellidos || ''}`.trim()}
                       </td>
@@ -973,9 +1266,26 @@ export function UsuariosView() {
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Contraseña {modalMode === 'editar' && '(opcional)'}</label>
                                         <input type="password" ref={registrarRef('password')} className={claseInput('password')}
                                             aria-invalid={erroresCampo.password ? true : undefined}
+                                            autoComplete="new-password"
                                             value={formData.password}
-                                            onChange={e => setFormData({ ...formData, password: e.target.value, confirmPassword: e.target.value })} />
+                                            onChange={e => {
+                                              setFormData({ ...formData, password: e.target.value, confirmPassword: e.target.value });
+                                              setPasswordTemporalGenerada(false);
+                                            }} />
                                         {mensajeCampo('password')}
+                                        <button
+                                          type="button"
+                                          onClick={generarPasswordTemporalParaFormulario}
+                                          className="mt-2 inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-[#052A79] hover:bg-blue-100"
+                                        >
+                                          <KeyRound size={14} />
+                                          {passwordTemporalGenerada ? 'Generar otra temporal' : 'Generar contraseña temporal'}
+                                        </button>
+                                        {passwordTemporalGenerada && (
+                                          <p role="status" className="mt-1 text-[11px] text-slate-600">
+                                            Contraseña aleatoria de 24 caracteres. Si se guarda, quedará disponible una sola vez en el Excel temporal de esta sesión.
+                                          </p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Confirmar Contraseña</label>
@@ -1253,6 +1563,7 @@ export function UsuariosView() {
 
                                 return (
                                     <div className="space-y-3">
+                                        <p className="rounded border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">Todos los usuarios activos pueden consultar el Dashboard de su sede y solicitar notas de crédito sobre operaciones autorizadas. Aprobar, emitir, exportar y consultar alcance global requieren sus permisos específicos.</p>
                                         {MODULOS_CON_SUBMODULOS.map(bloqueModulo)}
                                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                             {otros.map((p) => casilla(p, false, true))}
@@ -1267,7 +1578,11 @@ export function UsuariosView() {
             </div>
             
             <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-2 rounded-b-xl">
-                <button type="button" onClick={() => setShowModal(false)} className="px-6 py-2 border border-slate-300 bg-white rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
+                <button type="button" onClick={() => {
+                  setShowModal(false);
+                  setFormData((actual: Record<string, unknown>) => ({ ...actual, password: '', confirmPassword: '' }));
+                  setPasswordTemporalGenerada(false);
+                }} className="px-6 py-2 border border-slate-300 bg-white rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
                 <button type="submit" form="main-form" className="px-6 py-2 bg-[#052a79] text-white rounded-lg font-semibold hover:bg-blue-900 transition-colors shadow-sm disabled:opacity-50" disabled={saving}>
                     {saving ? 'Guardando...' : 'Guardar'}
                 </button>

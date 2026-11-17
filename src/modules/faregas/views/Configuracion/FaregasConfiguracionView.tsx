@@ -4,15 +4,16 @@ import TabCatalogo from './components/TabCatalogo';
 import TabTarifas from './components/TabTarifas';
 import TabEmpresas from './components/TabEmpresas';
 import TabCorrelativos from './components/TabCorrelativos';
+import {
+  resolverPermisosConfiguracionFaregas,
+  type ConfiguracionTabId,
+} from '../../utils/configuracion-permisos';
 
-// SERIES ya no es una pestaña de Configuración: vive en
-// Facturación electrónica > SERIES, con las vistas SERIES NUBEFACT y
-// MAESTRO DMS. Se retira SÓLO la entrada visual; la tabla, los endpoints y el
-// permiso CONFIGURACION_SERIES se conservan intactos.
-type ConfigTab = 'SEDES' | 'CATALOGO' | 'TARIFAS' | 'EMPRESAS' | 'CORRELATIVOS';
-
+// La administración principal de series vive en Facturación electrónica.
+// Esta vista conserva los correlativos cuando el usuario tiene CONFIGURACION_SERIES
+// o MENU_FACTURACION_SERIES, permisos que también valida el backend.
 export function FaregasConfiguracionView() {
-  const [activeTab, setActiveTab] = useState<ConfigTab>('SEDES');
+  const [activeTab, setActiveTab] = useState<ConfiguracionTabId | null>(null);
   
   
   let fUser: { permisos?: string[] } = {};
@@ -24,38 +25,20 @@ export function FaregasConfiguracionView() {
   }
 
   const permisos = fUser?.permisos || [];
-
-  const hasSedes = permisos.includes('CONFIGURACION_SEDES');
-  const hasServicios = permisos.includes('CONFIGURACION_SERVICIOS');
-  const hasCategorias = permisos.includes('CONFIGURACION_CATEGORIAS');
-  const hasProductos = permisos.includes('CONFIGURACION_PRODUCTOS');
-  const hasTarifas = permisos.includes('CONFIGURACION_TARIFAS');
-  const hasSeries = permisos.includes('CONFIGURACION_SERIES');
-  // La relación empresa-sede forma parte de la administración de sedes.
-  // El permiso específico permite separarla en perfiles futuros, mientras
-  // CONFIGURACION_SEDES conserva acceso para las sesiones actuales.
-  const hasEmpresas = permisos.includes('CONFIGURACION_EMPRESAS') || hasSedes;
-  const hasCatalogo = hasCategorias || hasServicios || hasProductos;
-  const hasCorrelativos = hasSeries;
-  const tabs = [];
-  if (permisos.includes('MENU_CONFIGURACION_SEDES') && hasSedes) {
-    tabs.push({ id: 'SEDES', label: 'SEDES / CATEGORÍAS DMS' });
-  }
-  if (permisos.includes('MENU_CONFIGURACION_CATALOGO') && hasCatalogo) {
-    tabs.push({ id: 'CATALOGO', label: 'CATÁLOGO' });
-  }
-  if (permisos.includes('MENU_CONFIGURACION_TARIFAS') && hasTarifas) {
-    // tabs.push({ id: 'TARIFAS', label: 'TARIFAS POR SEDE' });
-  }
-  if (permisos.includes('MENU_CONFIGURACION_CORRELATIVOS') && hasCorrelativos) {
-    tabs.push({ id: 'CORRELATIVOS', label: 'CORRELATIVOS' });
-  }
-  if (permisos.includes('MENU_CONFIGURACION_EMPRESAS') && hasEmpresas) {
-    tabs.push({ id: 'EMPRESAS', label: 'EMPRESAS' });
-  }
+  const {
+    hasSedes,
+    hasServicios,
+    hasCategorias,
+    hasProductos,
+    hasTarifas,
+    hasCorrelativos,
+    hasEmpresas,
+    hasCatalogo,
+    tabs,
+  } = resolverPermisosConfiguracionFaregas(permisos);
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
     ? activeTab
-    : tabs[0]?.id as ConfigTab | undefined;
+    : tabs[0]?.id;
 
   return (
     <div className="space-y-4">
@@ -72,7 +55,7 @@ export function FaregasConfiguracionView() {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as ConfigTab)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 py-4 text-sm font-bold transition-colors ${
                   tabVisible === tab.id
                     ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
@@ -87,7 +70,7 @@ export function FaregasConfiguracionView() {
           <div className="p-6">
             {!tabVisible && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
-                Tu perfil no tiene permisos para administrar módulos de Configuración.
+                Tu perfil no tiene submódulos de Configuración autorizados. Solicita que revisen sus permisos efectivos.
               </div>
             )}
             {tabVisible === 'SEDES' && hasSedes && <TabSedes />}

@@ -45,6 +45,9 @@ export interface MaestrosPagoResponse {
       cci: string;
       entidad: string;
     };
+    politicaSpot?: {
+      umbralComercial: number;
+    };
   };
 }
 

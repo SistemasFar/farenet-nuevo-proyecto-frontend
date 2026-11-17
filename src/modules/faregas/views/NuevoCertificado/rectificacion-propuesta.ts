@@ -1,6 +1,8 @@
 import type { DatosPropuestosRectificacion } from '../../services/faregas-rectificaciones.api';
 
-type CualquierObjeto = Record<string, unknown>;
+// Los estados del wizard son interfaces estructuradas sin firma de índice.
+// `any` aquí permite consumir sus campos dinámicos sin rechazar esos estados.
+type CualquierObjeto = Record<string, any>;
 
 interface ConstruirPropuestaRectificacionParams {
   tipoCertificado: string;

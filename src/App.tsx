@@ -27,7 +27,10 @@ import { FaregasFacturacionView } from './modules/faregas/views/Facturacion/Fare
 import { DescuentosView as FaregasDescuentosView } from './modules/faregas/views/Descuentos/DescuentosView';
 import { FaregasDashboardView } from './modules/faregas/views/Dashboard/FaregasDashboardView';
 import { ReportesFinancierosView } from './modules/faregas/views/Dashboard/ReportesFinancierosView';
+import { tieneAccesoDashboard } from './modules/faregas/views/Dashboard/dashboard-config';
 import { ChipsView as FaregasChipsView } from './modules/faregas/views/Chips/ChipsView';
+import { puedeAbrirChipsFaregas } from './modules/faregas/utils/chips-permisos';
+import { puedeAbrirFacturacionFaregas } from './modules/faregas/utils/facturacion-permisos';
 
 import { useEmpresa } from './context/EmpresaContext';
 
@@ -595,20 +598,13 @@ export default function App() {
                 )
               }
             >
-              <Route path="inicio" element={<FaregasInicioView />} />
+              <Route path="inicio" element={(faregasUser || leerUsuarioFaregas())?.permisos?.includes('MENU_INICIO')
+                ? <FaregasInicioView /> : <ForbiddenView />} />
               <Route
                 path="dashboard"
-                element={
-                  (() => {
-                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
-                    const userPerms = fUser?.permisos || [];
-                    return userPerms.includes('MENU_DASHBOARD') || userPerms.includes('DASHBOARD_GLOBAL') || userPerms.includes('DASHBOARD_SEDE') ? (
-                      <FaregasDashboardView />
-                    ) : (
-                      <ForbiddenView />
-                    );
-                  })()
-                }
+                element={tieneAccesoDashboard((faregasUser || leerUsuarioFaregas())?.permisos || [])
+                  ? <FaregasDashboardView />
+                  : <ForbiddenView />}
               />
               <Route
                 path="reportes-financieros"
@@ -616,7 +612,7 @@ export default function App() {
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
                     const userPerms = fUser?.permisos || [];
-                    return userPerms.includes('MENU_DASHBOARD') || userPerms.includes('DASHBOARD_GLOBAL') || userPerms.includes('DASHBOARD_SEDE') ? (
+                    return tieneAccesoDashboard(userPerms) && userPerms.includes('DASHBOARD_EXPORTAR') ? (
                       <ReportesFinancierosView />
                     ) : (
                       <ForbiddenView />
@@ -624,9 +620,12 @@ export default function App() {
                   })()
                 }
               />
-              <Route path="certificados/nuevo" element={<FaregasNuevoCertificadoView />} />
-              <Route path="certificados/:id/continuar" element={<FaregasNuevoCertificadoView />} />
-              <Route path="certificados/:id/rectificar" element={<FaregasNuevoCertificadoView />} />
+              <Route path="certificados/nuevo" element={(faregasUser || leerUsuarioFaregas())?.permisos?.includes('MENU_INICIO')
+                ? <FaregasNuevoCertificadoView /> : <ForbiddenView />} />
+              <Route path="certificados/:id/continuar" element={(faregasUser || leerUsuarioFaregas())?.permisos?.includes('MENU_INICIO')
+                ? <FaregasNuevoCertificadoView /> : <ForbiddenView />} />
+              <Route path="certificados/:id/rectificar" element={(faregasUser || leerUsuarioFaregas())?.permisos?.includes('MENU_INICIO')
+                ? <FaregasNuevoCertificadoView /> : <ForbiddenView />} />
               <Route
                 path="usuarios"
                 element={
@@ -692,8 +691,7 @@ export default function App() {
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
                     const userPerms = fUser?.permisos || [];
-                    const pId = String(fUser?.perfilId || fUser?.perfil_id || '').toLowerCase();
-                    return userPerms.includes('MENU_DESCUENTOS') || pId === 'sistemas' ? (
+                    return userPerms.includes('MENU_DESCUENTOS') ? (
                       <FaregasDescuentosView />
                     ) : (
                       <ForbiddenView />
@@ -708,8 +706,7 @@ export default function App() {
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
                     const userPerms = fUser?.permisos || [];
-                    const pId = String(fUser?.perfilId || fUser?.perfil_id || '').toLowerCase();
-                    return userPerms.includes('MENU_FACTURACION') || pId === 'sistemas' ? (
+                    return puedeAbrirFacturacionFaregas(userPerms) ? (
                       <FaregasFacturacionView />
                     ) : (
                       <ForbiddenView />
@@ -723,7 +720,7 @@ export default function App() {
                   (() => {
                     const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
                     const userPerms = fUser?.permisos || [];
-                    return userPerms.includes('MENU_CHIPS') || userPerms.includes('CHIPS_VER') ? (
+                    return puedeAbrirChipsFaregas(userPerms) ? (
                       <FaregasChipsView />
                     ) : (
                       <ForbiddenView />

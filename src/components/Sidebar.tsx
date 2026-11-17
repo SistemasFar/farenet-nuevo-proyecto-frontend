@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import faregasLogo from '@/assets/images/faregas_logo.png';
+import { puedeAbrirConfiguracionFaregas } from '../modules/faregas/utils/configuracion-permisos';
+import { puedeAbrirChipsFaregas } from '../modules/faregas/utils/chips-permisos';
+import { puedeAbrirFacturacionFaregas } from '../modules/faregas/utils/facturacion-permisos';
 
 interface MenuItem {
   path: string;
@@ -327,14 +330,7 @@ export function Sidebar({
     // cualquier restricción se corrige asignando o quitando el permiso.
     if (isFaregas) {
       if (item.key === 'dashboard') {
-        const pId = (perfilId || '').toLowerCase();
-        return (
-          permisos.includes('MENU_DASHBOARD') ||
-          permisos.includes('DASHBOARD_GLOBAL') ||
-          permisos.includes('DASHBOARD_SEDE') ||
-          pId === 'sistemas' ||
-          pId === 'aministrador'
-        );
+        return (item.permisos || []).some((permiso) => permisos.includes(permiso));
       }
       if (item.key === 'descuentos') {
         return permisos.includes('MENU_DESCUENTOS');
@@ -349,13 +345,13 @@ export function Sidebar({
         return permisos.includes('MENU_AUDITORIA');
       }
       if (item.key === 'configuracion') {
-        return permisos.includes('MENU_CONFIGURACION');
+        return puedeAbrirConfiguracionFaregas(permisos);
       }
       if (item.key === 'facturacion') {
-        return permisos.includes('MENU_FACTURACION');
+        return puedeAbrirFacturacionFaregas(permisos);
       }
       if (item.key === 'chips') {
-        return permisos.includes('MENU_CHIPS') || permisos.includes('CHIPS_VER');
+        return puedeAbrirChipsFaregas(permisos);
       }
       return false;
     }

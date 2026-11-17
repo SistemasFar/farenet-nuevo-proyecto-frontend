@@ -42,14 +42,20 @@ export default function TabFacturacion({ plantaKey: _plantaKey, plantaNombre: _p
     </button>
   );
 
+  if (visibles.length === 0) {
+    return <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+      El perfil puede abrir Facturación, pero no tiene submódulos autorizados. Solicita que revisen sus permisos efectivos.
+    </div>;
+  }
+
   return <div className="space-y-5">
     <div className="-mx-1 overflow-x-auto px-1">
       <div className="flex min-w-max gap-2 border-b border-slate-200 pb-3">
         {visibles.map((p) => pestana(p.id, p.label))}
       </div>
     </div>
-    {vista === 'SERIES' && <TabSeries />}
-    {vista === 'DOCUMENTOS' && <TabDocumentosFacturacion />}
-    {vista === 'CLIENTES' && <TabClientesFacturacion />}
+    {vista === 'SERIES' && permitidas.includes('SERIES') && <TabSeries />}
+    {vista === 'DOCUMENTOS' && permitidas.includes('DOCUMENTOS') && <TabDocumentosFacturacion />}
+    {vista === 'CLIENTES' && permitidas.includes('CLIENTES') && <TabClientesFacturacion />}
   </div>;
 }

@@ -61,6 +61,23 @@ describe('control de autosave y conteo de peticiones', () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
+  it('el estado limpio permite salir sin programar una escritura', () => {
+    const control = new ControlAutosave();
+    const snapshot = crearSnapshotAutosave({ placa: 'ABC123', marca: 'TOYOTA' });
+    control.sembrar('VEHICULO', snapshot);
+    expect(control.tieneCambiosPendientes('VEHICULO', snapshot)).toBe(false);
+  });
+
+  it('el estado modificado se marca como pendiente hasta confirmar el guardado', () => {
+    const control = new ControlAutosave();
+    const inicial = crearSnapshotAutosave({ placa: 'ABC123', marca: 'TOYOTA' });
+    const editado = crearSnapshotAutosave({ placa: 'ABC123', marca: 'KIA' });
+    control.sembrar('VEHICULO', inicial);
+    expect(control.tieneCambiosPendientes('VEHICULO', editado)).toBe(true);
+    control.confirmar('VEHICULO', editado);
+    expect(control.tieneCambiosPendientes('VEHICULO', editado)).toBe(false);
+  });
+
   it('el cambio persistido se conserva al simular una recarga', async () => {
     let servidor = { marca: 'TOYOTA', modelo: 'YARIS' };
     const control = new ControlAutosave();
@@ -154,5 +171,11 @@ describe('persistencia de la recuperación histórica', () => {
 
   it('vacía la cola antes de avanzar, volver o salir', () => {
     expect(fuenteWizard.match(/await autosaveQueueRef\.current\.catch/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('marca los datos de facturación cargados como línea base y guarda ediciones antes de salir', () => {
+    expect(fuenteWizard).toContain("sembrar('FACTURACION', snapshotFacturacionAutosave)");
+    expect(fuenteWizard).toContain("tieneCambiosPendientes('FACTURACION', snapshotFacturacionAutosave)");
+    expect(fuenteWizard).toContain("guardarFacturacion(certificadoId, construirPayloadFacturacion())");
   });
 });

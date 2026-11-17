@@ -47,6 +47,7 @@ export interface ProductoInventariable {
   tipo: string;
   controlStock: boolean;
   activo: boolean;
+  codigoAutogenerable?: boolean;
   productoFacturacionId?: number | null;
   sedes: ProductoInventariableSede[];
   stockTotal: number;
@@ -131,6 +132,7 @@ export interface CrearProductoInventariablePayload {
   codigo: string;
   nombre: string;
   tipo: string;
+  codigoAutogenerable?: boolean;
   sedes: Array<{
     plantaKey: string;
     precio: number;
@@ -138,6 +140,16 @@ export interface CrearProductoInventariablePayload {
     ventaHabilitada: boolean;
     productoFacturacionId?: number;
   }>;
+}
+
+export interface PropuestaCodigosDisponibles {
+  token: string;
+  prefijo: string;
+  cantidad: number;
+  digitos: number;
+  codigos: string[];
+  omitidos: string[];
+  venceEn: string | null;
 }
 
 export interface ChipDisponibilidad {
@@ -384,7 +396,8 @@ export const faregasChipsApi = {
     const query=params.toString();
     return (await faregasFetch(`/chips/disponibilidad/${encodeURIComponent(numeroChip)}${query?`?${query}`:''}`)).chip as ChipDisponibilidad;
   },
-  ingresar: async (productoInventariableId:number,numeros:string[],referencia?:string) => faregasFetch('/chips/ingresos',{method:'POST',body:JSON.stringify({productoInventariableId,numeros,referencia})}),
+  ingresar: async (productoInventariableId:number,numeros:string[],referencia?:string, propuesta?:{modoCodigo:'GENERADOS';tokenPropuesta:string}) => faregasFetch('/chips/ingresos',{method:'POST',body:JSON.stringify({productoInventariableId,numeros,referencia,...propuesta})}),
+  proponerCodigosDisponibles: async (productoInventariableId:number, solicitud:{prefijo:string;cantidad:number;digitos:number;minimo?:number|string}) => (await faregasFetch('/chips/ingresos/proponer-codigos',{method:'POST',body:JSON.stringify({productoInventariableId,...solicitud})})).propuesta as PropuestaCodigosDisponibles,
   transferir: async (productoInventariableId:number,destinoKey:string,numeros:string[],referencia?:string) => faregasFetch('/chips/transferencias',{method:'POST',body:JSON.stringify({productoInventariableId,destinoKey,numeros,referencia})}),
   baja: async (numeroChip:string,referencia:string) => faregasFetch('/chips/bajas',{method:'POST',body:JSON.stringify({numeroChip,referencia})}),
   validarVentaDirecta: async (entrada: string[] | { productoInventariableId: number; cantidad: number }): Promise<ValidacionVentaDirectaResponse> => faregasFetch('/chips/venta-directa/validar', { method: 'POST', body: JSON.stringify(Array.isArray(entrada) ? { chips: entrada } : entrada) }) as Promise<ValidacionVentaDirectaResponse>,

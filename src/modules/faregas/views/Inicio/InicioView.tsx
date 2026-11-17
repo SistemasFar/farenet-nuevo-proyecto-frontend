@@ -11,6 +11,7 @@ import { abrirPdfNotaCreditoNubefact, abrirPdfNubefact } from '../../services/fa
 import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
 import { SolicitudOperacionModal } from './SolicitudOperacionModal';
 import { NotaCreditoModal } from './NotaCreditoModal';
+import { SolicitudNotaCreditoModal } from './SolicitudNotaCreditoModal';
 import {
   estadoCertificadoPanel,
   estadoComprobantePanel,
@@ -365,6 +366,10 @@ export const puedeSolicitarAnulacionCertificado = (item: BorradorPanel, permisos
 
 export const puedeCrearNotaCreditoPanel = (item: BorradorPanel, permisos: string[], hoyLima = obtenerFechaHoyLima()) => {
   if (!permisos.includes('FAREGAS_NOTA_CREDITO')) return false;
+  return puedeSolicitarNotaCreditoPanel(item, hoyLima);
+};
+
+export const puedeSolicitarNotaCreditoPanel = (item: BorradorPanel, hoyLima = obtenerFechaHoyLima()) => {
   if (!fechaFiscalEsAnteriorALima(item.fechaDocumentoFiscal, hoyLima)) return false;
 
   if (esSolicitudActivaAnulacion(item.solicitudOperacionEstado) || esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)) return false;
@@ -418,6 +423,7 @@ export function InicioView() {
   const [certificadoSolicitudId, setCertificadoSolicitudId] = useState<number | null>(null);
   const [solicitudSolicitadaId, setSolicitudSolicitadaId] = useState<number | null>(null);
   const [solicitudNotaCreditoMotivo, setSolicitudNotaCreditoMotivo] = useState<'01' | '02' | '03' | null>(null);
+  const [notaSolicitadaId, setNotaSolicitadaId] = useState<number | null>(null);
   const [solicitudNotaCreditoItemIndice, setSolicitudNotaCreditoItemIndice] = useState<number | null>(null);
   const [solicitudNotaCreditoDescripcion, setSolicitudNotaCreditoDescripcion] = useState<string>('');
   const [notaCreditoModal, setNotaCreditoModal] = useState<{
@@ -1078,6 +1084,7 @@ export function InicioView() {
                               className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
                             ><Ban size={16} /></button>
                           )}
+                          {puedeSolicitarNotaCreditoPanel(ins) && <button type="button" onClick={() => setNotaSolicitadaId(ins.id)} title="Solicitar nota de crédito" aria-label="Solicitar nota de crédito" className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-violet-800"><FileEdit size={16} /></button>}
                           {!solicitudCompletada && puedeCrearNota && (
                             <button
                               type="button"
@@ -1273,7 +1280,7 @@ export function InicioView() {
                       )}
                     </div>
                   )}
-                  {!solicitudCompletada && (puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar || motivoAccionFiscal) && (
+                  {!solicitudCompletada && (puedeSolicitarNotaCreditoPanel(ins) || puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar || motivoAccionFiscal) && (
                     <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       {anulacionPendiente && ins.anulacionId && (
                         <button
@@ -1283,6 +1290,7 @@ export function InicioView() {
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
                         ><RefreshCw size={16} className={accionEnProceso === ins.id ? 'animate-spin' : ''} /> Consultar anulación</button>
                       )}
+                      {puedeSolicitarNotaCreditoPanel(ins) && <button type="button" onClick={() => setNotaSolicitadaId(ins.id)} className="rounded-md border border-violet-200 px-3 py-2 text-sm text-violet-800">Solicitar nota de crédito</button>}
                       {puedeCrearNotaCredito && (
                         <button
                           type="button"
@@ -1392,6 +1400,7 @@ export function InicioView() {
         onCerrar={() => { setCertificadoSolicitudId(null); setSolicitudSolicitadaId(null); setSolicitudNotaCreditoMotivo(null); setSolicitudNotaCreditoItemIndice(null); setSolicitudNotaCreditoDescripcion(''); }}
         onCreada={() => { void cargarInspecciones(page, pageSize); }}
       />
+      {notaSolicitadaId !== null && <SolicitudNotaCreditoModal key={notaSolicitadaId} certificadoId={notaSolicitadaId} onCerrar={() => setNotaSolicitadaId(null)} onCreada={() => { void cargarInspecciones(page, pageSize); }} />}
       <NotaCreditoModal
         abierto={notaCreditoModal !== null}
         certificadoId={notaCreditoModal?.certificadoId || null}

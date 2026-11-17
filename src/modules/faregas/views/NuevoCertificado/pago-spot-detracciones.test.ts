@@ -107,7 +107,7 @@ describe('FAREGAS — SPOT Detracciones (SUNAT RS 183-2004) en Wizard de Pagos',
     expect(evaluacion.aplica).toBe(false);
     expect(evaluacion.montoDetraccion).toBe(0);
     expect(evaluacion.netoCobrar).toBe(500.00);
-    expect(evaluacion.motivoExclusion).toBe('IMPORTE_MENOR_O_IGUAL_A_700');
+    expect(evaluacion.motivoExclusion).toBe('BAJO_UMBRAL_COMERCIAL');
   });
 
   it('5. Operación de CORTESÍA (Total 0): No aplica SPOT', () => {

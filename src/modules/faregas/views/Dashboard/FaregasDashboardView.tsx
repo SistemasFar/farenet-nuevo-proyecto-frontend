@@ -22,7 +22,7 @@ export const FaregasDashboardView: React.FC = () => {
   const plantaActiva = context?.plantaSeleccionada;
   const plantasDisponibles = context?.plantasDisponibles || [];
 
-  const { puedeVerGlobal } = resolverPermisosDashboard(permisos, perfilId);
+  const { puedeVerGlobal, puedeExportar } = resolverPermisosDashboard(permisos, perfilId);
   const [tabActiva, setTabActiva] = useState<DashboardTabId>('resumen');
   const [filtros, setFiltros] = useState<FiltrosDashboard>(() => {
     const { desde, hasta } = obtenerRangoRapido('30D');
@@ -78,6 +78,7 @@ export const FaregasDashboardView: React.FC = () => {
         plantasDisponibles={plantasDisponibles}
         plantaActivaNombre={plantaActiva?.nombre || 'Sede Actual'}
         puedeVerGlobal={puedeVerGlobal}
+        puedeExportar={puedeExportar}
         cargando={dashboard.cargando}
         tiposCertificadoDisponibles={dashboard.resumen?.distribucionCertificados.map((item) => item.tipo)}
       />

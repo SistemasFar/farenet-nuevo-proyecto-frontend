@@ -6,13 +6,20 @@ import { construirFilasReporteFinancieroBase } from '../../utils/faregas-reporte
 
 const servicioSujeto = { sujetoDetraccion: true, codigoSpot: '037', porcentajeSpot: 12 };
 
-function renderPago(tipoComprobante: 'BOLETA' | 'FACTURA', pagosAgregados: Array<{ id: number; tipo: 'EFECTIVO'; importe: string; tarjetaKey: string; entidadFinancieraKey: string }> = []) {
+function renderPago(
+  tipoComprobante: 'BOLETA' | 'FACTURA',
+  pagosAgregados: Array<{ id: number; tipo: 'EFECTIVO'; importe: string; tarjetaKey: string; entidadFinancieraKey: string }> = [],
+  opciones: { total?: number; spotServicio?: typeof servicioSujeto | { sujetoDetraccion?: boolean | null }; tipoItemSpot?: 'PRODUCTO' | 'SERVICIO' | 'MIXTO' } = {},
+) {
   return renderToStaticMarkup(
     <PagoStep
       pagoTab="EFECTIVO" setPagoTab={() => undefined}
       formPago={{ importe: '', tarjetaKey: '', entidadFinancieraKey: '' }} setFormPago={() => undefined}
       pagosAgregados={pagosAgregados} handleAgregarPago={() => undefined} eliminarPago={() => undefined}
-      totalPagar={1260} tipoComprobante={tipoComprobante} spotServicio={servicioSujeto}
+      totalPagar={opciones.total ?? 1260} tipoComprobante={tipoComprobante}
+      spotServicio={opciones.spotServicio ?? servicioSujeto}
+      spotProducto={opciones.tipoItemSpot === 'PRODUCTO' ? opciones.spotServicio : undefined}
+      tipoItemSpot={opciones.tipoItemSpot ?? 'SERVICIO'}
       condicionPago="CONTADO" onCondicionPagoChange={() => undefined}
       fechaInicioCredito="" fechaVencimientoCredito=""
       onFechaInicioCreditoChange={() => undefined} onFechaVencimientoCreditoChange={() => undefined}
@@ -44,6 +51,15 @@ describe('wizard real de pagos — SPOT', () => {
     expect(codigoServicio.motivoExclusion).toBe('CLASIFICACION_SPOT_NO_RECONOCIDA');
   });
 
+  it('muestra por qué una factura de chips de S/ 1,080 no lleva SPOT cuando el catálogo dice no sujeto', () => {
+    const html = renderPago('FACTURA', [], {
+      total: 1080, tipoItemSpot: 'PRODUCTO', spotServicio: { sujetoDetraccion: false },
+    });
+    expect(html).toContain('El importe cumple el umbral comercial');
+    expect(html).toContain('el producto está configurado como no sujeto a detracción');
+    expect(html).not.toContain('Detracción SPOT (');
+  });
+
   it('muestra total fiscal S/ 1,260, código 037 al 12%, detracción S/ 151 y neto S/ 1,109', () => {
     const html = renderPago('FACTURA');
     expect(html).toContain('Total comprobante:');
@@ -70,23 +86,52 @@ describe('wizard real de pagos — SPOT', () => {
     expect(html).toContain('datos de identificación del comprador');
   });
 
-  it('bloquea confirmación si la factura supera S/ 700 y el servicio carece de clasificación SPOT', () => {
+  it('bloquea confirmación desde S/ 700 inclusive si la clasificación SPOT está pendiente', () => {
     expect(evaluarSpotWizard({ tipoComprobante: 'FACTURA', total: 1260 }).motivoExclusion)
       .toBe('CLASIFICACION_SPOT_NO_VERIFICADA');
+    expect(evaluarSpotWizard({ tipoComprobante: 'FACTURA', total: 700 }).requiereRevision).toBe(true);
     expect(validarPasoPago({
-      tipoComprobante: 'FACTURA', condicionPago: 'CONTADO', pagos: [{ importe: 1260 }], precioTotal: 1260,
+      tipoComprobante: 'FACTURA', condicionPago: 'CONTADO', pagos: [{ importe: 700 }], precioTotal: 700,
     }).pagos).toMatch(/clasificación SPOT/i);
   });
 
-  it('aplica el umbral solo por encima de S/ 700 y respeta servicios excluidos', () => {
-    for (const importe of [699.99, 700]) {
-      expect(evaluarSpotWizard({ tipoComprobante: 'FACTURA', total: importe, servicio: servicioSujeto }).aplica).toBe(false);
-    }
-    expect(evaluarSpotWizard({ tipoComprobante: 'FACTURA', total: 700.01, servicio: servicioSujeto }).montoDetraccion).toBe(84);
+  it('evalúa desde S/ 700 y conserva el límite legal estricto para servicios', () => {
+    const inferior = evaluarSpotWizard({ tipoComprobante: 'FACTURA', total: 699, servicio: servicioSujeto });
+    expect(inferior.aplica).toBe(false);
+    expect(inferior.estadoEvaluacionSpot).toBe('BAJO_UMBRAL_COMERCIAL');
+    const limite = evaluarSpotWizard({ tipoComprobante: 'FACTURA', total: 700, servicio: servicioSujeto });
+    expect(limite.aplica).toBe(false);
+    expect(limite.estadoEvaluacionSpot).toBe('CLASIFICADA_SIN_UMBRAL_LEGAL');
+    expect(evaluarSpotWizard({ tipoComprobante: 'FACTURA', total: 701, servicio: servicioSujeto }).montoDetraccion).toBe(84);
     expect(evaluarSpotWizard({
       tipoComprobante: 'FACTURA', total: 1260,
       servicio: { sujetoDetraccion: false, codigoSpot: null, porcentajeSpot: null },
     }).aplica).toBe(false);
+  });
+
+  it('usa el umbral configurable del backend sin ocultar la aplicación legal por encima de S/ 700', () => {
+    const umbralComercialMayor = evaluarSpotWizard({
+      tipoComprobante: 'FACTURA', total: 800, servicio: servicioSujeto, umbralComercial: 1000,
+    });
+    expect(umbralComercialMayor.aplica).toBe(true);
+    expect(umbralComercialMayor.umbralComercialAlcanzado).toBe(false);
+    expect(umbralComercialMayor.montoDetraccion).toBe(96);
+
+    const umbralComercialMenor = evaluarSpotWizard({
+      tipoComprobante: 'FACTURA', total: 650, servicio: servicioSujeto, umbralComercial: 600,
+    });
+    expect(umbralComercialMenor.aplica).toBe(false);
+    expect(umbralComercialMenor.umbralComercialAlcanzado).toBe(true);
+    expect(umbralComercialMenor.estadoEvaluacionSpot).toBe('CLASIFICADA_SIN_UMBRAL_LEGAL');
+  });
+
+  it('bloquea una factura mixta antes del pago si la base sujeta no puede determinarse por concepto', () => {
+    const resultado = evaluarSpotWizard({
+      tipoComprobante: 'FACTURA', total: 1260, tipoItem: 'MIXTO', servicio: servicioSujeto,
+    });
+    expect(resultado.requiereRevision).toBe(true);
+    expect(resultado.motivoExclusion).toBe('CONCEPTOS_MIXTOS_REQUIEREN_REVISION');
+    expect(renderPago('FACTURA', [], { tipoItemSpot: 'MIXTO' })).toContain('combina productos y servicios');
   });
 
   it('acepta el neto pagado y rechaza el pago completo anterior cuando existe detracción', () => {

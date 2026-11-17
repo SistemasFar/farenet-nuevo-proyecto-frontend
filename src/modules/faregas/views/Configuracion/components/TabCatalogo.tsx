@@ -18,7 +18,7 @@ export default function TabCatalogo({ hasCategorias, hasServicios, hasProductos,
   const tabs = useMemo(() => [
     ...(hasProductos ? [{ id: 'FISCALES' as const, label: 'PRODUCTOS FISCALES', icon: PackageSearch }] : []),
     ...(hasCategorias ? [{ id: 'CATEGORIAS' as const, label: 'TIPOS DE CERTIFICADO', icon: Tags }] : []),
-    ...(hasServicios && hasCategorias ? [{ id: 'OPERACIONES' as const, label: 'OPERACIÓN Y FORMATOS', icon: FileCheck2 }] : [])
+    ...(hasServicios ? [{ id: 'OPERACIONES' as const, label: 'OPERACIÓN Y FORMATOS', icon: FileCheck2 }] : [])
   ], [hasCategorias, hasProductos, hasServicios]);
   
   const [activeTab, setActiveTab] = useState<CatalogoTab>(tabs[0]?.id || 'FISCALES');
@@ -57,7 +57,7 @@ export default function TabCatalogo({ hasCategorias, hasServicios, hasProductos,
         </div>
       )}
 
-      {activeTab === 'OPERACIONES' && hasServicios && hasCategorias && (
+      {activeTab === 'OPERACIONES' && hasServicios && (
         <TabOperacionesWrapper 
           canViewProducts={hasProductos} 
           canManageTarifas={hasTarifas} 

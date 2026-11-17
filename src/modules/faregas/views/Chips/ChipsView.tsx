@@ -6,17 +6,18 @@ import { Cpu, Boxes, FileText, Search, Trash2, Ban, RefreshCw, ScanLine, FileSpr
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
 import { Paginacion } from '../components/Paginacion';
 import { useListadoPaginado } from '../hooks/useListadoPaginado';
-import { faregasChipsApi, type Chip, type ChipResumen, type ImpactoTipoChip, type MovimientoInventarioCantidad, type ProductoFiscalChipOpcion, type ProductoInventariable, type VentaChipOperacion } from '../../services/faregas-chips.api';
+import { faregasChipsApi, type Chip, type ChipResumen, type ImpactoTipoChip, type MovimientoInventarioCantidad, type ProductoFiscalChipOpcion, type ProductoInventariable, type PropuestaCodigosDisponibles, type VentaChipOperacion } from '../../services/faregas-chips.api';
 import { ChipScannerInput } from './ChipScannerInput';
 import { extraerCodigosDeHoja, generarCodigosPorRango, parseChipScan } from './chips-ingreso-masivo';
 import { mostrarPrecioVentaFiscal, obtenerProductoFiscalChip } from './chips-producto-fiscal';
 import { ModalDetalleVentaChips } from './ModalDetalleVentaChips';
 import { ModalVentaChips } from './ModalVentaChips';
 import { esProductoCantidad, etiquetaControlInventario } from './inventario-control';
+import { puedeAnularComprobanteChips, puedeGestionarVentasChips } from '../../utils/chips-permisos';
 
 const empty: ChipResumen = { total: 0, disponibles: 0, reservados: 0, vendidos: 0, baja: 0, precio: 0, stockPermitido: false, ventaHabilitada: false, mappingFiscalCompleto: false };
 type EditableSede = { precio: number; stockPermitido: boolean; ventaHabilitada: boolean; productoFacturacionId?: number };
-type MetodoIngreso = 'ESCANEO' | 'EXCEL' | 'RANGO';
+type MetodoIngreso = 'ESCANEO' | 'EXCEL' | 'RANGO' | 'GENERAR';
 const SEDES_TRANSFERENCIA_CHIPS = ['13', '98', '160'];
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un error inesperado.';
 
@@ -47,9 +48,8 @@ export function ChipsView() {
   const [searchParams] = useSearchParams();
   const productoSolicitadoId = Number(searchParams.get('producto') || 0);
 
-  // Submódulos de Chips. MENU_CHIPS da el módulo; los MENU_CHIPS_* dan cada
-  // pestaña. El botón de venta sigue dependiendo de CHIPS_VENDER (capacidad
-  // operativa), no de la navegación.
+  // Cada submódulo autoriza sus funciones ordinarias. Las capacidades CHIPS_*
+  // no se vuelven una segunda llave oculta para la misma pestaña.
   const lista = Array.isArray(permisos) ? permisos : [];
   const puedeInventario = lista.includes('MENU_CHIPS_INVENTARIO');
   const puedeTipos = lista.includes('MENU_CHIPS_TIPOS');
@@ -64,10 +64,13 @@ export function ChipsView() {
   // Si la URL pide una pestaña que el perfil no tiene, se cae a la primera
   // permitida en lugar de dejar la pantalla vacía.
   const [activeTab, setActiveTab] = useState<'INVENTARIO' | 'PRODUCTOS' | 'VENTAS'>(() => {
-    const pedida = searchParams.get('tab') === 'productos' ? 'PRODUCTOS' : 'INVENTARIO';
-    if (pedida === 'PRODUCTOS' && !puedeTipos) return puedeVentas ? 'VENTAS' : 'INVENTARIO';
-    if (pedida === 'INVENTARIO' && !puedeInventario) return puedeVentas ? 'VENTAS' : 'INVENTARIO';
-    return pedida;
+    const pedida = searchParams.get('tab');
+    if (pedida === 'productos' && puedeTipos) return 'PRODUCTOS';
+    if (pedida === 'ventas' && puedeVentas) return 'VENTAS';
+    if (puedeInventario) return 'INVENTARIO';
+    if (puedeTipos) return 'PRODUCTOS';
+    if (puedeVentas) return 'VENTAS';
+    return 'INVENTARIO';
   });
   const [productoSolicitadoAtendido, setProductoSolicitadoAtendido] = useState(false);
   const [resumen, setResumen] = useState<ChipResumen>(empty);
@@ -83,6 +86,8 @@ export function ChipsView() {
   const [cargandoArchivo, setCargandoArchivo] = useState(false);
   const archivoInputRef = useRef<HTMLInputElement>(null);
   const [rango, setRango] = useState({ prefijo: 'CHIP', desde: '1', hasta: '200', digitos: '3' });
+  const [solicitudCodigos, setSolicitudCodigos] = useState({ prefijo: 'CHIP', cantidad: '6', digitos: '1', minimo: '1' });
+  const [propuestaCodigos, setPropuestaCodigos] = useState<(PropuestaCodigosDisponibles & { productoId: number }) | null>(null);
   const [buscar, setBuscar] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
   // Paginacion del inventario: 10 por pagina, en el backend.
@@ -100,6 +105,7 @@ export function ChipsView() {
   const [newProductCodigo, setNewProductCodigo] = useState('');
   const [newProductName, setNewProductName] = useState('');
   const [newProductTipo, setNewProductTipo] = useState('CHIP_SERIALIZADO');
+  const [newProductCodigoAutogenerable, setNewProductCodigoAutogenerable] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
   const [newProductSedes, setNewProductSedes] = useState<Record<string, EditableSede>>({});
 
@@ -108,6 +114,7 @@ export function ChipsView() {
   const [editProductCodigo, setEditProductCodigo] = useState('');
   const [editProductName, setEditProductName] = useState('');
   const [editProductTipo, setEditProductTipo] = useState('OTRO_PRODUCTO_FISICO');
+  const [editProductCodigoAutogenerable, setEditProductCodigoAutogenerable] = useState(false);
   const [editProductSedes, setEditProductSedes] = useState<Record<string, EditableSede>>({});
 
   // Selected product in Inventory tab (for scanning/transferring)
@@ -118,6 +125,9 @@ export function ChipsView() {
 
   const parsed = useMemo(() => parseChipScan(scan), [scan]);
   const productoSeleccionado = useMemo(() => productos.find((producto) => producto.id === Number(selectedProductId)), [productos, selectedProductId]);
+  const puedeGenerarCodigos = productoSeleccionado?.tipo === 'CHIP_SERIALIZADO' && productoSeleccionado.codigoAutogenerable === true;
+  const propuestaSeleccionada = propuestaCodigos?.productoId === Number(selectedProductId) ? propuestaCodigos : null;
+  const codigosParaIngreso = metodoIngreso === 'GENERAR' ? (propuestaSeleccionada?.codigos || []) : parsed.validos;
   const esCantidad = esProductoCantidad(productoSeleccionado);
   const sedeAlmacenHabilitada = SEDES_TRANSFERENCIA_CHIPS.includes(String(plantaKey));
 
@@ -211,19 +221,30 @@ export function ChipsView() {
 
   const confirmar = async () => {
     setError(''); setMensaje('');
-    if (!parsed.validos.length || parsed.duplicados.length || parsed.errores.length) { setError('Corrija duplicados o lecturas inválidas antes de confirmar.'); return; }
+    const esPropuestaGenerada = modo === 'INGRESO' && metodoIngreso === 'GENERAR';
+    const codigos = esPropuestaGenerada ? (propuestaSeleccionada?.codigos || []) : parsed.validos;
+    if (esPropuestaGenerada && !propuestaSeleccionada) { setError('Genere y revise una propuesta disponible antes de confirmar.'); return; }
+    if (!codigos.length || (!esPropuestaGenerada && (parsed.duplicados.length || parsed.errores.length))) { setError('Corrija duplicados o lecturas inválidas antes de confirmar.'); return; }
     if (selectedProductId === '') { setError('Seleccione un producto.'); return; }
     try {
       setLoading(true);
       if (modo === 'INGRESO') {
-        await faregasChipsApi.ingresar(Number(selectedProductId), parsed.validos);
+        await faregasChipsApi.ingresar(
+          Number(selectedProductId),
+          codigos,
+          undefined,
+          esPropuestaGenerada && propuestaSeleccionada
+            ? { modoCodigo: 'GENERADOS', tokenPropuesta: propuestaSeleccionada.token }
+            : undefined
+        );
       } else {
         if (!sedeAlmacenHabilitada) throw new Error('Los chips sólo pueden transferirse entre COLINA, SURCO y SURQUILLO.');
         if (!destino) throw new Error('Seleccione la sede destino.');
         await faregasChipsApi.transferir(Number(selectedProductId), destino, parsed.validos);
       }
-      setMensaje(`${parsed.validos.length} unidad(es) procesada(s) correctamente.`);
+      setMensaje(`${codigos.length} unidad(es) procesada(s) correctamente.`);
       setScan('');
+      setPropuestaCodigos(null);
       await cargar();
     } catch (error: unknown) { setError(errorMessage(error)); } finally { setLoading(false); }
   };
@@ -251,8 +272,35 @@ export function ChipsView() {
 
   const seleccionarMetodoIngreso = (metodo: MetodoIngreso) => {
     setMetodoIngreso(metodo);
+    if (metodo !== metodoIngreso) setPropuestaCodigos(null);
     setError('');
     setMensaje('');
+  };
+
+  const crearPropuestaCodigos = async () => {
+    setError('');
+    setMensaje('');
+    setPropuestaCodigos(null);
+    if (selectedProductId === '') { setError('Seleccione un producto serializado.'); return; }
+    if (!puedeGenerarCodigos) {
+      setError('La generación está deshabilitada para este producto hasta que se confirme compatibilidad con el proveedor.');
+      return;
+    }
+    try {
+      setLoading(true);
+      const propuesta = await faregasChipsApi.proponerCodigosDisponibles(Number(selectedProductId), {
+        prefijo: solicitudCodigos.prefijo,
+        cantidad: Number(solicitudCodigos.cantidad),
+        digitos: Number(solicitudCodigos.digitos),
+        minimo: solicitudCodigos.minimo === '' ? undefined : solicitudCodigos.minimo
+      });
+      setPropuestaCodigos({ ...propuesta, productoId: Number(selectedProductId) });
+      setMensaje(`Propuesta lista: ${propuesta.codigos.length} códigos reservados por 15 minutos. Revísela antes de ingresar el lote.`);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const importarArchivoChips = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,7 +318,7 @@ export function ChipsView() {
         const contenido = await archivo.text();
         filas = contenido.split(/\r?\n/).map((linea) => linea.split(/[;,\t]/));
       } else {
-        filas = await readXlsxFile(archivo) as unknown[][];
+        filas = await readXlsxFile(archivo) as unknown as unknown[][];
       }
 
       const codigos = extraerCodigosDeHoja(filas);
@@ -303,6 +351,7 @@ export function ChipsView() {
     setNewProductCodigo('');
     setNewProductName('');
     setNewProductTipo('CHIP_SERIALIZADO');
+    setNewProductCodigoAutogenerable(false);
     setNewProductSedes({});
     setShowProductModal(true);
   };
@@ -317,6 +366,7 @@ export function ChipsView() {
         codigo: newProductCodigo,
         nombre: newProductName,
         tipo: newProductTipo,
+        codigoAutogenerable: newProductTipo === 'CHIP_SERIALIZADO' && newProductCodigoAutogenerable,
         sedes: Object.entries(newProductSedes)
           .filter(([, sede]) => Boolean(sede.productoFacturacionId) || sede.ventaHabilitada)
           .map(([sedeKey, sede]) => ({
@@ -333,6 +383,7 @@ export function ChipsView() {
       setNewProductCodigo('');
       setNewProductName('');
       setNewProductTipo('CHIP_SERIALIZADO');
+      setNewProductCodigoAutogenerable(false);
       setNewProductSedes({});
       await cargar();
     } catch (error: unknown) {
@@ -348,6 +399,7 @@ export function ChipsView() {
     setEditProductCodigo(prod.codigo);
     setEditProductName(prod.nombre);
     setEditProductTipo(prod.tipo);
+    setEditProductCodigoAutogenerable(prod.codigoAutogenerable === true);
     const sedesConfig: Record<string, EditableSede> = {};
     (prod.sedes || []).forEach(s => {
       sedesConfig[s.plantaKey] = {
@@ -371,6 +423,7 @@ export function ChipsView() {
       setEditProductCodigo(prod.codigo);
       setEditProductName(prod.nombre);
       setEditProductTipo(prod.tipo);
+      setEditProductCodigoAutogenerable(prod.codigoAutogenerable === true);
       const sedesConfig: Record<string, EditableSede> = {};
       (prod.sedes || []).forEach((sede) => {
         sedesConfig[sede.plantaKey] = {
@@ -396,6 +449,7 @@ export function ChipsView() {
         codigo: editProductCodigo, // included just to satisfy type, backend ignores it
         nombre: editProductName,
         tipo: editProductTipo,
+        codigoAutogenerable: editProductTipo === 'CHIP_SERIALIZADO' && editProductCodigoAutogenerable,
         sedes: selectedKeys.map(plantaKey => ({
           plantaKey,
           precio: editProductSedes[plantaKey].precio,
@@ -471,7 +525,8 @@ export function ChipsView() {
       ))}
     </div>
 
-    {activeTab === 'PRODUCTOS' && <div className="space-y-4">
+    {PESTANAS.length === 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Tu perfil no tiene un submódulo de Inventario autorizado.</div>}
+    {PESTANAS.length > 0 && activeTab === 'PRODUCTOS' && <div className="space-y-4">
       <div className="flex flex-col justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 sm:flex-row sm:items-center">
         <div>
           <p className="font-bold">Catálogo de tipos de producto</p>
@@ -517,8 +572,8 @@ export function ChipsView() {
       </div>
     </div>}
 
-    {activeTab === 'VENTAS' && <TabVentas setShowVentaModal={setShowVentaModal} refreshToken={ventasRefreshToken} />}
-    {activeTab === 'INVENTARIO' && <>
+    {PESTANAS.length > 0 && activeTab === 'VENTAS' && <TabVentas setShowVentaModal={setShowVentaModal} refreshToken={ventasRefreshToken} />}
+    {PESTANAS.length > 0 && activeTab === 'INVENTARIO' && <>
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-4">
           <h2 className="font-bold text-slate-800">Cantidades por producto en {plantaNombre}</h2>
@@ -569,7 +624,7 @@ export function ChipsView() {
             <button
               type="button"
               disabled={!sedeAlmacenHabilitada}
-              onClick={() => { setModo('TRANSFERENCIA'); setError(''); setMensaje(''); }}
+              onClick={() => { setModo('TRANSFERENCIA'); setMetodoIngreso('ESCANEO'); setPropuestaCodigos(null); setError(''); setMensaje(''); }}
               className={`rounded-lg px-3 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40 ${modo === 'TRANSFERENCIA' ? 'bg-[#052A79] text-white' : 'bg-slate-100 text-slate-700'}`}
             >
               TRANSFERIR ENTRE SEDES
@@ -588,7 +643,13 @@ export function ChipsView() {
           {sedeAlmacenHabilitada && <>
           <div className="mb-3">
             <label className="mb-1 block text-sm font-bold text-slate-700">Tipo de chip a {modo === 'INGRESO' ? 'ingresar' : 'transferir'}</label>
-            <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value ? Number(e.target.value) : '')} className="w-full rounded border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none">
+            <select value={selectedProductId} onChange={e => {
+              const id = e.target.value ? Number(e.target.value) : '';
+              const producto = productos.find((item) => item.id === Number(id));
+              setSelectedProductId(id);
+              setPropuestaCodigos(null);
+              if (!(producto?.tipo === 'CHIP_SERIALIZADO' && producto.codigoAutogenerable)) setMetodoIngreso('ESCANEO');
+            }} className="w-full rounded border border-slate-300 p-2 text-sm focus:border-blue-500 focus:outline-none">
               <option value="">Seleccione un tipo de producto</option>
               {productos.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.codigo})</option>)}
             </select>
@@ -622,7 +683,44 @@ export function ChipsView() {
                   <ListOrdered className="h-5 w-5 shrink-0" />
                   <span><b className="block text-xs">INGRESAR RANGO CONSECUTIVO</b><small className="text-[11px] text-slate-500">Úselo sólo si el proveedor confirma que no existen saltos.</small></span>
                 </button>
+                {puedeGenerarCodigos && <button
+                  type="button"
+                  onClick={() => seleccionarMetodoIngreso('GENERAR')}
+                  className={`flex items-center gap-3 rounded-lg border p-3 text-left transition ${metodoIngreso === 'GENERAR' ? 'border-violet-500 bg-violet-50 text-violet-900' : 'border-slate-200 hover:bg-slate-50'}`}
+                >
+                  <ListOrdered className="h-5 w-5 shrink-0" />
+                  <span><b className="block text-xs">GENERAR CÓDIGOS DISPONIBLES</b><small className="text-[11px] text-slate-500">Busca seriales libres y los reserva antes de confirmar.</small></span>
+                </button>}
               </div>
+              {metodoIngreso !== 'GENERAR' && selectedProductId !== '' && !puedeGenerarCodigos && productoSeleccionado?.tipo === 'CHIP_SERIALIZADO' && (
+                <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">La generación automática está apagada para este producto. Puede habilitarla en Tipos de producto solo después de confirmar que el proveedor permite asignar códigos internos.</p>
+              )}
+
+              {metodoIngreso === 'GENERAR' && (
+                <div className="mt-3 space-y-3 rounded-lg border border-violet-200 bg-violet-50/50 p-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="col-span-2 text-xs font-bold text-slate-700">Prefijo
+                      <input value={solicitudCodigos.prefijo} onChange={(event) => { setSolicitudCodigos((actual) => ({ ...actual, prefijo: event.target.value.toUpperCase() })); setPropuestaCodigos(null); }} placeholder="CHIP" className="mt-1 w-full rounded border border-slate-300 bg-white p-2 font-mono text-sm" />
+                    </label>
+                    <label className="text-xs font-bold text-slate-700">Cantidad solicitada
+                      <input type="number" min="1" max="500" step="1" value={solicitudCodigos.cantidad} onChange={(event) => { setSolicitudCodigos((actual) => ({ ...actual, cantidad: event.target.value })); setPropuestaCodigos(null); }} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm" />
+                    </label>
+                    <label className="text-xs font-bold text-slate-700">Dígitos del número
+                      <input type="number" min="1" max="15" value={solicitudCodigos.digitos} onChange={(event) => { setSolicitudCodigos((actual) => ({ ...actual, digitos: event.target.value })); setPropuestaCodigos(null); }} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm" />
+                    </label>
+                    <label className="col-span-2 text-xs font-bold text-slate-700">Número inicial mínimo (opcional)
+                      <input type="number" min="0" value={solicitudCodigos.minimo} onChange={(event) => { setSolicitudCodigos((actual) => ({ ...actual, minimo: event.target.value })); setPropuestaCodigos(null); }} className="mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm" />
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-slate-600">Se consulta el inventario global. Códigos disponibles, vendidos, reservados o dados de baja se consideran ocupados y no se reutilizan.</p>
+                  <button type="button" disabled={loading || !puedeGenerarCodigos} onClick={() => void crearPropuestaCodigos()} className="w-full rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50">{loading ? 'BUSCANDO…' : 'PROPONER CÓDIGOS'}</button>
+                  {propuestaSeleccionada && <div className="rounded-lg border border-violet-200 bg-white p-3 text-xs">
+                    <p className="font-bold text-violet-900">Propuesta: {propuestaSeleccionada.codigos.length} / {solicitudCodigos.cantidad} códigos · vence {propuestaSeleccionada.venceEn ? new Date(propuestaSeleccionada.venceEn).toLocaleTimeString() : 'en 15 minutos'}</p>
+                    <p className="mt-2 break-words font-mono text-slate-800">{propuestaSeleccionada.codigos.join(' · ')}</p>
+                    <p className="mt-2 text-slate-600">Códigos ocupados omitidos durante la búsqueda: {propuestaSeleccionada.omitidos.length ? propuestaSeleccionada.omitidos.join(', ') : 'ninguno'}.</p>
+                  </div>}
+                </div>
+              )}
 
               {metodoIngreso === 'EXCEL' && (
                 <div className="mt-3 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/50 p-4 text-center">
@@ -703,7 +801,7 @@ export function ChipsView() {
             </div>
           )}
 
-          <ChipScannerInput
+          {metodoIngreso !== 'GENERAR' && <ChipScannerInput
             value={scan}
             onChange={setScan}
             rows={metodoIngreso === 'ESCANEO' || modo === 'TRANSFERENCIA' ? 7 : 5}
@@ -713,17 +811,17 @@ export function ChipsView() {
               : metodoIngreso === 'ESCANEO'
                 ? 'Escanee cada chip; el lector debe enviar Enter después de cada código'
                 : 'Aquí aparecerán los códigos cargados. Puede revisarlos antes de confirmar.'}
-          />
+          />}
           {error && <p className="mt-3 text-sm text-red-700">{error}</p>}{mensaje && <p className="mt-3 text-sm text-emerald-700">{mensaje}</p>}
           <button
-            disabled={loading || selectedProductId === '' || parsed.validos.length === 0 || parsed.duplicados.length > 0 || parsed.errores.length > 0 || (modo === 'TRANSFERENCIA' && (!destino || !sedeAlmacenHabilitada))}
+            disabled={loading || selectedProductId === '' || codigosParaIngreso.length === 0 || (metodoIngreso !== 'GENERAR' && (parsed.duplicados.length > 0 || parsed.errores.length > 0)) || (modo === 'TRANSFERENCIA' && (!destino || !sedeAlmacenHabilitada))}
             onClick={confirmar}
             className="mt-4 w-full rounded-lg bg-emerald-600 px-4 py-2 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading
               ? 'PROCESANDO LOTE...'
               : modo === 'INGRESO'
-                ? `INGRESAR LOTE (${parsed.validos.length})`
+                ? `INGRESAR LOTE (${codigosParaIngreso.length})`
                 : `TRANSFERIR LOTE (${parsed.validos.length})`}
           </button>
           </>}
@@ -773,7 +871,15 @@ export function ChipsView() {
           <div className="space-y-4 p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Código del tipo</label><input type="text" disabled={!!editingProductoId} value={editingProductoId ? editProductCodigo : newProductCodigo} onChange={(e) => setNewProductCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))} placeholder="Ej. SUPERCHIP" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-slate-100" /></div>
-              <div><label className="mb-1 block text-sm font-bold text-slate-700">Clasificación</label><select value={editingProductoId ? editProductTipo : newProductTipo} onChange={(e) => editingProductoId ? setEditProductTipo(e.target.value) : setNewProductTipo(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"><option value="CHIP_SERIALIZADO">Chip serializado</option><option value="ACCESORIO">Accesorio</option><option value="OTRO_PRODUCTO_FISICO">Otro producto físico</option></select></div>
+              <div><label className="mb-1 block text-sm font-bold text-slate-700">Clasificación</label><select value={editingProductoId ? editProductTipo : newProductTipo} onChange={(e) => {
+                const tipo = e.target.value;
+                if (editingProductoId) { setEditProductTipo(tipo); if (tipo !== 'CHIP_SERIALIZADO') setEditProductCodigoAutogenerable(false); }
+                else { setNewProductTipo(tipo); if (tipo !== 'CHIP_SERIALIZADO') setNewProductCodigoAutogenerable(false); }
+              }} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"><option value="CHIP_SERIALIZADO">Chip serializado</option><option value="ACCESORIO">Accesorio</option><option value="OTRO_PRODUCTO_FISICO">Otro producto físico</option></select></div>
+              {(editingProductoId ? editProductTipo : newProductTipo) === 'CHIP_SERIALIZADO' && <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                <label className="flex items-start gap-2 text-sm font-bold text-amber-950"><input type="checkbox" className="mt-1" checked={editingProductoId ? editProductCodigoAutogenerable : newProductCodigoAutogenerable} onChange={(event) => editingProductoId ? setEditProductCodigoAutogenerable(event.target.checked) : setNewProductCodigoAutogenerable(event.target.checked)} />Permitir generar códigos disponibles para este producto</label>
+                <p className="mt-2 text-xs leading-5 text-amber-900">Déjelo desactivado salvo que el proveedor confirme que los seriales pueden asignarse internamente. Activarlo no cambia los chips existentes; solo permite proponer futuros códigos nuevos.</p>
+              </div>}
             </div>
             <div>
               <div><label className="mb-1 block text-sm font-bold text-slate-700">Nombre del tipo de chip</label><input type="text" value={editingProductoId ? editProductName : newProductName} onChange={(e) => editingProductoId ? setEditProductName(e.target.value) : setNewProductName(e.target.value)} placeholder="Ej. Superchip GNV" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" /></div>
@@ -844,11 +950,10 @@ export function ChipsView() {
 
 
 function TabVentas({ setShowVentaModal, refreshToken }: { setShowVentaModal: (v: boolean) => void; refreshToken: number }) {
-  // El botón se refleja con el permiso real CHIPS_VENDER. Si luego se retira el
-  // permiso del perfil, el botón desaparece sin tocar código. El backend sigue
-  // siendo la autoridad: protege cada ruta con ese mismo permiso.
   const { permisos } = useOutletContext<MainLayoutContext>();
-  const puedeVender = Array.isArray(permisos) && permisos.includes('CHIPS_VENDER');
+  const listaPermisos = Array.isArray(permisos) ? permisos : [];
+  const puedeVender = puedeGestionarVentasChips(listaPermisos);
+  const puedeAnular = puedeAnularComprobanteChips(listaPermisos);
   const [accionEnProceso, setAccionEnProceso] = useState<number | null>(null);
   const [detalleOperacionId, setDetalleOperacionId] = useState<number | null>(null);
 
@@ -1042,7 +1147,7 @@ function TabVentas({ setShowVentaModal, refreshToken }: { setShowVentaModal: (v:
                             <button type="button" disabled title="Comprobante anulado" className="inline-flex h-7 items-center gap-1 rounded border border-slate-200 bg-slate-100 px-2 text-[11px] font-bold text-slate-400">
                               <Ban size={13} /> ANULADO
                             </button>
-                          ) : puedeVender && venta.facturacion.anulacionEnPlazo === true ? (
+                          ) : puedeAnular && venta.facturacion.anulacionEnPlazo === true ? (
                             <button
                               type="button"
                               disabled={accionEnProceso === venta.operacionId}

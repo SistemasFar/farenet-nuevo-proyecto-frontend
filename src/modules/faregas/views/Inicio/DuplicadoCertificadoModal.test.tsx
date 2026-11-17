@@ -4,9 +4,11 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
-import { faregasDuplicadosApi } from '../../services/faregas-duplicados.api';
-import { faregasPagosApi } from '../../services/faregas-pagos.api';
-import Swal from 'sweetalert2';
+import {
+  faregasDuplicadosApi,
+  type CandidatoDuplicado,
+  type SolicitudDuplicado,
+} from '../../services/faregas-duplicados.api';
 
 vi.mock('sweetalert2', () => ({
   default: {
@@ -55,7 +57,7 @@ const cambiarValorInput = (input: HTMLInputElement | null, valor: string) => {
   if (!input) return;
   const lastValue = input.value;
   input.value = valor;
-  const tracker = (input as any)._valueTracker;
+  const tracker = (input as HTMLInputElement & { _valueTracker?: { setValue: (value: string) => void } })._valueTracker;
   if (tracker) {
     tracker.setValue(lastValue);
   }
@@ -63,15 +65,22 @@ const cambiarValorInput = (input: HTMLInputElement | null, valor: string) => {
   input.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
-const candidatoEjemplo = {
+const candidatoEjemplo: CandidatoDuplicado = {
   certificadoId: 777,
   numeroCertificado: 'GLP-000123',
+  tipoCertificadoClave: 'GLP',
+  modalidad: 'INICIAL',
   tipoNombre: 'GLP INICIAL',
   placa: 'ABC123',
   fechaEmision: '2026-01-15',
   fechaLimiteDuplicado: '2027-01-15',
+  vigente: true,
+  anulacionAceptada: false,
   duplicable: true,
   duplicadosEmitidosCount: 0,
+  motivoNoDisponible: null,
+  plantaKey: 'SURCO',
+  plantaNombre: 'SURCO',
   cliente: {
     tipoDocumento: 'DNI',
     nroDocumento: '',
@@ -82,16 +91,25 @@ const candidatoEjemplo = {
   },
 };
 
-const solicitudEjemplo = {
+const solicitudEjemplo: SolicitudDuplicado = {
   id: 999,
-  certificadoId: 777,
+  certificadoOriginalId: 777,
+  operacionId: 1777,
+  facturacionId: null,
   numeroCertificado: 'GLP-000123',
   tipoNombre: 'GLP INICIAL',
   placa: 'ABC123',
   fechaEmision: '2026-01-15',
+  fechaLimiteDuplicado: '2027-01-15',
   precio: 50,
-  estado: 'BORRADOR',
+  estado: 'PENDIENTE_PAGO',
   operacionEstado: 'BORRADOR',
+  facturacionEstado: null,
+  nroComprobante: null,
+  tipoComprobante: null,
+  fechaSolicitud: null,
+  fechaDisponible: null,
+  solicitadoPor: 'OPERADOR',
   pagos: [],
 };
 
@@ -105,9 +123,12 @@ afterEach(() => {
   contenedores.splice(0).forEach((contenedor) => contenedor.remove());
 });
 
-const renderModalYEntrarASolicitud = async () => {
-  vi.mocked(faregasDuplicadosApi.buscar).mockResolvedValueOnce([candidatoEjemplo]);
-  vi.mocked(faregasDuplicadosApi.crear).mockResolvedValueOnce(solicitudEjemplo);
+const renderModalYEntrarASolicitud = async (
+  candidato = candidatoEjemplo,
+  solicitud = solicitudEjemplo,
+) => {
+  vi.mocked(faregasDuplicadosApi.buscar).mockResolvedValueOnce([candidato]);
+  vi.mocked(faregasDuplicadosApi.crear).mockResolvedValueOnce(solicitud);
 
   const contenedor = document.createElement('div');
   document.body.appendChild(contenedor);
@@ -144,7 +165,160 @@ const renderModalYEntrarASolicitud = async () => {
   return { contenedor, root };
 };
 
+const seleccionarComprobante = async (contenedor: HTMLDivElement, tipo: 'BOLETA' | 'FACTURA') => {
+  const select = contenedor.querySelector<HTMLSelectElement>('#duplicado-tipo-comprobante');
+  if (!select) throw new Error('No se encontró el selector de comprobante.');
+  await act(async () => {
+    select.value = tipo;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+};
+
+const agregarPagoEfectivo = async (contenedor: HTMLDivElement) => {
+  const boton = [...contenedor.querySelectorAll('button')].find((item) => item.textContent?.includes('Agregar pago'));
+  await act(async () => boton?.click());
+};
+
 describe('DuplicadoCertificadoModal - Validaciones de campos obligatorios', () => {
+  it('valida el dígito verificador del RUC y conserva el error debajo del documento', async () => {
+    const { contenedor, root } = await renderModalYEntrarASolicitud();
+    await seleccionarComprobante(contenedor, 'FACTURA');
+
+    const inputDoc = contenedor.querySelector<HTMLInputElement>('#duplicado-documento');
+    const inputNombre = contenedor.querySelector<HTMLInputElement>('#duplicado-nombre');
+    await act(async () => {
+      cambiarValorInput(inputDoc, '10740456121');
+      cambiarValorInput(inputNombre, 'GRACE IBARRA');
+    });
+    await agregarPagoEfectivo(contenedor);
+
+    const botonFinalizar = [...contenedor.querySelectorAll('button')].find((b) => b.textContent?.includes('Pagar S/ 50.00 y emitir comprobante'));
+    await act(async () => botonFinalizar?.click());
+
+    expect(inputDoc?.className).toContain('border-red-500');
+    expect(contenedor.textContent).toContain('El RUC no tiene un dígito verificador válido.');
+    expect(faregasDuplicadosApi.procesar).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+  });
+
+  it('permite FACTURA con RUC de dígito verificador válido y dirección vacía', async () => {
+    vi.mocked(faregasDuplicadosApi.procesar).mockResolvedValueOnce({
+      ...solicitudEjemplo,
+      estado: 'PENDIENTE_COMPROBANTE',
+    });
+    const { contenedor, root } = await renderModalYEntrarASolicitud();
+    await seleccionarComprobante(contenedor, 'FACTURA');
+
+    const inputDoc = contenedor.querySelector<HTMLInputElement>('#duplicado-documento');
+    const inputNombre = contenedor.querySelector<HTMLInputElement>('#duplicado-nombre');
+    await act(async () => {
+      cambiarValorInput(inputDoc, '20100070970');
+      cambiarValorInput(inputNombre, 'EMPRESA DE PRUEBA');
+    });
+    await agregarPagoEfectivo(contenedor);
+    const botonFinalizar = [...contenedor.querySelectorAll('button')].find((b) => b.textContent?.includes('Pagar S/ 50.00 y emitir comprobante'));
+    await act(async () => botonFinalizar?.click());
+
+    expect(faregasDuplicadosApi.procesar).toHaveBeenCalledWith(999, expect.objectContaining({
+      facturacion: expect.objectContaining({
+        tipoComprobante: 'FACTURA',
+        tipoDocumentoCliente: 'RUC',
+        nroDocumento: '20100070970',
+        nombreRazonSocial: 'EMPRESA DE PRUEBA',
+        direccion: '',
+      }),
+    }));
+    await act(async () => root.unmount());
+  });
+
+  it('muestra debajo del campo el detalle de validación que devuelve el backend', async () => {
+    vi.mocked(faregasDuplicadosApi.procesar).mockRejectedValueOnce(Object.assign(
+      new Error('El nombre o razon social es obligatorio y admite hasta 100 caracteres.'),
+      {
+        codigo: 'DATOS_FACTURACION_INVALIDOS',
+        detalles: ['El nombre o razon social es obligatorio y admite hasta 100 caracteres.'],
+      },
+    ));
+    const { contenedor, root } = await renderModalYEntrarASolicitud();
+    await seleccionarComprobante(contenedor, 'FACTURA');
+    await act(async () => {
+      cambiarValorInput(contenedor.querySelector<HTMLInputElement>('#duplicado-documento'), '20100070970');
+      cambiarValorInput(contenedor.querySelector<HTMLInputElement>('#duplicado-nombre'), 'EMPRESA DE PRUEBA');
+    });
+    await agregarPagoEfectivo(contenedor);
+    const boton = [...contenedor.querySelectorAll('button')].find((item) => item.textContent?.includes('Pagar S/ 50.00 y emitir comprobante'));
+    await act(async () => boton?.click());
+
+    expect(contenedor.querySelector<HTMLInputElement>('#duplicado-nombre')?.className).toContain('border-red-500');
+    expect(contenedor.textContent).toContain('El nombre o razon social es obligatorio y admite hasta 100 caracteres.');
+    await act(async () => root.unmount());
+  });
+
+  it('al alternar entre comprobantes no reutiliza un DNI como RUC ni un RUC como DNI', async () => {
+    const { contenedor, root } = await renderModalYEntrarASolicitud();
+    const inputDoc = contenedor.querySelector<HTMLInputElement>('#duplicado-documento');
+    await act(async () => cambiarValorInput(inputDoc, '74045612'));
+
+    await seleccionarComprobante(contenedor, 'FACTURA');
+    expect(contenedor.querySelector<HTMLSelectElement>('#duplicado-tipo-documento')?.value).toBe('RUC');
+    expect(inputDoc?.value).toBe('');
+
+    await act(async () => cambiarValorInput(inputDoc, '20100070970'));
+    await seleccionarComprobante(contenedor, 'BOLETA');
+    expect(contenedor.querySelector<HTMLSelectElement>('#duplicado-tipo-documento')?.value).toBe('DNI');
+    expect(inputDoc?.value).toBe('');
+    await act(async () => root.unmount());
+  });
+
+  it('usa la misma validación fiscal para duplicados GLP, GNV y Conformidad', async () => {
+    const casos = [
+      { clave: 'GLP', nombre: 'GLP INICIAL', numero: 'DG-41-000454' },
+      { clave: 'GNV', nombre: 'GNV INICIAL', numero: 'DG-22-000413' },
+      { clave: 'CONFORMIDAD', nombre: 'CONFORMIDAD', numero: 'DG-39-000415' },
+    ];
+    for (const caso of casos) {
+      const candidato = {
+        ...candidatoEjemplo,
+        tipoCertificadoClave: caso.clave,
+        tipoNombre: caso.nombre,
+        numeroCertificado: caso.numero,
+      };
+      const solicitud = {
+        ...solicitudEjemplo,
+        tipoNombre: caso.nombre,
+        numeroCertificado: caso.numero,
+      };
+      const { contenedor, root } = await renderModalYEntrarASolicitud(candidato, solicitud);
+      expect(contenedor.textContent).toContain(caso.numero);
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('mantiene el pago confirmado de S/ 50 y no inicia otro cobro ante error fiscal', async () => {
+    const duplicadoPagado = {
+      ...solicitudEjemplo,
+      estado: 'PENDIENTE_COMPROBANTE',
+      operacionEstado: 'PAGADO',
+      pagos: [{ id: 444, tipo: 'EFECTIVO', importe: 50 }],
+    } satisfies SolicitudDuplicado;
+    const { contenedor, root } = await renderModalYEntrarASolicitud(candidatoEjemplo, duplicadoPagado);
+    await seleccionarComprobante(contenedor, 'FACTURA');
+    await act(async () => {
+      cambiarValorInput(contenedor.querySelector<HTMLInputElement>('#duplicado-documento'), '10740456121');
+      cambiarValorInput(contenedor.querySelector<HTMLInputElement>('#duplicado-nombre'), 'GRACE IBARRA');
+    });
+
+    expect(contenedor.textContent).toContain('El pago de S/ 50.00 ya está registrado.');
+    expect(contenedor.textContent).toContain('CONFIRMADO');
+    expect(contenedor.textContent).toContain('S/ 50.00');
+    const boton = [...contenedor.querySelectorAll('button')].find((item) => item.textContent?.includes('Confirmar comprobante y habilitar duplicado'));
+    await act(async () => boton?.click());
+
+    expect(contenedor.textContent).toContain('El RUC no tiene un dígito verificador válido.');
+    expect(faregasDuplicadosApi.procesar).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+  });
+
   it('1 y 2. Documento vacío y Nombre vacío: muestra error rojo en ambos campos y resumen', async () => {
     const { contenedor, root } = await renderModalYEntrarASolicitud();
 
@@ -366,7 +540,7 @@ describe('DuplicadoCertificadoModal - Validaciones de campos obligatorios', () =
     vi.mocked(faregasDuplicadosApi.procesar).mockResolvedValueOnce({
       ...solicitudEjemplo,
       estado: 'DISPONIBLE',
-    } as any);
+    });
 
     const { contenedor, root } = await renderModalYEntrarASolicitud();
 

@@ -52,6 +52,10 @@ export class ControlAutosave {
     return this.persistidos.get(bloque) === snapshot;
   }
 
+  tieneCambiosPendientes(bloque: string, snapshot: string) {
+    return !this.estaPersistido(bloque, snapshot);
+  }
+
   private retirarPendiente(bloque: string, snapshot: string) {
     const cola = this.pendientes.get(bloque);
     if (!cola) return;

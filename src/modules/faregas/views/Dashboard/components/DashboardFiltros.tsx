@@ -12,6 +12,7 @@ interface DashboardFiltrosProps {
   plantasDisponibles: PlantaAsignada[];
   plantaActivaNombre: string;
   puedeVerGlobal: boolean;
+  puedeExportar?: boolean;
   tiposCertificadoDisponibles?: string[];
 }
 
@@ -24,6 +25,7 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
   plantasDisponibles,
   plantaActivaNombre,
   puedeVerGlobal,
+  puedeExportar = false,
   tiposCertificadoDisponibles = ['GLP', 'GNV', 'CONFORMIDAD', 'COMPLEMENTARIOS']
 }) => {
   const validacionRango = validarRangoFechasDashboard(filtros.desde || '', filtros.hasta || '');
@@ -74,11 +76,12 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
 
         {/* Acciones principales */}
         <div className="flex flex-wrap items-center gap-2">
-          {puedeVerGlobal && (
-            <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50 text-sm font-medium">
+          <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50 text-sm font-medium">
+            {puedeVerGlobal && (
               <button
                 type="button"
                 onClick={() => onCambiarFiltros({ alcance: 'GLOBAL', plantaKey: undefined })}
+                aria-pressed={filtros.alcance === 'GLOBAL'}
                 className={`px-3 py-1.5 rounded-md transition ${
                   filtros.alcance === 'GLOBAL'
                     ? 'bg-blue-700 text-white shadow-sm'
@@ -87,19 +90,20 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
               >
                 Global Multi-Sede
               </button>
-              <button
-                type="button"
-                onClick={() => onCambiarFiltros({ alcance: 'SEDE' })}
-                className={`px-3 py-1.5 rounded-md transition ${
-                  filtros.alcance === 'SEDE'
-                    ? 'bg-blue-700 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Por Sede
-              </button>
-            </div>
-          )}
+            )}
+            <button
+              type="button"
+              onClick={() => onCambiarFiltros({ alcance: 'SEDE', plantaKey: undefined })}
+              aria-pressed={filtros.alcance === 'SEDE'}
+              className={`px-3 py-1.5 rounded-md transition ${
+                filtros.alcance === 'SEDE'
+                  ? 'bg-blue-700 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Por Sede
+            </button>
+          </div>
 
           <button
             type="button"
@@ -118,7 +122,7 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
             {cargando ? 'Actualizando...' : 'Actualizar'}
           </button>
 
-          <button
+          {puedeExportar && <button
               type="button"
               onClick={onAbrirReportes}
               title="Abrir reportes financieros"
@@ -128,7 +132,7 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               Reportes financieros
-          </button>
+          </button>}
         </div>
       </div>
 

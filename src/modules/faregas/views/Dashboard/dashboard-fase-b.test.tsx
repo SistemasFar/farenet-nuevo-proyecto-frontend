@@ -4,7 +4,8 @@ import type { DashboardResumenResponse, PaginadoResponse, ProductoDetalleItem } 
 import { VentasProductosTab } from './components/VentasProductosTab';
 import { ResumenGeneralTab } from './components/ResumenGeneralTab';
 import { CertificadosTab } from './components/CertificadosTab';
-import { DASHBOARD_TAB_CONFIG, resolverPermisosDashboard } from './dashboard-config';
+import { DashboardFiltros } from './components/DashboardFiltros';
+import { DASHBOARD_TAB_CONFIG, resolverPermisosDashboard, tieneAccesoDashboard } from './dashboard-config';
 
 const kpi = { actual: 10, anterior: 8, delta: 2, porcentaje: 25, tooltip: '' };
 
@@ -27,6 +28,11 @@ const resumen: DashboardResumenResponse = {
     certificadosEmitidos: kpi,
     certificadosPendientes: kpi,
     certificadosAnulados: kpi,
+    duplicadosEmitidos: kpi,
+    ventaDuplicados: kpi,
+    totalCobradoDuplicados: kpi,
+    saldoPendienteDuplicados: kpi,
+    ticketPromedioDuplicados: kpi,
     productosVendidos: kpi,
     montoDescontado: kpi,
     facturasAceptadas: kpi,
@@ -86,11 +92,15 @@ describe('Dashboard FAREGAS — Fase B', () => {
       <CertificadosTab
         resumen={resumen}
         certificados={null}
+        duplicados={null}
         sedes={[]}
         cargando={false}
-        pagina={1}
-        onCambiarPagina={() => undefined}
+        paginaCertificados={1}
+        paginaDuplicados={1}
+        onCambiarPaginaCertificados={() => undefined}
+        onCambiarPaginaDuplicados={() => undefined}
         onSeleccionarTipoCertificado={() => undefined}
+        onSeleccionarTipoDuplicado={() => undefined}
       />
     );
     expect(html).toContain('GLP');
@@ -125,12 +135,16 @@ describe('Dashboard FAREGAS — Fase B', () => {
       <CertificadosTab
         resumen={resumen}
         certificados={null}
+        duplicados={null}
         sedes={[]}
         cargando={false}
         tipoCertificadoSeleccionado="GLP"
-        pagina={1}
-        onCambiarPagina={() => undefined}
+        paginaCertificados={1}
+        paginaDuplicados={1}
+        onCambiarPaginaCertificados={() => undefined}
+        onCambiarPaginaDuplicados={() => undefined}
         onSeleccionarTipoCertificado={() => undefined}
+        onSeleccionarTipoDuplicado={() => undefined}
       />
     );
     expect(html).toContain('aria-pressed="true"');
@@ -145,5 +159,51 @@ describe('Dashboard FAREGAS — Fase B', () => {
     expect(resolverPermisosDashboard([], 'SISTEMAS')).toEqual({ puedeVerGlobal: false, puedeExportar: false });
     expect(resolverPermisosDashboard(['DASHBOARD_GLOBAL', 'DASHBOARD_EXPORTAR'], 'SISTEMAS'))
       .toEqual({ puedeVerGlobal: true, puedeExportar: true });
+  });
+
+  it('requiere permiso de módulo o de alcance para entrar al Dashboard', () => {
+    expect(tieneAccesoDashboard([])).toBe(false);
+    expect(tieneAccesoDashboard(['MENU_DASHBOARD'])).toBe(true);
+    expect(tieneAccesoDashboard(['DASHBOARD_SEDE'])).toBe(true);
+    expect(tieneAccesoDashboard(['DASHBOARD_GLOBAL'])).toBe(true);
+    expect(tieneAccesoDashboard(['DASHBOARD_EXPORTAR'])).toBe(false);
+  });
+
+  it('muestra Por Sede a cualquier usuario autorizado y reserva Global/Reportes a sus permisos', () => {
+    const html = renderToStaticMarkup(
+      <DashboardFiltros
+        filtros={{ alcance: 'SEDE', desde: '2026-11-01', hasta: '2026-11-06' }}
+        onCambiarFiltros={() => undefined}
+        onActualizar={() => undefined}
+        onAbrirReportes={() => undefined}
+        cargando={false}
+        plantasDisponibles={[]}
+        plantaActivaNombre="SURCO"
+        puedeVerGlobal={false}
+        puedeExportar={false}
+      />
+    );
+    expect(html).toContain('Por Sede');
+    expect(html).not.toContain('Global Multi-Sede');
+    expect(html).not.toContain('Reportes financieros');
+  });
+
+  it('muestra Global y Reportes solo al recibir permisos específicos', () => {
+    const html = renderToStaticMarkup(
+      <DashboardFiltros
+        filtros={{ alcance: 'GLOBAL', desde: '2026-11-01', hasta: '2026-11-06' }}
+        onCambiarFiltros={() => undefined}
+        onActualizar={() => undefined}
+        onAbrirReportes={() => undefined}
+        cargando={false}
+        plantasDisponibles={[]}
+        plantaActivaNombre="SURCO"
+        puedeVerGlobal
+        puedeExportar
+      />
+    );
+    expect(html).toContain('Por Sede');
+    expect(html).toContain('Global Multi-Sede');
+    expect(html).toContain('Reportes financieros');
   });
 });

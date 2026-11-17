@@ -379,3 +379,15 @@ describe('InicioView - simulación temporal y aislada de Nota de Crédito', () =
     expect(puedeCrearNotaCreditoPanel(objetivo, [], fecha)).toBe(false);
   });
 });
+
+
+describe('solicitud universal de nota de crédito', () => {
+  it('permite solicitar sin permiso de emisión y conserva restricciones fiscales', async () => {
+    const { puedeSolicitarNotaCreditoPanel, puedeCrearNotaCreditoPanel } = await import('./InicioView');
+    const item: BorradorPanel = { id: 10, estado: 'EMITIDO', numeroCertificado: 'DG-TEST', facturacionId: 20, estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, fechaDocumentoFiscal: '2026-11-16', nroComprobante: 'BTEST-1' };
+    expect(puedeSolicitarNotaCreditoPanel(item, '2026-11-17')).toBe(true);
+    expect(puedeCrearNotaCreditoPanel(item, [], '2026-11-17')).toBe(false);
+    expect(puedeSolicitarNotaCreditoPanel({ ...item, solicitudOperacionEstado: 'PENDIENTE_APROBACION' }, '2026-11-17')).toBe(false);
+    expect(puedeSolicitarNotaCreditoPanel(item, '2026-11-16')).toBe(false);
+  });
+});

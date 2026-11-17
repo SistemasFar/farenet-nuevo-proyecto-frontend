@@ -14,3 +14,7 @@ export function resolverPermisosDashboard(permisos: string[] = [], _perfilId?: s
     puedeExportar: (permisos || []).includes('DASHBOARD_EXPORTAR')
   };
 }
+
+export const tieneAccesoDashboard = (permisos: string[] = []): boolean => (
+  (permisos || []).some((permiso) => ['MENU_DASHBOARD', 'DASHBOARD_SEDE', 'DASHBOARD_GLOBAL'].includes(permiso))
+);

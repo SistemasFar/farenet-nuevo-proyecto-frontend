@@ -135,10 +135,11 @@ export function ModalVentaChips({
     total: totalMonto,
     tipoItem: 'PRODUCTO',
     servicio: spotProducto,
+    umbralComercial: maestrosPago?.politicaSpot?.umbralComercial,
   });
   const spotError = tipoComprobante === 'FACTURA'
-    && String(evaluacionSpotProducto.motivoExclusion || '').startsWith('CLASIFICACION_SPOT_')
-    ? `El producto fiscal #${primeraClasificacionSpot?.productoFacturacionId ?? 'sin vínculo'} tiene la clasificación SPOT pendiente o incompleta. Revise ese registro en Configuración → Productos antes de confirmar.`
+    && evaluacionSpotProducto.requiereRevision
+    ? `El producto fiscal #${primeraClasificacionSpot?.productoFacturacionId ?? 'sin vínculo'} tiene la clasificación SPOT pendiente, incompleta o inconsistente. Revise ese registro en Configuración → Productos antes de confirmar.`
     : '';
   const hayErrorDeEscaneo = parsed.errores.length > 0 || parsed.duplicados.length > 0;
   const validacionCompleta = Boolean(resultadoValidacion
@@ -168,32 +169,6 @@ export function ModalVentaChips({
   const totalCuotasProgramado = cuotasEfectivas.reduce((sum, c) => sum + (Number(c.importe) || 0), 0);
   const diferenciaCuotas = Math.round((totalCuotasProgramado - saldoAFinanciar) * 100) / 100;
   const cuotasCuadran = Math.abs(diferenciaCuotas) <= toleranciaMonto;
-
-  const agregarCuota = () => {
-    setCuotas(() => {
-      const base = cuotasEfectivas;
-      return [...base, {
-        numeroCuota: base.length + 1,
-        fechaPago: fechaVencimiento || fechaMas30,
-        importe: ''
-      }];
-    });
-  };
-
-  const actualizarCuota = (index: number, campo: 'fechaPago' | 'importe', valor: string) => {
-    setCuotas(() => {
-      const base = [...cuotasEfectivas];
-      base[index] = { ...base[index], [campo]: valor };
-      return base;
-    });
-  };
-
-  const eliminarCuota = (index: number) => {
-    setCuotas(() => {
-      const base = cuotasEfectivas.filter((_, i) => i !== index);
-      return base.map((c, i) => ({ ...c, numeroCuota: i + 1 }));
-    });
-  };
 
   const creditoValido = Boolean(
     condicionPago === 'CREDITO'
