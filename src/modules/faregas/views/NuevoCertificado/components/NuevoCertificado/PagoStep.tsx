@@ -26,6 +26,9 @@ interface PagoStepProps {
   resumenComercial?: ResumenComercialFaregas | null;
   maestrosPago?: MaestrosPagoResponse['data'] | null;
   tipoComprobante: string;
+  spotServicio?: { sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
+  spotProducto?: { productoFacturacionId?: number | null; sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
+  tipoItemSpot?: 'PRODUCTO' | 'SERVICIO';
   condicionPago: 'CONTADO' | 'CREDITO';
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
   fechaInicioCredito: string;
@@ -56,6 +59,9 @@ export function PagoStep({
   resumenComercial,
   maestrosPago,
   tipoComprobante,
+  spotServicio,
+  spotProducto,
+  tipoItemSpot = 'SERVICIO',
   labelTarifaOriginal = "Certificado:",
   condicionPago,
   onCondicionPagoChange,
@@ -79,11 +85,14 @@ export function PagoStep({
     tipoComprobante,
     total: totalPagar,
     esCortesia,
+    servicio: tipoItemSpot === 'PRODUCTO' ? spotProducto : spotServicio,
+    tipoItem: tipoItemSpot,
   });
   const totalExigible = esCortesia ? 0 : evaluacionSpot.netoCobrar;
   const totalPagarCalculado = esCortesia ? 0 : totalPagar;
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
   const pendiente = esCortesia ? 0 : (totalExigible - pagado);
+  const excesoPagado = Math.max(0, pagado - totalExigible);
   const descuentoVisual = esCortesia ? tarifaOriginal : descuento;
   const cuentaFaregas = maestrosPago?.cuentasCorrientes?.[0];
   const entidadFaregas = maestrosPago?.entidadesFinancieras?.find(
@@ -465,6 +474,7 @@ export function PagoStep({
               </div>
               {evaluacionSpot.aplica && (
                 <div className="space-y-1.5 rounded-xl bg-amber-50/90 p-2.5 border border-amber-200">
+                  <p className="text-[11px] font-bold text-amber-900">Código SPOT {evaluacionSpot.codigoSpot} · {evaluacionSpot.descripcionSpot}</p>
                   <div className="flex justify-between items-center text-amber-800 font-semibold text-xs">
                     <span>Detracción SPOT ({evaluacionSpot.porcentaje}%):</span>
                     <span className="font-bold">- S/ {evaluacionSpot.montoDetraccion.toFixed(2)}</span>
@@ -490,6 +500,28 @@ export function PagoStep({
             {evaluacionSpot.aplica && (
               <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-center text-xs font-semibold text-amber-900 leading-tight">
                 Operación sujeta a Detracción SPOT ({evaluacionSpot.porcentaje}%). El cliente retiene S/ {evaluacionSpot.montoDetraccion.toFixed(2)} para depositarlo en el Banco de la Nación.
+              </div>
+            )}
+            {tipoComprobante === 'BOLETA' && totalPagar > 700 && (
+              <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                Boleta: no se aplica detracción por este comprobante. Por superar S/ 700, los datos de identificación del comprador deben constar en el comprobante.
+              </p>
+            )}
+            {tipoComprobante === 'FACTURA' && totalPagar > 700 && String(evaluacionSpot.motivoExclusion || '').startsWith('CLASIFICACION_SPOT_') && (
+              <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-800">
+                {tipoItemSpot === 'PRODUCTO'
+                  ? `Producto fiscal #${spotProducto?.productoFacturacionId ?? 'sin vínculo'}: clasificación SPOT pendiente o incompleta. Revise este registro en Configuración → Productos antes de emitir.`
+                  : 'No se puede verificar la clasificación SPOT de esta operación. Revise la clasificación fiscal del servicio en Configuración → Servicios antes de emitir.'}
+              </div>
+            )}
+            {evaluacionSpot.aplica && (
+              <div className="mt-2 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                <span>Estado del depósito de detracción</span><strong className="text-amber-700">PENDIENTE — constancia no registrada</strong>
+              </div>
+            )}
+            {excesoPagado > 0.009 && (
+              <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-800">
+                Pago registrado excede el neto ordinario en S/ {excesoPagado.toFixed(2)}. El pago existente se conserva; revise y regularice la inconsistencia antes de confirmar.
               </div>
             )}
             {esCortesia ? (

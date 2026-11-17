@@ -97,6 +97,9 @@ export interface ServicioConfiguracionFaregas {
   requiere_vehiculo: boolean;
   activo: boolean;
   orden: number;
+  sujeto_detraccion?: boolean | null;
+  detraccion_codigo?: string | null;
+  detraccion_porcentaje?: number | null;
 }
 
 export const faregasConfigApi = {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
-import { AlertTriangle, CheckCircle, Search, Tag } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Search } from 'lucide-react';
 import { faregasTarifasApi } from '../../../../services/faregas-tarifas.api';
 import type { FormCajaState } from '../../NuevoCertificadoView';
 import type {
@@ -49,7 +49,6 @@ export function CajaStep({
   plantaNombre,
   formCaja,
   setFormCaja,
-  certificadoId,
   consultaRealizada,
   consultando,
   onConsultar,
@@ -78,7 +77,16 @@ export function CajaStep({
         setFormCaja((actual) => {
           // FIX: Ya no borramos la tarifaCodigo agresivamente si no esta en el catalogo
           // para proteger los borradores antiguos en previsualizacion.
-          return actual;
+          const servicioSeleccionado = nuevoCatalogo.categorias
+            .flatMap((categoria) => categoria.servicios)
+            .find((servicio) => servicio.tarifa.codigo === actual.tarifaCodigo);
+          if (!servicioSeleccionado) return actual;
+          return {
+            ...actual,
+            spotSujetoDetraccion: servicioSeleccionado.spot?.sujetoDetraccion,
+            spotCodigo: servicioSeleccionado.spot?.codigo,
+            spotPorcentaje: servicioSeleccionado.spot?.porcentaje,
+          };
         });
       })
       .catch((err: unknown) => {
@@ -111,6 +119,9 @@ export function CajaStep({
       return {
         ...actual,
         servicioCodigo: servicio.codigo,
+        spotSujetoDetraccion: servicio.spot?.sujetoDetraccion,
+        spotCodigo: servicio.spot?.codigo,
+        spotPorcentaje: servicio.spot?.porcentaje,
         tarifaCodigo: servicio.tarifa.codigo,
         tipoCertificado: servicio.tipo_certificado_clave,
         modalidadCertificado: servicio.modalidad ?? '',

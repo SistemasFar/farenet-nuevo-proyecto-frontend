@@ -77,6 +77,11 @@ export function ServicioModal({
     [categoria.codigo]
   );
   const [requiereVehiculo, setRequiereVehiculo] = useState(initialData.requiere_vehiculo ?? Boolean(initialData.requiere_certificado));
+  const [clasificacionSpot, setClasificacionSpot] = useState<'PENDIENTE' | 'NO_SUJETO' | 'SUJETO'>(
+    initialData.sujeto_detraccion === true ? 'SUJETO' : initialData.sujeto_detraccion === false ? 'NO_SUJETO' : 'PENDIENTE'
+  );
+  const [codigoSpot, setCodigoSpot] = useState(initialData.detraccion_codigo || '');
+  const tasasSpot: Record<string, number> = { '020': 12, '022': 12, '025': 10, '037': 12 };
   const orden = initialData.orden ?? 10;
   const productosSeleccionables = useMemo(() => productos.filter((producto) =>
     Number(producto.categoria_id) === Number(categoria.id)
@@ -148,6 +153,9 @@ export function ServicioModal({
 
   const validar = () => {
     if (!codigoTecnico(codigo) || !nombre.trim()) throw new Error('El código y el nombre de la operación son obligatorios.');
+    if (clasificacionSpot === 'SUJETO' && !tasasSpot[codigoSpot]) {
+      throw new Error('Selecciona una clasificación SPOT y su tasa oficial para este servicio.');
+    }
     // La plantilla del certificado NO se elige aquí: se configura después, en el
     // flujo de formatos. Por eso no es un campo obligatorio de este formulario.
     if (productoFijo && !Object.values(sedes).some((sede) => sede.seleccionada)) {
@@ -180,6 +188,9 @@ export function ServicioModal({
         requiere_certificado: generaCertificado,
         tipo_certificado_clave: certificado?.tipo_certificado_clave || null,
         modalidad: certificado?.modalidad || null,
+        sujeto_detraccion: clasificacionSpot === 'PENDIENTE' ? null : clasificacionSpot === 'SUJETO',
+        detraccion_codigo: clasificacionSpot === 'SUJETO' ? codigoSpot : null,
+        detraccion_porcentaje: clasificacionSpot === 'SUJETO' ? tasasSpot[codigoSpot] : null,
         // `formato_id` no se envía: la plantilla se asigna después, desde el
         // flujo de formatos. Omitirlo (en vez de mandarlo en null) es lo que
         // permite que el backend conserve el formato ya configurado.
@@ -228,6 +239,36 @@ export function ServicioModal({
               <label className="text-sm font-semibold text-slate-700">Código técnico<input required disabled={mode === 'EDIT'} value={codigo} onChange={(event) => setCodigo(event.target.value)} className="mt-1 w-full rounded-lg border p-2 capitalize disabled:bg-slate-100" /></label>
               <label className="text-sm font-semibold text-slate-700">Nombre<input required value={nombre} onChange={(event) => setNombre(event.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
             </div>
+          </section>
+          <section className="rounded-xl border border-slate-200 p-4">
+            <h4 className="mb-1 font-bold text-slate-800">Clasificación de detracción SPOT</h4>
+            <p className="mb-3 text-xs text-slate-500">Clasifica cada servicio según la norma aplicable. No se presume SPOT por superar S/ 700.</p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm font-semibold text-slate-700">Estado fiscal
+                <select value={clasificacionSpot} onChange={(event) => setClasificacionSpot(event.target.value as typeof clasificacionSpot)} className="mt-1 w-full rounded-lg border bg-white p-2">
+                  <option value="PENDIENTE">Pendiente de clasificación tributaria</option>
+                  <option value="NO_SUJETO">Servicio no sujeto a SPOT</option>
+                  <option value="SUJETO">Servicio sujeto a SPOT</option>
+                </select>
+              </label>
+              {clasificacionSpot === 'SUJETO' && (
+                <label className="text-sm font-semibold text-slate-700">Código SPOT
+                  <select value={codigoSpot} onChange={(event) => setCodigoSpot(event.target.value)} className="mt-1 w-full rounded-lg border bg-white p-2">
+                    <option value="">Selecciona según la clasificación verificada</option>
+                    <option value="020">020 · Mantenimiento y reparación de bienes muebles · 12%</option>
+                    <option value="022">022 · Otros servicios empresariales · 12%</option>
+                    <option value="025">025 · Fabricación de bienes por encargo · 10%</option>
+                    <option value="037">037 · Demás servicios gravados con IGV · 12%</option>
+                  </select>
+                </label>
+              )}
+            </div>
+            {clasificacionSpot === 'SUJETO' && tasasSpot[codigoSpot] && (
+              <p className="mt-2 text-xs font-semibold text-amber-800">Tasa oficial de la clasificación seleccionada: {tasasSpot[codigoSpot]}%.</p>
+            )}
+            {clasificacionSpot === 'PENDIENTE' && (
+              <p className="mt-2 text-xs font-semibold text-amber-800">Las facturas mayores a S/ 700 de este servicio no se confirmarán hasta completar su clasificación.</p>
+            )}
           </section>
           <section className="rounded-xl border border-slate-200 p-4">
             <h4 className="mb-3 font-bold text-slate-800">2. Certificado</h4>

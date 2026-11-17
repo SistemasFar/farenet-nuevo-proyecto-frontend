@@ -57,6 +57,9 @@ export interface FormCajaState {
   requiere_certificado: boolean;
   servicioCodigo: string;
   tarifaCodigo: string;
+  spotSujetoDetraccion?: boolean | null;
+  spotCodigo?: string | null;
+  spotPorcentaje?: number | null;
   tipoAutorizacion: string;
   descuentoObj?: { source_table: string; source_id: string; isCuponidad?: boolean; documentoBusqueda?: string; uuid?: string };
   nrodocumentoreinspeccion?: string;
@@ -565,8 +568,9 @@ function NuevoCertificadoWizard() {
       fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
       cuotas: formFacturacion.cuotasFac,
       esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
+      spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
     }).map((cuota) => ({ ...cuota, importe: String(cuota.importe) })),
-    [formFacturacion.condicionPagoFac, formFacturacion.tipoDocFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal, descuentoAplicado]
+    [formFacturacion.condicionPagoFac, formFacturacion.tipoDocFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal, descuentoAplicado, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje]
   );
 
   const titularPrincipal = React.useMemo(
@@ -1748,6 +1752,7 @@ function NuevoCertificadoWizard() {
       fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
       cuotas,
       esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
+      spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
     });
     const erroresCliente = validarDatosFacturacionCampos(formFacturacion);
     const primerError = Object.values({ ...erroresCliente, ...erroresPago })[0];
@@ -2282,6 +2287,7 @@ function NuevoCertificadoWizard() {
           fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
           cuotas: cuotasCreditoResueltas,
           esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
+          spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
         }))) return;
         setIsSavingStep(true);
         try {
@@ -2442,7 +2448,8 @@ function NuevoCertificadoWizard() {
     tipoComprobante: formFacturacion.tipoDocFac,
     total: precioTotal,
     esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
-  }), [formFacturacion.tipoDocFac, precioTotal, descuentoAplicado]);
+    servicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+  }), [formFacturacion.tipoDocFac, precioTotal, descuentoAplicado, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje]);
 
   const totalExigibleCaja = descuentoAplicado?.autorizaGratuidad ? 0 : evaluacionSpotActual.netoCobrar;
   const montoPendiente = Math.max(0, totalExigibleCaja - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
@@ -2994,6 +3001,7 @@ function NuevoCertificadoWizard() {
               resumenComercial={resumenComercial}
               maestrosPago={maestrosPago}
               tipoComprobante={formFacturacion.tipoDocFac}
+              spotServicio={{ sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje }}
               condicionPago={formFacturacion.condicionPagoFac}
               fechaInicioCredito={formFacturacion.fechaInicioCreditoFac}
               fechaVencimientoCredito={formFacturacion.fechaVencimientoFac}

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { evaluarSpotWizard, validarPasoPago, resolverCuotasCredito } from './faregas-wizard.validation';
 
+const servicioSpot037 = { sujetoDetraccion: true, codigoSpot: '037', porcentajeSpot: 12 };
+
 describe('FAREGAS — SPOT Detracciones (SUNAT RS 183-2004) en Wizard de Pagos', () => {
 
   it('1. Caso BOLETA de S/ 1,260.00: No aplica SPOT y exige pago íntegro de S/ 1,260.00', () => {
@@ -37,6 +39,7 @@ describe('FAREGAS — SPOT Detracciones (SUNAT RS 183-2004) en Wizard de Pagos',
     const evaluacion = evaluarSpotWizard({
       tipoComprobante: 'FACTURA',
       total: 1260.00,
+      servicio: servicioSpot037,
     });
 
     expect(evaluacion.aplica).toBe(true);
@@ -53,6 +56,7 @@ describe('FAREGAS — SPOT Detracciones (SUNAT RS 183-2004) en Wizard de Pagos',
       condicionPago: 'CONTADO',
       pagos: [{ importe: 1109.00 }],
       precioTotal: 1260.00,
+      spotServicio: servicioSpot037,
     });
     expect(erroresNeto.pagos).toBeUndefined();
 
@@ -62,6 +66,7 @@ describe('FAREGAS — SPOT Detracciones (SUNAT RS 183-2004) en Wizard de Pagos',
       condicionPago: 'CONTADO',
       pagos: [{ importe: 1000.00 }],
       precioTotal: 1260.00,
+      spotServicio: servicioSpot037,
     });
     expect(erroresMenor.pagos).toContain('Saldo pendiente: S/ 109.00.');
   });
@@ -73,6 +78,7 @@ describe('FAREGAS — SPOT Detracciones (SUNAT RS 183-2004) en Wizard de Pagos',
       pagos: [{ importe: 109.00 }], // Pago inicial
       precioTotal: 1260.00,
       fechaVencimientoCredito: '2026-12-31',
+      spotServicio: servicioSpot037,
     });
 
     // Saldo neto a financiar = 1109 - 109 = 1000.00
@@ -87,6 +93,7 @@ describe('FAREGAS — SPOT Detracciones (SUNAT RS 183-2004) en Wizard de Pagos',
       fechaInicioCredito: '2026-11-13',
       fechaVencimientoCredito: '2026-12-31',
       cuotas: [{ numeroCuota: 1, fechaPago: '2026-12-31', importe: '1000.00' }],
+      spotServicio: servicioSpot037,
     });
     expect(errores.pagos).toBeUndefined();
     expect(errores.cuotas).toBeUndefined();

@@ -20,6 +20,9 @@ export interface ProductoFacturacion {
   tipo_afectacion_igv?: string | null;
   codigo_afectacion_isc?: string | null;
   porcentaje_isc?: number | null;
+  sujeto_detraccion?: boolean | null;
+  detraccion_codigo?: string | null;
+  detraccion_porcentaje?: number | null;
   disponible_pos: boolean;
   es_para_venta: boolean;
   es_para_compra: boolean;

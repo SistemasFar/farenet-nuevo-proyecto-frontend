@@ -149,7 +149,6 @@ export const validarExpedienteTecnico = ({
   }
 
   if (tipoCertificado === 'GLP_ANUAL') {
-    const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
     agregarFaltantes(errores, vehiculo, [['cargaUtil', 'la carga útil']]);
     const hoyPeru = obtenerFechaHoyPeru();
     if (vacio(glp.fechaVigencia)) {
@@ -458,7 +457,6 @@ export const validarDatosEspecificos = ({
   }
 
   if (tipo === 'GLP_ANUAL') {
-    const esGlpAnual = String(modalidad || '').toUpperCase() === 'ANUAL';
     const hoyPeru = obtenerFechaHoyPeru();
     if (!vacio(glp.fechaVigencia) && String(glp.fechaVigencia).slice(0, 10) < hoyPeru) {
       marcar(errores, 'glp.fechaVigencia', 'La fecha de vigencia no puede ser anterior a la fecha actual.');
@@ -599,6 +597,7 @@ type DatosPago = {
   cuotas?: Array<{ numeroCuota: number; fechaPago: string; importe: string | number }>;
   esCortesia?: boolean;
   autorizaGratuidad?: boolean;
+  spotServicio?: { sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
 };
 
 const redondearMoneda = (valor: number) => Math.round((valor + Number.EPSILON) * 100) / 100;
@@ -618,10 +617,14 @@ export const evaluarSpotWizard = ({
   tipoComprobante,
   total,
   esCortesia = false,
+  servicio,
+  tipoItem = 'SERVICIO',
 }: {
   tipoComprobante?: string;
   total: number;
   esCortesia?: boolean;
+  servicio?: { sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null; descripcionSpot?: string | null } | null;
+  tipoItem?: 'PRODUCTO' | 'SERVICIO';
 }): EvaluacionSpotWizard => {
   const totalRedondeado = redondearMoneda(total);
   const esFactura = String(tipoComprobante || '').toUpperCase() === 'FACTURA';
@@ -652,7 +655,7 @@ export const evaluarSpotWizard = ({
     };
   }
 
-  if (totalRedondeado <= 700.00) {
+  if (tipoItem === 'SERVICIO' && totalRedondeado <= 700.00) {
     return {
       aplica: false,
       porcentaje: 0,
@@ -665,15 +668,66 @@ export const evaluarSpotWizard = ({
     };
   }
 
-  const porcentaje = 12;
+  if (!servicio || servicio.sujetoDetraccion == null) {
+    return {
+      aplica: false, porcentaje: 0, codigoSpot: '', descripcionSpot: '',
+      totalComprobante: totalRedondeado, montoDetraccion: 0, netoCobrar: totalRedondeado,
+      motivoExclusion: 'CLASIFICACION_SPOT_NO_VERIFICADA',
+    };
+  }
+
+  if (servicio.sujetoDetraccion === false) {
+    return {
+      aplica: false, porcentaje: 0, codigoSpot: '', descripcionSpot: '',
+      totalComprobante: totalRedondeado, montoDetraccion: 0, netoCobrar: totalRedondeado,
+      motivoExclusion: tipoItem === 'PRODUCTO' ? 'BIEN_MUEBLE_NO_SUJETO_A_SPOT' : 'SERVICIO_EXCLUIDO_POR_CONFIGURACION',
+    };
+  }
+
+  if (!servicio.codigoSpot || !Number.isFinite(Number(servicio.porcentajeSpot)) || Number(servicio.porcentajeSpot) <= 0) {
+    return {
+      aplica: false, porcentaje: 0, codigoSpot: '', descripcionSpot: '',
+      totalComprobante: totalRedondeado, montoDetraccion: 0, netoCobrar: totalRedondeado,
+      motivoExclusion: 'CLASIFICACION_SPOT_INCOMPLETA',
+    };
+  }
+
+  const tasasSpotOficiales: Record<string, number> = tipoItem === 'PRODUCTO'
+    ? { '002': 4, '004': 10, '005': 10, '006': 15, '007': 10, '009': 4, '011': 10, '012': 4, '015': 4, '017': 10, '021': 1.5, '023': 15 }
+    : { '020': 12, '022': 12, '025': 10, '037': 12 };
+  const tasaOficial = tasasSpotOficiales[servicio.codigoSpot];
+  if (tasaOficial == null) {
+    return {
+      aplica: false, porcentaje: 0, codigoSpot: '', descripcionSpot: '',
+      totalComprobante: totalRedondeado, montoDetraccion: 0, netoCobrar: totalRedondeado,
+      motivoExclusion: 'CLASIFICACION_SPOT_NO_RECONOCIDA',
+    };
+  }
+  if (tasaOficial !== Number(servicio.porcentajeSpot)) {
+    return {
+      aplica: false, porcentaje: 0, codigoSpot: '', descripcionSpot: '',
+      totalComprobante: totalRedondeado, montoDetraccion: 0, netoCobrar: totalRedondeado,
+      motivoExclusion: 'CLASIFICACION_SPOT_INCONSISTENTE',
+    };
+  }
+
+  if (tipoItem === 'PRODUCTO' && totalRedondeado <= 700 && !['006', '021'].includes(servicio.codigoSpot || '')) {
+    return {
+      aplica: false, porcentaje: 0, codigoSpot: '', descripcionSpot: '',
+      totalComprobante: totalRedondeado, montoDetraccion: 0, netoCobrar: totalRedondeado,
+      motivoExclusion: 'IMPORTE_MENOR_O_IGUAL_A_700',
+    };
+  }
+
+  const porcentaje = Number(servicio.porcentajeSpot);
   const montoDetraccion = Math.round((totalRedondeado * porcentaje) / 100);
   const netoCobrar = redondearMoneda(totalRedondeado - montoDetraccion);
 
   return {
     aplica: true,
     porcentaje,
-    codigoSpot: '037',
-    descripcionSpot: 'Demás servicios gravados con el IGV',
+    codigoSpot: servicio.codigoSpot,
+    descripcionSpot: servicio.descripcionSpot || (tipoItem === 'PRODUCTO' ? `Bien sujeto al SPOT · código ${servicio.codigoSpot}` : 'Servicio sujeto al SPOT'),
     totalComprobante: totalRedondeado,
     montoDetraccion,
     netoCobrar,
@@ -688,12 +742,14 @@ export const resolverCuotasCredito = ({
   fechaVencimientoCredito,
   cuotas = [],
   esCortesia = false,
-}: Pick<DatosPago, 'condicionPago' | 'tipoComprobante' | 'pagos' | 'precioTotal' | 'fechaVencimientoCredito' | 'cuotas' | 'esCortesia'>) => {
+  spotServicio,
+}: Pick<DatosPago, 'condicionPago' | 'tipoComprobante' | 'pagos' | 'precioTotal' | 'fechaVencimientoCredito' | 'cuotas' | 'esCortesia' | 'spotServicio'>) => {
   if (condicionPago !== 'CREDITO') return [];
   const evaluacionSpot = evaluarSpotWizard({
     tipoComprobante,
     total: precioTotal,
     esCortesia,
+    servicio: spotServicio,
   });
   const exigibleCaja = esCortesia ? 0 : evaluacionSpot.netoCobrar;
   const totalPagado = redondearMoneda(pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0));
@@ -731,6 +787,7 @@ export const validarPasoPago = ({
   cuotas = [],
   esCortesia = false,
   autorizaGratuidad = false,
+  spotServicio,
 }: DatosPago): ErroresCampo => {
   const totalPagado = redondearMoneda(pagos.reduce((total, pago) => total + Number(pago.importe || 0), 0));
   const esCredito = condicionPago === 'CREDITO';
@@ -738,6 +795,7 @@ export const validarPasoPago = ({
     tipoComprobante,
     total: precioTotal,
     esCortesia: esCortesia || autorizaGratuidad,
+    servicio: spotServicio,
   });
   const exigibleCaja = esCortesia || autorizaGratuidad ? 0 : evaluacionSpot.netoCobrar;
   const saldo = redondearMoneda(Math.max(0, exigibleCaja - totalPagado));
@@ -759,6 +817,11 @@ export const validarPasoPago = ({
 
   if (String(tipoComprobante || '').toUpperCase() === 'BOLETA' && esCredito) {
     errores.pagos = 'La boleta sólo admite condición de pago CONTADO.';
+    return errores;
+  }
+
+  if (String(tipoComprobante || '').toUpperCase() === 'FACTURA' && precioTotal > 700 && String(evaluacionSpot.motivoExclusion || '').startsWith('CLASIFICACION_SPOT_')) {
+    errores.pagos = 'No se puede confirmar la venta: falta verificar la clasificación SPOT del servicio. Revise la configuración del servicio o aplique la migración 004 antes de emitir.';
     return errores;
   }
 

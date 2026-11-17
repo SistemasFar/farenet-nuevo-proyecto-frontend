@@ -28,11 +28,18 @@ const productoVacio = (): Partial<ProductoFacturacion> => ({
   precio_referencia: null, valor_referencial_unitario: null,
   codigo_clasificacion_sunat: null, tipo_afectacion_igv: '10',
   codigo_afectacion_isc: null, porcentaje_isc: null,
+  sujeto_detraccion: null, detraccion_codigo: null, detraccion_porcentaje: null,
   disponible_pos: false, es_para_venta: true,
   es_para_compra: false, tiene_icbper: false, activo: true,
   imagen_url: null,
   requiere_chip: false, producto_chip_id: null, precio_chip: null
 });
+
+const TASAS_SPOT_PRODUCTOS: Record<string, number> = {
+  '002': 4, '004': 10, '005': 10, '006': 15, '007': 10, '009': 4,
+  '011': 10, '012': 4, '015': 4, '017': 10,
+  '021': 1.5, '023': 15,
+};
 
 const nullableNumber = (value: string) => value === '' ? null : Number(value);
 const escaparHtml = (value: string) => value.replace(/[&<>'"]/g, (caracter) => ({
@@ -120,8 +127,6 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [resumen, setResumen] = useState({ items: 0, total: 0, page: 1, limit: 10, totalPages: 0 });
-  // Catálogo de unidades completo, lo devuelve el backend junto al listado.
-  const [catalogoUnidades, setCatalogoUnidades] = useState<string[]>([]);
   // Se incrementa tras crear/editar/eliminar para recargar conservando filtros.
   const [refreshToken, setRefreshToken] = useState(0);
   const [modal, setModal] = useState(false);
@@ -218,7 +223,6 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
             limit: r.limit,
             totalPages: r.totalPages
           });
-          if (r.unidades.length) setCatalogoUnidades(r.unidades);
           setError('');
         })
         .catch((err: unknown) => {
@@ -254,8 +258,6 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
   // El listado ya viene filtrado y paginado del backend: `productos` ES la
   // página actual del resultado. Filtrar aquí en memoria sólo podía mirar esos
   // 10 registros, por eso buscar un SKU de otra página devolvía 0 resultados.
-  const unidades = catalogoUnidades;
-
   const exportarProductos = async () => {
     try {
       setExportando(true);
@@ -278,6 +280,18 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
     const unidadTributaria = String(actual.unidad || '').trim().toUpperCase();
     if (actual.es_para_venta && !['NIU', 'ZZ'].includes(unidadTributaria)) {
       alert('La unidad tributaria para venta debe ser NIU o ZZ.');
+      return;
+    }
+    if (actual.sujeto_detraccion === true && (!actual.detraccion_codigo || TASAS_SPOT_PRODUCTOS[actual.detraccion_codigo] == null)) {
+      alert('Selecciona una clasificación SPOT válida para el producto.');
+      return;
+    }
+    if (actual.sujeto_detraccion === true && Number(actual.detraccion_porcentaje) !== TASAS_SPOT_PRODUCTOS[actual.detraccion_codigo!]) {
+      alert('La tasa no coincide con el código SPOT seleccionado. Vuelve a seleccionar el código.');
+      return;
+    }
+    if (actual.sujeto_detraccion !== true && (actual.detraccion_codigo || actual.detraccion_porcentaje != null)) {
+      alert('Un producto pendiente o no sujeto no puede conservar código ni tasa SPOT.');
       return;
     }
     try {
@@ -412,7 +426,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
                 return <tr key={producto.id} className="hover:bg-gray-50">
                   <td className="min-w-64 px-3 py-3"><div className="font-mono font-bold text-gray-700">{producto.codigo_sku}</div><div className="mt-1 font-medium text-gray-800">{producto.descripcion}</div><div className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${producto.categoria_id ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{producto.categoria_nombre || 'SIN TIPO DE CERTIFICADO'}</div><div className="mt-1 text-xs text-slate-500">Tipo: {producto.tipo_producto || 'Producto'}</div></td>
                   <td className="min-w-52 px-3 py-3 text-xs">{sedesVinculadas.length ? <div className="font-semibold text-slate-800" title={sedesVinculadas.join(', ')}>{sedesVinculadas.join(', ')}</div> : <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">SIN VINCULAR</span>}<div className="mt-1 text-slate-500"></div></td>
-                  <td className="min-w-52 px-3 py-3 text-xs"><div>Unidad: <b>{producto.unidad || '-'}</b> · IGV: <b>{producto.tipo_afectacion_igv || '-'}</b></div><div className="mt-1 text-slate-500">SUNAT: {producto.codigo_clasificacion_sunat || '-'}</div><div className="mt-1 text-slate-500">ISC: {producto.codigo_afectacion_isc || '-'} · {producto.porcentaje_isc == null ? '-' : `${producto.porcentaje_isc}%`}</div><div className="mt-1 text-slate-500">Cuenta: {producto.cuenta_por_cobrar || '-'}</div></td>
+                  <td className="min-w-52 px-3 py-3 text-xs"><div>Unidad: <b>{producto.unidad || '-'}</b> · IGV: <b>{producto.tipo_afectacion_igv || '-'}</b></div><div className="mt-1 text-slate-500">SUNAT: {producto.codigo_clasificacion_sunat || '-'}</div><div className="mt-1 text-slate-500">ISC: {producto.codigo_afectacion_isc || '-'} · {producto.porcentaje_isc == null ? '-' : `${producto.porcentaje_isc}%`}</div><div className="mt-1 text-slate-500">SPOT: {producto.sujeto_detraccion == null ? 'Pendiente' : producto.sujeto_detraccion ? `${producto.detraccion_codigo || 'Código faltante'} · ${producto.detraccion_porcentaje ?? 'Tasa faltante'}%` : 'No sujeto'}</div><div className="mt-1 text-slate-500">Cuenta: {producto.cuenta_por_cobrar || '-'}</div></td>
                   <td className="min-w-52 px-3 py-3 text-xs"><div>P. unitario: <b>{producto.precio_unitario == null ? '-' : `S/ ${producto.precio_unitario.toFixed(2)}`}</b></div><div className="mt-1">P. venta: <b>{producto.precio_referencia == null ? '-' : `S/ ${producto.precio_referencia.toFixed(2)}`}</b></div><div className="mt-1">V. referencial: <b>{producto.valor_referencial_unitario == null ? '-' : `S/ ${producto.valor_referencial_unitario.toFixed(2)}`}</b></div><div className="mt-1 text-slate-500">Barras: {producto.codigo_barras || '-'}</div></td>
                   <td className="min-w-40 px-3 py-3 text-xs"><div><span className={`rounded-full px-2 py-1 font-semibold ${producto.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{producto.activo ? 'ACTIVO' : 'INACTIVO'}</span></div><div className="mt-2 text-slate-600">Venta: {producto.es_para_venta ? 'Sí' : 'No'} · Compra: {producto.es_para_compra ? 'Sí' : 'No'}</div><div className="mt-1 text-slate-600">POS: {producto.disponible_pos ? 'Sí' : 'No'} · ICBPER: {producto.tiene_icbper ? 'Sí' : 'No'}</div></td>
                   <td className="min-w-60 px-3 py-3 text-xs">{usosOperativos.length ? <div className="font-semibold text-slate-800">{usosOperativos.join(', ')}</div> : <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-800">SIN VINCULAR</span>}</td>
@@ -454,6 +468,41 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
             <div><label className="mb-1 block text-sm font-semibold">Código afectación ISC</label><input value={actual.codigo_afectacion_isc || ''} maxLength={20} onChange={(e) => setActual({ ...actual, codigo_afectacion_isc: e.target.value || null })} className="w-full rounded-lg border p-2" /></div>
             <div><label className="mb-1 block text-sm font-semibold">% ISC</label><input type="number" min="0" step="0.0001" value={actual.porcentaje_isc ?? ''} onChange={(e) => setActual({ ...actual, porcentaje_isc: nullableNumber(e.target.value) })} className="w-full rounded-lg border p-2" /></div>
           </div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 p-4">
+          <h4 className="mb-1 text-sm font-bold uppercase tracking-wide text-[#052A79]">Clasificación de detracción SPOT</h4>
+          <p className="mb-3 text-xs text-slate-500">Clasifica el producto solo según evaluación tributaria. La tasa se determina por el código y no se asigna automáticamente.</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm font-semibold">Estado fiscal
+              <select value={actual.sujeto_detraccion == null ? 'PENDIENTE' : actual.sujeto_detraccion ? 'SUJETO' : 'NO_SUJETO'} onChange={(e) => setActual({ ...actual, sujeto_detraccion: e.target.value === 'PENDIENTE' ? null : e.target.value === 'SUJETO', detraccion_codigo: e.target.value === 'SUJETO' ? actual.detraccion_codigo || null : null, detraccion_porcentaje: e.target.value === 'SUJETO' ? actual.detraccion_porcentaje ?? null : null })} className="mt-1 w-full rounded-lg border bg-white p-2">
+                <option value="PENDIENTE">Pendiente de clasificación tributaria</option>
+                <option value="NO_SUJETO">Producto no sujeto a SPOT</option>
+                <option value="SUJETO">Producto sujeto a SPOT</option>
+              </select>
+            </label>
+            {actual.sujeto_detraccion === true && <>
+              <label className="text-sm font-semibold">Código SPOT
+              <select value={actual.detraccion_codigo || ''} onChange={(e) => setActual({ ...actual, detraccion_codigo: e.target.value || null, detraccion_porcentaje: e.target.value ? TASAS_SPOT_PRODUCTOS[e.target.value] : null })} className="mt-1 w-full rounded-lg border bg-white p-2">
+                  <option value="">Selecciona una clasificación verificada</option>
+                  <option value="002">002 · Maíz amarillo duro · 4%</option>
+                  <option value="004">004 · Caña de azúcar · 10%</option>
+                  <option value="005">005 · Arena y piedra · 10%</option>
+                  <option value="006">006 · Residuos y subproductos · 15%</option>
+                  <option value="007">007 · Bienes gravados por renuncia a exoneración · 10%</option>
+                  <option value="009">009 · Carnes y despojos comestibles · 4%</option>
+                  <option value="011">011 · Aceite de pescado · 10%</option>
+                  <option value="012">012 · Harina y pellets de pescado · 4%</option>
+                  <option value="015">015 · Madera · 4%</option>
+                  <option value="017">017 · Páprika y frutos capsicum o pimienta · 10%</option>
+                  <option value="021">021 · Oro y minerales metálicos exonerados · 1.5%</option>
+                  <option value="023">023 · Plomo · 15%</option>
+                </select>
+              </label>
+              <div className="text-sm font-semibold">Porcentaje aplicable<input readOnly value={actual.detraccion_porcentaje == null ? '' : `${actual.detraccion_porcentaje}%`} className="mt-1 w-full rounded-lg border bg-slate-100 p-2" placeholder="Se determina al elegir el código" /></div>
+            </>}
+          </div>
+          {actual.sujeto_detraccion == null && <p className="mt-2 text-xs font-semibold text-amber-800">Pendiente de clasificación; este valor no declara que el producto esté afecto.</p>}
         </section>
 
         <section className="rounded-xl border border-slate-200 p-4">

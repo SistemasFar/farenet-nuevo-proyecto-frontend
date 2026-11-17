@@ -13,6 +13,9 @@ import { faregasPagosApi } from '../../services/faregas-pagos.api';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../NuevoCertificado/NuevoCertificadoView';
 import { entradaVentaCantidad, esProductoCantidad, etiquetaControlInventario } from './inventario-control';
+import { resolverRequisitosConfirmacionVentaChips } from './venta-chips-requisitos';
+import { evaluarSpotWizard } from '../NuevoCertificado/faregas-wizard.validation';
+import { sanitizarTelefonoMovilPeru, telefonoMovilPeruValido } from './telefono-movil-peru';
 
 const crearFormPagoVacio = (): FormPagoState => ({
   importe: '',
@@ -43,20 +46,17 @@ const errorDocumentoFiscal = (
 };
 
 /**
- * Mismas reglas que aplica el backend en `faregas-facturacion.rules.js`
- * (normalizarFacturacion / validarFacturacion). No se inventan reglas nuevas:
- * el correo se normaliza en minúsculas y se valida su formato; el teléfono se
- * limita a 30 caracteres. Ambos siguen siendo opcionales, igual que en
- * FAREGAS, de modo que agregar el campo no bloquea ventas que antes pasaban.
+ * El correo conserva las reglas de facturación existentes. El teléfono usa
+ * la validación específica del backend de venta de chips. Ambos son opcionales.
  */
 const normalizarEmail = (valor: string) => valor.trim().toLowerCase();
-const LIMITE_TELEFONO = 30;
+const LIMITE_TELEFONO = 9;
 const REGLA_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const errorContacto = (email: string, telefono: string) => {
   if (email && !REGLA_EMAIL.test(email)) return 'El correo no tiene un formato válido.';
-  if (telefono && telefono.length > LIMITE_TELEFONO) {
-    return `El teléfono admite hasta ${LIMITE_TELEFONO} caracteres.`;
+  if (!telefonoMovilPeruValido(telefono)) {
+    return 'El teléfono móvil debe tener 9 dígitos y comenzar con 9.';
   }
   return '';
 };
@@ -116,7 +116,30 @@ export function ModalVentaChips({
   const productoSeleccionado = productos.find((producto) => producto.id === Number(productoInventariableId));
   const esCantidad = esProductoCantidad(productoSeleccionado);
   const chipsValidados = resultadoValidacion?.items.filter((item) => item.validoParaVenta) ?? [];
+  const itemsSpotProducto = resultadoValidacion?.items || [];
+  const primeraClasificacionSpot = itemsSpotProducto[0];
   const totalMonto = resultadoValidacion?.totalEstimado ?? 0;
+  const spotProductoUniforme = itemsSpotProducto.length > 0 && itemsSpotProducto.every((item) =>
+    item.spotSujeto === primeraClasificacionSpot?.spotSujeto
+    && item.spotCodigo === primeraClasificacionSpot?.spotCodigo
+    && item.spotPorcentaje === primeraClasificacionSpot?.spotPorcentaje
+  );
+  const spotProducto = primeraClasificacionSpot ? {
+    productoFacturacionId: spotProductoUniforme ? primeraClasificacionSpot.productoFacturacionId ?? null : null,
+    sujetoDetraccion: spotProductoUniforme ? primeraClasificacionSpot.spotSujeto ?? null : null,
+    codigoSpot: spotProductoUniforme ? primeraClasificacionSpot.spotCodigo || null : null,
+    porcentajeSpot: spotProductoUniforme ? primeraClasificacionSpot.spotPorcentaje ?? null : null,
+  } : null;
+  const evaluacionSpotProducto = evaluarSpotWizard({
+    tipoComprobante,
+    total: totalMonto,
+    tipoItem: 'PRODUCTO',
+    servicio: spotProducto,
+  });
+  const spotError = tipoComprobante === 'FACTURA'
+    && String(evaluacionSpotProducto.motivoExclusion || '').startsWith('CLASIFICACION_SPOT_')
+    ? `El producto fiscal #${primeraClasificacionSpot?.productoFacturacionId ?? 'sin vínculo'} tiene la clasificación SPOT pendiente o incompleta. Revise ese registro en Configuración → Productos antes de confirmar.`
+    : '';
   const hayErrorDeEscaneo = parsed.errores.length > 0 || parsed.duplicados.length > 0;
   const validacionCompleta = Boolean(resultadoValidacion
     && resultadoValidacion.items.length > 0
@@ -129,8 +152,11 @@ export function ModalVentaChips({
     const importe = Number(pago.importe);
     return sum + (Number.isFinite(importe) ? importe : 0);
   }, 0);
-  const pendiente = totalMonto - totalPagado;
-  const saldoAFinanciar = Math.max(0, totalMonto - totalPagado);
+  const totalExigible = tipoComprobante === 'FACTURA' && evaluacionSpotProducto.aplica
+    ? evaluacionSpotProducto.netoCobrar
+    : totalMonto;
+  const pendiente = totalExigible - totalPagado;
+  const saldoAFinanciar = Math.max(0, totalExigible - totalPagado);
   const pagoCompleto = validacionCompleta && Math.abs(pendiente) <= toleranciaMonto;
 
   const cuotasEfectivas = cuotas.length > 0 ? cuotas : (condicionPago === 'CREDITO' && saldoAFinanciar > 0 ? [{
@@ -191,10 +217,28 @@ export function ModalVentaChips({
     && !errorContactoActual
     && nombreRazonSocial.trim()
     && nombreRazonSocial.trim().length <= 100
-    && direccion.trim()
     && direccion.trim().length <= 100
   );
   const pagoDisponible = validacionCompleta && !loadingVenta && !validandoChips && !ventaRegistrada;
+  const cuotasConDatosInvalidos = cuotasEfectivas.some(c => !(Number(c.importe) > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(c.fechaPago));
+  const requisitosConfirmacion = resolverRequisitosConfirmacionVentaChips({
+    productoSeleccionado: Boolean(productoSeleccionado),
+    validacionCompleta,
+    errorFiscalDocumento,
+    nombreRazonSocial,
+    direccion,
+    errorContacto: errorContactoActual,
+    tipoComprobante,
+    condicionPago,
+    pagoValido,
+    pendiente,
+    saldoAFinanciar,
+    cantidadCuotas: cuotasEfectivas.length,
+    cuotasCuadran,
+    cuotasConDatosInvalidos,
+    fechaCreditoValida: !fechaInicioCredito || !fechaVencimiento || fechaVencimiento >= fechaInicioCredito,
+    spotError
+  });
 
   useEffect(() => {
     faregasPagosApi.obtenerMaestros()
@@ -245,7 +289,8 @@ export function ModalVentaChips({
       setNombreRazonSocial(prev => persona.nombreRazonSocial || persona.nombrerazonsocial || prev);
       setDireccion(prev => persona.direccion || prev);
       setEmail(prev => normalizarEmail(persona.correo || persona.email || '') || prev);
-      setTelefono(prev => (persona.telefono || '').trim() || prev);
+      const telefonoCliente = sanitizarTelefonoMovilPeru(persona.telefono || '');
+      setTelefono(prev => telefonoMovilPeruValido(telefonoCliente) && telefonoCliente ? telefonoCliente : prev);
       setError('');
 
       await Swal.fire({
@@ -610,7 +655,9 @@ export function ModalVentaChips({
                   value={telefono}
                   maxLength={LIMITE_TELEFONO}
                   disabled={ventaRegistrada}
-                  onChange={e => setTelefono(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="tel-national"
+                  onChange={e => setTelefono(sanitizarTelefonoMovilPeru(e.target.value))}
                   className="mt-1 w-full rounded-lg border border-slate-300 p-2 focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
                 />
               </label>
@@ -695,6 +742,8 @@ export function ModalVentaChips({
               tarifaOriginal={totalMonto}
               maestrosPago={maestrosPago}
               tipoComprobante={tipoComprobante}
+              spotProducto={spotProducto}
+              tipoItemSpot="PRODUCTO"
               condicionPago={condicionPago}
               onCondicionPagoChange={(cond) => {
                 setCondicionPago(cond);
@@ -738,12 +787,20 @@ export function ModalVentaChips({
           <button onClick={onClose} disabled={loadingVenta || validandoChips} className="w-full rounded-lg px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Cancelar</button>
           <button
             onClick={() => void handleSubmit()}
-            disabled={loadingVenta || validandoChips || ventaRegistrada || !validacionCompleta || !datosFiscalesValidos || !pagoValido}
+            disabled={loadingVenta || validandoChips || ventaRegistrada || !validacionCompleta || !datosFiscalesValidos || !pagoValido || Boolean(spotError)}
             className="w-full rounded-lg bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             {loadingVenta ? 'Procesando...' : 'Confirmar Venta y Emitir'}
           </button>
         </div>
+        {!loadingVenta && !validandoChips && !ventaRegistrada && requisitosConfirmacion.length > 0 && (
+          <div role="status" aria-live="polite" className="mx-4 mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 sm:mx-5">
+            <p className="font-bold">No se puede confirmar todavía. Complete estos requisitos:</p>
+            <ul className="mt-1 list-inside list-disc">
+              {requisitosConfirmacion.map((requisito) => <li key={requisito}>{requisito}</li>)}
+            </ul>
+          </div>
+        )}
 
         {/* El resultado de la emisión vive AQUÍ, al final del flujo y debajo del
             botón que lo produce. Antes se renderizaba dentro de la columna

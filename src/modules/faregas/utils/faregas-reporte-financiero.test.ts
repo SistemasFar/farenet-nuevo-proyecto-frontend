@@ -93,7 +93,7 @@ describe('Reporte financiero consolidado', () => {
     expect(typeof sheets[0].rows[0].fecha).toBe('number');
     const xmlZip = new TextDecoder().decode(crearExcelVariasHojasBytes(sheets));
     expect((xmlZip.match(/<sheet name=/g) || [])).toHaveLength(1);
-    expect(xmlZip).toContain('<autoFilter ref="A7:AU');
+    expect(xmlZip).toContain('<autoFilter ref="A7:BE');
     expect(xmlZip).toContain('REPORTE FINANCIERO CONSOLIDADO');
     expect(sheets[0].columns.map((c) => c.key)).toContain('horaEmisionComprobanteC');
     expect(sheets[0].columns.map((c) => c.header)).toContain('Hora de emisión del comprobante');

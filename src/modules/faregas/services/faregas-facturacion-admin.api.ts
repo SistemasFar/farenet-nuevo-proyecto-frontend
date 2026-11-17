@@ -36,7 +36,7 @@ export interface DocumentoFacturacionAdmin {
   intentos: number;
   fechaUltimoIntento: string | null;
   fechaCreacion: string;
-  sujetoDetraccion?: boolean;
+  sujetoDetraccion?: boolean | null;
   detraccionCodigo?: string | null;
   detraccionDescripcion?: string | null;
   detraccionPorcentaje?: number | null;

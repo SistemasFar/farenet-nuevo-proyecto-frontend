@@ -104,6 +104,37 @@ export function UsuariosView() {
   const [modalMode, setModalMode] = useState<'crear' | 'editar'>('crear');
   const [formData, setFormData] = useState<any>({});
   const [selectedUsername, setSelectedUsername] = useState('');
+  const [bajaPerfil, setBajaPerfil] = useState<{ clave: string; usuarios: any[] } | null>(null);
+  const [reemplazoPerfil, setReemplazoPerfil] = useState('');
+  const [errorBajaPerfil, setErrorBajaPerfil] = useState('');
+  const [procesandoBaja, setProcesandoBaja] = useState(false);
+
+  const abrirBajaPerfil = async (clave: string) => {
+    try {
+      const resultado = await faregasUsuariosApi.obtenerUsuariosPorPerfil(clave);
+      setBajaPerfil({ clave, usuarios: resultado.usuarios });
+      setReemplazoPerfil('');
+      setErrorBajaPerfil('');
+    } catch (e: any) { alert(e.message || 'No se pudieron consultar los usuarios del perfil'); }
+  };
+
+  const confirmarBajaPerfil = async () => {
+    if (!bajaPerfil || (bajaPerfil.usuarios.length > 0 && !reemplazoPerfil)) return;
+    setProcesandoBaja(true);
+    setErrorBajaPerfil('');
+    try {
+      await faregasUsuariosApi.eliminarPerfil(bajaPerfil.clave, reemplazoPerfil || undefined);
+      setBajaPerfil(null);
+      await cargarDatos();
+    } catch (e: any) {
+      setErrorBajaPerfil(e.message || 'No se pudo eliminar el perfil');
+      // Actualiza la lista si otro administrador cambió las asignaciones.
+      try {
+        const actual = await faregasUsuariosApi.obtenerUsuariosPorPerfil(bajaPerfil.clave);
+        setBajaPerfil({ clave: bajaPerfil.clave, usuarios: actual.usuarios });
+      } catch { /* El error original permanece visible. */ }
+    } finally { setProcesandoBaja(false); }
+  };
   const [detalleSedes, setDetalleSedes] = useState<{
     usuario: string;
     sedes: Array<{ key: string; nombre: string }>;
@@ -253,13 +284,21 @@ export function UsuariosView() {
   };
 
   const handleDeleteUsuario = async (username: string) => {
-    if (confirm(`¿Deseas eliminar el usuario ${username}? Esta acción eliminará el usuario de FAREGAS.`)) {
-      try {
-        await faregasUsuariosApi.eliminarUsuario(username);
-        cargarDatos();
-      } catch (e: any) {
-        alert(e.message || 'Error al eliminar usuario');
-      }
+    if (!confirm(`¿Eliminar la cuenta ${username} de FAREGAS? Si conserva historial, podrás desactivarla.`)) return;
+    try {
+      const resultado = await faregasUsuariosApi.eliminarUsuario(username);
+      alert(resultado.mensaje || 'Usuario eliminado');
+      await cargarDatos();
+    } catch (e: any) {
+      if (e.codigo === 'USUARIO_CON_HISTORIAL') {
+        if (confirm(`${e.message} Se conservará el historial. ¿Deseas desactivar esta cuenta y revocar sus sesiones?`)) {
+          try {
+            const resultado = await faregasUsuariosApi.desactivarUsuario(username);
+            alert(resultado.mensaje || 'Usuario desactivado');
+            await cargarDatos();
+          } catch (error: any) { alert(error.message || 'No se pudo desactivar'); }
+        }
+      } else alert(e.message || 'Error al eliminar usuario');
     }
   };
 
@@ -665,16 +704,7 @@ export function UsuariosView() {
                           <Edit size={18} />
                         </button>
                         {p.clave !== 'SISTEMAS' && (
-                          <button onClick={async () => {
-                            if (confirm(`¿Eliminar perfil ${p.clave}?`)) {
-                              try {
-                                await faregasUsuariosApi.eliminarPerfil(p.clave);
-                                cargarDatos();
-                              } catch (e: any) {
-                                alert(e.message || 'Error al eliminar');
-                              }
-                            }
-                          }} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors">
+                          <button onClick={() => abrirBajaPerfil(p.clave)} title="Eliminar" className="rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-red-100 transition-colors">
                             <Trash2 size={18} />
                           </button>
                         )}
@@ -743,6 +773,32 @@ export function UsuariosView() {
           </div>
         </div>
       )}
+      {bajaPerfil && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="titulo-baja-perfil" className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl">
+            <h2 id="titulo-baja-perfil" className="text-lg font-bold">Eliminar perfil {bajaPerfil.clave}</h2>
+            <p className="mt-3 text-sm">{bajaPerfil.usuarios.length} usuario(s) vinculado(s).</p>
+            {bajaPerfil.usuarios.length > 0 && <>
+              <ul className="my-3 max-h-48 overflow-auto text-sm">
+                {bajaPerfil.usuarios.map(u => <li key={u.username}>{u.username} — {[u.nombres, u.apellidos].filter(Boolean).join(' ') || 'Sin nombre registrado'}{u.estado ? '' : ' (inactivo)'}</li>)}
+              </ul>
+              <label htmlFor="perfil-reemplazo" className="text-sm font-semibold">Perfil de reemplazo</label>
+              <select id="perfil-reemplazo" value={reemplazoPerfil} onChange={e => setReemplazoPerfil(e.target.value)} disabled={procesandoBaja} className="mt-1 w-full rounded border p-2">
+                <option value="">Selecciona un perfil</option>
+                {perfiles.filter(p => p.clave !== bajaPerfil.clave).map(p => <option key={p.clave} value={p.clave}>{p.nombre} ({p.clave})</option>)}
+              </select>
+              <p className="mt-2 text-sm text-gray-600">Los usuarios recibirán los permisos del perfil elegido y deberán iniciar sesión nuevamente. El reemplazo debe permitir sus sedes actuales.</p>
+            </>}
+            <p className="mt-3 text-sm">Se eliminarán las asignaciones de permisos y sedes del perfil. Los permisos y las sedes se conservan.</p>
+            {errorBajaPerfil && <p role="alert" className="mt-3 text-sm text-red-700">{errorBajaPerfil}</p>}
+            <div className="mt-5 flex justify-end gap-3">
+              <button disabled={procesandoBaja} onClick={() => setBajaPerfil(null)} className="rounded border px-4 py-2">Cancelar</button>
+              <button disabled={procesandoBaja || (bajaPerfil.usuarios.length > 0 && !reemplazoPerfil)} onClick={confirmarBajaPerfil} className="rounded bg-red-700 px-4 py-2 text-white disabled:opacity-50">{procesandoBaja ? 'Procesando…' : bajaPerfil.usuarios.length ? 'Reasignar y eliminar' : 'Eliminar perfil'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">

@@ -1,6 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import type { DocumentosEmitidosExtendidoResponse, ReporteFinancieroResponse } from '../services/faregas-dashboard.api';
 import { construirHojasDocumentosEmitidosExtendido, construirHojasUnificadas } from './faregas-documentos-emitidos-extendido';
+import { crearExcelVariasHojasBytes } from './exportar-excel';
+
+function leerEntradasXlsx(bytes: Uint8Array): Record<string, string> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const decoder = new TextDecoder();
+  const entries: Record<string, string> = {};
+  let offset = 0;
+  while (offset + 30 <= bytes.length && view.getUint32(offset, true) === 0x04034b50) {
+    const method = view.getUint16(offset + 8, true);
+    const compressedSize = view.getUint32(offset + 18, true);
+    const nameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = decoder.decode(bytes.subarray(nameStart, nameStart + nameLength));
+    if (method !== 0) throw new Error(`Método ZIP no esperado (${method}) en ${name}`);
+    entries[name] = decoder.decode(bytes.subarray(dataStart, dataStart + compressedSize));
+    offset = dataStart + compressedSize;
+  }
+  return entries;
+}
 
 const sample: DocumentosEmitidosExtendidoResponse = {
   cabeceras: [
@@ -14,17 +35,88 @@ const sample: DocumentosEmitidosExtendidoResponse = {
 };
 
 describe('Documentos emitidos — Extendido', () => {
-  it('conserva la estructura de 56 campos y un solo total por comprobante', () => {
+  it('genera un XLSX válido con encabezados y autofiltro cuando no hay resultados', async () => {
+    const hojas = construirHojasDocumentosEmitidosExtendido({ cabeceras: [], lineas: [] });
+    expect(hojas).toHaveLength(2);
+    expect(hojas[0].columns).toHaveLength(74);
+    expect(hojas[0].rows).toHaveLength(0);
+    const entries = leerEntradasXlsx(await crearExcelVariasHojasBytes(hojas));
+    const workbookSheets = [...entries['xl/workbook.xml'].matchAll(/<sheet name="([^"]+)"/g)].map((match) => match[1]);
+    expect(workbookSheets).toEqual(['Datos', 'Líneas de productos']);
+    expect(entries['xl/worksheets/sheet1.xml']).toContain('HORA DE EMISIÓN DEL COMPROBANTE');
+    expect(entries['xl/worksheets/sheet1.xml']).toContain('<autoFilter');
+  });
+
+  it('integra SPOT de la misma factura en Datos y Consolidado_Datos sin duplicar venta ni sumatorias', async () => {
+    const spot = {
+      sujeto_detraccion: true, detraccion_codigo: '037',
+      detraccion_descripcion: 'Demás servicios gravados con el IGV', detraccion_porcentaje: 12,
+      detraccion_base: 1260, detraccion_monto: 151, detraccion_neto: 1109,
+      detraccion_estado_deposito: 'DEPOSITADO', detraccion_constancia_nro: 'CONST-TEST-01',
+      detraccion_constancia_fecha: '2026-11-15'
+    };
+    const extendido: DocumentosEmitidosExtendidoResponse = {
+      cabeceras: [{
+        id_documento: 'SPOT-1', fecha_emision: '2026-11-15T15:00:00Z',
+        tipo_comprobante: 'FACTURA', serie: 'F001', numero: 99, importe_total: 1260,
+        estado: 'ACEPTADO', aceptada_sunat: true, empresa_emisora: 'FAREGAS',
+        ruc_emisor: '20123456789', ...spot
+      } as any],
+      lineas: [{ id_detalle: 1, operacion_id: 1, documentos_ids: 'SPOT-1', documentos_asociados: 'F001-99',
+        tipo_producto: 'SERVICIO', codigo_producto: 'SERV-037', producto: 'Servicio sujeto SPOT',
+        cantidad: 1, precio_unitario: 1260, base_imponible: 1260, importe_total: 1260,
+        sujeto_spot: true, codigo_spot: '037' } as any]
+    };
+    const consolidado = {
+      metadatos: { desde: '2026-11-01', hasta: '2026-11-30', fechaGeneracion: '2026-11-16', usuarioExportador: 'test', plantas: ['98'], razonSocialEmisor: '', rucEmisor: '' },
+      sedes: [{ planta_key: '98', planta_nombre: 'SURCO' }],
+      operaciones: [{ id: 1, planta_key: '98', planta_nombre: 'SURCO', estado: 'FACTURADO', fecha_creacion: '2026-11-15T15:00:00Z', importe_total: 1260, nombre_cliente_snapshot: 'CLIENTE', tipo_documento_cliente_snapshot: 'RUC', documento_cliente_snapshot: '20111111111' }],
+      lineas: [{ id: 1, operacion_id: 1, tipo_item: 'SERVICIO', producto: 'Servicio sujeto SPOT', cantidad: 1, precio_unitario: 1260, importe_total: 1260, certificado_estado: 'EMITIDO' }],
+      ventasDirectas: [], comprobantes: [{ id: 1, operacion_id: 1, tipo_comprobante: 'FACTURA', serie: 'F001', numero: 99, nro_comprobante: 'F001-99', fecha_documento: '2026-11-15', estado: 'ACEPTADO', aceptada_sunat: true, importe_total: 1260, ...spot }],
+      ordenes: [{ id: 1, operacion_id: 1, importe_total: 1109 }],
+      pagos: [{ id: 1, orden_pago_id: 1, estado: 'CAN', tipocontado_key: 'EFECTIVO', importe: 1109 }],
+      descuentos: [], ajustes: []
+    } as unknown as ReporteFinancieroResponse;
+
+    const hojas = construirHojasUnificadas(extendido, consolidado, '2026-11-01', '2026-11-30');
+    const datos = hojas.find((hoja) => hoja.name === 'Datos')!;
+    const resumen = hojas.find((hoja) => hoja.name === 'Consolidado_Datos')!;
+    expect(datos.rows).toHaveLength(1);
+    expect(resumen.rows.filter((row) => row.sede !== 'TOTAL VENTAS VIGENTES' && row.sede !== 'TOTAL PAGADO')).toHaveLength(1);
+    expect(datos.rows[0]).toMatchObject({
+      detraccionCodigo: '037', detraccionPorcentaje: 12, detraccionBase: 1260,
+      detraccionImporte: 151, detraccionNeto: 1109, detraccionEstadoDeposito: 'DEPOSITADO',
+      detraccionConstanciaNro: 'CONST-TEST-01', detraccionConstanciaFecha: '2026-11-15'
+    });
+    const filaConsolidada = resumen.rows.find((row) => row.sede !== 'TOTAL VENTAS VIGENTES' && row.sede !== 'TOTAL PAGADO')!;
+    expect(filaConsolidada).toMatchObject({
+      detraccionCodigo: '037', detraccionPorcentaje: 12, detraccionBase: 1260,
+      detraccionMonto: 151, detraccionNeto: 1109, detraccionEstadoDeposito: 'DEPOSITADO',
+      detraccionConstanciaNro: 'CONST-TEST-01', detraccionConstanciaFecha: '2026-11-15'
+    });
+    expect(resumen.rows.at(-2)).toMatchObject({ sede: 'TOTAL VENTAS VIGENTES', importeNeto: 1260, detraccionMonto: 151, detraccionNeto: 1109 });
+    const bytes = await crearExcelVariasHojasBytes(hojas);
+    expect(bytes.length).toBeGreaterThan(1000);
+    const entries = leerEntradasXlsx(bytes);
+    const datosXml = entries['xl/worksheets/sheet1.xml'];
+    const consolidadoXml = entries['xl/worksheets/sheet3.xml'];
+    expect(datosXml.toLocaleUpperCase('es')).toContain('CÓDIGO SPOT');
+    expect(datosXml).toContain('CONST-TEST-01');
+    expect(consolidadoXml.toLocaleUpperCase('es')).toContain('CÓDIGO SPOT');
+    expect(consolidadoXml).toContain('CONST-TEST-01');
+  });
+
+  it('conserva la estructura actual de 74 campos y un solo total por comprobante', () => {
     const [cabeceras, lineas] = construirHojasDocumentosEmitidosExtendido(sample, '2026-10-01', '2026-10-31');
     expect(cabeceras.name).toBe('Datos');
-    expect(cabeceras.columns).toHaveLength(67);
+    expect(cabeceras.columns).toHaveLength(74);
     expect(cabeceras.rows).toHaveLength(2);
     expect(cabeceras.rows[0]).toMatchObject({ numeroDocumento: 'F001-20', total: 118, descuentos: 5, montoPago: 118, items: 2, descripcion: '' });
     expect(cabeceras.columns.map((c) => c.key)).not.toContain('metodoPago');
     expect(cabeceras.columns.map((c) => c.header)).not.toContain('MÉTODO DE PAGO');
     expect(cabeceras.columns.map((c) => c.key)).toContain('horaEmisionComprobante');
     expect(cabeceras.columns.map((c) => c.header)).toContain('HORA DE EMISIÓN DEL COMPROBANTE');
-    expect(lineas.columns).toHaveLength(13);
+    expect(lineas.columns).toHaveLength(15);
     const lineKeys = lineas.columns.map((c) => c.key);
     expect(lineKeys).not.toContain('documentIds');
     expect(lineKeys).not.toContain('idDetalle');
@@ -69,7 +161,7 @@ describe('Documentos emitidos — Extendido', () => {
     } as unknown as ReporteFinancieroResponse;
     const unificadas = construirHojasUnificadas(sample, consolidado, '2026-10-01', '2026-10-31');
     expect(unificadas.some((h) => h.name.includes('Consolidado'))).toBe(true);
-    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(67);
+    expect(unificadas.find((h) => h.name === 'Datos')?.columns).toHaveLength(74);
     // Horas: certificado y comprobante con hora explícita → HH:mm:ss
     const conHora = {
       ...sample,
@@ -136,7 +228,7 @@ describe('Documentos emitidos — Extendido', () => {
 
     // 2. Líneas de productos tiene 13 columnas y no contiene IDs técnicos
     const hojaLineas = unificadas.find((h) => h.name === 'Líneas de productos')!;
-    expect(hojaLineas.columns).toHaveLength(13);
+    expect(hojaLineas.columns).toHaveLength(15);
     const lineCols = hojaLineas.columns.map((c) => c.key);
     expect(lineCols).not.toContain('documentIds');
     expect(lineCols).not.toContain('idDetalle');
@@ -175,6 +267,17 @@ describe('Documentos emitidos — Extendido', () => {
     expect(bytes[1]).toBe(0x4B);
     expect(bytes[2]).toBe(0x03);
     expect(bytes[3]).toBe(0x04);
+    const entries = leerEntradasXlsx(bytes);
+    expect(entries['[Content_Types].xml']).toContain('application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml');
+    const workbookXml = entries['xl/workbook.xml'];
+    const actualSheetNames = [...workbookXml.matchAll(/<sheet name="([^"]+)"/g)].map((match) => match[1]);
+    expect(actualSheetNames).toEqual(nombresHojas);
+    for (let sheet = 1; sheet <= nombresHojas.length; sheet += 1) {
+      expect(entries[`xl/worksheets/sheet${sheet}.xml`]).toContain('<autoFilter');
+    }
+    expect(entries['xl/worksheets/sheet1.xml'].toLocaleUpperCase('es')).toContain('HORA DE EMISIÓN DEL COMPROBANTE');
+    expect(entries['xl/worksheets/sheet1.xml'].toLocaleUpperCase('es')).toContain('DETRACCIÓN (%)');
+    expect(entries['xl/worksheets/sheet3.xml'].toLocaleUpperCase('es')).toContain('DETRACCIÓN (%)');
   });
 
   it('clasifica facturas a crédito con N cuotas en hoja Datos (Fase 3)', () => {

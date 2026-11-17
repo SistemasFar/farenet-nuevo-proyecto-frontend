@@ -158,6 +158,7 @@ export interface ValidacionChipVentaDirecta {
   plantaKey: string | null;
   plantaNombre: string | null;
   productoInventariableId: number | null;
+  productoFacturacionId: number | null;
   productoCodigo: string | null;
   productoNombre: string | null;
   precio: number | null;
@@ -165,6 +166,9 @@ export interface ValidacionChipVentaDirecta {
   stockPermitido: boolean;
   ventaHabilitada: boolean;
   productoFiscalValido: boolean;
+  spotSujeto?: boolean | null;
+  spotCodigo?: string | null;
+  spotPorcentaje?: number | null;
   validoParaVenta: boolean;
   codigo: string | null;
   motivo: string | null;

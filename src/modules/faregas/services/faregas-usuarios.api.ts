@@ -24,7 +24,14 @@ export const faregasUsuariosApi = {
   eliminarUsuario: (username: string) => fetchWithToken(`/usuarios/${username}`, {
     method: 'DELETE'
   }),
+  desactivarUsuario: (username: string) => fetchWithToken(`/usuarios/${username}/desactivar`, {
+    method: 'POST'
+  }),
+  activarUsuario: (username: string) => fetchWithToken(`/usuarios/${username}/activar`, {
+    method: 'POST'
+  }),
   obtenerPerfiles: () => fetchWithToken('/usuarios/perfiles'),
+  obtenerUsuariosPorPerfil: (clave: string) => fetchWithToken(`/usuarios/perfiles/${clave}/usuarios`),
   crearPerfil: (data: CrearPerfilFaregasRequest) => fetchWithToken('/usuarios/perfiles', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -33,8 +40,9 @@ export const faregasUsuariosApi = {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
-  eliminarPerfil: (clave: string) => fetchWithToken(`/usuarios/perfiles/${clave}`, {
-    method: 'DELETE'
+  eliminarPerfil: (clave: string, nuevoPerfilClave?: string) => fetchWithToken(`/usuarios/perfiles/${clave}`, {
+    method: 'DELETE',
+    ...(nuevoPerfilClave ? { body: JSON.stringify({ nuevoPerfilClave }) } : {})
   }),
   obtenerPlantas: () => fetchWithToken('/usuarios/plantas'),
   obtenerPermisos: () => fetchWithToken('/usuarios/permisos'),
