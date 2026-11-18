@@ -67,7 +67,7 @@ describe('wizard real de pagos — SPOT', () => {
     expect(html).toContain('Detracción SPOT (12%)');
     expect(html).toContain('Código SPOT 037');
     expect(html).toContain('S/ 151.00');
-    expect(html).toContain('Neto a pagar ordinario:');
+    expect(html).toContain('Importe neto a pagar al proveedor:');
     expect(html).toContain('S/ 1109.00');
     expect(html).toContain('PENDIENTE — constancia no registrada');
   });
@@ -158,5 +158,16 @@ describe('wizard real de pagos — SPOT', () => {
       detraccionBase: 1260, detraccionMonto: 151, detraccionNeto: 1109,
       detraccionEstadoDeposito: 'PENDIENTE',
     });
+  });
+});
+
+describe('naturaleza fiscal explícita del producto comercial', () => {
+  it('evalúa Producto como Servicio037 cuando esa naturaleza fue configurada', () => {
+    const r=evaluarSpotWizard({tipoComprobante:'FACTURA',total:1260,tipoItem:'PRODUCTO',servicio:{naturalezaSpot:'SERVICIO',sujetoDetraccion:true,codigoSpot:'037',porcentajeSpot:12}});
+    expect(r.aplica).toBe(true);expect(r.montoDetraccion).toBe(151);expect(r.netoCobrar).toBe(1109);
+  });
+  it('permite certificado con chip bajo el umbral sin reclamar clasificación SPOT', () => {
+    const r=evaluarSpotWizard({tipoComprobante:'FACTURA',total:160,tipoItem:'MIXTO'});
+    expect(r.aplica).toBe(false);expect(r.requiereRevision).toBe(false);expect(r.netoCobrar).toBe(160);
   });
 });

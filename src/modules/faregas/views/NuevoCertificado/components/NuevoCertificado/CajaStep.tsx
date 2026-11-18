@@ -83,6 +83,7 @@ export function CajaStep({
           if (!servicioSeleccionado) return actual;
           return {
             ...actual,
+            spotNaturaleza: servicioSeleccionado.spot?.naturaleza,
             spotSujetoDetraccion: servicioSeleccionado.spot?.sujetoDetraccion,
             spotCodigo: servicioSeleccionado.spot?.codigo,
             spotPorcentaje: servicioSeleccionado.spot?.porcentaje,
@@ -119,6 +120,7 @@ export function CajaStep({
       return {
         ...actual,
         servicioCodigo: servicio.codigo,
+        spotNaturaleza: servicio.spot?.naturaleza,
         spotSujetoDetraccion: servicio.spot?.sujetoDetraccion,
         spotCodigo: servicio.spot?.codigo,
         spotPorcentaje: servicio.spot?.porcentaje,

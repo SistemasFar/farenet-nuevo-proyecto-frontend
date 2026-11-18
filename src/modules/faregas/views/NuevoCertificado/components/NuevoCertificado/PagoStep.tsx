@@ -26,8 +26,8 @@ interface PagoStepProps {
   resumenComercial?: ResumenComercialFaregas | null;
   maestrosPago?: MaestrosPagoResponse['data'] | null;
   tipoComprobante: string;
-  spotServicio?: { sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
-  spotProducto?: { productoFacturacionId?: number | null; sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
+  spotServicio?: { naturalezaSpot?: 'BIEN' | 'SERVICIO' | null; sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
+  spotProducto?: { productoFacturacionId?: number | null; naturalezaSpot?: 'BIEN' | 'SERVICIO' | null; sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
   tipoItemSpot?: 'PRODUCTO' | 'SERVICIO' | 'MIXTO';
   condicionPago: 'CONTADO' | 'CREDITO';
   onCondicionPagoChange: (condicion: 'CONTADO' | 'CREDITO') => void;
@@ -491,7 +491,7 @@ export function PagoStep({
                     <span className="font-bold">- S/ {evaluacionSpot.montoDetraccion.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-amber-200/60 pt-1">
-                    <span className="text-slate-700 font-bold text-xs">Neto a pagar ordinario:</span>
+                    <span className="text-slate-700 font-bold text-xs">Importe neto a pagar al proveedor:</span>
                     <span className="font-black text-slate-900 text-base">S/ {evaluacionSpot.netoCobrar.toFixed(2)}</span>
                   </div>
                 </div>
@@ -524,7 +524,7 @@ export function PagoStep({
                   ? 'Esta factura combina productos y servicios. El tratamiento SPOT de cada base no se puede inferir del total; revise los conceptos antes de emitir.'
                   : tipoItemSpot === 'PRODUCTO'
                   ? `Producto fiscal #${spotProducto?.productoFacturacionId ?? 'sin vínculo'}: clasificación SPOT pendiente o incompleta. Revise este registro en Configuración → Productos antes de emitir.`
-                  : 'No se puede verificar la clasificación SPOT de esta operación. Revise la clasificación fiscal del servicio en Configuración → Servicios antes de emitir.'}
+                  : 'No se puede verificar la clasificación SPOT de esta operación. Revise naturaleza fiscal, estado, código y tasa en Configuración → Productos fiscales (o la clasificación vigente del servicio) antes de emitir.'}
               </div>
             )}
             {tipoComprobante === 'FACTURA' && !evaluacionSpot.aplica && !evaluacionSpot.requiereRevision && (

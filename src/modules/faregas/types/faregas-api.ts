@@ -555,7 +555,8 @@ export interface ServicioCatalogoFaregas {
   requiere_vehiculo: boolean;
   tipo_certificado_clave: string;
   modalidad: ModalidadServicioFaregas;
-  spot?: { sujetoDetraccion: boolean | null; codigo: string | null; porcentaje: number | null };
+  spot?: {
+    naturaleza?: 'BIEN' | 'SERVICIO' | null; sujetoDetraccion: boolean | null; codigo: string | null; porcentaje: number | null };
   tarifa: TarifaCatalogoFaregas;
 }
 

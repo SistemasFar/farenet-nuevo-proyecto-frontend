@@ -28,13 +28,14 @@ const productoVacio = (): Partial<ProductoFacturacion> => ({
   precio_referencia: null, valor_referencial_unitario: null,
   codigo_clasificacion_sunat: null, tipo_afectacion_igv: '10',
   codigo_afectacion_isc: null, porcentaje_isc: null,
-  sujeto_detraccion: null, detraccion_codigo: null, detraccion_porcentaje: null,
+  naturaleza_spot: null, sujeto_detraccion: null, detraccion_codigo: null, detraccion_porcentaje: null,
   disponible_pos: false, es_para_venta: true,
   es_para_compra: false, tiene_icbper: false, activo: true,
   imagen_url: null,
   requiere_chip: false, producto_chip_id: null, precio_chip: null
 });
 
+const TASAS_SPOT_SERVICIOS: Record<string, number> = { '020': 12, '022': 12, '025': 10, '037': 12 };
 const TASAS_SPOT_PRODUCTOS: Record<string, number> = {
   '002': 4, '004': 10, '005': 10, '006': 15, '007': 10, '009': 4,
   '011': 10, '012': 4, '015': 4, '017': 10,
@@ -282,11 +283,11 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
       alert('La unidad tributaria para venta debe ser NIU o ZZ.');
       return;
     }
-    if (actual.sujeto_detraccion === true && (!actual.detraccion_codigo || TASAS_SPOT_PRODUCTOS[actual.detraccion_codigo] == null)) {
+    if (actual.sujeto_detraccion === true && (!actual.detraccion_codigo || (actual.naturaleza_spot === 'SERVICIO' ? TASAS_SPOT_SERVICIOS : TASAS_SPOT_PRODUCTOS)[actual.detraccion_codigo] == null)) {
       alert('Selecciona una clasificación SPOT válida para el producto.');
       return;
     }
-    if (actual.sujeto_detraccion === true && Number(actual.detraccion_porcentaje) !== TASAS_SPOT_PRODUCTOS[actual.detraccion_codigo!]) {
+    if (actual.sujeto_detraccion === true && Number(actual.detraccion_porcentaje) !== (actual.naturaleza_spot === 'SERVICIO' ? TASAS_SPOT_SERVICIOS : TASAS_SPOT_PRODUCTOS)[actual.detraccion_codigo!]) {
       alert('La tasa no coincide con el código SPOT seleccionado. Vuelve a seleccionar el código.');
       return;
     }
@@ -451,7 +452,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div><label className="mb-1 block text-sm font-semibold">Código SKU</label><input required disabled={mode === 'EDIT'} value={actual.codigo_sku || ''} onChange={(e) => setActual({ ...actual, codigo_sku: e.target.value })} className="w-full rounded-lg border p-2 disabled:bg-slate-100" /></div>
             <div className="md:col-span-2"><label className="mb-1 block text-sm font-semibold">Descripción / Nombre</label><input required value={actual.descripcion || ''} onChange={(e) => setActual({ ...actual, descripcion: e.target.value })} className="w-full rounded-lg border p-2" /></div>
-            <div><label className="mb-1 block text-sm font-semibold">Tipo</label><input value={actual.tipo_producto || 'Producto'} readOnly className="w-full rounded-lg border bg-slate-100 p-2" /></div>
+            <div><label className="mb-1 block text-sm font-semibold">Tipo comercial</label><input value={actual.tipo_producto || 'Producto'} readOnly className="w-full rounded-lg border bg-slate-100 p-2" /></div>
             <div><label className="mb-1 block text-sm font-semibold">Tipo de certificado</label><select required value={actual.categoria_id || ''} onChange={(e) => setActual({ ...actual, categoria_id: e.target.value ? Number(e.target.value) : null })} className="w-full rounded-lg border bg-white p-2"><option value="">Seleccionar tipo...</option>{categorias.map((item) => <option key={item.id} value={item.id}>{item.nombre} ({item.codigo})</option>)}</select></div>
             <div><label className="mb-1 block text-sm font-semibold">Código de barras</label><input value={actual.codigo_barras || ''} onChange={(e) => setActual({ ...actual, codigo_barras: e.target.value || null })} className="w-full rounded-lg border p-2" /></div>
           </div>
@@ -474,6 +475,11 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
           <h4 className="mb-1 text-sm font-bold uppercase tracking-wide text-[#052A79]">Clasificación de detracción SPOT</h4>
           <p className="mb-3 text-xs text-slate-500">Clasifica el producto solo según evaluación tributaria. La tasa se determina por el código y no se asigna automáticamente.</p>
           <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm font-semibold">Naturaleza fiscal SPOT
+              <select aria-label="Naturaleza fiscal SPOT" value={actual.naturaleza_spot || ''} required={actual.sujeto_detraccion === true} onChange={e => setActual({ ...actual, naturaleza_spot: (e.target.value || null) as 'BIEN' | 'SERVICIO' | null, detraccion_codigo: null, detraccion_porcentaje: null })} className="mt-1 w-full rounded-lg border bg-white p-2">
+                <option value="">Seleccionar naturaleza fiscal</option><option value="BIEN">Bien</option><option value="SERVICIO">Servicio</option>
+              </select><span className="block mt-1 text-xs font-normal text-slate-500">Independiente del tipo comercial Producto. Seleccione según evaluación tributaria.</span>
+            </label>
             <label className="text-sm font-semibold">Estado fiscal
               <select value={actual.sujeto_detraccion == null ? 'PENDIENTE' : actual.sujeto_detraccion ? 'SUJETO' : 'NO_SUJETO'} onChange={(e) => setActual({ ...actual, sujeto_detraccion: e.target.value === 'PENDIENTE' ? null : e.target.value === 'SUJETO', detraccion_codigo: e.target.value === 'SUJETO' ? actual.detraccion_codigo || null : null, detraccion_porcentaje: e.target.value === 'SUJETO' ? actual.detraccion_porcentaje ?? null : null })} className="mt-1 w-full rounded-lg border bg-white p-2">
                 <option value="PENDIENTE">Pendiente de clasificación tributaria</option>
@@ -483,9 +489,9 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
             </label>
             {actual.sujeto_detraccion === true && <>
               <label className="text-sm font-semibold">Código SPOT
-              <select value={actual.detraccion_codigo || ''} onChange={(e) => setActual({ ...actual, detraccion_codigo: e.target.value || null, detraccion_porcentaje: e.target.value ? TASAS_SPOT_PRODUCTOS[e.target.value] : null })} className="mt-1 w-full rounded-lg border bg-white p-2">
+              <select value={actual.detraccion_codigo || ''} onChange={(e) => setActual({ ...actual, detraccion_codigo: e.target.value || null, detraccion_porcentaje: e.target.value ? (actual.naturaleza_spot === 'SERVICIO' ? TASAS_SPOT_SERVICIOS : TASAS_SPOT_PRODUCTOS)[e.target.value] : null })} className="mt-1 w-full rounded-lg border bg-white p-2">
                   <option value="">Selecciona una clasificación verificada</option>
-                  <option value="002">002 · Maíz amarillo duro · 4%</option>
+                  {actual.naturaleza_spot === 'SERVICIO' ? <><option value="020">020 · Mantenimiento y reparación de bienes muebles · 12%</option><option value="022">022 · Otros servicios empresariales · 12%</option><option value="025">025 · Fabricación de bienes por encargo · 10%</option><option value="037">037 — Demás servicios gravados con IGV (12 %)</option></> : <><option value="002">002 · Maíz amarillo duro · 4%</option>
                   <option value="004">004 · Caña de azúcar · 10%</option>
                   <option value="005">005 · Arena y piedra · 10%</option>
                   <option value="006">006 · Residuos y subproductos · 15%</option>
@@ -496,7 +502,7 @@ export default function TabProductos({ canViewRelations = false, canViewTarifas 
                   <option value="015">015 · Madera · 4%</option>
                   <option value="017">017 · Páprika y frutos capsicum o pimienta · 10%</option>
                   <option value="021">021 · Oro y minerales metálicos exonerados · 1.5%</option>
-                  <option value="023">023 · Plomo · 15%</option>
+                  <option value="023">023 · Plomo · 15%</option></>}
                 </select>
               </label>
               <div className="text-sm font-semibold">Porcentaje aplicable<input readOnly value={actual.detraccion_porcentaje == null ? '' : `${actual.detraccion_porcentaje}%`} className="mt-1 w-full rounded-lg border bg-slate-100 p-2" placeholder="Se determina al elegir el código" /></div>

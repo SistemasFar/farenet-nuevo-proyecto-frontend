@@ -838,6 +838,9 @@ export function UsuariosView() {
               <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
                 + Crear Usuario
               </button>
+              <p className="basis-full text-right text-xs text-slate-500" role="note">
+                EXPORTAR EXCEL es el listado normal y deja vacías las contraseñas existentes. Para entregar claves válidas, seleccione las cuentas y use GENERAR NUEVAS CREDENCIALES; requiere confirmación y reemplaza sus contraseñas actuales.
+              </p>
             </div>
           ) : (
             <button onClick={() => {

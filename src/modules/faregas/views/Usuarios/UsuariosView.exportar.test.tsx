@@ -115,7 +115,9 @@ describe('exportación desde Administración de Usuarios', () => {
     host.innerHTML = '';
     root = createRoot(host);
     await act(async () => { root.render(<UsuariosView />); });
-    expect(host.textContent).not.toContain('GENERAR NUEVAS CREDENCIALES');
+    expect([...host.querySelectorAll('button')].some((item) => (
+      item.textContent?.includes('GENERAR NUEVAS CREDENCIALES')
+    ))).toBe(false);
   });
 
   it('prepara una contraseña temporal segura al abrir un alta, sin guardar credenciales aún', async () => {

@@ -58,6 +58,7 @@ export interface FormCajaState {
   requiere_certificado: boolean;
   servicioCodigo: string;
   tarifaCodigo: string;
+  spotNaturaleza?: 'BIEN' | 'SERVICIO' | null;
   spotSujetoDetraccion?: boolean | null;
   spotCodigo?: string | null;
   spotPorcentaje?: number | null;
@@ -585,11 +586,11 @@ function NuevoCertificadoWizard() {
       fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
       cuotas: formFacturacion.cuotasFac,
       esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
-      spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+      spotServicio: { naturalezaSpot: formCaja.spotNaturaleza, sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
       tipoItemSpot: tipoItemSpotPago,
       umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
     }).map((cuota) => ({ ...cuota, importe: String(cuota.importe) })),
-    [formFacturacion.condicionPagoFac, formFacturacion.tipoDocFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal, descuentoAplicado, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje, tipoItemSpotPago, maestrosPago?.politicaSpot?.umbralComercial]
+    [formFacturacion.condicionPagoFac, formFacturacion.tipoDocFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal, descuentoAplicado, formCaja.spotNaturaleza, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje, tipoItemSpotPago, maestrosPago?.politicaSpot?.umbralComercial]
   );
 
   const titularPrincipal = React.useMemo(
@@ -1827,7 +1828,7 @@ function NuevoCertificadoWizard() {
       fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
       cuotas,
       esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
-      spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+      spotServicio: { naturalezaSpot: formCaja.spotNaturaleza, sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
       tipoItemSpot: tipoItemSpotPago,
       umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
     });
@@ -2365,7 +2366,7 @@ function NuevoCertificadoWizard() {
           fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
           cuotas: cuotasCreditoResueltas,
           esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
-          spotServicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+          spotServicio: { naturalezaSpot: formCaja.spotNaturaleza, sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
           tipoItemSpot: tipoItemSpotPago,
           umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
         }))) return;
@@ -2529,10 +2530,10 @@ function NuevoCertificadoWizard() {
     tipoComprobante: formFacturacion.tipoDocFac,
     total: precioTotal,
     esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
-    servicio: { sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+    servicio: { naturalezaSpot: formCaja.spotNaturaleza, sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
     tipoItem: tipoItemSpotPago,
     umbralComercial: maestrosPago?.politicaSpot?.umbralComercial,
-  }), [formFacturacion.tipoDocFac, precioTotal, descuentoAplicado, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje, tipoItemSpotPago, maestrosPago?.politicaSpot?.umbralComercial]);
+  }), [formFacturacion.tipoDocFac, precioTotal, descuentoAplicado, formCaja.spotNaturaleza, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje, tipoItemSpotPago, maestrosPago?.politicaSpot?.umbralComercial]);
 
   const totalExigibleCaja = descuentoAplicado?.autorizaGratuidad ? 0 : evaluacionSpotActual.netoCobrar;
   const montoPendiente = Math.max(0, totalExigibleCaja - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
@@ -3147,7 +3148,7 @@ function NuevoCertificadoWizard() {
               resumenComercial={resumenComercial}
               maestrosPago={maestrosPago}
               tipoComprobante={formFacturacion.tipoDocFac}
-              spotServicio={{ sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje }}
+              spotServicio={{ naturalezaSpot: formCaja.spotNaturaleza, sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje }}
               tipoItemSpot={tipoItemSpotPago}
               condicionPago={formFacturacion.condicionPagoFac}
               fechaInicioCredito={formFacturacion.fechaInicioCreditoFac}

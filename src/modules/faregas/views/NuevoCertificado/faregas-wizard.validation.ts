@@ -597,7 +597,7 @@ type DatosPago = {
   cuotas?: Array<{ numeroCuota: number; fechaPago: string; importe: string | number }>;
   esCortesia?: boolean;
   autorizaGratuidad?: boolean;
-  spotServicio?: { sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
+  spotServicio?: { naturalezaSpot?: 'BIEN' | 'SERVICIO' | null; sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
   tipoItemSpot?: 'PRODUCTO' | 'SERVICIO' | 'MIXTO';
   umbralComercialSpot?: number;
 };
@@ -633,10 +633,11 @@ export const evaluarSpotWizard = ({
   tipoComprobante?: string;
   total: number;
   esCortesia?: boolean;
-  servicio?: { sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null; descripcionSpot?: string | null } | null;
+  servicio?: { naturalezaSpot?: 'BIEN' | 'SERVICIO' | null; sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null; descripcionSpot?: string | null } | null;
   tipoItem?: 'PRODUCTO' | 'SERVICIO' | 'MIXTO';
   umbralComercial?: number;
 }): EvaluacionSpotWizard => {
+  if (tipoItem !== 'MIXTO' && servicio?.naturalezaSpot) tipoItem = servicio.naturalezaSpot === 'SERVICIO' ? 'SERVICIO' : 'PRODUCTO';
   const totalRedondeado = redondearMoneda(total);
   const esFactura = String(tipoComprobante || '').toUpperCase() === 'FACTURA';
   const umbralComercial = Number.isFinite(Number(umbralRecibido)) && Number(umbralRecibido) >= 0
@@ -666,6 +667,7 @@ export const evaluarSpotWizard = ({
     return resultado('BOLETA_VENTA_CONSUMIDOR_FINAL_NO_SUJETA', 'EXCLUIDA_COMPROBANTE');
   }
 
+  if (tipoItem === 'MIXTO' && totalRedondeado <= UMBRAL_LEGAL_SERVICIOS_SPOT) return resultado('IMPORTE_MENOR_O_IGUAL_A_700', 'CLASIFICADA_SIN_UMBRAL_LEGAL');
   if (tipoItem === 'MIXTO') {
     return resultado('CONCEPTOS_MIXTOS_REQUIEREN_REVISION', 'MIXTA_REQUIERE_REVISION', true);
   }

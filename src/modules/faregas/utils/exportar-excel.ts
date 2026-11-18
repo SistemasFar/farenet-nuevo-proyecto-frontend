@@ -96,7 +96,19 @@ const zip = (files: Array<{ name: string; content: string }>) => {
   return concat(...localParts, centralDirectory, end);
 };
 
-const xmlEscape = (value: unknown) => String(value ?? '')
+const limpiarCaracteresXml = (value: unknown) => Array.from(String(value ?? ''))
+  .filter((character) => {
+    const codePoint = character.codePointAt(0) || 0;
+    return codePoint === 0x09
+      || codePoint === 0x0a
+      || codePoint === 0x0d
+      || (codePoint >= 0x20 && codePoint <= 0xd7ff)
+      || (codePoint >= 0xe000 && codePoint <= 0xfffd)
+      || (codePoint >= 0x10000 && codePoint <= 0x10ffff);
+  })
+  .join('');
+
+const xmlEscape = (value: unknown) => limpiarCaracteresXml(value)
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
   .replaceAll('>', '&gt;')
@@ -177,7 +189,7 @@ function generarWorksheetXml(sheet: ExcelSheetDefinition) {
       return cellXml(row[column.key], `${columnName(columnIndex)}${rowIndex + dataStart}`, styleIndex);
     }).join('');
     return `<row r="${rowIndex + dataStart}">${cells}</row>`;
-  }).join('');
+  });
   const merges = [
     ...(sheet.groupHeaders?.filter((group) => group.end > group.start).map((group) => `<mergeCell ref="${columnName(group.start - 1)}${groupRow}:${columnName(group.end - 1)}${groupRow}"/>`) || []),
     ...(sheet.note ? [`<mergeCell ref="A6:${lastColumn}6"/>`] : []),
@@ -185,13 +197,26 @@ function generarWorksheetXml(sheet: ExcelSheetDefinition) {
   ];
   const occupiedRows = new Set([...preamble.map((_, index) => index + 1), groupRow, sheet.note ? 6 : 0, headerRowIndex, ...(sheet.numberColumnsRow ? [headerRowIndex + 1] : [])].filter(Boolean));
   const blankRows = Array.from({ length: headerRowIndex - 1 }, (_, index) => index + 1)
-    .filter((row) => !occupiedRows.has(row)).map((row) => `<row r="${row}"/>`).join('');
+    .filter((row) => !occupiedRows.has(row)).map((row) => `<row r="${row}"/>`);
+  const worksheetRows = [
+    ...preamble,
+    ...blankRows,
+    ...(sheet.note ? [`<row r="6">${cellXml(sheet.note, 'A6')}</row>`] : []),
+    ...(groupRow ? [`<row r="${groupRow}">${sheet.groupHeaders!.map((group) => cellXml(group.header, `${columnName(group.start - 1)}${groupRow}`, 1)).join('')}</row>`] : []),
+    `<row r="${headerRowIndex}">${headerRow}</row>`,
+    ...(sequenceRow ? [sequenceRow] : []),
+    ...dataRows,
+  ].sort((left, right) => {
+    const leftRow = Number(left.match(/^<row r="(\d+)"/)?.[1] || 0);
+    const rightRow = Number(right.match(/^<row r="(\d+)"/)?.[1] || 0);
+    return leftRow - rightRow;
+  }).join('');
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <dimension ref="A1:${lastColumn}${lastRow}"/>
   <sheetViews><sheetView workbookViewId="0"><pane ySplit="${headerRowIndex}" topLeftCell="A${dataStart}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
   <cols>${columnDefinitions}</cols>
-  <sheetData>${preamble.join('')}${blankRows}${sheet.note ? `<row r="6">${cellXml(sheet.note, 'A6')}</row>` : ''}${groupRow ? `<row r="${groupRow}">${sheet.groupHeaders!.map((group) => cellXml(group.header, `${columnName(group.start - 1)}${groupRow}`, 1)).join('')}</row>` : ''}<row r="${headerRowIndex}">${headerRow}</row>${sequenceRow}${dataRows}</sheetData>
+  <sheetData>${worksheetRows}</sheetData>
   <autoFilter ref="A${headerRowIndex}:${lastColumn}${filterLastRow}"/>${merges.length ? `<mergeCells count="${merges.length}">${merges.join('')}</mergeCells>` : ''}
 </worksheet>`;
 }
