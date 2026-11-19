@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { crearExcelVariasHojasBytes } from '../../utils/exportar-excel';
 import {
-  construirHojaCredencialesTemporales,
   construirHojaUsuariosFaregas,
-  type CredencialTemporalParaExportar,
   type PerfilParaExportar,
   type UsuarioParaExportar,
 } from './usuarios-exportacion';
-import { generarContrasenaTemporal, LONGITUD_CONTRASENA_TEMPORAL } from './contrasena-temporal';
 
 function unzipStored(bytes: Uint8Array) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -37,39 +34,32 @@ const usuario: UsuarioParaExportar = {
   perfil_id: 'CONTADOR',
   estado: true,
   sedes: [{ key: 'surco', nombre: 'SURCO' }],
+  fechaUltimoRestablecimiento: '19/11/2026, 11:14:04',
+  estadoCredencial: 'Vigente (Administrada)',
+  cambiadaPosteriormente: false,
+  necesitaRestablecimiento: false,
+  observacionesCredencial: 'Credencial administrada vigente asignada en la última renovación.',
 };
 
 describe('exportación de usuarios FAREGAS', () => {
-  it('conserva la fila 9 y las diez columnas del formato y deja vacía la clave histórica', () => {
+  it('conserva la fila 9 y retira por completo la columna de contraseñas', () => {
     const sheet = construirHojaUsuariosFaregas([usuario], perfiles, { estado: 'ACTIVOS', busqueda: 'wilber' });
     const files = unzipStored(crearExcelVariasHojasBytes([sheet]));
     const xml = files.get('xl/worksheets/sheet1.xml') || '';
     for (const header of [
-      'N.º', 'Nombre completo', 'Username', 'Correo electrónico', 'Perfil FAREGAS',
-      'Sede', 'Contraseña temporal', 'Estado', 'Resultado', 'Observaciones',
+      'N.º', 'Nombre completo', 'Username', 'Documento', 'Correo electrónico', 'Perfil FAREGAS',
+      'Sede', 'Estado', 'Fecha último restablecimiento', 'Responsable último cambio', 'Estado credencial administrada',
+      'Contraseña cambiada posteriormente', 'Necesidad de nuevo restablecimiento', 'Resultado', 'Observaciones',
     ]) expect(xml).toContain(header);
     expect(xml).toContain('<row r="9">');
-    expect(xml).toContain('<c r="G10" t="inlineStr"><is><t xml:space="preserve"></t></is></c>');
     expect(xml).toContain('WILBER DONAYRE');
     expect(xml).toContain('wdonayre@example.pe');
     expect(xml).toContain('SURCO');
+    expect(xml).toContain('Vigente (Administrada)');
+    // No existe columna exclusiva para entregar contraseñas en claro ni hashes
+    expect(xml).not.toContain('<is><t xml:space="preserve">Contraseña</t></is>');
+    expect(xml).not.toContain('password');
     expect(xml).not.toContain('contrasenha');
-  });
-
-  it('incluye una clave solo en la hoja transitoria de altas o restablecimientos recientes', () => {
-    const password = generarContrasenaTemporal();
-    const credential: CredencialTemporalParaExportar = {
-      ...usuario,
-      password,
-      resultado: 'Creado',
-    };
-    const sheet = construirHojaCredencialesTemporales([credential], perfiles);
-    const files = unzipStored(crearExcelVariasHojasBytes([sheet]));
-    const xml = files.get('xl/worksheets/sheet1.xml') || '';
-    expect(xml).toContain(password);
-    expect(xml).toContain('Creado');
-    expect(xml).toContain('Confidencial');
-    expect(construirHojaUsuariosFaregas([usuario], perfiles).rows[0].password).toBe('');
   });
 
   it('genera un XLSX válido con encabezados cuando los filtros no devuelven usuarios', () => {
@@ -79,21 +69,7 @@ describe('exportación de usuarios FAREGAS', () => {
     const xml = files.get('xl/worksheets/sheet1.xml') || '';
     expect(xml).toContain('<row r="9">');
     expect(xml).toContain('Nombre completo');
-    expect(xml).toContain('Contraseña temporal');
-    expect(xml).toContain('<autoFilter ref="A9:J9"/>');
-  });
-
-  it('genera claves temporales aleatorias de 24 caracteres que cumplen la política de inicio de sesión', () => {
-    const password = generarContrasenaTemporal(globalThis.crypto, 'mquijano');
-    expect(password).toHaveLength(LONGITUD_CONTRASENA_TEMPORAL);
-    expect(password.length).toBeGreaterThanOrEqual(24);
-    expect(password).toMatch(/[A-Z]/);
-    expect(password).toMatch(/[a-z]/);
-    expect(password).toMatch(/[0-9]/);
-    expect(password).toMatch(/[!@#$%_\-]/);
-    expect(password.toLowerCase()).not.toContain('mquijano');
-    expect(generarContrasenaTemporal()).not.toBe(password);
-    expect(() => generarContrasenaTemporal(undefined)).not.toThrow();
-    expect(() => generarContrasenaTemporal({ getRandomValues: undefined } as unknown as Crypto)).toThrow(/generador criptográfico seguro/);
+    expect(xml).not.toContain('<is><t xml:space="preserve">Contraseña</t></is>');
+    expect(xml).toContain('<autoFilter ref="A9:O9"/>');
   });
 });

@@ -4,6 +4,11 @@ export type FaregasHttpError = Error & {
   status?: number;
   codigo?: string;
   detalles?: unknown;
+  errores?: Record<string, string>;
+  response?: {
+    status: number;
+    data?: any;
+  };
 };
 
 export interface FaregasRequestInit extends RequestInit {
@@ -13,7 +18,7 @@ export interface FaregasRequestInit extends RequestInit {
 const request = async (
   endpoint: string,
   options: FaregasRequestInit = {},
-  exposeResponseStatus = false,
+  _exposeResponseStatus = false,
 ) => {
   const { handleUnauthorized = true, ...fetchOptions } = options;
   const token = sessionStorage.getItem('faregasAccessToken');
@@ -36,11 +41,15 @@ const request = async (
     let message = `Error HTTP ${response.status} al completar la petición FAREGAS.`;
     let codigo: string | undefined;
     let detalles: unknown;
+    let errores: Record<string, string> | undefined;
+    let rawData: any = undefined;
     try {
       const errorData = await response.json();
+      rawData = errorData;
       message = errorData.message || message;
       codigo = errorData.codigo;
       detalles = errorData.detalles;
+      errores = errorData.errores;
     } catch {
       // Conservar el mensaje generico cuando la respuesta no sea JSON.
     }
@@ -48,7 +57,12 @@ const request = async (
     const error = new Error(message) as FaregasHttpError;
     error.codigo = codigo;
     error.detalles = detalles;
-    if (exposeResponseStatus) error.status = response.status;
+    error.errores = errores;
+    error.status = response.status;
+    error.response = {
+      status: response.status,
+      data: rawData,
+    };
     throw error;
   }
 

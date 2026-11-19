@@ -1,4 +1,4 @@
-import { faregasFetch as fetchWithToken, faregasFetchWithStatus } from './faregas-http-client';
+import { faregasFetch as fetchWithToken, faregasFetchBlob } from './faregas-http-client';
 import type {
   ActualizarPerfilFaregasRequest,
   ActualizarUsuarioFaregasRequest,
@@ -9,6 +9,17 @@ import type {
 
 export const faregasUsuariosApi = {
   obtenerUsuarios: () => fetchWithToken('/usuarios'),
+  obtenerPoliticaPassword: () => fetchWithToken('/usuarios/politica-password'),
+  consultarCredencialAsignada: (username: string) => fetchWithToken(`/usuarios/${username}/credencial-asignada`),
+  revelarCredencialCustodiada: (username: string, passwordAdmin: string) =>
+    fetchWithToken(`/usuarios/${username}/revelar-credencial`, {
+      method: 'POST',
+      body: JSON.stringify({ passwordAdmin })
+    }),
+  generarCredencialTemporal: (username: string) => fetchWithToken(`/usuarios/${username}/generar-credencial-temporal`, {
+    method: 'POST'
+  }),
+  descargarInventarioRenovadoBlob: () => faregasFetchBlob('/usuarios/inventario-credenciales/descargar'),
   crearUsuario: (data: CrearUsuarioFaregasRequest) => fetchWithToken('/usuarios', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -17,13 +28,9 @@ export const faregasUsuariosApi = {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
-  cambiarPassword: (username: string, password: string) => fetchWithToken(`/usuarios/${username}/password`, {
+  cambiarPassword: (username: string, password: string, confirmPassword: string) => fetchWithToken(`/usuarios/${username}/password`, {
     method: 'PATCH',
-    body: JSON.stringify({ password })
-  }),
-  restablecerCredencialesTemporales: (credenciales: Array<{ username: string; password: string }>) => faregasFetchWithStatus('/usuarios/credenciales/restablecer', {
-    method: 'POST',
-    body: JSON.stringify({ credenciales })
+    body: JSON.stringify({ password, confirmPassword })
   }),
   eliminarUsuario: (username: string) => fetchWithToken(`/usuarios/${username}`, {
     method: 'DELETE'

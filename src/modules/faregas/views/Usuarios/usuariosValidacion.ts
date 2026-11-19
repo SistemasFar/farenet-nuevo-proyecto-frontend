@@ -34,10 +34,9 @@
  *
  * CONTRASEÑA
  * ----------
- * No hay política de contraseña en el sistema: el login sólo compara bcrypt. No
- * se inventa una segunda. Al crear se exige contraseña y confirmación
- * coincidente; al editar, vacía significa "no cambiar", que es lo que ya hacía
- * el formulario.
+ * Refleja la política que ya aplica `faregas-auth.service.js`: mínimo 12
+ * caracteres, combinación básica y rechazo de claves triviales o que contengan
+ * el username. El backend vuelve a validarla; esta capa solo ofrece feedback.
  */
 
 /** Anchos reales de las columnas. */
@@ -216,6 +215,7 @@ export interface DatosUsuarioForm {
   nombreRazonSocial?: string;
   password?: string;
   confirmPassword?: string;
+  requierePassword?: boolean;
   paisKey?: string;
   departamentoKey?: string;
   provinciaKey?: string;
@@ -225,6 +225,109 @@ export interface DatosUsuarioForm {
   email?: string;
   personaContacto?: string;
   [campo: string]: unknown;
+}
+
+export interface PoliticaPasswordOpciones {
+  minLongitud?: number;
+  exigirComplejidad?: boolean;
+  esProduccion?: boolean;
+  esAdmin?: boolean;
+}
+
+export function obtenerMinPasswordLengthDefecto(): number {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FAREGAS_MIN_PASSWORD_LENGTH) {
+    const val = parseInt(import.meta.env.VITE_FAREGAS_MIN_PASSWORD_LENGTH, 10);
+    if (!isNaN(val) && val >= 1) return val;
+  }
+  return 4;
+}
+
+export function evaluarPasswordSegura(
+  password: string,
+  username = '',
+  opciones: PoliticaPasswordOpciones = {}
+): {
+  valido: boolean;
+  error: string | null;
+  esDebil: boolean;
+  advertencia: string | null;
+  minLongitud: number;
+} {
+  const minLongitud = opciones.minLongitud ?? (opciones.esProduccion || opciones.esAdmin ? 12 : obtenerMinPasswordLengthDefecto());
+  const exigirComplejidad = opciones.exigirComplejidad ?? Boolean(opciones.esProduccion || opciones.esAdmin);
+  const pwd = String(password || '');
+  const cleanUsername = String(username || '').trim().toLowerCase();
+
+  if (pwd.length < minLongitud) {
+    return {
+      valido: false,
+      error: `La contraseña debe tener al menos ${minLongitud} caracteres.`,
+      esDebil: true,
+      advertencia: null,
+      minLongitud,
+    };
+  }
+
+  const triviales = new Set([
+    '123456789012', '1234567890123', 'password1234', 'contrasena123',
+    'faregas2026*', 'faregas2026**', 'qwertyuiop12', 'admin1234567',
+  ]);
+  if (triviales.has(pwd.toLowerCase())) {
+    return {
+      valido: false,
+      error: 'La contraseña es demasiado predecible o trivial.',
+      esDebil: true,
+      advertencia: null,
+      minLongitud,
+    };
+  }
+
+  if (cleanUsername && pwd.toLowerCase().includes(cleanUsername)) {
+    return {
+      valido: false,
+      error: 'La contraseña no puede contener el nombre de usuario.',
+      esDebil: true,
+      advertencia: null,
+      minLongitud,
+    };
+  }
+
+  const tieneMayuscula = /[A-Z]/.test(pwd);
+  const tieneMinuscula = /[a-z]/.test(pwd);
+  const tieneNumeroOSimbolo = /[\d!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pwd);
+  const tieneComplejidadCompleta = tieneMayuscula && tieneMinuscula && tieneNumeroOSimbolo;
+  const esDebil = pwd.length < 8 || !tieneComplejidadCompleta;
+
+  if (exigirComplejidad && !tieneComplejidadCompleta) {
+    return {
+      valido: false,
+      error: 'La contraseña debe contener al menos una mayúscula, una minúscula y un número o símbolo.',
+      esDebil: true,
+      advertencia: null,
+      minLongitud,
+    };
+  }
+
+  const advertencia = esDebil
+    ? `Advertencia: Contraseña débil (${pwd.length} caracteres). Se recomienda usar al menos 8 o 12 caracteres con mayúsculas, minúsculas, números y símbolos.`
+    : null;
+
+  return {
+    valido: true,
+    error: null,
+    esDebil,
+    advertencia,
+    minLongitud,
+  };
+}
+
+export function validarPasswordSegura(
+  password: string,
+  username = '',
+  opciones: PoliticaPasswordOpciones = {}
+): string | null {
+  const res = evaluarPasswordSegura(password, username, opciones);
+  return res.error;
 }
 
 /**
@@ -239,14 +342,14 @@ export function validarFormularioUsuario(
   const errores: ErroresUsuario = {};
   const esCrear = modo !== 'editar';
 
-  const errorUsername = validarUsername(form.username);
+  const errorUsername = validarUsername(form.username || '');
   if (errorUsername) errores.username = errorUsername;
 
   const tipoDocumentoKey = texto(form.tipoDocumentoKey);
   if (!tipoDocumentoKey) errores.tipoDocumentoKey = 'Seleccione el tipo de documento.';
 
   const regla = REGLAS_DOCUMENTO[tipoDocumentoKey.toLowerCase()];
-  const documento = regla?.soloDigitos ? normalizarSoloDigitos(form.nroDocumento) : texto(form.nroDocumento);
+  const documento = regla?.soloDigitos ? normalizarSoloDigitos(form.nroDocumento || '') : texto(form.nroDocumento);
   const errorDocumento = validarDocumento(tipoDocumentoKey, documento);
   if (errorDocumento) errores.nroDocumento = errorDocumento;
 
@@ -271,12 +374,12 @@ export function validarFormularioUsuario(
     errores.direccion = `La dirección no puede superar los ${DIRECCION_MAXIMA} caracteres.`;
   }
 
-  const errorTelefono = validarTelefono(form.telefono);
+  const errorTelefono = validarTelefono(form.telefono || '');
   if (errorTelefono) errores.telefono = errorTelefono;
 
   // El email sigue siendo opcional: vacío es válido, con contenido debe tener
   // formato de correo.
-  const errorEmail = validarEmail(form.email);
+  const errorEmail = validarEmail(form.email || '');
   if (errorEmail) errores.email = errorEmail;
 
   if (!texto(form.paisKey)) errores.paisKey = 'Seleccione el país.';
@@ -286,7 +389,17 @@ export function validarFormularioUsuario(
 
   const password = String(form.password ?? '');
   const confirmPassword = String(form.confirmPassword ?? '');
-  if (esCrear && !password) errores.password = 'La contraseña es obligatoria.';
+  const requierePassword = esCrear || form.requierePassword === true;
+  if (requierePassword && !password) errores.password = 'La contraseña es obligatoria.';
+  if (password) {
+    const errorPassword = validarPasswordSegura(password, texto(form.username), {
+      minLongitud: typeof form.minPasswordLength === 'number' ? form.minPasswordLength : undefined,
+      esProduccion: form.esProduccion === true,
+      esAdmin: form.perfil_id === 'ADMINISTRADOR',
+      exigirComplejidad: form.esProduccion === true || form.perfil_id === 'ADMINISTRADOR',
+    });
+    if (errorPassword) errores.password = errorPassword;
+  }
   if (password && password !== confirmPassword) {
     errores.confirmPassword = 'Las contraseñas no coinciden.';
   }

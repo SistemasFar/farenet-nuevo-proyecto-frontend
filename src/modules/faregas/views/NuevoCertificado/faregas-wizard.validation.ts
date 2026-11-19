@@ -838,7 +838,9 @@ export const validarPasoPago = ({
     tipoItem: tipoItemSpot,
     umbralComercial: umbralComercialSpot,
   });
-  const exigibleCaja = esCortesia || autorizaGratuidad ? 0 : evaluacionSpot.netoCobrar;
+  const exigibleCaja = esCortesia || autorizaGratuidad
+    ? 0
+    : (esCredito && evaluacionSpot.aplica ? evaluacionSpot.netoCobrar : precioTotal);
   const saldo = redondearMoneda(Math.max(0, exigibleCaja - totalPagado));
   const errores: ErroresCampo = {};
 
@@ -891,8 +893,7 @@ export const validarPasoPago = ({
   }
 
   if (!esCredito && Math.abs(totalPagado - exigibleCaja) > 0.009) {
-    const sufijoSpot = evaluacionSpot.aplica ? ` (Neto sujeto a SPOT ${evaluacionSpot.porcentaje}%)` : '';
-    errores.pagos = `El pago debe completar S/ ${exigibleCaja.toFixed(2)}${sufijoSpot}. Saldo pendiente: S/ ${saldo.toFixed(2)}.`;
+    errores.pagos = `El pago debe completar S/ ${exigibleCaja.toFixed(2)}. Saldo pendiente: S/ ${saldo.toFixed(2)}.`;
   }
   if (esCredito && totalPagado >= exigibleCaja - 0.009) {
     errores.pagos = 'Una venta a crédito debe conservar un saldo pendiente. Cambie la condición a CONTADO o reduzca el pago inicial.';

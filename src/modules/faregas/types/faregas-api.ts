@@ -494,6 +494,7 @@ export interface UsuarioFaregas extends Omit<UsuarioFaregasBaseRequest, 'estado'
 
 export interface CrearUsuarioFaregasRequest extends UsuarioFaregasBaseRequest {
   password: string;
+  confirmPassword: string;
 }
 
 export type ActualizarUsuarioFaregasRequest = UsuarioFaregasBaseRequest;

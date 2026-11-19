@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Download, Edit, KeyRound, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, Download, Edit, Eye, EyeOff, FileSpreadsheet, Key, Lock, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 import type { MaestroUsuario } from '../../types/faregas-api';
 import {
@@ -11,16 +11,14 @@ import {
   perfilTieneAccesoGlobalSedes,
 } from './acceso-global-sedes';
 import {
-  descargarExcelCredencialesTemporales,
   descargarExcelUsuariosFaregas,
-  type CredencialTemporalParaExportar,
 } from './usuarios-exportacion';
-import { generarContrasenaTemporal } from './contrasena-temporal';
 
 import {
   atributosDocumento,
   EMAIL_MAXIMO,
   esRuc,
+  evaluarPasswordSegura,
   normalizarSoloDigitos,
   normalizarTelefono,
   primerCampoConError,
@@ -87,15 +85,33 @@ export function UsuariosView() {
       <p className="mt-1 text-[11px] font-semibold text-red-600">{erroresCampo[campo]}</p>
     ) : null;
   const [saving, setSaving] = useState(false);
-  const [passwordTemporalGenerada, setPasswordTemporalGenerada] = useState(false);
-  // Secretos solo en memoria de esta pantalla; nunca se escriben en storage.
-  const [credencialesTemporales, setCredencialesTemporales] = useState<CredencialTemporalParaExportar[]>([]);
-  const [usuariosSeleccionados, setUsuariosSeleccionados] = useState<Set<string>>(() => new Set());
-  const [restablecimientoPendiente, setRestablecimientoPendiente] = useState<{
-    credenciales: Array<{ username: string; password: string }>;
-    usuarios: any[];
+  const [crearNuevaPassword, setCrearNuevaPassword] = useState(false);
+  const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [mostrarConfirmPassword, setMostrarConfirmPassword] = useState(false);
+  const [politicaPassword, setPoliticaPassword] = useState<{ minLongitud: number; esProduccion?: boolean; exigirComplejidad?: boolean } | null>(null);
+  const [advertenciaPassword, setAdvertenciaPassword] = useState<string | null>(null);
+  const [credencialNueva, setCredencialNueva] = useState<{
+    username: string;
+    password: string;
+    accion: 'creada' | 'actualizada';
   } | null>(null);
-  const [restableciendoCredenciales, setRestableciendoCredenciales] = useState(false);
+  const [credencialCopiada, setCredencialCopiada] = useState(false);
+
+  const [descargandoInventario, setDescargandoInventario] = useState(false);
+  const [modalCredencialConsultada, setModalCredencialConsultada] = useState<{
+    cargando: boolean;
+    datos?: any;
+    error?: string;
+  } | null>(null);
+  const [mostrarPasswordConsultada, setMostrarPasswordConsultada] = useState(false);
+  const [credencialConsultadaCopiada, setCredencialConsultadaCopiada] = useState(false);
+  const [generandoTemporal, setGenerandoTemporal] = useState(false);
+  const [solicitandoReautenticacion, setSolicitandoReautenticacion] = useState(false);
+  const [passwordAdminReautenticacion, setPasswordAdminReautenticacion] = useState('');
+  const [mostrarPasswordAdminReautenticacion, setMostrarPasswordAdminReautenticacion] = useState(false);
+  const [reautenticando, setReautenticando] = useState(false);
+  const [errorReautenticacion, setErrorReautenticacion] = useState<string | null>(null);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(null);
 
   // Filtro de estado del listado de usuarios. Por defecto sólo los activos: los
   // inactivos se conservan (su auditoría es real) pero no se ven en el día a día.
@@ -163,6 +179,173 @@ export function UsuariosView() {
   const puedeGestionarCredenciales = Array.isArray(usuarioSesion.permisos)
     && usuarioSesion.permisos.includes('MENU_USUARIOS');
 
+  const descargarInventarioCredenciales = async () => {
+    try {
+      setDescargandoInventario(true);
+      const blob = await faregasUsuariosApi.descargarInventarioRenovadoBlob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'faregas_credenciales_renovadas.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(e.message || 'No se pudo descargar el inventario de credenciales.');
+    } finally {
+      setDescargandoInventario(false);
+    }
+  };
+
+  const consultarCredencialUsuario = async (username: string) => {
+    setModalCredencialConsultada({ cargando: true });
+    setMostrarPasswordConsultada(false);
+    setCredencialConsultadaCopiada(false);
+    setSolicitandoReautenticacion(false);
+    setPasswordAdminReautenticacion('');
+    setErrorReautenticacion(null);
+    try {
+      const resp = await faregasUsuariosApi.consultarCredencialAsignada(username);
+      setModalCredencialConsultada({ cargando: false, datos: resp });
+    } catch (e: any) {
+      setModalCredencialConsultada({ cargando: false, error: e.message || 'Error al consultar la credencial.' });
+    }
+  };
+
+  const handleRevelarCredencial = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!passwordAdminReautenticacion) {
+      setErrorReautenticacion('Ingrese su contraseña de administrador para continuar.');
+      return;
+    }
+    const targetUsername = modalCredencialConsultada?.datos?.username;
+    if (!targetUsername) return;
+
+    setReautenticando(true);
+    setErrorReautenticacion(null);
+    try {
+      const resp = await faregasUsuariosApi.revelarCredencialCustodiada(targetUsername, passwordAdminReautenticacion);
+      setModalCredencialConsultada((prev) => prev ? ({
+        ...prev,
+        datos: {
+          ...prev.datos,
+          password: resp.password,
+          disponible: true,
+          fechaAsignacion: resp.fechaActualizacion
+            ? new Date(resp.fechaActualizacion).toLocaleString('es-PE', { timeZone: 'America/Lima' })
+            : prev.datos?.fechaAsignacion
+        }
+      }) : null);
+      setPasswordAdminReautenticacion('');
+      setSolicitandoReautenticacion(false);
+      setMostrarPasswordConsultada(true);
+    } catch (err: any) {
+      setErrorReautenticacion(err.message || 'Contraseña de administrador incorrecta o límite de consultas excedido.');
+    } finally {
+      setReautenticando(false);
+    }
+  };
+
+  const handleGenerarCredencialTemporal = async (username: string) => {
+    if (!window.confirm(`Se generará una nueva contraseña temporal para ${username}. La contraseña anterior dejará de funcionar y se revocarán sus sesiones activas. ¿Desea continuar?`)) {
+      return;
+    }
+    setGenerandoTemporal(true);
+    setError('');
+    try {
+      const resp = await faregasUsuariosApi.generarCredencialTemporal(username);
+      setModalCredencialConsultada({
+        cargando: false,
+        datos: {
+          username: resp.username,
+          password: resp.password,
+          nombreCompleto: resp.nombreCompleto || modalCredencialConsultada?.datos?.nombreCompleto,
+          perfil: resp.perfil || modalCredencialConsultada?.datos?.perfil,
+          sede: resp.sede || modalCredencialConsultada?.datos?.sede,
+          vigente: true,
+          disponible: true,
+          puedeRestablecer: true,
+          fechaAsignacion: new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' }),
+          mensaje: 'Nueva contraseña temporal generada correctamente para entrega.'
+        }
+      });
+      setMostrarPasswordConsultada(true);
+      await cargarDatos();
+    } catch (e: any) {
+      alert(e.message || 'Error al generar la contraseña temporal.');
+    } finally {
+      setGenerandoTemporal(false);
+    }
+  };
+
+  const copiarCredencialNueva = async () => {
+    if (!credencialNueva?.password) return;
+    try {
+      await navigator.clipboard.writeText(credencialNueva.password);
+      setCredencialCopiada(true);
+      setTimeout(() => setCredencialCopiada(false), 2000);
+    } catch {
+      // Ignorar fallo de portapapeles
+    }
+  };
+
+  const descargarComprobanteEntrega = (datos: {
+    username: string;
+    password?: string;
+    nombreCompleto?: string;
+    perfil?: string;
+    sede?: string;
+    accion?: string;
+  }) => {
+    const ahora = new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' });
+    const separador = '='.repeat(64);
+    const linea = '-'.repeat(64);
+    const contenido = `${separador}
+FAREGAS — COMPROBANTE DE ENTREGA DE CREDENCIAL INDIVIDUAL
+${separador}
+
+ATENCIÓN: DOCUMENTO CONFIDENCIAL DE USO EXCLUSIVO PARA EL TITULAR
+
+DATOS DEL USUARIO:
+${linea}
+Usuario / Login       : ${datos.username}
+Nombre completo       : ${datos.nombreCompleto || '-'}
+Perfil asignado       : ${datos.perfil || '-'}
+Sede(s) autorizada(s) : ${datos.sede || 'Según perfil'}
+
+CREDENCIAL ASIGNADA:
+${linea}
+Contraseña            : ${datos.password || '(No disponible)'}
+
+DETALLES DE LA EMISIÓN:
+${linea}
+Operación             : ${datos.accion ? datos.accion.toUpperCase() : 'ASIGNACIÓN DE CREDENCIAL'}
+Fecha y hora (PE)     : ${ahora}
+Responsable emisión   : ${currentUsername || 'ADMINISTRADOR'}
+
+NORMAS DE SEGURIDAD:
+${linea}
+1. Esta credencial es personal e intransferible. No la comparta con terceros.
+2. Ingrese a FAREGAS con su usuario y esta contraseña temporal.
+3. Se recomienda modificar su contraseña en el primer inicio de sesión.
+4. Por razones de seguridad, elimine o resguarde este archivo tras su uso.
+
+${separador}
+SISTEMA DE GESTIÓN FAREGAS — CONTROL ADMINISTRATIVO DE ACCESOS
+${separador}
+`;
+    const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `COMPROBANTE_CREDENCIAL_${datos.username}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   const cargarDatos = async () => {
     setLoading(true);
     setError('');
@@ -180,6 +363,7 @@ export function UsuariosView() {
       setPermisos(resPermisos);
       setTiposDocumento(resMaestros.tiposDocumentos);
       setPaises(resMaestros.paises);
+      faregasUsuariosApi.obtenerPoliticaPassword?.().then((pol: any) => setPoliticaPassword(pol)).catch(() => null);
     } catch (e: any) {
       setError(e.message || 'Error al cargar datos');
     } finally {
@@ -191,11 +375,14 @@ export function UsuariosView() {
     cargarDatos();
   }, []);
 
-  const handleOpenUsuario = async (usuario?: any) => {
+  const handleOpenUsuario = async (usuario?: any, iniciarConNuevaPassword = false) => {
     setError('');
+    setAdvertenciaPassword(null);
     if (usuario) {
-      setPasswordTemporalGenerada(false);
       setModalMode('editar');
+      setCrearNuevaPassword(iniciarConNuevaPassword);
+      setMostrarPassword(false);
+      setMostrarConfirmPassword(false);
       setSelectedUsername(usuario.username);
       
       // Cargar jerarquía geográfica si la tiene
@@ -236,21 +423,17 @@ export function UsuariosView() {
         personaContacto: usuario.personaContacto || ''
       });
     } else {
-      let passwordTemporal = '';
-      try {
-        passwordTemporal = generarContrasenaTemporal();
-        setPasswordTemporalGenerada(true);
-      } catch {
-        setPasswordTemporalGenerada(false);
-      }
       setModalMode('crear');
+      setCrearNuevaPassword(false);
+      setMostrarPassword(false);
+      setMostrarConfirmPassword(false);
       setDepartamentos([]);
       setProvincias([]);
       setDistritos([]);
       setFormData({
         username: '',
-        password: passwordTemporal,
-        confirmPassword: passwordTemporal,
+        password: '',
+        confirmPassword: '',
         perfil_id: perfiles.length > 0 ? perfiles[0].clave : '',
         sedes: [],
         estado: true,
@@ -337,21 +520,28 @@ export function UsuariosView() {
 
     // Se valida el formulario COMPLETO antes de tocar la red. Si algo falla no
     // se hace request: no tiene sentido mandar datos que ya sabemos inválidos.
-    const errores = validarFormularioUsuario(formData, modalMode === 'crear' ? 'crear' : 'editar');
+    const errores = validarFormularioUsuario({
+      ...formData,
+      minPasswordLength: politicaPassword?.minLongitud,
+      esProduccion: politicaPassword?.esProduccion,
+    }, modalMode === 'crear' ? 'crear' : 'editar');
     setErroresCampo(errores);
     if (tieneErrores(errores)) {
       // Se lleva al operador al primer campo inválido de arriba hacia abajo.
       const primero = primerCampoConError(errores);
+      const mensaje = (primero && errores[primero]) || 'Por favor complete todos los campos obligatorios antes de guardar.';
+      setError(mensaje);
       const elemento = primero ? refsCampos.current[primero] : null;
       if (elemento) {
-        elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        elemento.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
         (elemento as HTMLElement & { focus?: () => void }).focus?.();
       }
       return;
     }
-    if (modalMode === 'crear' && !passwordTemporalGenerada) {
-      const mensaje = 'Genere una contraseña temporal aleatoria con el botón de seguridad antes de crear la cuenta.';
+    if (modalMode === 'crear' && !formData.password) {
+      const mensaje = 'La contraseña es obligatoria.';
       setErroresCampo((actuales) => ({ ...actuales, password: mensaje }));
+      setError(mensaje);
       refsCampos.current.password?.focus();
       return;
     }
@@ -363,204 +553,37 @@ export function UsuariosView() {
     try {
       const payloadUsuario = { ...formData };
       const passwordEntregable = formData.password;
-      const entregarCredencial = modalMode === 'crear'
-        ? passwordTemporalGenerada
-        : Boolean(formData.password);
+      const entregarCredencial = Boolean(formData.password);
       if (modalMode === 'crear') {
         // El backend aplica el valor canónico USER cuando no se envía user_type.
         delete payloadUsuario.user_type;
         await faregasUsuariosApi.crearUsuario(payloadUsuario);
       } else {
         // En edición se conserva el tipo original internamente; solo se oculta el selector.
+        // La actualización de datos, sedes y contraseña se procesa atómicamente en el backend.
         await faregasUsuariosApi.actualizarUsuario(selectedUsername, payloadUsuario);
-        // Contraseña vacía significa "no cambiar": es el comportamiento previo.
-        if (formData.password) {
-          await faregasUsuariosApi.cambiarPassword(formData.username, formData.password);
-        }
       }
       if (entregarCredencial && passwordEntregable) {
-        const credencial: CredencialTemporalParaExportar = {
+        setCredencialNueva({
           username: payloadUsuario.username,
-          tipoDocumentoKey: payloadUsuario.tipoDocumentoKey,
-          nombres: payloadUsuario.nombres,
-          apellidos: payloadUsuario.apellidos,
-          nombreRazonSocial: payloadUsuario.nombreRazonSocial,
-          email: payloadUsuario.email,
-          perfil_id: payloadUsuario.perfil_id,
-          sedes: (payloadUsuario.sedes || []).map((key: string) => ({
-            key,
-            nombre: plantas.find((planta) => planta.key === key)?.nombre || key,
-          })),
-          estado: payloadUsuario.estado === true || payloadUsuario.estado === 'true',
           password: passwordEntregable,
-          resultado: modalMode === 'crear' ? 'Creado' : 'Restablecida',
-          observaciones: modalMode === 'crear'
-            ? 'Contraseña temporal generada para esta alta.'
-            : 'Contraseña restablecida explícitamente por un administrador.',
-        };
-        setCredencialesTemporales((actuales) => [
-          ...actuales.filter((item) => item.username !== credencial.username),
-          credencial,
-        ]);
+          accion: modalMode === 'crear' ? 'creada' : 'actualizada'
+        });
       }
       setShowModal(false);
       setFormData((actual: Record<string, unknown>) => ({ ...actual, password: '', confirmPassword: '' }));
-      setPasswordTemporalGenerada(false);
-      cargarDatos();
+      await cargarDatos();
+      setMensajeExito(`Usuario ${payloadUsuario.username} guardado correctamente.`);
+      setTimeout(() => setMensajeExito(null), 5000);
     } catch (e: any) {
       // El backend devuelve 400 con el detalle campo a campo; se marca igual que
       // la validación local para que el mensaje no se pierda.
-      const delBackend = e.response?.data?.errores;
+      const delBackend = e.errores || e.response?.data?.errores;
       if (delBackend && typeof delBackend === 'object') setErroresCampo(delBackend);
       setError(e.response?.data?.message || e.message || 'Error al guardar');
     } finally {
       setSaving(false);
     }
-  };
-
-  const generarPasswordTemporalParaFormulario = () => {
-    try {
-      const password = generarContrasenaTemporal();
-      setFormData((actual: Record<string, unknown>) => ({
-        ...actual,
-        password,
-        confirmPassword: password,
-      }));
-      setPasswordTemporalGenerada(true);
-      setErroresCampo((actual) => {
-        const siguiente = { ...actual };
-        delete siguiente.password;
-        delete siguiente.confirmPassword;
-        return siguiente;
-      });
-      setError('');
-    } catch (e: any) {
-      setPasswordTemporalGenerada(false);
-      setError(e.message || 'No se pudo generar una contraseña segura.');
-    }
-  };
-
-  const descargarCredencialesPendientes = () => {
-    if (!credencialesTemporales.length) return;
-    const confirmar = window.confirm(
-      'Este Excel contiene contraseñas temporales y solo podrá descargarse una vez desde esta sesión. Guárdelo en una ubicación protegida y elimínelo después de entregar las credenciales. ¿Descargar ahora?'
-    );
-    if (!confirmar) return;
-    descargarExcelCredencialesTemporales(credencialesTemporales, perfiles);
-    setCredencialesTemporales([]);
-  };
-
-  const enviarRestablecimientoDeCredenciales = async (lote: {
-    credenciales: Array<{ username: string; password: string }>;
-    usuarios: any[];
-  }) => {
-    setRestableciendoCredenciales(true);
-    setError('');
-    try {
-      const respuesta = await faregasUsuariosApi.restablecerCredencialesTemporales(lote.credenciales);
-      const resultados = Array.isArray(respuesta?.resultados) ? respuesta.resultados : [];
-      const usernamesConfirmados = new Set(resultados.map((item: any) => item.username));
-      const usernamesEnviados = new Set(lote.credenciales.map((item) => item.username));
-      if (respuesta?.success !== true
-        || usernamesConfirmados.size !== usernamesEnviados.size
-        || [...usernamesEnviados].some((username) => !usernamesConfirmados.has(username))) {
-        throw Object.assign(new Error('El servidor no confirmó todas las cuentas del lote.'), { status: 500 });
-      }
-
-      const contrasenas = new Map(lote.credenciales.map((item) => [item.username, item.password]));
-      const filas = lote.usuarios.map((usuario: any) => ({
-        username: usuario.username,
-        tipoDocumentoKey: usuario.tipoDocumentoKey,
-        nombres: usuario.nombres,
-        apellidos: usuario.apellidos,
-        nombreRazonSocial: usuario.nombreRazonSocial,
-        email: usuario.email,
-        perfil_id: usuario.perfil_id,
-        sedes: (usuario.sedes || []).map((sede: any) => ({ key: sede.key, nombre: sede.nombre })),
-        estado: true,
-        password: contrasenas.get(usuario.username) || '',
-        resultado: 'Restablecida' as const,
-        observaciones: 'Contraseña temporal nueva. Se revocaron las sesiones anteriores; solicite cambio al primer inicio de sesión.',
-      }));
-      if (filas.some((fila) => !fila.password)) {
-        throw Object.assign(new Error('No se pudo relacionar la respuesta con todas las credenciales. Mantenga el lote en esta pantalla y reintente.'), { status: 500 });
-      }
-
-      setCredencialesTemporales((actuales) => [
-        ...actuales.filter((actual) => !usernamesEnviados.has(actual.username)),
-        ...filas,
-      ]);
-      setUsuariosSeleccionados(new Set());
-      setRestablecimientoPendiente(null);
-      setError('Contraseñas actualizadas y sesiones anteriores revocadas. Descargue ahora el Excel confidencial.');
-    } catch (e: any) {
-      const status = Number(e?.status || e?.statusCode || e?.response?.status);
-      if (status >= 400 && status < 500) {
-        setRestablecimientoPendiente(null);
-        setError(e.message || 'El servidor rechazó el lote; no se restablecieron sus contraseñas.');
-      } else {
-        // Se conserva el mismo lote solo en memoria para poder repetir exactamente
-        // los mismos valores si se perdió la respuesta después del COMMIT.
-        setRestablecimientoPendiente(lote);
-        setError('No se pudo confirmar la respuesta del servidor. El lote permanece solo en memoria; reintente el mismo envío antes de generar otras claves.');
-      }
-    } finally {
-      setRestableciendoCredenciales(false);
-    }
-  };
-
-  const prepararRestablecimientoCredenciales = async () => {
-    if (!puedeGestionarCredenciales || restablecimientoPendiente || restableciendoCredenciales) return;
-    const usernames = usuariosSeleccionados;
-    const seleccionados = usuarios.filter((usuario: any) => (
-      usernames.has(usuario.username) && usuario.estado === true
-    ));
-    if (!seleccionados.length) {
-      setError('Seleccione una o más cuentas activas para restablecer.');
-      return;
-    }
-
-    const detalle = seleccionados.map((usuario: any) => usuario.username).join(', ');
-    if (!window.confirm(
-      `Se reemplazarán las contraseñas actuales de ${seleccionados.length} cuenta(s): ${detalle}. Las claves anteriores dejarán de funcionar y se revocarán sus sesiones activas. Las nuevas claves se mostrarán una sola vez en un Excel confidencial. ¿Confirmar el restablecimiento?`
-    )) return;
-
-    try {
-      const usadas = new Set<string>();
-      const credenciales = seleccionados.map((usuario: any) => {
-        let password = '';
-        for (let intento = 0; intento < 100; intento += 1) {
-          const candidata = generarContrasenaTemporal(globalThis.crypto, usuario.username);
-          if (!usadas.has(candidata)) {
-            password = candidata;
-            usadas.add(candidata);
-            break;
-          }
-        }
-        if (!password) throw new Error('No se pudo generar un conjunto de claves únicas. Intente nuevamente.');
-        return { username: usuario.username, password };
-      });
-      const lote = { credenciales, usuarios: seleccionados };
-      setRestablecimientoPendiente(lote);
-      await enviarRestablecimientoDeCredenciales(lote);
-    } catch (e: any) {
-      setError(e.message || 'No se pudieron generar credenciales seguras.');
-    }
-  };
-
-  const reintentarRestablecimientoCredenciales = async () => {
-    if (!restablecimientoPendiente || restableciendoCredenciales) return;
-    if (!window.confirm('Se reenviarán las mismas contraseñas temporales de este lote. Si el primer intento ya se aplicó, se mantendrán estas mismas claves. ¿Reintentar?')) return;
-    await enviarRestablecimientoDeCredenciales(restablecimientoPendiente);
-  };
-
-  const alternarSeleccionUsuario = (username: string, seleccionado: boolean) => {
-    setUsuariosSeleccionados((actuales) => {
-      const siguiente = new Set(actuales);
-      if (seleccionado) siguiente.add(username);
-      else siguiente.delete(username);
-      return siguiente;
-    });
   };
 
   const toggleSede = (key: string) => {
@@ -696,17 +719,36 @@ export function UsuariosView() {
   // que puede operar: los usuarios desactivados —porque se limpiaron sus datos
   // de prueba pero su auditoría se conserva— siguen existiendo y se pueden
   // consultar, pero no ensucian el listado diario.
-  const filteredUsuarios = usuarios.filter(u => {
-    if (estadoFiltro === 'ACTIVOS' && u.estado === false) return false;
-    if (estadoFiltro === 'INACTIVOS' && u.estado !== false) return false;
+  const query = (searchQuery || '').trim().toLowerCase();
+
+  const usuarioCoincideBusqueda = (u: any) => {
+    if (!query) return true;
     return (
-      (u.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (u.perfil_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (u.nombres || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (u.apellidos || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (u.nombreRazonSocial || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (u.nroDocumento || '').includes(searchQuery)
+      (u.username || '').toLowerCase().includes(query) ||
+      (u.perfil_id || '').toLowerCase().includes(query) ||
+      (u.nombres || '').toLowerCase().includes(query) ||
+      (u.apellidos || '').toLowerCase().includes(query) ||
+      (u.nombreRazonSocial || '').toLowerCase().includes(query) ||
+      (u.nroDocumento || '').toLowerCase().includes(query)
     );
+  };
+
+  const filteredUsuarios = usuarios.filter(u => {
+    const coincide = usuarioCoincideBusqueda(u);
+    if (!coincide) return false;
+
+    // Si no hay término de búsqueda activo, aplicar el filtro de estado estricto:
+    if (!query) {
+      if (estadoFiltro === 'ACTIVOS' && u.estado === false) return false;
+      if (estadoFiltro === 'INACTIVOS' && u.estado !== false) return false;
+      return true;
+    }
+
+    // Cuando hay un término de búsqueda explícito:
+    // - Si el filtro es 'INACTIVOS', sólo mostrar inactivos que coincidan.
+    // - Si el filtro es 'ACTIVOS' o 'TODOS', no ocultar coincidencias explícitas de usuarios inactivos.
+    if (estadoFiltro === 'INACTIVOS' && u.estado !== false) return false;
+    return true;
   });
 
   const filteredPerfiles = perfiles.filter(p =>
@@ -723,12 +765,7 @@ export function UsuariosView() {
   }, [totalPages, page]);
 
   const paginatedData = activeData.slice((page - 1) * limit, page * limit);
-  const usuariosActivosPagina = activeTab === 'usuarios'
-    ? paginatedData.filter((usuario: any) => usuario.estado === true)
-    : [];
-  const paginaSeleccionadaCompleta = usuariosActivosPagina.length > 0
-    && usuariosActivosPagina.every((usuario: any) => usuariosSeleccionados.has(usuario.username));
-  const cantidadSeleccionada = usuariosSeleccionados.size;
+  
   const mostrandoInicio = totalRegistros === 0 ? 0 : (page - 1) * limit + 1;
   const mostrandoFin = Math.min(page * limit, totalRegistros);
 
@@ -761,6 +798,13 @@ export function UsuariosView() {
       {error && !showModal && (
         <div className="bg-red-50 text-red-600 p-4 rounded-xl shadow-sm border border-red-200">
           {error}
+        </div>
+      )}
+
+      {mensajeExito && !showModal && (
+        <div role="status" className="bg-emerald-50 text-emerald-800 p-4 rounded-xl shadow-sm border border-emerald-200 flex items-center gap-2">
+          <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+          <span className="font-medium text-sm">{mensajeExito}</span>
         </div>
       )}
 
@@ -801,6 +845,24 @@ export function UsuariosView() {
         </div>
       </div>
 
+      {activeTab === 'usuarios' && query && estadoFiltro === 'ACTIVOS' && filteredUsuarios.some(u => u.estado === false) && (
+        <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+            <span>
+              La búsqueda incluye coincidencias con usuarios en estado <strong>Inactivo</strong>. Puede editarlos para reactivarlos o filtrar por <strong>Sólo inactivos</strong>.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setEstadoFiltro('INACTIVOS')}
+            className="ml-3 shrink-0 rounded bg-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-300 transition-colors"
+          >
+            Ver en Inactivos
+          </button>
+        </div>
+      )}
+
       {/* Table Section */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm flex flex-col">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
@@ -816,48 +878,26 @@ export function UsuariosView() {
                   busqueda: searchQuery,
                 })}
                 disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#052A79] bg-white px-4 py-2 text-sm font-semibold text-[#052A79] disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg border border-[#052A79] bg-white px-4 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-50/50 disabled:opacity-50"
               >
                 <Download size={16} /> EXPORTAR EXCEL
               </button>
-              {credencialesTemporales.length > 0 && (
+              {puedeGestionarCredenciales && (
                 <button
                   type="button"
-                  onClick={descargarCredencialesPendientes}
-                  className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900"
-                  title="Descarga de una sola vez; se borra al descargar o salir de esta pantalla"
+                  onClick={descargarInventarioCredenciales}
+                  disabled={descargandoInventario || loading}
+                  title="Descargar el inventario XLSX de credenciales renovadas"
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-600 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                 >
-                  <KeyRound size={16} /> Credenciales temporales ({credencialesTemporales.length})
+                  <FileSpreadsheet size={16} /> {descargandoInventario ? 'DESCARGANDO...' : 'INVENTARIO DE CREDENCIALES'}
                 </button>
-              )}
-              {puedeGestionarCredenciales && (
-                <>
-                  <button
-                    type="button"
-                    onClick={prepararRestablecimientoCredenciales}
-                    disabled={cantidadSeleccionada === 0 || loading || restableciendoCredenciales || Boolean(restablecimientoPendiente)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-amber-600 bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                    title="Reemplaza las contraseñas de las cuentas activas seleccionadas y revoca sus sesiones"
-                  >
-                    <KeyRound size={16} /> GENERAR NUEVAS CREDENCIALES ({cantidadSeleccionada})
-                  </button>
-                  {restablecimientoPendiente && (
-                    <button
-                      type="button"
-                      onClick={reintentarRestablecimientoCredenciales}
-                      disabled={restableciendoCredenciales}
-                      className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 disabled:opacity-50"
-                    >
-                      {restableciendoCredenciales ? 'Confirmando…' : 'Reintentar el mismo envío'}
-                    </button>
-                  )}
-                </>
               )}
               <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
                 + Crear Usuario
               </button>
               <p className="basis-full text-right text-xs text-slate-500" role="note">
-                EXPORTAR EXCEL es el listado normal y deja vacías las contraseñas existentes. Para entregar claves válidas, seleccione las cuentas y use GENERAR NUEVAS CREDENCIALES; requiere confirmación y reemplaza sus contraseñas actuales.
+                EXPORTAR EXCEL contiene únicamente datos administrativos; nunca incluye contraseñas ni hashes.
               </p>
             </div>
           ) : (
@@ -879,23 +919,7 @@ export function UsuariosView() {
               <thead className="bg-gray-50 text-xs capitalize text-gray-500">
                 {activeTab === 'usuarios' ? (
                   <tr>
-                    <th className="px-4 py-3">
-                      {puedeGestionarCredenciales && (
-                        <label className="mr-2 inline-flex items-center gap-1 text-[10px] normal-case">
-                          <input
-                            type="checkbox"
-                            aria-label="Seleccionar usuarios activos de esta página"
-                            checked={paginaSeleccionadaCompleta}
-                            disabled={usuariosActivosPagina.length === 0 || Boolean(restablecimientoPendiente) || restableciendoCredenciales}
-                            onChange={(event) => usuariosActivosPagina.forEach((usuario: any) => (
-                              alternarSeleccionUsuario(usuario.username, event.target.checked)
-                            ))}
-                          />
-                          Página
-                        </label>
-                      )}
-                      Usuario
-                    </th>
+                    <th className="px-4 py-3">Usuario</th>
                     <th className="px-4 py-3 min-w-[200px]">Nombre/Razón Social</th>
                     <th className="px-4 py-3">Documento</th>
                     <th className="px-4 py-3">Tipo</th>
@@ -921,19 +945,16 @@ export function UsuariosView() {
                   </tr>
                 ) : activeTab === 'usuarios' ? (
                   paginatedData.map((u: any) => (
-                    <tr key={u.username} className="hover:bg-gray-50">
+                    <tr key={u.username} className={`hover:bg-gray-50 ${!u.estado ? 'bg-amber-50/20' : ''}`}>
                       <td className="px-4 py-3 font-semibold text-gray-900">
-                        {puedeGestionarCredenciales && (
-                          <input
-                            type="checkbox"
-                            className="mr-2 align-middle"
-                            aria-label={`Seleccionar usuario ${u.username}`}
-                            checked={usuariosSeleccionados.has(u.username)}
-                            disabled={u.estado !== true || Boolean(restablecimientoPendiente) || restableciendoCredenciales}
-                            onChange={(event) => alternarSeleccionUsuario(u.username, event.target.checked)}
-                          />
-                        )}
-                        {u.username}
+                        <div className="flex items-center gap-1.5">
+                          <span>{u.username}</span>
+                          {!u.estado && (
+                            <span className="inline-flex items-center rounded border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                              Inactivo
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                           {esRuc(u.tipoDocumentoKey) ? u.nombreRazonSocial : `${u.nombres || ''} ${u.apellidos || ''}`.trim()}
@@ -979,6 +1000,16 @@ export function UsuariosView() {
                         )}
                       </td>
                       <td className="px-4 py-3 flex gap-2">
+                        {puedeGestionarCredenciales && (
+                          <button
+                            type="button"
+                            onClick={() => consultarCredencialUsuario(u.username)}
+                            title="Consultar / entregar credencial administrada"
+                            className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-base text-amber-700 hover:bg-amber-100 transition-colors"
+                          >
+                            <Key size={18} />
+                          </button>
+                        )}
                         <button onClick={() => handleOpenUsuario(u)} title="Editar" className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-base text-[#052A79] hover:bg-blue-100 transition-colors">
                           <Edit size={18} />
                         </button>
@@ -1087,6 +1118,356 @@ export function UsuariosView() {
           </div>
         </div>
       )}
+
+      {modalCredencialConsultada && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-credencial-consultada"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Key className="text-[#052A79]" size={20} />
+                <h2 id="titulo-credencial-consultada" className="text-lg font-bold text-[#052A79]">
+                  Gestión de Credencial Administrada
+                </h2>
+              </div>
+            </div>
+
+            {modalCredencialConsultada.cargando ? (
+              <div className="py-8 text-center text-sm text-slate-500">
+                Consultando inventario de credenciales y verificando vigencia con la base de datos...
+              </div>
+            ) : modalCredencialConsultada.error ? (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {modalCredencialConsultada.error}
+              </div>
+            ) : modalCredencialConsultada.datos ? (
+              <div className="mt-4 space-y-4">
+                {modalCredencialConsultada.datos.username === 'gibarra' ? (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    <p className="font-bold">Cuenta administrativa protegida</p>
+                    <p className="mt-1">
+                      El usuario <strong>gibarra</strong> fue expresamente excluido de la renovación masiva.
+                      Su contraseña, permisos y sesiones no fueron alterados.
+                    </p>
+                  </div>
+                ) : (modalCredencialConsultada.datos.custodiada || modalCredencialConsultada.datos.password) ? (
+                  <>
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-start gap-2">
+                      {modalCredencialConsultada.datos.password ? (
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <ShieldCheck size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="font-semibold">
+                          {modalCredencialConsultada.datos.password
+                            ? (modalCredencialConsultada.datos.custodiada ? 'Credencial vigente bajo custodia (revelada)' : 'Credencial vigente lista para entrega')
+                            : 'Contraseña vigente bajo custodia (AES-256-GCM)'}
+                        </p>
+                        <p className="mt-0.5">
+                          {modalCredencialConsultada.datos.password
+                            ? 'La contraseña coincide con el hash actual de PostgreSQL. Puede ser entregada al usuario.'
+                            : 'La credencial administrada está enmascarada por seguridad. Presione el ícono del ojo para revelar.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      <div>
+                        <span className="text-slate-500 font-medium">Usuario:</span>{' '}
+                        <span className="font-bold text-slate-800">{modalCredencialConsultada.datos.username}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-medium">Perfil:</span>{' '}
+                        <span className="font-bold text-slate-800">{modalCredencialConsultada.datos.perfil || '-'}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-500 font-medium">Nombre:</span>{' '}
+                        <span className="font-semibold text-slate-800">{modalCredencialConsultada.datos.nombreCompleto || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-medium">Estado:</span>{' '}
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                          {modalCredencialConsultada.datos.custodiada ? 'Vigente bajo custodia' : (modalCredencialConsultada.datos.estadoCredencial || 'Vigente')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-medium">Última modificación:</span>{' '}
+                        <span className="text-slate-700">{modalCredencialConsultada.datos.fechaAsignacion || modalCredencialConsultada.datos.fechaUltimoRestablecimiento || '-'}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-500 font-medium">Responsable:</span>{' '}
+                        <span className="font-semibold text-slate-800">{modalCredencialConsultada.datos.responsableRestablecimiento || 'gibarra'}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-slate-600">Contraseña administrada</label>
+                        {!modalCredencialConsultada.datos.password && (
+                          <span className="text-[11px] text-blue-700 font-medium flex items-center gap-1">
+                            <Lock size={12} /> Clic en el ojo para revelar
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            readOnly
+                            type={(modalCredencialConsultada.datos.password && mostrarPasswordConsultada) ? 'text' : 'password'}
+                            value={modalCredencialConsultada.datos.password || '••••••••••••••••'}
+                            aria-label="Contraseña administrada asignada"
+                            className="w-full rounded border border-slate-300 p-2 pr-10 font-mono text-sm bg-slate-50"
+                            onFocus={(event) => {
+                              if (modalCredencialConsultada.datos?.password) {
+                                event.currentTarget.select();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            aria-label={modalCredencialConsultada.datos.password && mostrarPasswordConsultada ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                            onClick={() => {
+                              if (!modalCredencialConsultada.datos?.password) {
+                                setSolicitandoReautenticacion(true);
+                                setPasswordAdminReautenticacion('');
+                                setErrorReautenticacion(null);
+                              } else {
+                                setMostrarPasswordConsultada((v) => !v);
+                              }
+                            }}
+                            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
+                            title={!modalCredencialConsultada.datos.password ? 'Presione para reautenticar y revelar' : (mostrarPasswordConsultada ? 'Ocultar' : 'Mostrar')}
+                          >
+                            {modalCredencialConsultada.datos.password && mostrarPasswordConsultada ? <EyeOff size={17} /> : <Eye size={17} />}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!modalCredencialConsultada.datos?.password) {
+                              setSolicitandoReautenticacion(true);
+                              setPasswordAdminReautenticacion('');
+                              setErrorReautenticacion(null);
+                              return;
+                            }
+                            await navigator.clipboard.writeText(modalCredencialConsultada.datos.password);
+                            setCredencialConsultadaCopiada(true);
+                            setTimeout(() => setCredencialConsultadaCopiada(false), 2000);
+                          }}
+                          className="inline-flex items-center gap-2 rounded bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900"
+                          title={!modalCredencialConsultada.datos.password ? 'Requiere reautenticación previa' : 'Copiar'}
+                        >
+                          <Copy size={16} /> {credencialConsultadaCopiada ? '¡Copiada!' : 'Copiar'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!modalCredencialConsultada.datos?.password) {
+                              setSolicitandoReautenticacion(true);
+                              setPasswordAdminReautenticacion('');
+                              setErrorReautenticacion(null);
+                              return;
+                            }
+                            descargarComprobanteEntrega({
+                              username: modalCredencialConsultada.datos.username,
+                              password: modalCredencialConsultada.datos.password,
+                              nombreCompleto: modalCredencialConsultada.datos.nombreCompleto,
+                              perfil: modalCredencialConsultada.datos.perfil,
+                              sede: modalCredencialConsultada.datos.sede,
+                              accion: 'Entrega de credencial administrada'
+                            });
+                          }}
+                          className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                          title={!modalCredencialConsultada.datos.password ? 'Requiere reautenticación previa' : 'Descargar comprobante'}
+                        >
+                          <Download size={16} /> Descargar comprobante (.txt)
+                        </button>
+                      </div>
+                    </div>
+
+                    {solicitandoReautenticacion && !modalCredencialConsultada.datos.password && (
+                      <form onSubmit={handleRevelarCredencial} className="rounded-lg border border-blue-200 bg-blue-50/80 p-3 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                            <Lock size={14} className="text-blue-700" />
+                            Para revelar la credencial, confirme su contraseña de administrador:
+                          </label>
+                          <span className="text-[10px] text-blue-700 font-semibold">Reautenticación de seguridad</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type={mostrarPasswordAdminReautenticacion ? 'text' : 'password'}
+                              value={passwordAdminReautenticacion}
+                              onChange={(e) => setPasswordAdminReautenticacion(e.target.value)}
+                              placeholder="Ingrese su contraseña actual..."
+                              autoFocus
+                              className="w-full rounded border border-blue-300 p-2 pr-10 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setMostrarPasswordAdminReautenticacion((v) => !v)}
+                              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-blue-900"
+                              aria-label={mostrarPasswordAdminReautenticacion ? 'Ocultar clave' : 'Mostrar clave'}
+                            >
+                              {mostrarPasswordAdminReautenticacion ? <EyeOff size={15} /> : <Eye size={15} />}
+                            </button>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={reautenticando || !passwordAdminReautenticacion}
+                            className="inline-flex items-center gap-1.5 rounded bg-[#052A79] px-4 py-2 text-xs font-bold text-white hover:bg-blue-900 disabled:opacity-50 shadow-sm"
+                          >
+                            {reautenticando ? 'Verificando...' : 'Confirmar y Revelar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSolicitandoReautenticacion(false);
+                              setPasswordAdminReautenticacion('');
+                              setErrorReautenticacion(null);
+                            }}
+                            className="rounded border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                        {errorReautenticacion && (
+                          <p className="text-xs text-red-600 font-semibold">{errorReautenticacion}</p>
+                        )}
+                      </form>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const uObj = usuarios.find(u => u.username?.toLowerCase() === modalCredencialConsultada.datos?.username?.toLowerCase());
+                          setModalCredencialConsultada(null);
+                          if (uObj) {
+                            handleOpenUsuario(uObj, true);
+                          }
+                        }}
+                        className="text-slate-600 hover:text-[#052A79] underline font-medium"
+                      >
+                        Editar manualmente...
+                      </button>
+                      <button
+                        type="button"
+                        disabled={generandoTemporal}
+                        onClick={() => handleGenerarCredencialTemporal(modalCredencialConsultada.datos.username)}
+                        className="inline-flex items-center gap-1.5 text-slate-600 hover:text-[#052A79] font-medium"
+                      >
+                        <Key size={13} /> {generandoTemporal ? 'Generando...' : 'Generar nueva clave temporal...'}
+                      </button>
+                    </div>
+                  </>
+                ) : modalCredencialConsultada.datos.vigente ? (
+                  <div className="rounded-lg border border-emerald-200 bg-slate-50 p-4 text-sm text-slate-800 space-y-3">
+                    <div className="flex items-center gap-2 font-bold text-emerald-800">
+                      <CheckCircle2 size={18} className="text-emerald-600" />
+                      <span>{modalCredencialConsultada.datos.estadoCredencial || 'Contraseña activa / Vigente'}</span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      La cuenta cuenta con una contraseña activa y vigente en el sistema de autenticación de PostgreSQL.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-white p-3 rounded-lg border border-slate-200">
+                      <div>
+                        <span className="text-slate-500 font-medium">Usuario:</span>{' '}
+                        <span className="font-bold text-slate-800">{modalCredencialConsultada.datos.username}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-medium">Perfil:</span>{' '}
+                        <span className="font-bold text-slate-800">{modalCredencialConsultada.datos.perfil || '-'}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-500 font-medium">Nombre:</span>{' '}
+                        <span className="font-semibold text-slate-800">{modalCredencialConsultada.datos.nombreCompleto || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-medium">Última modificación:</span>{' '}
+                        <span className="font-semibold text-slate-800">
+                          {modalCredencialConsultada.datos.fechaUltimoRestablecimiento || 'No registrada'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-medium">Responsable:</span>{' '}
+                        <span className="font-semibold text-slate-800">
+                          {modalCredencialConsultada.datos.responsableRestablecimiento || 'gibarra'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="rounded border border-blue-100 bg-blue-50/80 p-2.5 text-xs text-blue-900">
+                      <p className="font-semibold text-blue-950">Protección criptográfica</p>
+                      <p className="mt-0.5 text-[11px] text-blue-800">
+                        Esta cuenta no registra una credencial previa en el almacén de custodia cifrada. Por motivos de seguridad se resguarda en PostgreSQL mediante hash unidireccional (bcrypt). Si requiere entregar una nueva clave al usuario, genere una contraseña temporal con 1 clic.
+                      </p>
+                    </div>
+
+                    {modalCredencialConsultada.datos.puedeRestablecer && (
+                      <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const uObj = usuarios.find(u => u.username?.toLowerCase() === modalCredencialConsultada.datos?.username?.toLowerCase());
+                            setModalCredencialConsultada(null);
+                            if (uObj) {
+                              handleOpenUsuario(uObj, true);
+                            }
+                          }}
+                          className="text-xs text-slate-600 hover:text-[#052A79] underline font-medium"
+                        >
+                          Editar manualmente...
+                        </button>
+                        <button
+                          type="button"
+                          disabled={generandoTemporal}
+                          onClick={() => handleGenerarCredencialTemporal(modalCredencialConsultada.datos.username)}
+                          className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 shadow-sm disabled:opacity-50"
+                        >
+                          <Key size={14} /> {generandoTemporal ? 'Generando contraseña...' : `Generar nueva contraseña temporal`}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 space-y-3">
+                    <div className="flex items-center gap-2 font-bold text-red-800">
+                      <AlertTriangle size={18} />
+                      <span>Cuenta o contraseña inactiva</span>
+                    </div>
+                    <p className="text-xs">
+                      {modalCredencialConsultada.datos.motivo || 'La cuenta se encuentra inactiva o no registra contraseña configurada.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalCredencialConsultada(null);
+                  setMostrarPasswordConsultada(false);
+                  setCredencialConsultadaCopiada(false);
+                  setSolicitandoReautenticacion(false);
+                  setPasswordAdminReautenticacion('');
+                  setErrorReautenticacion(null);
+                }}
+                className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {bajaPerfil && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div role="dialog" aria-modal="true" aria-labelledby="titulo-baja-perfil" className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl">
@@ -1127,11 +1508,30 @@ export function UsuariosView() {
             
             <div className="p-6 overflow-y-auto flex-1">
                 {error && (
-                    <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg shadow-sm border border-red-200 text-sm">
-                    {error}
+                    <div className="mb-4 bg-red-50 text-red-700 p-3 rounded-lg shadow-sm border border-red-200 text-sm space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
+                        <div>{error}</div>
+                      </div>
+                      {(error.toLowerCase().includes('inactivo') || error.toLowerCase().includes('inactivos')) && (
+                        <div className="pt-2 border-t border-red-200 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const usernameABuscar = formData.username;
+                              setShowModal(false);
+                              setEstadoFiltro('INACTIVOS');
+                              setSearchQuery(usernameABuscar);
+                            }}
+                            className="rounded bg-[#052A79] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-900 transition-colors"
+                          >
+                            Ir a filtro Inactivos y localizar cuenta
+                          </button>
+                        </div>
+                      )}
                     </div>
                 )}
-                <form id="main-form" onSubmit={activeTab === 'usuarios' ? handleSaveUsuario : async (e) => {
+                <form id="main-form" noValidate onSubmit={activeTab === 'usuarios' ? handleSaveUsuario : async (e) => {
                 e.preventDefault();
                 try {
                     setSaving(true);
@@ -1147,7 +1547,9 @@ export function UsuariosView() {
                     localStorage.setItem('faregas_permisos_updated_at', String(Date.now()));
                     window.dispatchEvent(new CustomEvent('faregasPermisosActualizados'));
                     setShowModal(false);
-                    cargarDatos();
+                    await cargarDatos();
+                    setMensajeExito(`Perfil ${payload.nombre || payload.clave} guardado correctamente.`);
+                    setTimeout(() => setMensajeExito(null), 5000);
                 } catch (err: any) {
                     const mensajes: Record<string, string> = {
                     PERFILES_NO_AUTORIZADO:
@@ -1284,41 +1686,102 @@ export function UsuariosView() {
                             {/* SECCIÓN SEGURIDAD */}
                             <div className="bg-white p-4 rounded-lg border border-slate-200">
                                 <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Seguridad</h3>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Contraseña {modalMode === 'editar' && '(opcional)'}</label>
-                                        <input type="password" ref={registrarRef('password')} className={claseInput('password')}
-                                            aria-invalid={erroresCampo.password ? true : undefined}
-                                            autoComplete="new-password"
-                                            value={formData.password}
-                                            onChange={e => {
-                                              setFormData({ ...formData, password: e.target.value, confirmPassword: e.target.value });
-                                              setPasswordTemporalGenerada(false);
-                                            }} />
-                                        {mensajeCampo('password')}
-                                        <button
-                                          type="button"
-                                          onClick={generarPasswordTemporalParaFormulario}
-                                          className="mt-2 inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-[#052A79] hover:bg-blue-100"
-                                        >
-                                          <KeyRound size={14} />
-                                          {passwordTemporalGenerada ? 'Generar otra temporal' : 'Generar contraseña temporal'}
-                                        </button>
-                                        {passwordTemporalGenerada && (
-                                          <p role="status" className="mt-1 text-[11px] text-slate-600">
-                                            Contraseña aleatoria de 24 caracteres. Si se guarda, quedará disponible una sola vez en el Excel temporal de esta sesión.
-                                          </p>
-                                        )}
+                                {modalMode === 'editar' && (
+                                    <div className="mb-4">
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="h-4 w-4 text-[#052a79]"
+                                                checked={crearNuevaPassword}
+                                                onChange={(e) => {
+                                                    const check = e.target.checked;
+                                                    setCrearNuevaPassword(check);
+                                                    setFormData({
+                                                        ...formData,
+                                                        requierePassword: check,
+                                                        password: '',
+                                                        confirmPassword: ''
+                                                    });
+                                                }}
+                                            />
+                                            <span>Crear nueva contraseña</span>
+                                        </label>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Confirmar Contraseña</label>
-                                        <input type="password" ref={registrarRef('confirmPassword')} className={claseInput('confirmPassword')}
-                                            aria-invalid={erroresCampo.confirmPassword ? true : undefined}
-                                            value={formData.confirmPassword}
-                                            onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} />
-                                        {mensajeCampo('confirmPassword')}
+                                )}
+
+                                {(modalMode === 'crear' || crearNuevaPassword) && (
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">
+                                                Contraseña {modalMode === 'crear' && <span className="text-red-500">*</span>}
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type={mostrarPassword ? 'text' : 'password'}
+                                                    ref={registrarRef('password')}
+                                                    className={`${claseInput('password')} pr-10`}
+                                                    aria-invalid={erroresCampo.password ? true : undefined}
+                                                    autoComplete="new-password"
+                                                    value={formData.password}
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        setFormData({ ...formData, password: val });
+                                                        if (val) {
+                                                            const evalRes = evaluarPasswordSegura(val, formData.username, {
+                                                                minLongitud: politicaPassword?.minLongitud,
+                                                                esProduccion: politicaPassword?.esProduccion,
+                                                                esAdmin: formData.perfil_id === 'ADMINISTRADOR',
+                                                            });
+                                                            setAdvertenciaPassword(evalRes.advertencia);
+                                                        } else {
+                                                            setAdvertenciaPassword(null);
+                                                        }
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                                    onClick={() => setMostrarPassword((v) => !v)}
+                                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
+                                                >
+                                                    {mostrarPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+                                            </div>
+                                            {advertenciaPassword && !erroresCampo.password && (
+                                                <div className="mt-1 flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 border border-amber-200">
+                                                    <ShieldAlert size={14} className="text-amber-600 shrink-0" />
+                                                    <span>{advertenciaPassword}</span>
+                                                </div>
+                                            )}
+                                            {mensajeCampo('password')}
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">
+                                                Confirmar Contraseña {modalMode === 'crear' && <span className="text-red-500">*</span>}
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type={mostrarConfirmPassword ? 'text' : 'password'}
+                                                    ref={registrarRef('confirmPassword')}
+                                                    className={`${claseInput('confirmPassword')} pr-10`}
+                                                    aria-invalid={erroresCampo.confirmPassword ? true : undefined}
+                                                    autoComplete="new-password"
+                                                    value={formData.confirmPassword}
+                                                    onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    aria-label={mostrarConfirmPassword ? 'Ocultar confirmar contraseña' : 'Mostrar confirmar contraseña'}
+                                                    onClick={() => setMostrarConfirmPassword((v) => !v)}
+                                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
+                                                >
+                                                    {mostrarConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                </button>
+                                            </div>
+                                            {mensajeCampo('confirmPassword')}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                                 <div className="flex items-center gap-2">
                                     <input type="checkbox" id="estadoCheck" className="h-4 w-4 text-[#052a79]"
                                         disabled={modalMode === 'editar' && formData.username === currentUsername}
@@ -1605,11 +2068,91 @@ export function UsuariosView() {
                 <button type="button" onClick={() => {
                   setShowModal(false);
                   setFormData((actual: Record<string, unknown>) => ({ ...actual, password: '', confirmPassword: '' }));
-                  setPasswordTemporalGenerada(false);
                 }} className="px-6 py-2 border border-slate-300 bg-white rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
                 <button type="submit" form="main-form" className="px-6 py-2 bg-[#052a79] text-white rounded-lg font-semibold hover:bg-blue-900 transition-colors shadow-sm disabled:opacity-50" disabled={saving}>
                     {saving ? 'Guardando...' : 'Guardar'}
                 </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {credencialNueva && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titulo-credencial-nueva"
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl"
+          >
+            <h2 id="titulo-credencial-nueva" className="text-lg font-bold text-[#052A79]">
+              Contraseña {credencialNueva.accion}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Esta es la única oportunidad para copiar la nueva contraseña de <strong>{credencialNueva.username}</strong>.
+              Al cerrar esta confirmación, FAREGAS la eliminará de la pantalla y conservará únicamente su hash seguro.
+            </p>
+            <div className="mt-4">
+              <label className="block text-xs font-bold text-slate-600 mb-1">Nueva contraseña</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    readOnly
+                    type={mostrarPassword ? 'text' : 'password'}
+                    value={credencialNueva.password}
+                    aria-label="Contraseña nueva para copiar"
+                    className="w-full rounded border border-slate-300 p-2 pr-10 font-mono text-sm"
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
+                  <button
+                    type="button"
+                    aria-label={mostrarPassword ? 'Ocultar contraseña nueva' : 'Mostrar contraseña nueva'}
+                    onClick={() => setMostrarPassword((valor) => !valor)}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
+                  >
+                    {mostrarPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={copiarCredencialNueva}
+                  className="inline-flex items-center gap-2 rounded bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900"
+                >
+                  <Copy size={16} /> {credencialCopiada ? 'Copiada' : 'Copiar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const uObj = usuarios.find(u => u.username?.toLowerCase() === credencialNueva.username?.toLowerCase());
+                    const nomComp = uObj ? ([uObj.nombres, uObj.apellidos].filter(Boolean).join(' ') || uObj.nombreRazonSocial || '') : '';
+                    const perfNom = perfiles.find(p => p.clave === uObj?.perfil_id)?.nombre || uObj?.perfil_id || '';
+                    const sedesNom = uObj?.sedes ? uObj.sedes.map((s: any) => s.nombre || s.key).join(', ') : '';
+                    descargarComprobanteEntrega({
+                      username: credencialNueva.username,
+                      password: credencialNueva.password,
+                      nombreCompleto: nomComp,
+                      perfil: perfNom,
+                      sede: sedesNom,
+                      accion: credencialNueva.accion === 'creada' ? 'Creación de cuenta' : 'Restablecimiento de contraseña'
+                    });
+                  }}
+                  className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Download size={16} /> Descargar comprobante (.txt)
+                </button>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setCredencialNueva(null);
+                  setCredencialCopiada(false);
+                  setMostrarPassword(false);
+                }}
+                className="rounded border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700"
+              >
+                Cerrar y olvidar contraseña
+              </button>
             </div>
           </div>
         </div>

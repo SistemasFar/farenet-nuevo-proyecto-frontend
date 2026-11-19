@@ -1068,16 +1068,6 @@ export function InicioView() {
                               className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
                             ><FileText size={16} /></button>
                           )}
-                          {puedeVerComprobanteFaregas && (
-                            <button
-                              type="button"
-                              disabled={accionEnProceso === ins.id}
-                              onClick={() => void verComprobanteFaregas(ins.id)}
-                              title="Ver representación comercial FAREGAS"
-                              aria-label="Ver representación comercial FAREGAS"
-                              className="rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-cyan-800 hover:bg-cyan-100 disabled:opacity-50"
-                            ><FileText size={16} /></button>
-                          )}
                           {puedeVerNotaCredito && ins.notaCreditoId && (
                             <button
                               type="button"
@@ -1105,7 +1095,6 @@ export function InicioView() {
                               className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1.5 text-slate-400"
                             ><Ban size={16} /></button>
                           )}
-                          {puedeSolicitarNotaCreditoPanel(ins) && <button type="button" onClick={() => setNotaSolicitadaId(ins.id)} title="Solicitar nota de crédito" aria-label="Solicitar nota de crédito" className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-violet-800"><FileEdit size={16} /></button>}
                           {!solicitudCompletada && puedeCrearNota && (
                             <button
                               type="button"

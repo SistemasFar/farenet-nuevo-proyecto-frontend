@@ -2595,7 +2595,10 @@ function NuevoCertificadoWizard() {
     umbralComercial: maestrosPago?.politicaSpot?.umbralComercial,
   }), [formFacturacion.tipoDocFac, precioTotal, descuentoAplicado, formCaja.spotNaturaleza, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje, tipoItemSpotPago, maestrosPago?.politicaSpot?.umbralComercial]);
 
-  const totalExigibleCaja = descuentoAplicado?.autorizaGratuidad ? 0 : evaluacionSpotActual.netoCobrar;
+  const esCreditoFac = formFacturacion.condicionPagoFac === 'CREDITO';
+  const totalExigibleCaja = descuentoAplicado?.autorizaGratuidad
+    ? 0
+    : (esCreditoFac && evaluacionSpotActual.aplica ? evaluacionSpotActual.netoCobrar : precioTotal);
   const montoPendiente = Math.max(0, totalExigibleCaja - pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe || '0'), 0));
 
   // Efecto para inyectar automticamente el pago de Cuponidad

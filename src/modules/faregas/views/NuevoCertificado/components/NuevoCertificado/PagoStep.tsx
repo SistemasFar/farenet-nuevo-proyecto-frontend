@@ -83,6 +83,7 @@ export function PagoStep({
 
   const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
   const esCortesia = Boolean(descuentoActual?.autorizaGratuidad);
+  const totalPagarCalculado = esCortesia ? 0 : totalPagar;
   const evaluacionSpot = evaluarSpotWizard({
     tipoComprobante,
     total: totalPagar,
@@ -91,8 +92,9 @@ export function PagoStep({
     tipoItem: tipoItemSpot,
     umbralComercial: maestrosPago?.politicaSpot?.umbralComercial,
   });
-  const totalExigible = esCortesia ? 0 : evaluacionSpot.netoCobrar;
-  const totalPagarCalculado = esCortesia ? 0 : totalPagar;
+  const totalExigible = esCortesia
+    ? 0
+    : (condicionPago === 'CREDITO' && evaluacionSpot.aplica ? evaluacionSpot.netoCobrar : totalPagarCalculado);
   const pagado = pagosAgregados.reduce((sum, p) => sum + parseFloat(p.importe), 0);
   const pendiente = esCortesia ? 0 : (totalExigible - pagado);
   const excesoPagado = Math.max(0, pagado - totalExigible);
@@ -506,11 +508,15 @@ export function PagoStep({
                   <p className="text-[11px] font-bold text-amber-900">Código SPOT {evaluacionSpot.codigoSpot} · {evaluacionSpot.descripcionSpot}</p>
                   <div className="flex justify-between items-center text-amber-800 font-semibold text-xs">
                     <span>Detracción SPOT ({evaluacionSpot.porcentaje}%):</span>
-                    <span className="font-bold">- S/ {evaluacionSpot.montoDetraccion.toFixed(2)}</span>
+                    <span className="font-bold">S/ {evaluacionSpot.montoDetraccion.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-amber-900 font-semibold text-xs">
+                    <span>Responsable del depósito:</span>
+                    <span className="font-bold">EMPRESA</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-amber-200/60 pt-1">
-                    <span className="text-slate-700 font-bold text-xs">Importe neto a pagar al proveedor:</span>
-                    <span className="font-black text-slate-900 text-base">S/ {evaluacionSpot.netoCobrar.toFixed(2)}</span>
+                    <span className="text-slate-700 font-bold text-xs">{condicionPago === 'CREDITO' ? 'Neto a financiar:' : 'Total a cobrar en caja:'}</span>
+                    <span className="font-black text-slate-900 text-base">S/ {totalExigible.toFixed(2)}</span>
                   </div>
                 </div>
               )}
@@ -543,7 +549,7 @@ export function PagoStep({
             </div>
             {evaluacionSpot.aplica && (
               <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-center text-xs font-semibold text-amber-900 leading-tight">
-                Operación sujeta a Detracción SPOT ({evaluacionSpot.porcentaje}%). El cliente retiene S/ {evaluacionSpot.montoDetraccion.toFixed(2)} para depositarlo en el Banco de la Nación.
+                Detracción SPOT S/ {evaluacionSpot.montoDetraccion.toFixed(2)} ({evaluacionSpot.porcentaje}%) — depósito a cargo de la empresa. La empresa realizará el depósito de detracción al Banco de la Nación.
               </div>
             )}
             {tipoComprobante === 'BOLETA' && totalPagar > 700 && (
@@ -575,7 +581,7 @@ export function PagoStep({
             )}
             {excesoPagado > 0.009 && (
               <div role="alert" className="mt-3 rounded-lg border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-800">
-                Pago registrado excede el neto ordinario en S/ {excesoPagado.toFixed(2)}. El pago existente se conserva; revise y regularice la inconsistencia antes de confirmar.
+                Pago registrado excede el total a cobrar en S/ {excesoPagado.toFixed(2)}. El pago existente se conserva; revise y regularice la inconsistencia antes de confirmar.
               </div>
             )}
             {esCortesia ? (

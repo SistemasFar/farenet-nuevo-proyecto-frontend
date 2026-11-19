@@ -94,6 +94,24 @@ describe('faregas-comprobante-visor.service', () => {
     expect(resultado).toBe(true);
   });
 
+  it('abre la representación comercial FAREGAS usando facturacionId cuando se especifica porFacturacionId', async () => {
+    const mockBlob = new Blob(['%PDF-1.4 comercial'], { type: 'application/pdf' });
+    const spyFetchBlob = vi.spyOn(httpClient, 'faregasFetchBlob').mockResolvedValue(mockBlob);
+    const mockVentana = {
+      location: { href: '' },
+      closed: false,
+      opener: null,
+      close: vi.fn(),
+    } as unknown as Window;
+
+    const resultado = await abrirPdfFaregas(789, { ventanaPrevia: mockVentana, porFacturacionId: true });
+
+    expect(spyFetchBlob).toHaveBeenCalledWith('/certificados/facturacion/789/pdf');
+    expect(mockVentana.location.href).toBe('blob:http://localhost/test-blob');
+    expect(resultado).toBe(true);
+  });
+
+
   it('cierra la ventana e informa si el PDF de NubeFact no está disponible', async () => {
     vi.spyOn(httpClient, 'faregasFetchBlob').mockRejectedValue(new Error('PDF_NUBEFACT_NO_DISPONIBLE'));
 

@@ -9,17 +9,19 @@ export interface UsuarioParaExportar {
   perfil_id?: string | null;
   estado?: boolean;
   tipoDocumentoKey?: string | null;
+  nroDocumento?: string | null;
+  persona_nrodocumentoidentidad?: string | null;
   nombres?: string | null;
   apellidos?: string | null;
   nombreRazonSocial?: string | null;
   email?: string | null;
   sedes?: Array<{ key?: string; nombre?: string }>;
-}
-
-export interface CredencialTemporalParaExportar extends UsuarioParaExportar {
-  password: string;
-  resultado: 'Creado' | 'Restablecida';
-  observaciones?: string;
+  fechaUltimoRestablecimiento?: string | null;
+  responsableRestablecimiento?: string | null;
+  estadoCredencial?: string | null;
+  cambiadaPosteriormente?: boolean | null;
+  necesitaRestablecimiento?: boolean | null;
+  observacionesCredencial?: string | null;
 }
 
 export interface PerfilParaExportar {
@@ -32,13 +34,18 @@ export const COLUMNAS_USUARIOS_FAREGAS = [
   { key: 'numero', header: 'N.º', width: 8 },
   { key: 'nombre', header: 'Nombre completo', width: 32 },
   { key: 'username', header: 'Username', width: 20 },
+  { key: 'documento', header: 'Documento', width: 18 },
   { key: 'email', header: 'Correo electrónico', width: 30 },
   { key: 'perfil', header: 'Perfil FAREGAS', width: 20 },
   { key: 'sede', header: 'Sede', width: 48 },
-  { key: 'password', header: 'Contraseña temporal', width: 28 },
   { key: 'estado', header: 'Estado', width: 14 },
+  { key: 'fechaRestablecimiento', header: 'Fecha último restablecimiento', width: 28 },
+  { key: 'responsableRestablecimiento', header: 'Responsable último cambio', width: 24 },
+  { key: 'estadoCredencial', header: 'Estado credencial administrada', width: 30 },
+  { key: 'cambiadaPosteriormente', header: 'Contraseña cambiada posteriormente', width: 32 },
+  { key: 'necesitaRestablecimiento', header: 'Necesidad de nuevo restablecimiento', width: 26 },
   { key: 'resultado', header: 'Resultado', width: 18 },
-  { key: 'observaciones', header: 'Observaciones', width: 42 },
+  { key: 'observaciones', header: 'Observaciones', width: 48 },
 ] as const;
 
 const nombreCompleto = (usuario: UsuarioParaExportar) =>
@@ -62,18 +69,14 @@ const nombrePerfil = (usuario: UsuarioParaExportar, perfiles: PerfilParaExportar
   return perfil?.nombre || usuario.perfil_id || '';
 };
 
-const metadatos = (tipo: 'normal' | 'credenciales', cantidad: number, filtros?: {
+const metadatos = (cantidad: number, filtros?: {
   estado?: string;
   busqueda?: string;
 }): Array<[string, string | number]> => [
   ['Fecha de exportación (America/Lima)', new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })],
   ['Registros exportados', cantidad],
-  ...(tipo === 'normal'
-    ? [
-        ['Filtro de estado', filtros?.estado || 'ACTIVOS'] as [string, string],
-        ['Búsqueda', filtros?.busqueda?.trim() || 'Todos'] as [string, string],
-      ]
-    : [['Tipo de entrega', 'Credenciales temporales de esta sesión'] as [string, string]]),
+  ['Filtro de estado', filtros?.estado || 'ACTIVOS'],
+  ['Búsqueda', filtros?.busqueda?.trim() || 'Todos'],
 ];
 
 export const construirHojaUsuariosFaregas = (
@@ -83,46 +86,33 @@ export const construirHojaUsuariosFaregas = (
 ): ExcelSheetDefinition => ({
   name: 'Usuarios FAREGAS',
   title: 'Usuarios FAREGAS',
-  metadata: metadatos('normal', usuarios.length, filtros),
-  note: 'Exportación administrativa. La contraseña temporal queda vacía para todos los usuarios existentes.',
+  metadata: metadatos(usuarios.length, filtros),
+  note: 'Exportación administrativa. Por seguridad no contiene contraseñas ni hashes.',
   headerRow: 9,
   columns: [...COLUMNAS_USUARIOS_FAREGAS],
-  rows: usuarios.map((usuario, index) => ({
-    numero: index + 1,
-    nombre: nombreCompleto(usuario),
-    username: usuario.username,
-    email: usuario.email || '',
-    perfil: nombrePerfil(usuario, perfiles),
-    sede: nombreSedes(usuario, perfiles),
-    password: '',
-    estado: usuario.estado ? 'Activo' : 'Inactivo',
-    resultado: 'Existente',
-    observaciones: '',
-  })),
-});
+  rows: usuarios.map((usuario, index) => {
+    const doc = usuario.nroDocumento || usuario.persona_nrodocumentoidentidad || '';
+    const tipoDoc = usuario.tipoDocumentoKey ? `${usuario.tipoDocumentoKey.toUpperCase()} ` : '';
+    const docDisplay = doc ? (tipoDoc ? `${tipoDoc}${doc}` : doc) : '-';
 
-export const construirHojaCredencialesTemporales = (
-  credenciales: CredencialTemporalParaExportar[],
-  perfiles: PerfilParaExportar[],
-): ExcelSheetDefinition => ({
-  name: 'Usuarios FAREGAS',
-  title: 'Usuarios FAREGAS',
-  metadata: metadatos('credenciales', credenciales.length),
-  note: 'Confidencial: guarde este archivo en una ubicación protegida y elimínelo después de entregar las credenciales.',
-  headerRow: 9,
-  columns: [...COLUMNAS_USUARIOS_FAREGAS],
-  rows: credenciales.map((credencial, index) => ({
-    numero: index + 1,
-    nombre: nombreCompleto(credencial),
-    username: credencial.username,
-    email: credencial.email || '',
-    perfil: nombrePerfil(credencial, perfiles),
-    sede: nombreSedes(credencial, perfiles),
-    password: credencial.password,
-    estado: credencial.estado ? 'Activo' : 'Inactivo',
-    resultado: credencial.resultado,
-    observaciones: credencial.observaciones || '',
-  })),
+    return {
+      numero: index + 1,
+      nombre: nombreCompleto(usuario),
+      username: usuario.username,
+      documento: docDisplay,
+      email: usuario.email || '',
+      perfil: nombrePerfil(usuario, perfiles),
+      sede: nombreSedes(usuario, perfiles),
+      estado: usuario.estado ? 'Activo' : 'Inactivo',
+      fechaRestablecimiento: usuario.fechaUltimoRestablecimiento || '-',
+      responsableRestablecimiento: usuario.responsableRestablecimiento || '-',
+      estadoCredencial: usuario.estadoCredencial || (usuario.username === 'gibarra' ? 'Protegida (Excluida)' : 'No registrado'),
+      cambiadaPosteriormente: usuario.cambiadaPosteriormente === true ? 'Sí' : 'No',
+      necesitaRestablecimiento: usuario.necesitaRestablecimiento === true ? 'Sí' : 'No',
+      resultado: 'Existente',
+      observaciones: usuario.observacionesCredencial || '',
+    };
+  }),
 });
 
 export const descargarExcelUsuariosFaregas = (
@@ -131,11 +121,4 @@ export const descargarExcelUsuariosFaregas = (
   filtros: { estado?: string; busqueda?: string } = {},
 ) => exportarExcelVariasHojas('USUARIOS_FAREGAS', [
   construirHojaUsuariosFaregas(usuarios, perfiles, filtros),
-]);
-
-export const descargarExcelCredencialesTemporales = (
-  credenciales: CredencialTemporalParaExportar[],
-  perfiles: PerfilParaExportar[],
-) => exportarExcelVariasHojas('CREDENCIALES_TEMPORALES_FAREGAS', [
-  construirHojaCredencialesTemporales(credenciales, perfiles),
 ]);
