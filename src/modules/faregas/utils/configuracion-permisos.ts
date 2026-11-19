@@ -5,22 +5,6 @@ export interface ConfiguracionTabAutorizada {
   label: string;
 }
 
-const PERMISOS_SUBMODULO = [
-  'CONFIGURACION_CATEGORIAS',
-  'CONFIGURACION_EMPRESAS',
-  'CONFIGURACION_PRODUCTOS',
-  'CONFIGURACION_SEDES',
-  'CONFIGURACION_SERIES',
-  'CONFIGURACION_SERVICIOS',
-  'CONFIGURACION_TARIFAS',
-  'MENU_FACTURACION_SERIES',
-  'MENU_CONFIGURACION_SEDES',
-  'MENU_CONFIGURACION_CATALOGO',
-  'MENU_CONFIGURACION_TARIFAS',
-  'MENU_CONFIGURACION_CORRELATIVOS',
-  'MENU_CONFIGURACION_EMPRESAS',
-] as const;
-
 const PERMISOS_IMPLICITOS: Record<string, readonly string[]> = {
   MENU_CONFIGURACION_SEDES: ['CONFIGURACION_SEDES'],
   MENU_CONFIGURACION_CATALOGO: ['CONFIGURACION_CATEGORIAS', 'CONFIGURACION_PRODUCTOS', 'CONFIGURACION_SERVICIOS'],
@@ -33,11 +17,6 @@ export const tienePermisoConfiguracionFaregas = (permisos: readonly string[] = [
   permisos.includes(clave)
   || Object.entries(PERMISOS_IMPLICITOS).some(([submodulo, ordinarios]) =>
     permisos.includes(submodulo) && ordinarios.includes(clave))
-);
-
-export const puedeAbrirConfiguracionFaregas = (permisos: readonly string[] = []): boolean => (
-  permisos.includes('MENU_CONFIGURACION')
-  || PERMISOS_SUBMODULO.some((permiso) => permisos.includes(permiso))
 );
 
 export const resolverPermisosConfiguracionFaregas = (permisos: readonly string[] = []) => {
@@ -72,4 +51,8 @@ export const resolverPermisosConfiguracionFaregas = (permisos: readonly string[]
     hasAnySubmodule: tabs.length > 0,
     tabs,
   };
+};
+
+export const puedeAbrirConfiguracionFaregas = (permisos: readonly string[] = []): boolean => {
+  return resolverPermisosConfiguracionFaregas(permisos).hasAnySubmodule;
 };

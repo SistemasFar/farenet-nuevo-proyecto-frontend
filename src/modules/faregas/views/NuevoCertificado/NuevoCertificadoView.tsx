@@ -6,7 +6,7 @@ import { maestrosApi, inspeccionesApi } from '@/services/api';
 import { faregasCertificadosApi } from '../../services/faregas-certificados.api';
 import { faregasClientesApi } from '../../services/faregas-clientes.api';
 import { faregasPagosApi } from '../../services/faregas-pagos.api';
-import type { ConsultaDescuentoResult } from '../../services/faregas-descuentos.api';
+import { quitarDescuentoBorrador, type ConsultaDescuentoResult } from '../../services/faregas-descuentos.api';
 import Swal from 'sweetalert2';
 import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoResponse } from '@/types/maestros';
 import { CheckCircle2, FileText, CreditCard, ArrowLeft, Search, Loader2, Save, Eye, PencilLine, History, Send } from 'lucide-react';
@@ -31,12 +31,12 @@ import type { TipoCertificadoFaregas } from '../../types/faregas';
 import type { FacturacionFaregas, PasoBorradorFaregas } from '../../types/faregas-api';
 import { useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../Dashboard/MainLayout';
-import { evaluarSpotWizard, resolverCuotasCredito, resolverTipoComprobantePorDocumento, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
+import { evaluarSpotWizard, resolverCuotasCredito, resolverTipoComprobantePorDocumento, sumarImportesPEN, validarDatosFacturacionCampos, validarDatosInicialesCampos, validarPasoPago, validarFormularioVehiculoVisible, validarFormularioFormatoDinamico } from './faregas-wizard.validation';
 import { useErroresPaso, PanelResumenErroresWizard, estructurarErroresPaso } from './faregas-wizard-errores';
 import { calcularMedioPago } from './faregas-facturacion.utils';
 import { indicePasoVisual, puedeRetrocederWizard } from './faregas-emision';
 import { manejarNavegacionFormulario, normalizarEnteroCertificado } from './faregas-formulario-operativo';
-import { descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
+import { descargarPdfFaregas, descargarPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { normalizarCombustibleGnvAnual } from './faregas-certificado-campos';
 import { ControlAutosave, crearSnapshotAutosave } from './autosave-control';
 import { esGlpInicial, normalizarCategoriaRecuperada, normalizarCombustibleRecuperado } from './normalizar-recuperacion-vehiculo';
@@ -387,6 +387,11 @@ function NuevoCertificadoWizard() {
     await descargarPdfNubefact(certificadoId);
   };
 
+  const descargarComprobanteComercialFaregas = async () => {
+    if (!certificadoId) return;
+    await descargarPdfFaregas(certificadoId);
+  };
+
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [furthestStepIndex, setFurthestStepIndex] = useState(0);
   const [minimumEditableStepIndex, setMinimumEditableStepIndex] = useState(0);
@@ -459,45 +464,6 @@ function NuevoCertificadoWizard() {
       setPrecioTotal(importe);
     }
   };
-
-  const onDescuentoChange = React.useCallback(
-    (desc: ConsultaDescuentoResult | null) => {
-      const precioChip = Number(resumenComercial?.precioChip || 0);
-      if (desc) {
-        setPrecioSubtotal(desc.tarifaOriginal);
-        setDescuento(desc.importeDescuento);
-        setPrecioTotal(desc.importeFinal + precioChip);
-        setDescuentoAplicado(desc);
-        if (desc.autorizaGratuidad) {
-          setFormFacturacion((prev) => ({
-            ...prev,
-            condicionPagoFac: 'CONTADO',
-            cuotasFac: [],
-          }));
-        }
-        setResumenComercial((actual) => actual ? {
-          ...actual,
-          precioCertificado: desc.tarifaOriginal,
-          descuentoCertificado: desc.importeDescuento,
-          certificadoNeto: desc.importeFinal,
-          importeTotal: desc.importeFinal + precioChip,
-        } : actual);
-      } else {
-        setDescuento(0);
-        setDescuentoAplicado(null);
-        setPrecioTotal(precioSubtotal + precioChip);
-        setResumenComercial((actual) => actual ? {
-          ...actual,
-          descuentoCertificado: 0,
-          certificadoNeto: precioSubtotal,
-          importeTotal: precioSubtotal + precioChip,
-        } : actual);
-      }
-    },
-    [precioSubtotal, resumenComercial]
-  );
-
-
 
   // Form State (Caja)
   const [formCaja, setFormCaja] = useState<FormCajaState>({
@@ -592,6 +558,46 @@ function NuevoCertificadoWizard() {
     }).map((cuota) => ({ ...cuota, importe: String(cuota.importe) })),
     [formFacturacion.condicionPagoFac, formFacturacion.tipoDocFac, formFacturacion.cuotasFac, formFacturacion.fechaVencimientoFac, pagosAgregados, precioTotal, descuentoAplicado, formCaja.spotNaturaleza, formCaja.spotSujetoDetraccion, formCaja.spotCodigo, formCaja.spotPorcentaje, tipoItemSpotPago, maestrosPago?.politicaSpot?.umbralComercial]
   );
+
+  const onDescuentoChange = React.useCallback((desc: ConsultaDescuentoResult | null) => {
+    // Defensa adicional de UI: el backend también rechaza toda combinación
+    // CRÉDITO + descuento/cortesía.
+    if (desc && formFacturacion.condicionPagoFac === 'CREDITO' && !desc.autorizaGratuidad) return;
+    const precioChip = Number(resumenComercial?.precioChip || 0);
+    const precioCertificado = desc ? Number(desc.importeFinal) : precioSubtotal;
+    const importeTotal = sumarImportesPEN(precioCertificado, precioChip);
+    if (!Number.isFinite(importeTotal)) return;
+
+    setPrecioSubtotal(desc?.tarifaOriginal ?? precioSubtotal);
+    setDescuento(desc?.importeDescuento ?? 0);
+    setPrecioTotal(desc?.autorizaGratuidad ? 0 : importeTotal);
+    setDescuentoAplicado(desc);
+    setResumenComercial((actual) => actual ? {
+      ...actual,
+      precioCertificado: desc?.tarifaOriginal ?? precioSubtotal,
+      descuentoCertificado: desc?.importeDescuento ?? 0,
+      certificadoNeto: desc?.importeFinal ?? precioSubtotal,
+      importeTotal: desc?.autorizaGratuidad ? 0 : importeTotal,
+    } : actual);
+
+    if (desc?.autorizaGratuidad) {
+      setFormFacturacion((prev) => ({ ...prev, condicionPagoFac: 'CONTADO', cuotasFac: [] }));
+    }
+  }, [formFacturacion.condicionPagoFac, precioSubtotal, resumenComercial?.precioChip]);
+
+  const confirmarCambioACortesia = React.useCallback(async () => {
+    if (formFacturacion.condicionPagoFac === 'CREDITO') {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'La cortesía requiere CONTADO',
+        text: 'Primero cambie la condición a CONTADO y descarte el plan de cuotas. Después podrá aplicar la cortesía.',
+        confirmButtonText: 'ENTENDIDO',
+        confirmButtonColor: '#052a79',
+      });
+      return false;
+    }
+    return true;
+  }, [formFacturacion.condicionPagoFac]);
 
   const titularPrincipal = React.useMemo(
     () => [...titulares].sort((a, b) => a.orden - b.orden)[0] || null,
@@ -1817,7 +1823,6 @@ function NuevoCertificadoWizard() {
   };
 
   const guardarPasoPagoCompleto = async (idBorrador: number, exigirFacturacion = false) => {
-    const resumenPago = await guardarPasoPagos(idBorrador);
     const cuotas = formFacturacion.condicionPagoFac === 'CREDITO' ? cuotasCreditoResueltas : [];
     const erroresPago = validarPasoPago({
       tipoComprobante: formFacturacion.tipoDocFac,
@@ -1828,14 +1833,18 @@ function NuevoCertificadoWizard() {
       fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
       cuotas,
       esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
+      descuentoActivo: Number(descuento) > 0 || Boolean(descuentoAplicado && Number(descuentoAplicado.importeDescuento) > 0),
       spotServicio: { naturalezaSpot: formCaja.spotNaturaleza, sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
       tipoItemSpot: tipoItemSpotPago,
       umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
     });
     const erroresCliente = validarDatosFacturacionCampos(formFacturacion);
     const primerError = Object.values({ ...erroresCliente, ...erroresPago })[0];
+    if (primerError && (exigirFacturacion || formFacturacion.condicionPagoFac === 'CREDITO')) {
+      throw new Error(primerError);
+    }
+    const resumenPago = await guardarPasoPagos(idBorrador);
     if (primerError) {
-      if (exigirFacturacion) throw new Error(primerError);
       return resumenPago;
     }
 
@@ -1922,18 +1931,37 @@ function NuevoCertificadoWizard() {
   }, [certificadoId, loading, loadingRegistro, soloLectura, modoRectificacion, currentStepIndex, snapshotVehiculoAutosave, estadoVehiculoActual, formCaja.tipo_flujo, formatoFormulario]);
 
   useEffect(() => {
-    if (!certificadoId || loading || loadingRegistro || soloLectura || modoRectificacion || currentStepIndex !== indicePaso('PAGO') || precioTotal <= 0) return;
+    if (!certificadoId || loading || loadingRegistro || isSavingStep || soloLectura || modoRectificacion || currentStepIndex !== indicePaso('PAGO') || precioTotal <= 0) return;
     if (autosaveControlRef.current.estaPersistido('PAGO', snapshotPagoAutosave)) return;
+    if (formFacturacion.condicionPagoFac === 'CREDITO' && Number(descuento) > 0) return;
+    if (formFacturacion.condicionPagoFac === 'CREDITO') {
+      const erroresPagoCredito = validarPasoPago({
+        tipoComprobante: formFacturacion.tipoDocFac,
+        condicionPago: formFacturacion.condicionPagoFac,
+        pagos: pagosAgregados,
+        precioTotal,
+        fechaInicioCredito: formFacturacion.fechaInicioCreditoFac,
+        fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
+        cuotas: cuotasCreditoResueltas,
+        esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
+        descuentoActivo: Number(descuento) > 0 || Boolean(descuentoAplicado && Number(descuentoAplicado.importeDescuento) > 0),
+        spotServicio: { naturalezaSpot: formCaja.spotNaturaleza, sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
+        tipoItemSpot: tipoItemSpotPago,
+        umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
+      });
+      if (Object.keys(erroresPagoCredito).length > 0 || Object.keys(validarDatosFacturacionCampos(formFacturacion)).length > 0) return;
+    }
     if (formFacturacion.condicionPagoFac === 'CREDITO'
       && (!formFacturacion.fechaInicioCreditoFac
         || !formFacturacion.fechaVencimientoFac
         || formFacturacion.fechaVencimientoFac < formFacturacion.fechaInicioCreditoFac)) return;
     const timer = window.setTimeout(() => {
+      if (isSavingStep) return;
       void encolarAutosave('PAGO', snapshotPagoAutosave, () => guardarPasoPagoCompleto(certificadoId)).catch(() => undefined);
     }, 1200);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [certificadoId, loading, loadingRegistro, soloLectura, modoRectificacion, currentStepIndex, snapshotPagoAutosave, precioTotal, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac]);
+  }, [certificadoId, loading, loadingRegistro, isSavingStep, soloLectura, modoRectificacion, currentStepIndex, snapshotPagoAutosave, snapshotFacturacionAutosave, precioTotal, descuento, formFacturacion.condicionPagoFac, formFacturacion.fechaInicioCreditoFac, formFacturacion.fechaVencimientoFac]);
 
   const eliminarTitularBorrador = async (titular: TitularState) => {
     if (!certificadoId || !titular.titularId) return;
@@ -2357,6 +2385,7 @@ function NuevoCertificadoWizard() {
         // Un borrador histórico guardado en PAGO conserva esa pantalla, pero no
         // puede saltar los datos técnicos que ahora aparecen antes en el flujo.
         if (exigirDatosTecnicosCompletos(true)) return;
+        if (bloquearPaso(validarDatosFacturacionCampos(formFacturacion))) return;
         if (bloquearPaso(validarPasoPago({
           tipoComprobante: formFacturacion.tipoDocFac,
           condicionPago: formFacturacion.condicionPagoFac,
@@ -2366,6 +2395,7 @@ function NuevoCertificadoWizard() {
           fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
           cuotas: cuotasCreditoResueltas,
           esCortesia: Boolean(descuentoAplicado?.autorizaGratuidad),
+          descuentoActivo: Number(descuento) > 0 || Boolean(descuentoAplicado && Number(descuentoAplicado.importeDescuento) > 0),
           spotServicio: { naturalezaSpot: formCaja.spotNaturaleza, sujetoDetraccion: formCaja.spotSujetoDetraccion, codigoSpot: formCaja.spotCodigo, porcentajeSpot: formCaja.spotPorcentaje },
           tipoItemSpot: tipoItemSpotPago,
           umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
@@ -2451,9 +2481,39 @@ function NuevoCertificadoWizard() {
     } else if (STEPS[currentStepIndex].id === 'pago' && certificadoId) {
       setIsSavingStep(true);
       try {
-        await guardarPasoPagoCompleto(certificadoId);
+        await autosaveQueueRef.current.catch(() => undefined);
+        while (true) {
+          try {
+            await guardarPasoPagoCompleto(certificadoId);
+            autosaveControlRef.current.confirmar('PAGO', snapshotPagoAutosave);
+            setLastSavedAt(new Date());
+            setSaveError('');
+            break;
+          } catch (e: any) {
+            const mensaje = mensajeErrorConEstadoHttp(e, 'No se pudieron guardar los pagos.');
+            setSaveError(mensaje);
+            autosaveControlRef.current.fallar('PAGO', snapshotPagoAutosave);
+            const decision = await Swal.fire({
+              icon: 'error',
+              title: 'No se pudo guardar el pago',
+              text: `${mensaje} Los datos siguen en pantalla. Puede reintentar, quedarse o volver al paso anterior sin guardar.`,
+              showDenyButton: true,
+              showCancelButton: true,
+              confirmButtonText: 'REINTENTAR',
+              denyButtonText: 'VOLVER SIN GUARDAR',
+              cancelButtonText: 'QUEDARME',
+              confirmButtonColor: '#052A79',
+              denyButtonColor: '#b91c1c',
+            });
+            if (decision.isDenied) {
+              setCurrentStepIndex(destino);
+              return;
+            }
+            if (!decision.isConfirmed) return;
+          }
+        }
       } catch (e: any) {
-        Swal.fire('No se pudo guardar', mensajeErrorConEstadoHttp(e, 'No se cambió de paso para evitar perder los pagos.'), 'error');
+        Swal.fire('No se pudo guardar', mensajeErrorConEstadoHttp(e, 'Los datos siguen en pantalla. Puede reintentar o volver sin guardar.'), 'error');
         return;
       } finally {
         setIsSavingStep(false);
@@ -3170,8 +3230,170 @@ function NuevoCertificadoWizard() {
               certificadoId={certificadoId}
               descuentoActual={descuentoAplicado}
               onDescuentoChange={onDescuentoChange}
-              onCondicionPagoChange={(condicionPago) => {
+              confirmarCambioACortesia={confirmarCambioACortesia}
+              onCondicionPagoChange={async (condicionPago) => {
+                if (isSavingStep) return;
                 if (formFacturacion.tipoDocFac === 'BOLETA' && condicionPago === 'CREDITO') return;
+                if (condicionPago === formFacturacion.condicionPagoFac) return;
+                if (condicionPago === 'CREDITO' && pagosAgregados.some((pago) => Boolean(pago.id))) {
+                  await Swal.fire({
+                    icon: 'warning',
+                    title: 'No se puede cambiar a crédito',
+                    text: 'Esta operación ya tiene pagos confirmados en caja. Se conservarán intactos; no se convertirán en cuotas. Mantenga CONTADO o regularice los cobros por el proceso autorizado.',
+                    confirmButtonText: 'ENTENDIDO',
+                  });
+                  return;
+                }
+                if (condicionPago === 'CREDITO') {
+                  const pagosLocales = pagosAgregados.filter((pago) => !pago.id);
+                  const hayBeneficio = Boolean(descuentoAplicado) || Number(descuento) > 0;
+                  if (hayBeneficio && !descuentoAplicado) {
+                    await Swal.fire(
+                      'No se pudo cambiar a crédito',
+                      'El borrador tiene un descuento sin detalle recuperable. Recargue el borrador o regularice el descuento desde CONTADO antes de continuar.',
+                      'warning',
+                    );
+                    return;
+                  }
+                  if (descuentoAplicado || pagosLocales.length > 0) {
+                    const totalOriginal = descuentoAplicado ? sumarImportesPEN(
+                      Number(descuentoAplicado.tarifaOriginal),
+                      Number(resumenComercial?.precioChip || 0),
+                    ) : precioTotal;
+                    const pagoLocalTotal = pagosLocales.reduce((total, pago) => total + Number(pago.importe || 0), 0);
+                    const accionesConfirmacion = [
+                      descuentoAplicado
+                        ? `Se retirará ${descuentoAplicado.autorizaGratuidad ? 'la cortesía' : 'el descuento'} y el importe volverá a <strong>S/ ${totalOriginal.toFixed(2)}</strong>.`
+                        : '',
+                      pagosLocales.length > 0
+                        ? `Se descartarán únicamente los pagos todavía no guardados por <strong>S/ ${pagoLocalTotal.toFixed(2)}</strong>.`
+                        : '',
+                      'Se generará un nuevo plan de cuotas. No se registrará ningún cobro automáticamente.'
+                    ].filter(Boolean).map((texto) => `<p class="mt-2">${texto}</p>`).join('');
+                    const confirmacion = await Swal.fire({
+                      icon: 'warning',
+                      title: 'Confirmar cambio a crédito',
+                      html: `<p>CRÉDITO no admite descuentos, cortesías ni pagos iniciales.</p>${accionesConfirmacion}<p class="mt-2">Si cancela, la configuración actual seguirá igual.</p>`,
+                      showCancelButton: true,
+                      confirmButtonText: 'CONFIRMAR Y CAMBIAR',
+                      cancelButtonText: 'CANCELAR',
+                      confirmButtonColor: '#052a79',
+                    });
+                    if (!confirmacion.isConfirmed) return;
+                    if (descuentoAplicado && !certificadoId) {
+                      await Swal.fire('No se pudo cambiar', 'Guarde primero el borrador para poder retirar el descuento de forma segura.', 'warning');
+                      return;
+                    }
+                    if (descuentoAplicado) {
+                      setIsSavingStep(true);
+                      try {
+                        await autosaveQueueRef.current.catch(() => undefined);
+                        await quitarDescuentoBorrador(certificadoId!);
+                      } catch (error: any) {
+                        await Swal.fire(
+                          'No se retiró el descuento',
+                          mensajeErrorConEstadoHttp(error, 'El descuento y los importes siguen sin cambios. Reintente o continúe en CONTADO.'),
+                          'error',
+                        );
+                        return;
+                      } finally {
+                        setIsSavingStep(false);
+                      }
+                    }
+
+                    if (descuentoAplicado) {
+                      setPrecioSubtotal(Number(descuentoAplicado.tarifaOriginal));
+                      setDescuento(0);
+                      setPrecioTotal(totalOriginal);
+                      setDescuentoAplicado(null);
+                      setResumenComercial((actual) => actual ? {
+                        ...actual,
+                        precioCertificado: Number(descuentoAplicado.tarifaOriginal),
+                        descuentoCertificado: 0,
+                        certificadoNeto: Number(descuentoAplicado.tarifaOriginal),
+                        importeTotal: totalOriginal,
+                      } : actual);
+                    }
+                    if (pagosLocales.length > 0) {
+                      setPagosAgregados((actuales) => actuales.filter((pago) => Boolean(pago.id)));
+                      setFormPago({ importe: '', tarjetaKey: '', modalidadTarjeta: '', entidadFinancieraKey: '', cuentaCorrienteKey: '', nroOperacion: '', fechaDeposito: fechaLocalIso() });
+                    }
+                    limpiarErrorCampo('pagos');
+                    limpiarErrorCampo('fechaInicioCredito');
+                    limpiarErrorCampo('fechaVencimientoCredito');
+                    limpiarErrorCampo('cuotas');
+                    const inicioCredito = formFacturacion.fechaInicioCreditoFac || fechaLocalIso();
+                    const cuotasRestauradas = resolverCuotasCredito({
+                      condicionPago: 'CREDITO',
+                      tipoComprobante: formFacturacion.tipoDocFac,
+                      pagos: [],
+                      precioTotal: totalOriginal,
+                      fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
+                      cuotas: [],
+                      spotServicio: {
+                        naturalezaSpot: formCaja.spotNaturaleza,
+                        sujetoDetraccion: formCaja.spotSujetoDetraccion,
+                        codigoSpot: formCaja.spotCodigo,
+                        porcentajeSpot: formCaja.spotPorcentaje,
+                      },
+                      tipoItemSpot: tipoItemSpotPago,
+                      umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
+                    }).map((cuota) => ({ ...cuota, importe: String(cuota.importe) }));
+                    setFormFacturacion((prev) => ({
+                      ...prev,
+                      condicionPagoFac: 'CREDITO',
+                      fechaInicioCreditoFac: inicioCredito,
+                      cuotasFac: cuotasRestauradas,
+                      medioPagoFac: '',
+                    }));
+                    return;
+                  }
+
+                  const inicioCredito = formFacturacion.fechaInicioCreditoFac || fechaLocalIso();
+                  const cuotasCredito = resolverCuotasCredito({
+                    condicionPago: 'CREDITO',
+                    tipoComprobante: formFacturacion.tipoDocFac,
+                    pagos: [],
+                    precioTotal,
+                    fechaVencimientoCredito: formFacturacion.fechaVencimientoFac,
+                    cuotas: [],
+                    esCortesia: false,
+                    spotServicio: {
+                      naturalezaSpot: formCaja.spotNaturaleza,
+                      sujetoDetraccion: formCaja.spotSujetoDetraccion,
+                      codigoSpot: formCaja.spotCodigo,
+                      porcentajeSpot: formCaja.spotPorcentaje,
+                    },
+                    tipoItemSpot: tipoItemSpotPago,
+                    umbralComercialSpot: maestrosPago?.politicaSpot?.umbralComercial,
+                  }).map((cuota) => ({ ...cuota, importe: String(cuota.importe) }));
+                  limpiarErrorCampo('pagos');
+                  limpiarErrorCampo('fechaInicioCredito');
+                  limpiarErrorCampo('fechaVencimientoCredito');
+                  limpiarErrorCampo('cuotas');
+                  setFormFacturacion((prev) => ({
+                    ...prev,
+                    condicionPagoFac: 'CREDITO',
+                    fechaInicioCreditoFac: inicioCredito,
+                    cuotasFac: cuotasCredito,
+                    medioPagoFac: '',
+                  }));
+                  return;
+                }
+                if (condicionPago === 'CONTADO'
+                  && formFacturacion.condicionPagoFac === 'CREDITO'
+                  && formFacturacion.cuotasFac.length > 0) {
+                  const confirmacion = await Swal.fire({
+                    icon: 'warning',
+                    title: 'Descartar el plan de cuotas',
+                    text: 'El plan de crédito guardado se eliminará de esta operación. No se registrará ningún pago automáticamente.',
+                    showCancelButton: true,
+                    confirmButtonText: 'DESCARTAR PLAN Y CONTINUAR',
+                    cancelButtonText: 'MANTENER CRÉDITO',
+                    confirmButtonColor: '#052a79',
+                  });
+                  if (!confirmacion.isConfirmed) return;
+                }
                 limpiarErrorCampo('pagos');
                 limpiarErrorCampo('fechaInicioCredito');
                 limpiarErrorCampo('fechaVencimientoCredito');
@@ -3352,7 +3574,12 @@ function NuevoCertificadoWizard() {
               )}
               {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && facturacion?.enlacePdf && (
                 <button type="button" onClick={() => void descargarComprobanteOficial()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50" title="Descargar PDF oficial de NubeFact">
-                  VER / DESCARGAR COMPROBANTE
+                  PDF FISCAL NUBEFACT
+                </button>
+              )}
+              {certificadoEstado === 'EMITIDO' && currentStepIndex === STEPS.length - 1 && facturacion?.enlacePdfFaregas && (
+                <button type="button" onClick={() => void descargarComprobanteComercialFaregas()} className="rounded-lg border border-cyan-200 bg-cyan-50 px-5 py-2.5 text-xs font-black text-cyan-800 hover:bg-cyan-100" title="Descargar representación comercial complementaria FAREGAS">
+                  PDF COMERCIAL FAREGAS
                 </button>
               )}
               <button type="button" onClick={salirAlInicio} className="rounded-lg bg-[#052a79] px-6 py-2.5 text-xs font-black text-white">
@@ -3364,7 +3591,12 @@ function NuevoCertificadoWizard() {
               <div className="flex items-center gap-3">
                 {facturacion?.enlacePdf && (
                   <button type="button" onClick={() => void descargarComprobanteOficial()} className="rounded-lg border border-blue-200 bg-white px-5 py-2.5 text-xs font-black text-blue-800 hover:bg-blue-50" title="Descargar PDF oficial de NubeFact">
-                    VER / DESCARGAR COMPROBANTE
+                    PDF FISCAL NUBEFACT
+                  </button>
+                )}
+                {facturacion?.enlacePdfFaregas && (
+                  <button type="button" onClick={() => void descargarComprobanteComercialFaregas()} className="rounded-lg border border-cyan-200 bg-cyan-50 px-5 py-2.5 text-xs font-black text-cyan-800 hover:bg-cyan-100" title="Descargar representación comercial complementaria FAREGAS">
+                    PDF COMERCIAL FAREGAS
                   </button>
                 )}
                 {isEmitido && (

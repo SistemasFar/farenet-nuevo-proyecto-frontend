@@ -3,6 +3,7 @@ import { ExternalLink, FileSearch, Loader2, RefreshCw, X, Receipt } from 'lucide
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { faregasCertificadosApi } from '../../../services/faregas-certificados.api';
+import { abrirPdfFaregas } from '../../../services/faregas-comprobante-visor.service';
 import {
   faregasFacturacionAdminApi,
   type DocumentoFacturacionAdmin,
@@ -188,7 +189,17 @@ export default function TabDocumentosFacturacion() {
           <button type="button" onClick={() => navigate(`/faregas/certificados/${documento.certificadoId}/continuar`)} className={`${claseAccion} border-blue-200 bg-white text-blue-800`}>Certificado</button>
         )}
         {documento.enlacePdf && (
-          <a href={documento.enlacePdf} target="_blank" rel="noreferrer" className={`${claseAccion} border-slate-200 bg-white text-slate-700`}>PDF <ExternalLink className="h-3 w-3" /></a>
+          <a href={documento.enlacePdf} target="_blank" rel="noreferrer" className={`${claseAccion} border-slate-200 bg-white text-slate-700`}>PDF NubeFact <ExternalLink className="h-3 w-3" /></a>
+        )}
+        {(documento.enlacePdf || documento.enlacePdfFaregas) && (documento.certificadoId != null || documento.id != null) && (
+          <button
+            type="button"
+            onClick={() => void (documento.certificadoId != null ? abrirPdfFaregas(documento.certificadoId) : abrirPdfFaregas(documento.id, { porFacturacionId: true }))}
+            className={`${claseAccion} border-blue-200 bg-blue-50 text-blue-800`}
+            title="Ver representación comercial complementaria con detalle de descuento de FAREGAS"
+          >
+            PDF comercial FAREGAS
+          </button>
         )}
         {anulacionPendiente && (
           <button disabled={procesandoId === documento.id} type="button" onClick={() => void consultarAnulacion(documento)} className={`${claseAccion} border-amber-200 bg-amber-50 text-amber-800`}><RefreshCw className={`h-3 w-3 ${procesandoId === documento.id ? 'animate-spin' : ''}`} /> Consultar anulación</button>
@@ -523,7 +534,17 @@ function DetalleModal({ detalle, onClose, onActualizado }: { detalle: DetalleSta
           </div>
 
           <div className="flex flex-wrap gap-3">
-            {docDetalle.enlacePdf && <a target="_blank" rel="noreferrer" href={docDetalle.enlacePdf} className="rounded-lg bg-[#052a79] px-4 py-2 font-bold text-white">PDF</a>}
+            {docDetalle.enlacePdf && <a target="_blank" rel="noreferrer" href={docDetalle.enlacePdf} className="rounded-lg bg-[#052a79] px-4 py-2 font-bold text-white">PDF NubeFact</a>}
+            {(docDetalle.enlacePdf || docDetalle.enlacePdfFaregas) && (docDetalle.certificadoId != null || docDetalle.id != null) && (
+              <button
+                type="button"
+                onClick={() => void (docDetalle.certificadoId != null ? abrirPdfFaregas(docDetalle.certificadoId) : abrirPdfFaregas(docDetalle.id, { porFacturacionId: true }))}
+                className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 font-bold text-blue-800"
+                title="Ver representación comercial complementaria con detalle de descuento de FAREGAS"
+              >
+                PDF comercial FAREGAS
+              </button>
+            )}
             {docDetalle.enlaceXml && <a target="_blank" rel="noreferrer" href={docDetalle.enlaceXml} className="rounded-lg border px-4 py-2 font-bold">XML</a>}
             {docDetalle.enlaceCdr && <a target="_blank" rel="noreferrer" href={docDetalle.enlaceCdr} className="rounded-lg border px-4 py-2 font-bold">CDR</a>}
           </div>

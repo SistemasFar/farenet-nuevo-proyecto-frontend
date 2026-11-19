@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ForbiddenView } from '@/core/views/ForbiddenView';
 import TabSedes from './TabSedes';
 import TabCatalogo from './components/TabCatalogo';
 import TabTarifas from './components/TabTarifas';
@@ -13,8 +15,7 @@ import {
 // Esta vista conserva los correlativos cuando el usuario tiene CONFIGURACION_SERIES
 // o MENU_FACTURACION_SERIES, permisos que también valida el backend.
 export function FaregasConfiguracionView() {
-  const [activeTab, setActiveTab] = useState<ConfiguracionTabId | null>(null);
-  
+  const [searchParams] = useSearchParams();
   
   let fUser: { permisos?: string[] } = {};
   try {
@@ -36,6 +37,25 @@ export function FaregasConfiguracionView() {
     hasCatalogo,
     tabs,
   } = resolverPermisosConfiguracionFaregas(permisos);
+
+  const tabFromQuery = searchParams.get('tab')?.toUpperCase() as ConfiguracionTabId | undefined;
+  const initialTab = (tabFromQuery && tabs.some((tab) => tab.id === tabFromQuery))
+    ? tabFromQuery
+    : (tabs[0]?.id ?? null);
+
+  const [activeTab, setActiveTab] = useState<ConfiguracionTabId | null>(initialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab')?.toUpperCase() as ConfiguracionTabId | undefined;
+    if (tabParam && tabs.some((tab) => tab.id === tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams, tabs]);
+
+  if (tabs.length === 0) {
+    return <ForbiddenView />;
+  }
+
   const tabVisible = tabs.some((tab) => tab.id === activeTab)
     ? activeTab
     : tabs[0]?.id;

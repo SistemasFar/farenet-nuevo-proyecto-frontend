@@ -597,12 +597,30 @@ type DatosPago = {
   cuotas?: Array<{ numeroCuota: number; fechaPago: string; importe: string | number }>;
   esCortesia?: boolean;
   autorizaGratuidad?: boolean;
+  descuentoActivo?: boolean;
   spotServicio?: { naturalezaSpot?: 'BIEN' | 'SERVICIO' | null; sujetoDetraccion?: boolean | null; codigoSpot?: string | null; porcentajeSpot?: number | null } | null;
   tipoItemSpot?: 'PRODUCTO' | 'SERVICIO' | 'MIXTO';
   umbralComercialSpot?: number;
 };
 
 const redondearMoneda = (valor: number) => Math.round((valor + Number.EPSILON) * 100) / 100;
+
+const aCentavosPEN = (valor: number | string) => {
+  const texto = String(valor ?? '').trim();
+  if (!/^-?(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(texto)) return null;
+  const negativo = texto.startsWith('-');
+  const [entero = '0', decimal = ''] = texto.replace(/^-/, '').split('.');
+  const centavos = BigInt(entero || '0') * 100n + BigInt(decimal.padEnd(2, '0') || '0');
+  return negativo ? -centavos : centavos;
+};
+
+const deCentavosPEN = (centavos: bigint) => Number(centavos) / 100;
+
+export const sumarImportesPEN = (...importes: Array<number | string>) => {
+  const valoresCentavos = importes.map(aCentavosPEN);
+  if (valoresCentavos.some(valor => valor == null)) return Number.NaN;
+  return deCentavosPEN(valoresCentavos.reduce<bigint>((total, valor) => total + (valor ?? 0n), 0n));
+};
 
 export interface EvaluacionSpotWizard {
   aplica: boolean;
@@ -742,7 +760,7 @@ export const resolverCuotasCredito = ({
   tipoItemSpot,
   umbralComercialSpot,
 }: Pick<DatosPago, 'condicionPago' | 'tipoComprobante' | 'pagos' | 'precioTotal' | 'fechaVencimientoCredito' | 'cuotas' | 'esCortesia' | 'spotServicio' | 'tipoItemSpot' | 'umbralComercialSpot'>) => {
-  if (condicionPago !== 'CREDITO') return [];
+  if (condicionPago !== 'CREDITO' || pagos.length > 0) return [];
   const evaluacionSpot = evaluarSpotWizard({
     tipoComprobante,
     total: precioTotal,
@@ -772,6 +790,24 @@ export const resolverCuotasCredito = ({
   }));
 };
 
+/** Recalcula importes conservando el número de cuotas y sus vencimientos. */
+export const redistribuirImportesCuotas = <T extends { numeroCuota: number; fechaPago: string; importe: number | string }>(
+  saldoAFinanciar: number,
+  cuotas: T[],
+): Array<Omit<T, 'importe'> & { importe: string }> => {
+  if (cuotas.length === 0) return [];
+  if (cuotas.length > 3) return cuotas.map(cuota => ({ ...cuota, importe: String(cuota.importe) }));
+  const totalCentavos = aCentavosPEN(saldoAFinanciar);
+  if (totalCentavos == null || totalCentavos <= 0n) return [];
+  const cantidad = BigInt(cuotas.length);
+  const base = totalCentavos / cantidad;
+  const residuo = totalCentavos % cantidad;
+  return cuotas.map((cuota, index) => {
+    const monto = index === cuotas.length - 1 ? base + residuo : base;
+    return { ...cuota, numeroCuota: index + 1, importe: deCentavosPEN(monto).toFixed(2) };
+  });
+};
+
 /**
  * Reglas de pago ya existentes en el asistente, expresadas por campo.
  * CONTADO exige el total exigible en caja (neto SPOT cuando aplica FACTURA > 700);
@@ -787,6 +823,7 @@ export const validarPasoPago = ({
   cuotas = [],
   esCortesia = false,
   autorizaGratuidad = false,
+  descuentoActivo = false,
   spotServicio,
   tipoItemSpot,
   umbralComercialSpot,
@@ -807,6 +844,13 @@ export const validarPasoPago = ({
 
   if (!['BOLETA', 'FACTURA'].includes(String(tipoComprobante || '').toUpperCase())) {
     errores.tipoDocFac = 'Debe seleccionar BOLETA o FACTURA para continuar.';
+  }
+
+  if (esCredito && (descuentoActivo || esCortesia || autorizaGratuidad)) {
+    errores.pagos = esCortesia || autorizaGratuidad
+      ? 'Una operación de cortesía no admite condición a crédito.'
+      : 'CRÉDITO no admite descuentos ni cortesías. Vuelva a CONTADO y retire el beneficio antes de continuar.';
+    return errores;
   }
 
   if (esCortesia || autorizaGratuidad) {
@@ -840,6 +884,10 @@ export const validarPasoPago = ({
     } else if (fechaInicioCredito && fechaVencimientoCredito && fechaVencimientoCredito < fechaInicioCredito) {
       errores.fechaVencimientoCredito = 'La fecha de vencimiento no puede ser anterior a la fecha de inicio.';
     }
+    if (pagos.length > 0) {
+      errores.pagos = 'El crédito puro no admite cobros iniciales. Cambie a CONTADO o regularice los pagos existentes antes de continuar.';
+      return errores;
+    }
   }
 
   if (!esCredito && Math.abs(totalPagado - exigibleCaja) > 0.009) {
@@ -848,13 +896,13 @@ export const validarPasoPago = ({
   }
   if (esCredito && totalPagado >= exigibleCaja - 0.009) {
     errores.pagos = 'Una venta a crédito debe conservar un saldo pendiente. Cambie la condición a CONTADO o reduzca el pago inicial.';
-  } else if (esCredito) {
+  } else if (esCredito && pagos.length === 0) {
     if (cuotas.length === 0) {
       errores.cuotas = 'La factura a crédito requiere al menos una cuota.';
     } else if (cuotas.length > 3) {
       errores.cuotas = 'El crédito permite como máximo 3 cuotas.';
     } else {
-      let sumaCuotas = 0;
+      let sumaCuotasCentavos = 0n;
       const numerosVistos = new Set<number>();
       for (const cuota of cuotas) {
         if (numerosVistos.has(cuota.numeroCuota)) {
@@ -864,11 +912,16 @@ export const validarPasoPago = ({
         numerosVistos.add(cuota.numeroCuota);
 
         const importe = Number(cuota.importe || 0);
-        sumaCuotas += importe;
         if (!Number.isFinite(importe) || importe <= 0) {
           errores.cuotas = 'Cada cuota debe tener un monto mayor a cero.';
           break;
         }
+        const importeCentavos = aCentavosPEN(cuota.importe);
+        if (importeCentavos == null || importeCentavos <= 0n) {
+          errores.cuotas = 'El importe de cada cuota debe usar como máximo dos decimales.';
+          break;
+        }
+        sumaCuotasCentavos += importeCentavos;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(cuota.fechaPago || '')) {
           errores.cuotas = 'Cada cuota debe tener una fecha válida.';
           break;
@@ -882,7 +935,8 @@ export const validarPasoPago = ({
           break;
         }
       }
-      if (!errores.cuotas && Math.abs(redondearMoneda(sumaCuotas) - saldo) > 0.009) {
+      const saldoCentavos = aCentavosPEN(saldo);
+      if (!errores.cuotas && (saldoCentavos == null || sumaCuotasCentavos !== saldoCentavos)) {
         errores.cuotas = `Las cuotas deben sumar el saldo financiado de S/ ${saldo.toFixed(2)}.`;
       }
     }

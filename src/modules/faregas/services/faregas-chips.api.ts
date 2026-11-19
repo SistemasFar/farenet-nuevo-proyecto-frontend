@@ -184,8 +184,20 @@ export interface ValidacionChipVentaDirecta {
   validoParaVenta: boolean;
   codigo: string | null;
   motivo: string | null;
+  mensajeStockSede?: string | null;
+  stockSede?: StockSedeInfo | null;
   cantidad?: number;
   disponible?: number;
+}
+
+export interface StockSedeInfo {
+  plantaKey: string;
+  plantaNombre: string;
+  total: number;
+  disponible: number;
+  reservado: number;
+  vendido: number;
+  baja: number;
 }
 
 export interface ValidacionVentaDirectaResponse {
@@ -195,6 +207,7 @@ export interface ValidacionVentaDirectaResponse {
   totalEstimado: number;
   cantidadSolicitados: number;
   cantidadValidos: number;
+  stockSedeActual?: StockSedeInfo | null;
 }
 
 export interface ComprobanteVentaChip {
@@ -426,6 +439,7 @@ export const faregasChipsApi = {
   ) as Promise<{ ok: boolean; data: { id: number; estado: string } }>,
   historial: async (id:number) => (await faregasFetch(`/chips/${id}/movimientos`)).movimientos,
   listarProductosInventariables: async () => (await faregasFetch('/chips/productos')).productos as ProductoInventariable[],
+  listarProductosVendibles: async () => (await faregasFetch('/chips/productos/venta')).productos as ProductoInventariable[],
   catalogosProductosInventariables: async () => (await faregasFetch('/chips/productos/catalogos')) as {
     sedes: Array<{key:string;nombre:string}>;
     productosFiscales: ProductoFiscalChipOpcion[];

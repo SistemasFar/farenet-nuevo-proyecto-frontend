@@ -2,9 +2,9 @@ export type TipoCalculo = 'FLAT' | 'MONTO' | 'PORCENTAJE';
 
 export type BeneficioDescuento = {
   tipoCalculo: TipoCalculo;
-  valor: number | string;
-  valorContado: number | string;
-  valorCredito: number | string;
+  valor: number | string | null;
+  valorContado: number | string | null;
+  valorCredito: number | string | null;
 };
 
 export type ReglaDescuento = BeneficioDescuento & {
@@ -16,13 +16,22 @@ export type ServicioPorPlanta = {
   id?: number;
   codigo?: string;
   nombre: string;
+  familia?: string | null;
   categoria?: string;
+  categoria_codigo?: string | null;
   tipo_certificado_clave?: string | null;
   modalidad?: string | null;
   tipo_flujo?: string | null;
+  formato_codigo_canonico?: string | null;
   planta_key: string;
+  sede_nombre?: string | null;
   precio: number | null;
   tarifa_codigo?: string;
+  producto_facturacion_id?: number | null;
+  producto_sku?: string | null;
+  producto_descripcion?: string | null;
+  tarifaDisponible?: boolean;
+  productoDisponible?: boolean;
 };
 
 export type ServicioLogico = {
@@ -45,6 +54,26 @@ export const beneficioInicial = (): BeneficioDescuento => ({
 export const claveRegla = (plantaKey: string, servicioId: number) => `${plantaKey}:${servicioId}`;
 export const esDisponibilidadValida = (servicio: ServicioPorPlanta) => Number.isFinite(Number(servicio.precio)) && Number(servicio.precio) > 0;
 
+export const tieneMaximoDosDecimales = (valor: number | string | null | undefined) => {
+  if (valor === null || valor === undefined || valor === '') return true;
+  if (typeof valor === 'string') return /^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(valor.trim());
+  return Number.isFinite(valor) && /^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(String(valor));
+};
+
+const centavos = (valor: number | string | null | undefined): bigint | null => {
+  if (valor === null || valor === undefined) return null;
+  const texto = String(valor ?? '').trim();
+  if (!/^[+-]?(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(texto)) return null;
+  const negativo = texto.startsWith('-');
+  const sinSigno = texto.replace(/^[+-]/, '');
+  const [entero = '0', decimal = ''] = sinSigno.split('.');
+  const magnitud = BigInt(entero || '0') * 100n + BigInt(decimal.padEnd(2, '0') || '0');
+  return negativo ? -magnitud : magnitud;
+};
+const aSoles = (valorCentavos: bigint) => Number(valorCentavos) / 100;
+const redondearPorcentaje = (precioCentavos: bigint, porcentajeCentavos: bigint) =>
+  (precioCentavos * porcentajeCentavos + 5000n) / 10000n;
+
 const limpiarNombreServicio = (valor: string) => String(valor || '')
   .replace(/^\s*\d{2,}\s*[-—:]\s*/u, '')
   .replace(/\s+/g, ' ')
@@ -65,11 +94,20 @@ export const nombreServicioLogico = (servicio: Pick<ServicioPorPlanta, 'nombre'>
 };
 
 export const claveServicioLogico = (servicio: ServicioPorPlanta) => {
-  const tipo = normalizarTextoLogico(servicio.tipo_certificado_clave || servicio.categoria);
+  const tipo = normalizarTextoLogico(servicio.tipo_certificado_clave);
   const modalidad = normalizarTextoLogico(servicio.modalidad);
   const flujo = normalizarTextoLogico(servicio.tipo_flujo);
-  const nombre = normalizarTextoLogico(limpiarNombreServicio(servicio.nombre));
-  return [tipo || 'SIN_TIPO', modalidad || 'SIN_MODALIDAD', flujo || 'SIN_FLUJO', nombre].join('::');
+  const familia = normalizarTextoLogico(servicio.familia);
+  const formato = normalizarTextoLogico(servicio.formato_codigo_canonico);
+  if (tipo && flujo && familia && formato) {
+    return ['CONCEPTO', tipo, modalidad || 'SIN_MODALIDAD', flujo, familia, formato].join('::');
+  }
+  // Si el catálogo no tiene completa la identidad canónica, el ID global del
+  // servicio es la única equivalencia segura; el nombre/SKU no se usa como llave.
+  const servicioId = Number(servicio.id);
+  return Number.isInteger(servicioId) && servicioId > 0
+    ? `SERVICIO_ID::${servicioId}`
+    : `SERVICIO_SIN_IDENTIDAD::${String(servicio.codigo || '').trim().toUpperCase()}`;
 };
 
 export const agruparServiciosLogicos = (
@@ -82,7 +120,7 @@ export const agruparServiciosLogicos = (
   for (const item of disponibilidad) {
     const plantaKey = String(item.planta_key);
     const servicioId = Number(item.id);
-    if ((sedesSet && !sedesSet.has(plantaKey)) || !Number.isInteger(servicioId) || !esDisponibilidadValida(item)) continue;
+    if ((sedesSet && !sedesSet.has(plantaKey)) || !Number.isInteger(servicioId)) continue;
     const key = claveServicioLogico(item);
     const grupo = grupos.get(key) || {
       key,
@@ -94,7 +132,11 @@ export const agruparServiciosLogicos = (
       precios: [],
     };
     const existente = grupo.serviciosPorSede.get(plantaKey);
-    if (!existente || servicioId < Number(existente.id)) grupo.serviciosPorSede.set(plantaKey, item);
+    if (!existente
+      || (esDisponibilidadValida(item) && !esDisponibilidadValida(existente))
+      || (esDisponibilidadValida(item) === esDisponibilidadValida(existente) && servicioId < Number(existente.id))) {
+      grupo.serviciosPorSede.set(plantaKey, item);
+    }
     grupos.set(key, grupo);
   }
 
@@ -108,6 +150,20 @@ export const agruparServiciosLogicos = (
       };
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
+};
+
+export const precioMinimoCombinacionesSeleccionadas = (
+  disponibilidad: ServicioPorPlanta[],
+  sedes: Iterable<string>,
+  servicios: Iterable<string>,
+) => {
+  const serviciosSeleccionados = new Set(servicios);
+  const precios = agruparServiciosLogicos(disponibilidad, sedes)
+    .filter(grupo => serviciosSeleccionados.has(grupo.key))
+    .flatMap(grupo => [...grupo.serviciosPorSede.values()])
+    .filter(esDisponibilidadValida)
+    .map(servicio => Number(servicio.precio));
+  return precios.length ? Math.min(...precios) : null;
 };
 
 const buscarServicioDeRegla = (
@@ -227,6 +283,7 @@ export const construirReglasValidas = ({
   for (const grupo of agruparServiciosLogicos(disponibilidad, sedesSet)) {
     if (!serviciosSet.has(grupo.key)) continue;
     for (const [plantaKey, itemPredeterminado] of grupo.serviciosPorSede) {
+      if (!esDisponibilidadValida(itemPredeterminado)) continue;
       const previa = previas.get(`${plantaKey}::${grupo.key}`);
       const servicioPrevio = previa && buscarServicioDeRegla(disponibilidad, plantaKey, previa.servicioId);
       const conservaServicioPrevio = servicioPrevio
@@ -259,15 +316,107 @@ export const aplicarBeneficioGeneral = (
 
 export const calcularPrecioFinal = (precio: number, beneficio: BeneficioDescuento) => {
   if (!Number.isFinite(precio)) return null;
+  const precioCentavos = centavos(precio);
+  if (precioCentavos == null) return null;
   if (beneficio.tipoCalculo === 'FLAT') {
     const valor = valorComparable(beneficio.valorContado ?? beneficio.valorCredito);
-    return typeof valor === 'number' ? valor : null;
+    if (typeof valor !== 'number' || !tieneMaximoDosDecimales(valor)) return null;
+    const valorCentavos = centavos(valor);
+    return valorCentavos == null ? null : aSoles(valorCentavos);
   }
   const valor = valorComparable(beneficio.valor);
-  if (typeof valor !== 'number') return null;
-  return beneficio.tipoCalculo === 'MONTO'
-    ? Math.max(0, precio - valor)
-    : Math.max(0, precio * (1 - valor / 100));
+  if (typeof valor !== 'number' || !tieneMaximoDosDecimales(valor)) return null;
+  const valorCentavos = centavos(valor);
+  if (valorCentavos == null) return null;
+  const descuentoCentavos = beneficio.tipoCalculo === 'MONTO'
+    ? valorCentavos
+    : redondearPorcentaje(precioCentavos, valorCentavos);
+  return aSoles(precioCentavos > descuentoCentavos ? precioCentavos - descuentoCentavos : 0n);
+};
+
+export type ErrorReglaPrecio = {
+  plantaKey: string;
+  servicioId: number;
+  sede: string;
+  tipoCalculo: TipoCalculo;
+  precioVenta: number | null;
+  valorSolicitado: number | null;
+  valorIngresado: string | null;
+  motivo: string;
+};
+
+const evaluarReglaFrenteAPrecio = (precio: number, regla: BeneficioDescuento) => {
+  const valorIngresado = regla.tipoCalculo === 'FLAT' ? regla.valorContado : regla.valor;
+  const valor = Number(valorIngresado);
+  const precioCentavos = centavos(precio);
+  const valorCentavos = centavos(valorIngresado);
+  if (!tieneMaximoDosDecimales(valorIngresado)) {
+    return { valida: false, motivo: 'Use como máximo dos decimales; el valor no se redondeará automáticamente.' };
+  }
+  if (!Number.isFinite(precio) || precioCentavos == null || precioCentavos <= 0n || !Number.isFinite(valor) || valorCentavos == null || valorCentavos <= 0n) {
+    return { valida: false, motivo: 'El precio vigente o el valor del descuento no es válido.' };
+  }
+  let descuentoCentavos: bigint;
+  if (regla.tipoCalculo === 'FLAT') {
+    const descuento = precioCentavos - valorCentavos;
+    if (valorCentavos <= 0n || descuento <= 0n) {
+      return { valida: false, motivo: 'El precio final debe ser positivo y menor que el precio de venta.' };
+    }
+    descuentoCentavos = descuento;
+  } else if (regla.tipoCalculo === 'MONTO') {
+    descuentoCentavos = valorCentavos;
+    if (descuentoCentavos >= precioCentavos) {
+      return { valida: false, motivo: 'El descuento debe ser menor que el precio de venta.' };
+    }
+  } else if (regla.tipoCalculo === 'PORCENTAJE') {
+    if (valor >= 100) return { valida: false, motivo: 'El descuento comercial debe ser menor al 100 %.' };
+    descuentoCentavos = redondearPorcentaje(precioCentavos, valorCentavos);
+  } else {
+    return { valida: false, motivo: 'El tipo de cálculo no es válido.' };
+  }
+  if (descuentoCentavos <= 0n || precioCentavos - descuentoCentavos <= 0n) {
+    return { valida: false, motivo: 'El descuento dejaría el importe final en cero o negativo.' };
+  }
+  return { valida: true, motivo: '' };
+};
+
+export const validarReglasContraPrecios = (
+  reglas: ReglaDescuento[],
+  disponibilidad: ServicioPorPlanta[],
+  plantas: Array<{ key?: string; nombre: string }> = [],
+): ErrorReglaPrecio[] => {
+  const plantasPorKey = new Map(plantas.map(planta => [String(planta.key), planta.nombre]));
+  const errores: ErrorReglaPrecio[] = [];
+  for (const regla of reglas) {
+    const servicio = disponibilidad.find(item => String(item.planta_key) === String(regla.plantaKey)
+      && Number(item.id) === Number(regla.servicioId));
+    const precio = servicio && esDisponibilidadValida(servicio) ? Number(servicio.precio) : null;
+    const valores = regla.tipoCalculo === 'FLAT'
+      ? [regla.valorContado, regla.valorCredito].filter(valor => valor !== '' && valor != null)
+      : [regla.valor];
+    for (const valorRegla of valores) {
+      if (valorRegla === '' || valorRegla == null) continue;
+      const reglaActual = regla.tipoCalculo === 'FLAT'
+        ? { ...regla, valorContado: valorRegla }
+        : { ...regla, valor: valorRegla };
+      const evaluacion = precio == null
+        ? { valida: false, motivo: 'No existe una tarifa activa con precio de venta válido.' }
+        : evaluarReglaFrenteAPrecio(precio, reglaActual);
+      if (!evaluacion.valida) {
+        errores.push({
+          plantaKey: String(regla.plantaKey),
+          servicioId: Number(regla.servicioId),
+          sede: plantasPorKey.get(String(regla.plantaKey)) || servicio?.sede_nombre || String(regla.plantaKey),
+          tipoCalculo: regla.tipoCalculo,
+          precioVenta: precio,
+          valorSolicitado: Number.isFinite(Number(valorRegla)) ? Number(valorRegla) : null,
+          valorIngresado: valorRegla == null ? null : String(valorRegla),
+          motivo: evaluacion.motivo,
+        });
+      }
+    }
+  }
+  return errores;
 };
 
 export const tipoServicio = (servicio: Pick<ServicioPorPlanta, 'categoria' | 'nombre' | 'codigo'>) => {

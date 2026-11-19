@@ -116,6 +116,32 @@ export async function descargarPdfNubefact(certificadoId: number): Promise<boole
   }
 }
 
+export interface OpcionesDescargaPdfFaregas {
+  porFacturacionId?: boolean;
+}
+
+/** Descarga la representación comercial complementaria generada por FAREGAS. */
+export async function descargarPdfFaregas(
+  id: number,
+  options: OpcionesDescargaPdfFaregas = {},
+): Promise<boolean> {
+  try {
+    const endpoint = options.porFacturacionId
+      ? `/certificados/facturacion/${id}/pdf`
+      : `/certificados/borradores/${id}/facturacion/pdf`;
+    const blob = await faregasFetchBlob(endpoint);
+    descargarBlobComoArchivo(blob, `REPRESENTACION-COMERCIAL-FAREGAS-${id}.pdf`);
+    return true;
+  } catch (error) {
+    await Swal.fire(
+      'No se pudo descargar',
+      error instanceof Error ? error.message : 'No se pudo generar la representación comercial FAREGAS.',
+      'error',
+    );
+    return false;
+  }
+}
+
 export async function descargarCertificadoFaregas(certificadoId: number): Promise<boolean> {
   try {
     const blob = await faregasFetchBlob(`/certificados/borradores/${certificadoId}/certificado/pdf`);
@@ -166,6 +192,58 @@ export async function abrirPdfNubefact(
     await Swal.fire(
       'No se pudo abrir',
       error instanceof Error ? error.message : 'El PDF oficial de NubeFact no está disponible.',
+      'error',
+    );
+    return false;
+  }
+}
+
+/**
+ * Abre la representación comercial complementaria de FAREGAS. El endpoint es
+ * distinto del PDF fiscal de NubeFact para que ambos documentos sigan siendo
+ * identificables y accesibles por separado.
+ */
+export interface AbrirPdfFaregasOptions extends AbrirPdfNubefactOptions {
+  porFacturacionId?: boolean;
+}
+
+export async function abrirPdfFaregas(
+  id: number,
+  options: AbrirPdfFaregasOptions = {},
+): Promise<boolean> {
+  const ventana = options.ventanaPrevia !== undefined
+    ? options.ventanaPrevia
+    : (typeof window !== 'undefined' && typeof window.open === 'function' ? window.open('', '_blank') : null);
+  if (ventana) ventana.opener = null;
+
+  try {
+    const endpoint = options.porFacturacionId
+      ? `/certificados/facturacion/${id}/pdf`
+      : `/certificados/borradores/${id}/facturacion/pdf`;
+    const blob = await faregasFetchBlob(endpoint);
+    const url = URL.createObjectURL(blob);
+    if (ventana && !ventana.closed) {
+      ventana.location.href = url;
+    } else if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.target = '_blank';
+      enlace.rel = 'noopener noreferrer';
+      enlace.click();
+    }
+    setTimeout(() => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // Ignorar error al revocar
+      }
+    }, 60_000);
+    return true;
+  } catch (error) {
+    ventana?.close();
+    await Swal.fire(
+      'No se pudo abrir',
+      error instanceof Error ? error.message : 'La representación comercial FAREGAS no está disponible.',
       'error',
     );
     return false;

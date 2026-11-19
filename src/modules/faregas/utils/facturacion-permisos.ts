@@ -5,5 +5,4 @@ const SUBMODULOS_FACTURACION = [
 ] as const;
 
 export const puedeAbrirFacturacionFaregas = (permisos: readonly string[] = []) =>
-  permisos.includes('MENU_FACTURACION')
-  || SUBMODULOS_FACTURACION.some((permiso) => permisos.includes(permiso));
+  SUBMODULOS_FACTURACION.some((permiso) => permisos.includes(permiso));

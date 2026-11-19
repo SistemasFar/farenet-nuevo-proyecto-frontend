@@ -8,8 +8,8 @@ describe('acceso al contenedor de Facturación FAREGAS', () => {
     expect(puedeAbrirFacturacionFaregas(['MENU_FACTURACION_CLIENTES'])).toBe(true);
   });
 
-  it('mantiene el contenedor y rechaza permisos de otros módulos', () => {
-    expect(puedeAbrirFacturacionFaregas(['MENU_FACTURACION'])).toBe(true);
+  it('rechaza cuando solo tiene el permiso contenedor sin submódulos', () => {
+    expect(puedeAbrirFacturacionFaregas(['MENU_FACTURACION'])).toBe(false);
     expect(puedeAbrirFacturacionFaregas(['CONFIGURACION_SERIES'])).toBe(false);
     expect(puedeAbrirFacturacionFaregas([])).toBe(false);
   });

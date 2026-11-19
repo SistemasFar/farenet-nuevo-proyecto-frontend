@@ -23,6 +23,7 @@ export interface DocumentoFacturacionAdmin {
   aceptadaSunat: boolean | null;
   mensajeSunat: string | null;
   enlacePdf: string | null;
+  enlacePdfFaregas: string | null;
   enlaceXml: string | null;
   enlaceCdr: string | null;
   entornoFacturador: string | null;

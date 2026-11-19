@@ -64,7 +64,8 @@ export function ChipsView() {
   // Si la URL pide una pestaña que el perfil no tiene, se cae a la primera
   // permitida en lugar de dejar la pantalla vacía.
   const [activeTab, setActiveTab] = useState<'INVENTARIO' | 'PRODUCTOS' | 'VENTAS'>(() => {
-    const pedida = searchParams.get('tab');
+    const pedida = searchParams.get('tab')?.toLowerCase();
+    if (pedida === 'inventario' && puedeInventario) return 'INVENTARIO';
     if (pedida === 'productos' && puedeTipos) return 'PRODUCTOS';
     if (pedida === 'ventas' && puedeVentas) return 'VENTAS';
     if (puedeInventario) return 'INVENTARIO';
@@ -72,6 +73,13 @@ export function ChipsView() {
     if (puedeVentas) return 'VENTAS';
     return 'INVENTARIO';
   });
+
+  useEffect(() => {
+    const pedida = searchParams.get('tab')?.toLowerCase();
+    if (pedida === 'inventario' && puedeInventario) setActiveTab('INVENTARIO');
+    else if (pedida === 'productos' && puedeTipos) setActiveTab('PRODUCTOS');
+    else if (pedida === 'ventas' && puedeVentas) setActiveTab('VENTAS');
+  }, [searchParams, puedeInventario, puedeTipos, puedeVentas]);
   const [productoSolicitadoAtendido, setProductoSolicitadoAtendido] = useState(false);
   const [resumen, setResumen] = useState<ChipResumen>(empty);
   const [chips, setChips] = useState<Chip[]>([]);

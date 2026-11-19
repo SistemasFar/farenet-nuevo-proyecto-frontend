@@ -25,12 +25,12 @@ describe('permisos del contenedor Configuración FAREGAS', () => {
     expect(resultado.hasCategorias).toBe(false);
   });
 
-  it('el permiso padre abre el contenedor, pero no concede submódulos por sí solo', () => {
+  it('el permiso padre no abre el contenedor si no tiene submódulos autorizados', () => {
     const resultado = resolverPermisosConfiguracionFaregas([
       'MENU_CONFIGURACION',
     ]);
 
-    expect(puedeAbrirConfiguracionFaregas(['MENU_CONFIGURACION'])).toBe(true);
+    expect(puedeAbrirConfiguracionFaregas(['MENU_CONFIGURACION'])).toBe(false);
     expect(resultado.hasAnySubmodule).toBe(false);
     expect(resultado.tabs).toEqual([]);
   });

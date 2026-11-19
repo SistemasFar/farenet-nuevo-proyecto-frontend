@@ -7,7 +7,7 @@ import type { FacturacionFaregas } from '../../types/faregas-api';
 import Swal from 'sweetalert2';
 import { FileText, FileEdit, Eye, Ban, RefreshCw, ClipboardX } from 'lucide-react';
 import { nombreTipoCertificadoPanel } from './tipo-certificado-panel';
-import { abrirPdfNotaCreditoNubefact, abrirPdfNubefact } from '../../services/faregas-comprobante-visor.service';
+import { abrirPdfFaregas, abrirPdfNotaCreditoNubefact, abrirPdfNubefact } from '../../services/faregas-comprobante-visor.service';
 import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
 import { SolicitudOperacionModal } from './SolicitudOperacionModal';
 import { NotaCreditoModal } from './NotaCreditoModal';
@@ -621,6 +621,15 @@ export function InicioView() {
     }
   };
 
+  const verComprobanteFaregas = async (certificadoId: number) => {
+    try {
+      setAccionEnProceso(certificadoId);
+      await abrirPdfFaregas(certificadoId);
+    } finally {
+      setAccionEnProceso(null);
+    }
+  };
+
   const verNotaCredito = async (certificadoId: number, notaCreditoId: number) => {
     try {
       setAccionEnProceso(certificadoId);
@@ -961,6 +970,7 @@ export function InicioView() {
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
                   // de abrir/enviar algo, por lo que no debilita la validación tributaria.
                   const puedeVerComprobante = Boolean(ins.enlacePdf);
+                  const puedeVerComprobanteFaregas = Boolean(ins.enlacePdfFaregas);
                   const puedeVerNotaCredito = Boolean(ins.notaCreditoId && ins.notaCreditoPdfDisponible);
 
                   return (
@@ -1053,8 +1063,19 @@ export function InicioView() {
                               type="button"
                               disabled={accionEnProceso === ins.id}
                               onClick={() => void verComprobante(ins.id)}
-                              title="Ver comprobante"
+                              title="Ver PDF fiscal original de NubeFact"
+                              aria-label="Ver PDF fiscal original de NubeFact"
                               className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
+                            ><FileText size={16} /></button>
+                          )}
+                          {puedeVerComprobanteFaregas && (
+                            <button
+                              type="button"
+                              disabled={accionEnProceso === ins.id}
+                              onClick={() => void verComprobanteFaregas(ins.id)}
+                              title="Ver representación comercial FAREGAS"
+                              aria-label="Ver representación comercial FAREGAS"
+                              className="rounded-md border border-cyan-200 bg-cyan-50 px-2.5 py-1.5 text-cyan-800 hover:bg-cyan-100 disabled:opacity-50"
                             ><FileText size={16} /></button>
                           )}
                           {puedeVerNotaCredito && ins.notaCreditoId && (
@@ -1170,6 +1191,7 @@ export function InicioView() {
               const accionesFiscalesCongeladas = accionesCongeladas || notaCreditoBloquea;
               const certificadoEditable = ins.estado === 'BORRADOR' && !accionesFiscalesCongeladas;
               const puedeVerComprobante = Boolean(ins.enlacePdf);
+              const puedeVerComprobanteFaregas = Boolean(ins.enlacePdfFaregas);
               const puedeVerNotaCredito = Boolean(ins.notaCreditoId && ins.notaCreditoPdfDisponible);
               const fechaEvaluacionNotaCredito = resolverFechaEvaluacionNotaCreditoPanel(ins, hoyLima);
               const puedeCrearNotaCredito = puedeCrearNotaCreditoPanel(ins, permisos, fechaEvaluacionNotaCredito) && !notaCreditoBloquea;
@@ -1250,7 +1272,7 @@ export function InicioView() {
                     </div>
                   </div>
 
-                  {((!certificadoEditable && !solicitudCompletada) || puedeVerComprobante || puedeVerNotaCredito) && (
+                  {((!certificadoEditable && !solicitudCompletada) || puedeVerComprobante || puedeVerComprobanteFaregas || puedeVerNotaCredito) && (
                     <div className="pt-3 flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       {!certificadoEditable && !solicitudCompletada && (
                         <button
@@ -1267,7 +1289,15 @@ export function InicioView() {
                           disabled={accionEnProceso === ins.id}
                           onClick={() => void verComprobante(ins.id)}
                           className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-100 disabled:opacity-50"
-                        ><FileText size={16} /> PDF</button>
+                        ><FileText size={16} /> PDF NubeFact</button>
+                      )}
+                      {puedeVerComprobanteFaregas && (
+                        <button
+                          type="button"
+                          disabled={accionEnProceso === ins.id}
+                          onClick={() => void verComprobanteFaregas(ins.id)}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-semibold text-cyan-800 hover:bg-cyan-100 disabled:opacity-50"
+                        ><FileText size={16} /> PDF comercial FAREGAS</button>
                       )}
                       {puedeVerNotaCredito && ins.notaCreditoId && (
                         <button

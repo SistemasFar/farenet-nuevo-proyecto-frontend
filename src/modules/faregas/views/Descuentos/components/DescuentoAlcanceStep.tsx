@@ -5,8 +5,11 @@ import {
   calcularPrecioFinal,
   claveServicioLogico,
   claveRegla,
+  esDisponibilidadValida,
   nombreServicioLogico,
+  precioMinimoCombinacionesSeleccionadas,
   tipoServicio,
+  validarReglasContraPrecios,
   type BeneficioDescuento,
   type ReglaDescuento,
   type ServicioPorPlanta,
@@ -94,6 +97,16 @@ export function DescuentoAlcanceStep({
     return mapa;
   }, [serviciosPorPlanta]);
 
+  const precioMinimoSeleccionado = useMemo(
+    () => precioMinimoCombinacionesSeleccionadas(serviciosPorPlanta, sedesSeleccionadas, serviciosSeleccionados),
+    [sedesSeleccionadas, serviciosPorPlanta, serviciosSeleccionados],
+  );
+
+  const erroresPrecio = useMemo(
+    () => validarReglasContraPrecios(reglas, serviciosPorPlanta, plantas),
+    [plantas, reglas, serviciosPorPlanta],
+  );
+
   const cambiarTipoGeneral = (tipoCalculo: TipoCalculo) => onCambiarBeneficio({
     tipoCalculo,
     valor: '',
@@ -156,28 +169,67 @@ export function DescuentoAlcanceStep({
             const seleccionado = serviciosSeleccionados.includes(item.key);
             const minimo = item.precios.length ? Math.min(...item.precios) : null;
             const maximo = item.precios.length ? Math.max(...item.precios) : null;
-            const precio = minimo == null ? 'Sin P. venta' : minimo === maximo ? dinero(minimo) : `${dinero(minimo)} – ${dinero(maximo)}`;
-            const disponibleTodas = item.sedes.size === sedesSeleccionadas.length;
+            const precio = minimo == null ? 'Sin P. venta válido' : minimo === maximo ? dinero(minimo) : `${dinero(minimo)} – ${dinero(maximo)}`;
+            const sitios = sedesSeleccionadas.map(plantaKey => ({
+              plantaKey,
+              nombre: plantasPorKey.get(plantaKey) || plantaKey,
+              servicio: item.serviciosPorSede.get(plantaKey),
+            }));
+            const hayIncidencias = sitios.some(({ servicio }) => !servicio || !esDisponibilidadValida(servicio));
+            const disponibleTodas = !hayIncidencias && sitios.length > 0;
             return <label key={item.key} className={`flex cursor-pointer items-start gap-3 border-b border-slate-100 px-3 py-3.5 text-xs last:border-b-0 ${seleccionado ? 'bg-blue-50 border-[#052a79] outline-none focus-within:ring-2 focus-within:ring-[#052a79]/20' : 'bg-white hover:bg-slate-50'}`}>
               <div className="flex items-center gap-2 mt-0.5">
                 <input type="checkbox" checked={seleccionado} onChange={event => onCambiarServicio(item.key, event.target.checked)} className="h-4 w-4 rounded border-slate-300 text-[#052a79] focus:ring-[#052a79] accent-[#052a79]" />
                 <span className="flex-1"><b className="text-slate-800">{item.nombre}</b><small className="mt-0.5 block text-slate-500">{item.categoria || tipoServicio(item.referencia)}</small></span>
               </div>
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${disponibleTodas ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>Disponible {item.sedes.size}/{sedesSeleccionadas.length}</span>
-              <span className={`font-bold ${minimo == null ? 'text-red-600' : 'text-[#052a79]'}`}>P. venta: {precio}</span>
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${disponibleTodas ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>Precio válido {item.precios.length}/{sedesSeleccionadas.length}</span>
+              <span className={`font-bold ${minimo == null ? 'text-red-600' : 'text-[#052a79]'}`}>Precio mínimo: {minimo == null ? '—' : dinero(minimo)}</span>
+              {minimo !== maximo && maximo != null && <span className="font-semibold text-slate-500">Rango: {precio}</span>}
+              <span className="sr-only">{seleccionado ? 'Seleccionado' : 'No seleccionado'}</span>
+              <div className="basis-full pl-7 text-[11px] text-slate-600">
+                {sitios.map(({ plantaKey, nombre, servicio }) => {
+                  if (!servicio) return <p key={plantaKey} className="text-amber-700">{nombre}: sin tarifa activa para este concepto; no se creará una regla en esta sede.</p>;
+                  if (!esDisponibilidadValida(servicio)) {
+                    const incidencia = servicio.productoDisponible === false
+                      ? 'producto fiscal ausente o no habilitado para venta'
+                      : 'precio de venta no configurado';
+                    return <p key={plantaKey} className="text-amber-700">{nombre} · {servicio.tarifa_codigo || 'sin código de tarifa'} · {servicio.producto_sku || servicio.codigo || 'sin SKU'}: {incidencia}; no se creará una regla en esta sede.</p>;
+                  }
+                  return <p key={plantaKey}>{nombre} · {servicio.tarifa_codigo || 'sin código de tarifa'} · {servicio.producto_sku || servicio.codigo || 'sin SKU'} · {servicio.nombre} · {dinero(Number(servicio.precio))}</p>;
+                })}
+              </div>
             </label>;
           })}
         </div>
       </section>
+
+      {serviciosSeleccionados.length > 0 && <section className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+        <b>Precio mínimo entre las combinaciones seleccionadas: {precioMinimoSeleccionado == null ? 'sin tarifa válida' : dinero(precioMinimoSeleccionado)}</b>
+        <p className="mt-1">Cada regla se valida en el backend contra la tarifa vigente de su propia sede y servicio antes de guardarse y nuevamente al aplicarse.</p>
+      </section>}
+
+      {erroresPrecio.length > 0 && <section role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+        <b className="block">Corrige los valores con precisión inválida, superiores al precio o que dejan un importe final no positivo.</b>
+        <ul className="mt-2 list-disc space-y-1 pl-5">{erroresPrecio.map(error => {
+          const precisionInvalida = error.motivo.includes('dos decimales');
+          const valor = precisionInvalida && error.valorIngresado != null
+            ? error.tipoCalculo === 'PORCENTAJE' ? `${error.valorIngresado}%` : `S/ ${error.valorIngresado}`
+            : error.valorSolicitado == null ? 'sin valor'
+              : error.tipoCalculo === 'PORCENTAJE' ? `${error.valorSolicitado}%` : dinero(error.valorSolicitado);
+          return <li key={`${error.plantaKey}:${error.servicioId}:${error.valorIngresado ?? error.valorSolicitado}`}>
+            {error.sede}: precio de venta {dinero(error.precioVenta)}; descuento solicitado {valor}. {error.motivo}
+          </li>;
+        })}</ul>
+      </section>}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <div><b className="text-xs">BENEFICIO GENERAL</b><p className="mt-1 text-xs text-slate-500">Se aplicará a todas las combinaciones válidas que no tengan una excepción.</p></div>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <label className="text-xs font-bold">TIPO<select value={beneficio.tipoCalculo} onChange={event => cambiarTipoGeneral(event.target.value as TipoCalculo)} className="input mt-1"><option value="FLAT">FLAT — precio final</option><option value="MONTO">MONTO — resta soles</option><option value="PORCENTAJE">PORCENTAJE</option></select></label>
           {beneficio.tipoCalculo === 'FLAT' ? <>
-            <label className="text-xs font-bold">PRECIO FINAL CONTADO (S/)<input type="number" min="0.01" step="0.01" value={beneficio.valorContado} onChange={event => onCambiarBeneficio({ valorContado: event.target.value })} className="input mt-1" /></label>
-            <label className="text-xs font-bold">PRECIO FINAL CRÉDITO (S/)<input type="number" min="0.01" step="0.01" value={beneficio.valorCredito} onChange={event => onCambiarBeneficio({ valorCredito: event.target.value })} className="input mt-1" /></label>
-          </> : <label className="text-xs font-bold">{tituloValor(beneficio.tipoCalculo).toUpperCase()}<input type="number" min="0.01" max={beneficio.tipoCalculo === 'PORCENTAJE' ? 100 : undefined} step="0.01" value={beneficio.valor} onChange={event => onCambiarBeneficio({ valor: event.target.value })} className="input mt-1" /></label>}
+            <label className="text-xs font-bold">PRECIO FINAL CONTADO (S/)<input type="number" min="0.01" step="0.01" value={beneficio.valorContado ?? ''} onChange={event => onCambiarBeneficio({ valorContado: event.target.value })} className="input mt-1" /></label>
+            <label className="text-xs font-bold">PRECIO FINAL CRÉDITO (S/)<input type="number" min="0.01" step="0.01" value={beneficio.valorCredito ?? ''} onChange={event => onCambiarBeneficio({ valorCredito: event.target.value })} className="input mt-1" /></label>
+          </> : <label className="text-xs font-bold">{tituloValor(beneficio.tipoCalculo).toUpperCase()}<input type="number" min="0.01" max={beneficio.tipoCalculo === 'PORCENTAJE' ? 99.99 : undefined} step="0.01" value={beneficio.valor ?? ''} onChange={event => onCambiarBeneficio({ valor: event.target.value })} className="input mt-1" /></label>}
         </div>
       </section>
 
@@ -204,8 +256,10 @@ export function DescuentoAlcanceStep({
               <td className="px-3 py-3"><b>{plantasPorKey.get(regla.plantaKey) || regla.plantaKey}</b><small className="block text-slate-500">{nombreLogico}</small></td>
               <td className="px-3 py-3 font-bold text-[#052a79]">{Number.isFinite(precio) ? dinero(precio) : 'Sin P. venta'}</td>
               <td className="px-3 py-3"><select value={regla.tipoCalculo} onChange={event => cambiarTipoExcepcion(regla, event.target.value as TipoCalculo)} className="input"><option value="FLAT">FLAT</option><option value="MONTO">MONTO</option><option value="PORCENTAJE">PORCENTAJE</option></select></td>
-              <td className="px-3 py-3">{regla.tipoCalculo === 'FLAT' ? <div className="grid grid-cols-2 gap-1"><input type="number" min="0.01" step="0.01" value={regla.valorContado} onChange={event => onCambiarExcepcion(regla.plantaKey, regla.servicioId, { valorContado: event.target.value })} placeholder="Contado" className="input" /><input type="number" min="0.01" step="0.01" value={regla.valorCredito} onChange={event => onCambiarExcepcion(regla.plantaKey, regla.servicioId, { valorCredito: event.target.value })} placeholder="Crédito" className="input" /></div> : <input type="number" min="0.01" max={regla.tipoCalculo === 'PORCENTAJE' ? 100 : undefined} step="0.01" value={regla.valor} onChange={event => onCambiarExcepcion(regla.plantaKey, regla.servicioId, { valor: event.target.value })} className="input" />}</td>
-              <td className="px-3 py-3 font-bold text-green-700">{regla.tipoCalculo === 'FLAT' ? `C: ${regla.valorContado || '—'} / Cr: ${regla.valorCredito || '—'}` : dinero(final)}</td>
+              <td className="px-3 py-3">{regla.tipoCalculo === 'FLAT' ? <div className="grid grid-cols-2 gap-1"><input type="number" min="0.01" step="0.01" value={regla.valorContado ?? ''} onChange={event => onCambiarExcepcion(regla.plantaKey, regla.servicioId, { valorContado: event.target.value })} placeholder="Contado" className="input" /><input type="number" min="0.01" step="0.01" value={regla.valorCredito ?? ''} onChange={event => onCambiarExcepcion(regla.plantaKey, regla.servicioId, { valorCredito: event.target.value })} placeholder="Crédito" className="input" /></div> : <input type="number" min="0.01" max={regla.tipoCalculo === 'PORCENTAJE' ? 99.99 : undefined} step="0.01" value={regla.valor ?? ''} onChange={event => onCambiarExcepcion(regla.plantaKey, regla.servicioId, { valor: event.target.value })} className="input" />}</td>
+              <td className="px-3 py-3 font-bold text-green-700">{regla.tipoCalculo === 'FLAT'
+                ? `C: ${regla.valorContado === '' || regla.valorContado == null ? '—' : dinero(Number(regla.valorContado))} / Cr: ${regla.valorCredito === '' || regla.valorCredito == null ? '—' : dinero(Number(regla.valorCredito))}`
+                : dinero(final)}</td>
               <td className="px-3 py-3"><button type="button" onClick={() => onRestaurarBeneficio(regla.plantaKey, regla.servicioId)} className="flex items-center gap-1 rounded-md border px-2 py-2 font-bold text-slate-600" title="Restaurar beneficio general"><RotateCcw className="h-3.5 w-3.5" /> General</button></td>
             </tr>;
           })}
@@ -213,6 +267,6 @@ export function DescuentoAlcanceStep({
       </section>
     </>}
 
-    <div className="flex justify-end border-t pt-4"><button type="button" onClick={onGuardar} className="h-10 rounded-lg bg-green-600 px-8 text-xs font-black text-white hover:bg-green-700">GUARDAR DESCUENTO</button></div>
+    <div className="flex justify-end border-t pt-4"><button type="button" onClick={onGuardar} disabled={erroresPrecio.length > 0 || reglas.length === 0} className="h-10 rounded-lg bg-green-600 px-8 text-xs font-black text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50">GUARDAR DESCUENTO</button></div>
   </div>;
 }

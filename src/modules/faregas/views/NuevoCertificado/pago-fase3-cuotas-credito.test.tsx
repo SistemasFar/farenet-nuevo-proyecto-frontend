@@ -104,20 +104,20 @@ describe('FAREGAS - Fase 3: Pruebas Exhaustivas de Cuotas y Crédito', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 4. Crédito parcial: inicial S/ 30.00 y dos cuotas de S/ 30.00
+  // 4. Crédito puro sin cobro inicial
   // ---------------------------------------------------------------------------
-  it('4. Crédito parcial: inicial de S/ 30.00 deja saldo de S/ 60.00 distribuible en cuotas', () => {
-    const pagos = [{ id: 101, importe: '30.00', tipo: 'EFECTIVO' as const }];
+  it('4. Crédito puro: financia el total sin registrar un cobro inicial', () => {
+    const pagos: Array<{ importe: string; tipo: 'EFECTIVO' }> = [];
     const totalPagar = 90.00;
     const pagado = pagos.reduce((s, p) => s + Number(p.importe), 0);
-    const saldoAFinanciar = totalPagar - pagado; // 60.00
+    const saldoAFinanciar = totalPagar - pagado;
 
-    expect(saldoAFinanciar).toBe(60.00);
+    expect(saldoAFinanciar).toBe(90.00);
 
     const cuotas = distribuirCuotasAutomaticas(saldoAFinanciar, 2, '2026-05-01', '2026-05-30');
     expect(cuotas).toHaveLength(2);
-    expect(cuotas[0].importe).toBe('30.00');
-    expect(cuotas[1].importe).toBe('30.00');
+    expect(cuotas[0].importe).toBe('45.00');
+    expect(cuotas[1].importe).toBe('45.00');
 
     const errores = validarPasoPago({
       tipoComprobante: 'FACTURA',
@@ -129,6 +129,7 @@ describe('FAREGAS - Fase 3: Pruebas Exhaustivas de Cuotas y Crédito', () => {
       cuotas,
     });
     expect(errores).toEqual({});
+    expect(pagos).toHaveLength(0);
   });
 
   // ---------------------------------------------------------------------------
@@ -251,8 +252,7 @@ describe('FAREGAS - Fase 3: Pruebas Exhaustivas de Cuotas y Crédito', () => {
   // ---------------------------------------------------------------------------
   // 8. Pago completo existente (caso Borrador #598)
   // ---------------------------------------------------------------------------
-  it('8. Pago completo existente: advierte que no existe saldo financiable y protege pagos confirmados', () => {
-    // Si la orden ya está pagada al 100%, seleccionar crédito debe ser bloqueado con instrucción clara
+  it('8. Cobro existente bloquea crédito puro y no muestra controles ni borra el pago', () => {
     const errores = validarPasoPago({
       tipoComprobante: 'FACTURA',
       condicionPago: 'CREDITO',
@@ -262,9 +262,7 @@ describe('FAREGAS - Fase 3: Pruebas Exhaustivas de Cuotas y Crédito', () => {
       fechaVencimientoCredito: '2026-05-30',
       cuotas: [],
     });
-    expect(errores.pagos).toBe(
-      'Una venta a crédito debe conservar un saldo pendiente. Cambie la condición a CONTADO o reduzca el pago inicial.'
-    );
+    expect(errores.pagos).toContain('crédito puro no admite cobros iniciales');
 
     // En UI muestra advertencia de pago completo confirmado
     const html = renderToStaticMarkup(
@@ -273,7 +271,7 @@ describe('FAREGAS - Fase 3: Pruebas Exhaustivas de Cuotas y Crédito', () => {
         setPagoTab={() => undefined}
         formPago={{ importe: '', tarjetaKey: '', entidadFinancieraKey: '' }}
         setFormPago={() => undefined}
-        pagosAgregados={[{ id: 1612, tipo: 'EFECTIVO', importe: '90.00' }]}
+        pagosAgregados={[{ id: 1612, tipo: 'EFECTIVO', importe: '90.00', tarjetaKey: '', entidadFinancieraKey: '' }]}
         handleAgregarPago={() => undefined}
         eliminarPago={() => undefined}
         totalPagar={90}
@@ -288,9 +286,11 @@ describe('FAREGAS - Fase 3: Pruebas Exhaustivas de Cuotas y Crédito', () => {
         onFechaVencimientoCreditoChange={() => undefined}
       />
     );
-    expect(html).toContain('Pago Completo Confirmado');
-    expect(html).toContain('CONFIRMADO');
-    expect(html).toContain('No existe saldo pendiente para financiar al crédito');
+    expect(html).toContain('Hay cobros de caja previos');
+    expect(html).toContain('S/ 90.00');
+    expect(html).not.toContain('CONFIRMADO');
+    expect(html).not.toContain('AGREGAR PAGO');
+    expect(html).not.toContain('Pagos Registrados');
   });
 
 });

@@ -4,6 +4,8 @@ import faregasLogo from '@/assets/images/faregas_logo.png';
 import { puedeAbrirConfiguracionFaregas } from '../modules/faregas/utils/configuracion-permisos';
 import { puedeAbrirChipsFaregas } from '../modules/faregas/utils/chips-permisos';
 import { puedeAbrirFacturacionFaregas } from '../modules/faregas/utils/facturacion-permisos';
+import { tieneAccesoDashboard } from '../modules/faregas/views/Dashboard/dashboard-config';
+import { resolverRutaInicialFaregas } from '../modules/faregas/utils/navegacion-permisos';
 
 interface MenuItem {
   path: string;
@@ -45,7 +47,7 @@ const menuItems: MenuItem[] = [
   {
     key: 'dashboard', path: '/dashboard',
     label: 'DASHBOARD',
-    permisos: ['MENU_DASHBOARD', 'DASHBOARD_GLOBAL', 'DASHBOARD_SEDE'],
+    permisos: ['MENU_DASHBOARD'],
     icon: (
       <svg className="h-6 w-6 text-current" viewBox="0 0 24 24" fill="none">
         <path d="M4 4h7v7H4V4zm10 0h6v4h-6V4zm6 7h-6v9h6v-9zM4 14h7v6H4v-6z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -330,7 +332,7 @@ export function Sidebar({
     // cualquier restricción se corrige asignando o quitando el permiso.
     if (isFaregas) {
       if (item.key === 'dashboard') {
-        return (item.permisos || []).some((permiso) => permisos.includes(permiso));
+        return tieneAccesoDashboard(permisos);
       }
       if (item.key === 'descuentos') {
         return permisos.includes('MENU_DESCUENTOS');
@@ -393,6 +395,7 @@ export function Sidebar({
     menuVisible = sorted;
   }
 
+  const rutaLogoFaregas = isFaregas ? (resolverRutaInicialFaregas(permisos) || '/faregas/inicio') : '/inicio';
   return (
     <aside
       onMouseEnter={onMouseEnterSidebar}
@@ -406,7 +409,7 @@ export function Sidebar({
     >
       <div className="relative flex min-h-[76px] items-center justify-center border-b border-blue-800/50 px-2 pb-4 pt-5">
         <Link
-          to={isFaregas ? '/faregas/inicio' : '/inicio'}
+          to={isFaregas ? rutaLogoFaregas : '/inicio'}
           onClick={onCloseMobile}
           className="flex w-full items-center justify-center cursor-pointer"
         >

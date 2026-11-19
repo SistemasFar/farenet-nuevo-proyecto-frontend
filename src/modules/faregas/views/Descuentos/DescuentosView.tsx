@@ -12,6 +12,7 @@ import {
   esDisponibilidadValida,
   obtenerBeneficio,
   reconstruirPaso2,
+  validarReglasContraPrecios,
   type BeneficioDescuento,
   type ReglaDescuento,
   type ServicioPorPlanta,
@@ -201,7 +202,7 @@ export function DescuentosView() {
   };
   const abrirCodigos = async (id: number, tab?: 'DATOS' | 'CONFIGURAR') => {
     try {
-      const respuesta = await faregasDescuentosAdminApi.detalle(id) as Promise<Detalle>;
+      const respuesta = await faregasDescuentosAdminApi.detalle(id) as Detalle;
       setDetalle(respuesta);
       setEditando(id);
       setForm(formDesdeDescuento(respuesta.descuento));
@@ -302,11 +303,30 @@ export function DescuentosView() {
       );
       return false;
     }
+    const erroresPrecio = validarReglasContraPrecios(reglas, serviciosPorPlanta, plantas);
+    if (erroresPrecio.length) {
+      const primera = erroresPrecio[0];
+      const valor = primera.valorIngresado && primera.motivo.includes('dos decimales')
+        ? primera.tipoCalculo === 'PORCENTAJE'
+          ? `${primera.valorIngresado}%`
+          : `S/ ${primera.valorIngresado}`
+        : primera.valorSolicitado == null
+        ? 'sin valor'
+        : primera.tipoCalculo === 'PORCENTAJE'
+          ? `${primera.valorSolicitado}%`
+          : `S/ ${primera.valorSolicitado.toFixed(2)}`;
+      await Swal.fire(
+        'Descuento fuera del precio de venta',
+        `${primera.sede}: precio de venta ${primera.precioVenta == null ? 'no configurado' : `S/ ${primera.precioVenta.toFixed(2)}`}; descuento solicitado ${valor}. ${primera.motivo}`,
+        'error'
+      );
+      return false;
+    }
     try {
       await faregasDescuentosAdminApi.guardarReglas(detalle.descuento.id, { reglas });
 
       // Verificar que las reglas se hayan persistido correctamente en el backend
-      const verificar = await faregasDescuentosAdminApi.detalle(detalle.descuento.id);
+      const verificar = await faregasDescuentosAdminApi.detalle(detalle.descuento.id) as Detalle;
       const reglasPersistidas = (verificar.reglas || []).map(r => ({
         plantaKey: String(r.plantaKey),
         servicioId: Number(r.servicioId),
@@ -471,7 +491,7 @@ export function DescuentosView() {
 
       {detalle && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
         <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white">
-          <div className="flex items-center justify-between border-b px-6 py-4"><div><h2 className="text-lg font-black">Editar y gestionar campaña — {detalle.descuento.nombre}</h2><p className="text-xs text-slate-500">Edita los datos generales, el alcance y el beneficio desde un único flujo.</p></div><button onClick={() => { setDetalle(null); setEditando(null); }}><X /></button></div>
+          <div className="flex items-center justify-between border-b px-6 py-4"><div><h2 className="text-lg font-black">Editar y gestionar campaña — {detalle.descuento.nombre}</h2><p className="text-xs text-slate-500">Edita los datos generales, el alcance y el beneficio desde un único flujo.</p></div><button title="Cerrar" aria-label="Cerrar edición de campaña" onClick={() => { setDetalle(null); setEditando(null); }}><X /></button></div>
           <div className="grid grid-cols-2 border-b bg-slate-50 px-6 py-3 text-xs font-bold">
             <div className="flex items-center gap-2 text-green-700"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100">✓</span><span>1. Datos generales</span></div>
             <div className={`flex items-center justify-center gap-2 ${reglas.length ? 'text-green-700' : 'text-[#052a79]'}`}><span className={`flex h-6 w-6 items-center justify-center rounded-full ${reglas.length ? 'bg-green-100' : 'bg-blue-100'}`}>{reglas.length ? '✓' : '2'}</span><span>2. Alcance y beneficio</span></div>

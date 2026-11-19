@@ -5,6 +5,7 @@ import { SelectPlantaView } from './core/views/SelectPlantaView';
 import { SeleccionPlantaView as FaregasSeleccionPlantaView } from './modules/faregas/views/SeleccionPlanta/SeleccionPlantaView';
 import { NotFoundView } from './core/views/NotFoundView';
 import { ForbiddenView } from './core/views/ForbiddenView';
+import { resolverRutaInicialFaregas, tieneAccesoRutaFaregas } from './modules/faregas/utils/navegacion-permisos';
 import { SeleccionEmpresaView } from './core/views/SeleccionEmpresaView';
 
 import { MainLayout } from './modules/farenet/views/Dashboard/MainLayout';
@@ -31,6 +32,7 @@ import { tieneAccesoDashboard } from './modules/faregas/views/Dashboard/dashboar
 import { ChipsView as FaregasChipsView } from './modules/faregas/views/Chips/ChipsView';
 import { puedeAbrirChipsFaregas } from './modules/faregas/utils/chips-permisos';
 import { puedeAbrirFacturacionFaregas } from './modules/faregas/utils/facturacion-permisos';
+import { puedeAbrirConfiguracionFaregas } from './modules/faregas/utils/configuracion-permisos';
 
 import { useEmpresa } from './context/EmpresaContext';
 
@@ -118,6 +120,59 @@ export default function App() {
     window.addEventListener('updatePlantasDisponibles', handleUpdate);
     return () => window.removeEventListener('updatePlantasDisponibles', handleUpdate);
   }, []);
+  const refrescarSesionFaregasSilencioso = useCallback(async () => {
+    const fToken = sessionStorage.getItem('faregasAccessToken');
+    if (!fToken) return;
+    try {
+      const sesionFaregas = await authFaregasApi.refrescarSesionAsync(fToken);
+      const usuarioActualizado = sesionFaregas.user as FaregasUserSession;
+      const plantaActualizada = sesionFaregas.plantaSeleccionada as PlantaAsignada;
+      const plantasActualizadas = Array.isArray(sesionFaregas.plantas)
+        ? sesionFaregas.plantas as PlantaAsignada[]
+        : leerPlantasFaregas();
+
+      setFaregasAccessToken(sesionFaregas.accessToken);
+      setFaregasUser(usuarioActualizado);
+      setFaregasPlanta(plantaActualizada);
+      setFaregasPlantasDisponibles(plantasActualizadas);
+      sessionStorage.setItem('faregasAccessToken', sesionFaregas.accessToken);
+      sessionStorage.setItem('faregasUser', JSON.stringify(usuarioActualizado));
+      sessionStorage.setItem('faregasPlanta', JSON.stringify(plantaActualizada));
+      sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(plantasActualizadas));
+
+      // Si la ruta actual ya no está autorizada con los nuevos permisos, redirigir al primer módulo disponible
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith('/faregas') && currentPath !== '/faregas/seleccionar-planta') {
+        const nuevosPermisos = usuarioActualizado.permisos || [];
+        if (!tieneAccesoRutaFaregas(currentPath, nuevosPermisos)) {
+          const rutaNueva = resolverRutaInicialFaregas(nuevosPermisos) || '/sin-acceso';
+          navigate(rutaNueva, { replace: true });
+        }
+      }
+    } catch {
+      // Fallo silencioso en refresco de permisos
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    const onActualizar = () => {
+      void refrescarSesionFaregasSilencioso();
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'faregas_permisos_updated_at') {
+        void refrescarSesionFaregasSilencioso();
+      }
+    };
+    window.addEventListener('faregasPermisosActualizados', onActualizar);
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onActualizar);
+    return () => {
+      window.removeEventListener('faregasPermisosActualizados', onActualizar);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onActualizar);
+    };
+  }, [refrescarSesionFaregasSilencioso]);
+
   const limpiarSesionFrontend = useCallback(() => {
     [
       'accessToken', 'user', 'plantasDisponibles', 'empresaSeleccionada', 'plantaSeleccionada', 'permisos',
@@ -246,7 +301,7 @@ export default function App() {
     // Determinamos si redirigir a faregas o farenet según si se autoseleccionó faregas
     const esSedeFaregas = plantaSeleccionada.nombre.toUpperCase().includes('FAREGAS');
     setTimeout(() => {
-      navigate(esSedeFaregas ? '/faregas/inicio' : '/inicio', { replace: isAutoRedirect });
+      navigate(esSedeFaregas ? (resolverRutaInicialFaregas(userPermisos) || '/sin-acceso') : '/inicio', { replace: isAutoRedirect });
     }, 0);
   };
 
@@ -415,7 +470,7 @@ export default function App() {
 
     setTimeout(() => {
       const actualIsFaregas = JSON.parse(sessionStorage.getItem('empresaSeleccionada') || '{}')?.nombre?.toUpperCase().includes('FAREGAS');
-      navigate(actualIsFaregas ? '/faregas/inicio' : '/inicio');
+      navigate(actualIsFaregas ? (resolverRutaInicialFaregas(permisosFinales) || '/sin-acceso') : '/inicio');
     }, 0);
   };
 
@@ -456,7 +511,8 @@ export default function App() {
     sessionStorage.setItem('faregasUser', JSON.stringify(resp.user));
 
     setTimeout(() => {
-      navigate('/faregas/inicio');
+      const rutaDestino = resolverRutaInicialFaregas(resp.user?.permisos || []) || '/sin-acceso';
+      navigate(rutaDestino);
     }, 0);
   };
 
@@ -504,7 +560,7 @@ export default function App() {
         path="/login"
         element={
           isDashboardReady ? (
-            <Navigate to={isFaregas ? '/faregas/inicio' : '/inicio'} replace />
+            <Navigate to={isFaregas ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso') : '/inicio'} replace />
           ) : (
             <LoginView
               onRequireEmpresa={handleRequireEmpresa}
@@ -570,7 +626,8 @@ export default function App() {
                       setFaregasPlanta(resp.plantaSeleccionada);
                       sessionStorage.setItem('faregasPlanta', JSON.stringify(resp.plantaSeleccionada));
 
-                      navigate('/faregas/inicio');
+                      const rutaDestino = resolverRutaInicialFaregas(resp.user?.permisos || []) || '/sin-acceso';
+                      navigate(rutaDestino);
 
                       setTimeout(() => {
                         setFaregasPreToken('');
@@ -598,6 +655,17 @@ export default function App() {
                 )
               }
             >
+              <Route
+                index
+                element={
+                  <Navigate
+                    to={
+                      resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || []) || '/sin-acceso'
+                    }
+                    replace
+                  />
+                }
+              />
               <Route path="inicio" element={(faregasUser || leerUsuarioFaregas())?.permisos?.includes('MENU_INICIO')
                 ? <FaregasInicioView /> : <ForbiddenView />} />
               <Route
@@ -699,7 +767,20 @@ export default function App() {
                   })()
                 }
               />
-              <Route path="configuracion" element={<FaregasConfiguracionView />} />
+              <Route
+                path="configuracion"
+                element={
+                  (() => {
+                    const fUser = faregasUser || JSON.parse(sessionStorage.getItem('faregasUser') || '{}');
+                    const userPerms = fUser?.permisos || [];
+                    return puedeAbrirConfiguracionFaregas(userPerms) ? (
+                      <FaregasConfiguracionView />
+                    ) : (
+                      <ForbiddenView />
+                    );
+                  })()
+                }
+              />
               <Route
                 path="facturacion"
                 element={
@@ -740,7 +821,7 @@ export default function App() {
           !isDashboardReady ? (
             <Navigate to="/login" replace />
           ) : isFaregas ? (
-            <Navigate to="/faregas/inicio" replace />
+            <Navigate to={resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso'} replace />
           ) : (
             <MainLayout
               user={user}
@@ -771,7 +852,7 @@ export default function App() {
       </Route>
 
       <Route path="/sin-acceso" element={<ForbiddenView />} />
-      <Route path="/" element={<Navigate to={isDashboardReady ? (isFaregas ? "/faregas/inicio" : "/inicio") : "/login"} replace />} />
+      <Route path="/" element={<Navigate to={isDashboardReady ? (isFaregas ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso') : "/inicio") : "/login"} replace />} />
       <Route path="*" element={<NotFoundView />} />
     </Routes>
   );

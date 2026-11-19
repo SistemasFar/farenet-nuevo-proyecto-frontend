@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import type { MainLayoutContext } from '../../Dashboard/MainLayout';
 import TabSeries from './TabSeries';
 import TabDocumentosFacturacion from './TabDocumentosFacturacion';
@@ -7,7 +7,7 @@ import TabClientesFacturacion from './TabClientesFacturacion';
 
 /**
  * Facturación electrónica: 3 pestañas gobernadas por submódulos (SERIES, COMPROBANTES, CLIENTES).
- * La pestaña inicial es SERIES.
+ * La pestaña inicial se sincroniza según permisos y el parámetro tab.
  */
 type VistaFacturacion = 'SERIES' | 'DOCUMENTOS' | 'CLIENTES';
 
@@ -17,16 +17,39 @@ const PESTANAS: ReadonlyArray<{ id: VistaFacturacion; permiso: string; label: st
   { id: 'CLIENTES', permiso: 'MENU_FACTURACION_CLIENTES', label: 'CLIENTES' }
 ];
 
+const MAPEO_TABS_FACTURACION: Record<string, VistaFacturacion> = {
+  SERIES: 'SERIES',
+  DOCUMENTOS: 'DOCUMENTOS',
+  COMPROBANTES: 'DOCUMENTOS',
+  CLIENTES: 'CLIENTES'
+};
+
 export default function TabFacturacion({ plantaKey: _plantaKey, plantaNombre: _plantaNombre }: { plantaKey: string; plantaNombre: string }) {
   const { permisos } = useOutletContext<MainLayoutContext>();
+  const [searchParams] = useSearchParams();
   const lista = Array.isArray(permisos) ? permisos : [];
 
   // Sólo se pintan las pestañas que el perfil tiene, en orden definido
   const visibles = PESTANAS.filter((p) => lista.includes(p.permiso));
   const permitidas = visibles.map((p) => p.id);
 
-  // La pestaña inicial es SERIES por defecto
-  const [vistaSeleccionada, setVistaSeleccionada] = useState<VistaFacturacion>('SERIES');
+  const tabParam = searchParams.get('tab')?.toUpperCase();
+  const resolvedTab = tabParam ? MAPEO_TABS_FACTURACION[tabParam] : undefined;
+  const initialVista = (resolvedTab && permitidas.includes(resolvedTab))
+    ? resolvedTab
+    : (permitidas[0] ?? 'SERIES');
+
+  // La pestaña inicial respeta los permisos y el query param
+  const [vistaSeleccionada, setVistaSeleccionada] = useState<VistaFacturacion>(initialVista);
+
+  useEffect(() => {
+    const currentParam = searchParams.get('tab')?.toUpperCase();
+    const mapped = currentParam ? MAPEO_TABS_FACTURACION[currentParam] : undefined;
+    if (mapped && permitidas.includes(mapped)) {
+      setVistaSeleccionada(mapped);
+    }
+  }, [searchParams, permitidas]);
+
   const vista = permitidas.includes(vistaSeleccionada)
     ? vistaSeleccionada
     : (permitidas[0] ?? 'SERIES');

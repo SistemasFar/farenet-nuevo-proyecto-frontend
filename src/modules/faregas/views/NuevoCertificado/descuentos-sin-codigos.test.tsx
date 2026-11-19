@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import type { ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -89,7 +90,7 @@ describe('FAREGAS — Implementación de Descuentos sin Códigos', () => {
 
     const html = renderToStaticMarkup(
       <CajaStep
-        catalogoInicial={catalogoMock as any}
+        catalogoInicial={catalogoMock as unknown as ComponentProps<typeof CajaStep>['catalogoInicial']}
         plantaSeleccionada="98"
         plantaNombre="SURCO"
         formCaja={{
@@ -139,7 +140,7 @@ describe('FAREGAS — Implementación de Descuentos sin Códigos', () => {
         tarifaOriginal={90}
         descuento={0}
         resumenComercial={null}
-        maestrosPago={{ tarjetas: [] } as any}
+        maestrosPago={{ tarjetas: [] } as unknown as ComponentProps<typeof PagoStep>['maestrosPago']}
         tipoComprobante="FACTURA"
         condicionPago="CONTADO"
         onCondicionPagoChange={() => undefined}
@@ -208,7 +209,7 @@ describe('FAREGAS — Implementación de Descuentos sin Códigos', () => {
           precioChip: 0,
           importeTotal: 81,
         }}
-        maestrosPago={{ tarjetas: [] } as any}
+        maestrosPago={{ tarjetas: [] } as unknown as ComponentProps<typeof PagoStep>['maestrosPago']}
         tipoComprobante="FACTURA"
         condicionPago="CONTADO"
         onCondicionPagoChange={() => undefined}
@@ -228,7 +229,38 @@ describe('FAREGAS — Implementación de Descuentos sin Códigos', () => {
     expect(html).not.toContain('Ingresa el código de descuento');
   });
 
-  it('6. Venta sin certificado puede volver de CON DESCUENTO a SIN DESCUENTO', async () => {
+  it('6. Una autorización de cortesía persistida se presenta separada y sin etiqueta heredada FARENET', () => {
+    const html = renderToStaticMarkup(
+      <SelectorDescuento
+        certificadoId={123}
+        descuentoActual={{
+          descuentoId: 17,
+          codigo: 'D_CONVENIO_A88137BB742F4157',
+          nombre: 'DESCUENTO CERTIFICADO TALLER',
+          empresaAliada: 'FARENET',
+          tipo: 'CONVENIO',
+          tipoCalculo: 'PORCENTAJE',
+          valor: 100,
+          formaPago: 'CONTADO',
+          tarifaOriginal: 90,
+          importeDescuento: 90,
+          importeFinal: 0,
+          fechaFin: '2027-01-01',
+          beneficio: '100% (-S/ 90.00)',
+          autorizaGratuidad: true,
+        }}
+        onDescuentoChange={() => undefined}
+      />
+    );
+
+    expect(html).toContain('CORTESÍA FAREGAS');
+    expect(html).toContain('Operación gratuita autorizada');
+    expect(html).not.toContain('DESCUENTO CERTIFICADO TALLER');
+    expect(html).not.toContain('FARENET');
+    expect(html).not.toContain('100%');
+  });
+
+  it('7. Venta sin certificado puede volver de CON DESCUENTO a SIN DESCUENTO', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -238,8 +270,9 @@ describe('FAREGAS — Implementación de Descuentos sin Códigos', () => {
     });
 
     const radios = container.querySelectorAll<HTMLInputElement>('input[type="radio"]');
-    expect(radios).toHaveLength(2);
+    expect(radios).toHaveLength(3);
     expect(radios[0].checked).toBe(true);
+    expect(container.textContent).toContain('CORTESÍA');
 
     await act(async () => {
       radios[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));

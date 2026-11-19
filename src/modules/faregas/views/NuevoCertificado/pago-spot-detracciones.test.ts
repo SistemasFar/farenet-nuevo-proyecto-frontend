@@ -71,32 +71,36 @@ describe('FAREGAS — SPOT Detracciones (SUNAT RS 183-2004) en Wizard de Pagos',
     expect(erroresMenor.pagos).toContain('Saldo pendiente: S/ 109.00.');
   });
 
-  it('3. Caso FACTURA a CRÉDITO con SPOT: saldo a financiar se calcula sobre el neto', () => {
+  it('3. Caso FACTURA a CRÉDITO puro con SPOT: financia el neto sin pago inicial', () => {
     const cuotasResueltas = resolverCuotasCredito({
       condicionPago: 'CREDITO',
       tipoComprobante: 'FACTURA',
-      pagos: [{ importe: 109.00 }], // Pago inicial
+      pagos: [],
       precioTotal: 1260.00,
       fechaVencimientoCredito: '2026-12-31',
       spotServicio: servicioSpot037,
     });
 
-    // Saldo neto a financiar = 1109 - 109 = 1000.00
+    // El neto luego de SPOT se financia completo; el pago en caja sigue en cero.
     expect(cuotasResueltas).toHaveLength(1);
-    expect(cuotasResueltas[0].importe).toBe('1000.00');
+    expect(cuotasResueltas[0].importe).toBe('1109.00');
 
     const errores = validarPasoPago({
       condicionPago: 'CREDITO',
       tipoComprobante: 'FACTURA',
-      pagos: [{ importe: 109.00 }],
+      pagos: [],
       precioTotal: 1260.00,
       fechaInicioCredito: '2026-11-13',
       fechaVencimientoCredito: '2026-12-31',
-      cuotas: [{ numeroCuota: 1, fechaPago: '2026-12-31', importe: '1000.00' }],
+      cuotas: cuotasResueltas,
       spotServicio: servicioSpot037,
     });
     expect(errores.pagos).toBeUndefined();
     expect(errores.cuotas).toBeUndefined();
+    expect(resolverCuotasCredito({
+      condicionPago: 'CREDITO', tipoComprobante: 'FACTURA', pagos: [{ importe: 109 }],
+      precioTotal: 1260, fechaVencimientoCredito: '2026-12-31', spotServicio: servicioSpot037,
+    })).toEqual([]);
   });
 
   it('4. Factura <= S/ 700.00 (Caso S/ 500.00): No aplica SPOT', () => {

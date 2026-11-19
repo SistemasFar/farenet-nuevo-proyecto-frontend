@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Download, Edit, KeyRound, Trash2 } from 'lucide-react';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 import type { MaestroUsuario } from '../../types/faregas-api';
@@ -598,6 +598,7 @@ export function UsuariosView() {
   const SUBMODULOS_CONFIGURACION = [
     'MENU_CONFIGURACION_SEDES',
     'MENU_CONFIGURACION_CATALOGO',
+    'MENU_CONFIGURACION_TARIFAS',
     'MENU_CONFIGURACION_CORRELATIVOS',
     'MENU_CONFIGURACION_EMPRESAS'
   ] as const;
@@ -635,8 +636,21 @@ export function UsuariosView() {
     FAREGAS_ANULAR_COMPROBANTE: 'Anular comprobante electrónico'
   };
 
+  const SUBMODULOS_DASHBOARD = [
+    'DASHBOARD_GLOBAL',
+    'DASHBOARD_EXPORTAR',
+    'DASHBOARD_SEDE'
+  ] as const;
+  const PERMISO_DASHBOARD = 'MENU_DASHBOARD';
+  const NOMBRES_PERMISOS_DASHBOARD: Record<string, string> = {
+    DASHBOARD_GLOBAL: 'Dashboard Global Multi-Sede',
+    DASHBOARD_EXPORTAR: 'Exportar Métricas del Dashboard',
+    DASHBOARD_SEDE: 'Dashboard de Sede Operativa'
+  };
+
   const MODULOS_CON_SUBMODULOS = [
     { padre: PERMISO_INICIO, hijos: SUBMODULOS_INICIO as readonly string[] },
+    { padre: PERMISO_DASHBOARD, hijos: SUBMODULOS_DASHBOARD as readonly string[] },
     { padre: PERMISO_CHIPS, hijos: SUBMODULOS_CHIPS as readonly string[] },
     { padre: PERMISO_FACTURACION, hijos: SUBMODULOS_FACTURACION as readonly string[] },
     { padre: PERMISO_CONFIGURACION, hijos: SUBMODULOS_CONFIGURACION as readonly string[] }
@@ -668,7 +682,11 @@ export function UsuariosView() {
     if (current.includes(clave)) {
       setFormData({ ...formData, permisos: current.filter((p: string) => p !== clave) });
     } else {
-      setFormData({ ...formData, permisos: [...current, clave] });
+      const padre = MODULOS_CON_SUBMODULOS.find((m) => m.hijos.includes(clave))?.padre;
+      const nextPermisos = padre && !current.includes(padre)
+        ? [...current, padre, clave]
+        : [...current, clave];
+      setFormData({ ...formData, permisos: nextPermisos });
     }
   };
 
@@ -1126,6 +1144,8 @@ export function UsuariosView() {
                     } else {
                     await faregasUsuariosApi.actualizarPerfil(payload.clave, payload);
                     }
+                    localStorage.setItem('faregas_permisos_updated_at', String(Date.now()));
+                    window.dispatchEvent(new CustomEvent('faregasPermisosActualizados'));
                     setShowModal(false);
                     cargarDatos();
                 } catch (err: any) {
@@ -1500,8 +1520,7 @@ export function UsuariosView() {
                                 // Los submódulos no se listan sueltos: se anidan bajo su padre.
                                 const lista = permisos.filter((p) => !esSubmodulo(p.clave));
                                 const otros = lista.filter((p) =>
-                                    !MODULOS_CON_SUBMODULOS.some((m) => m.padre === p.clave)
-                                    && p.clave !== 'MENU_CONFIGURACION_TARIFAS');
+                                    !MODULOS_CON_SUBMODULOS.some((m) => m.padre === p.clave));
 
                                 const casilla = (p: PermisoPerfil, hijo: boolean, padreActivo: boolean) => {
                                     const permisoSensible = esPermisoSensible(p.clave);
@@ -1519,7 +1538,9 @@ export function UsuariosView() {
                                             ? 'Configuración'
                                             : clavePadre === PERMISO_INICIO
                                                 ? 'Inicio'
-                                                : 'Inventario';
+                                                : clavePadre === PERMISO_DASHBOARD
+                                                    ? 'Dashboard'
+                                                    : 'Inventario';
                                     return (
                                         <label key={p.clave}
                                             className={`flex items-center gap-2 text-sm p-2 rounded border ${permisoSensible ? 'border-red-200 bg-red-50/60' : hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
@@ -1531,7 +1552,7 @@ export function UsuariosView() {
                                                 disabled={bloqueado}
                                             />
                                             <span className={`font-medium ${hijo ? 'text-slate-600 text-xs' : 'text-slate-700'}`}>
-                                                {NOMBRES_PERMISOS_INICIO[p.clave] || NOMBRES_MENU_INVENTARIO[p.clave] || p.nombre}
+                                                {NOMBRES_PERMISOS_INICIO[p.clave] || NOMBRES_MENU_INVENTARIO[p.clave] || NOMBRES_PERMISOS_DASHBOARD[p.clave] || p.nombre}
                                             </span>
                                             {permisoSensible && <span className="ml-auto rounded-full border border-red-200 bg-white px-2 py-0.5 text-[10px] font-bold text-red-700">Sensible</span>}
                                         </label>

@@ -2,8 +2,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   abrirPdfNotaCreditoNubefact,
+  abrirPdfFaregas,
   abrirPdfNubefact,
   descargarCertificadoFaregas,
+  descargarPdfFaregas,
   descargarPdfNubefact,
   mostrarCargaComprobanteNubefact,
   asegurarCentradoHtml,
@@ -74,6 +76,24 @@ describe('faregas-comprobante-visor.service', () => {
     expect(res).toBe(true);
   });
 
+  it('abre la representación comercial FAREGAS por un endpoint distinto al PDF fiscal', async () => {
+    const mockBlob = new Blob(['%PDF-1.4 comercial'], { type: 'application/pdf' });
+    const spyFetchBlob = vi.spyOn(httpClient, 'faregasFetchBlob').mockResolvedValue(mockBlob);
+    const mockVentana = {
+      location: { href: '' },
+      closed: false,
+      opener: null,
+      close: vi.fn(),
+    } as unknown as Window;
+
+    const resultado = await abrirPdfFaregas(123, { ventanaPrevia: mockVentana });
+
+    expect(spyFetchBlob).toHaveBeenCalledWith('/certificados/borradores/123/facturacion/pdf');
+    expect(spyFetchBlob).not.toHaveBeenCalledWith('/certificados/borradores/123/facturacion/pdf-nubefact');
+    expect(mockVentana.location.href).toBe('blob:http://localhost/test-blob');
+    expect(resultado).toBe(true);
+  });
+
   it('cierra la ventana e informa si el PDF de NubeFact no está disponible', async () => {
     vi.spyOn(httpClient, 'faregasFetchBlob').mockRejectedValue(new Error('PDF_NUBEFACT_NO_DISPONIBLE'));
 
@@ -121,6 +141,7 @@ describe('faregas-comprobante-visor.service', () => {
 
   it.each([
     ['PDF NubeFact', descargarPdfNubefact, '/certificados/borradores/91/facturacion/pdf-nubefact', 'COMPROBANTE-NUBEFACT-91.pdf'],
+    ['PDF comercial FAREGAS', descargarPdfFaregas, '/certificados/borradores/91/facturacion/pdf', 'REPRESENTACION-COMERCIAL-FAREGAS-91.pdf'],
     ['certificado', descargarCertificadoFaregas, '/certificados/borradores/91/certificado/pdf', 'CERTIFICADO-FAREGAS-91.pdf'],
   ])('descarga automáticamente %s', async (_nombre, descargar, endpoint, filename) => {
     const mockBlob = new Blob(['%PDF-1.4 test'], { type: 'application/pdf' });

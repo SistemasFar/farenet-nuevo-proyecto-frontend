@@ -8,8 +8,8 @@ import { DescuentosView } from './DescuentosView';
 
 type ReglaFila = {
   descuentoId: number;
-  plantaKey: string;
-  servicioId: number;
+  plantaKey: string | number;
+  servicioId: string | number;
   tipoCalculo: string;
   valor: unknown;
   valorContado: unknown;
@@ -90,12 +90,12 @@ const swal = vi.hoisted(() => ({ fire: vi.fn(async () => ({ isConfirmed: true })
 vi.mock('sweetalert2', () => ({ default: swal }));
 
 const CATALOGO = [
-  { id: 328, codigo: '0438', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'CERTIFICACION', planta_key: '13', precio: 100 },
-  { id: 329, codigo: '0437', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '13', precio: 100 },
-  { id: 331, codigo: '0423', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '98', precio: 100 },
-  { id: 406, codigo: '0422', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '98', precio: 100 },
-  { id: 414, codigo: '0428', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '160', precio: 100 },
-  { id: 415, codigo: '0427', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '160', precio: 100 },
+  { id: 328, codigo: '0438', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', familia: 'GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'CERTIFICACION', formato_codigo_canonico: 'GNV_ANUAL', planta_key: '13', precio: 100 },
+  { id: 329, codigo: '0437', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', familia: 'GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GLP_ANUAL', planta_key: '13', precio: 100 },
+  { id: 331, codigo: '0423', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', familia: 'GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GNV_ANUAL', planta_key: '98', precio: 100 },
+  { id: 406, codigo: '0422', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', familia: 'GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GLP_ANUAL', planta_key: '98', precio: 100 },
+  { id: 414, codigo: '0428', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', familia: 'GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GNV_ANUAL', planta_key: '160', precio: 100 },
+  { id: 415, codigo: '0427', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', familia: 'GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GLP_ANUAL', planta_key: '160', precio: 100 },
 ];
 
 const semillaCampanaEditable = () => {
@@ -130,7 +130,7 @@ const montar = async () => {
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => {
-    root.render(<DescuentosView />);
+  root!.render(<DescuentosView />);
     await new Promise((r) => setTimeout(r, 0));
   });
 };
@@ -326,7 +326,7 @@ describe('DescuentosView — ciclo real de edición de descuentos', () => {
     expect(modalAbierto).toBe(true);
   });
 
-  it('8. GUARDAR DATOS también persiste el alcance pendiente sin descartarlo', async () => {
+  it('8. GUARDAR DATOS advierte si hay reglas pendientes y GUARDAR DESCUENTO las persiste', async () => {
     semillaCampanaEditable();
     await montar();
     await abrirCampana();
@@ -339,6 +339,11 @@ describe('DescuentosView — ciclo real de edición de descuentos', () => {
     await clic(botonPorTexto('GUARDAR DATOS')!);
     await flush();
 
+    expect(h.payload).toBeNull();
+    expect(swalTextos().some((texto) => texto.includes('Usa GUARDAR DESCUENTO'))).toBe(true);
+
+    await clic(botonPorTexto('GUARDAR DESCUENTO')!);
+    await flush();
     expect(h.payload).not.toBeNull();
     const reglas = h.payload!.data.reglas as ReglaFila[];
     expect(reglas.every((r) => String(r.valor) === '20')).toBe(true);

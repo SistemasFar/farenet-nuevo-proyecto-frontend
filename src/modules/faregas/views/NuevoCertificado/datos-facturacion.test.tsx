@@ -1085,17 +1085,17 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       expect(erroresRucValido.tipoDocumentoFac).toBeUndefined();
     });
 
-    it('Crédito con cuotas en FACTURA para GNV ANUAL: validarPasoPago admite cuotas configuradas', () => {
+    it('Crédito puro con cuotas en FACTURA para GNV ANUAL: admite cuotas sin cobros en caja', () => {
       const erroresCreditoFactura = validarPasoPago({
         tipoComprobante: 'FACTURA',
         condicionPago: 'CREDITO',
-        pagos: [{ importe: 100 }],
+        pagos: [],
         precioTotal: 300,
         fechaInicioCredito: '2026-11-10',
         fechaVencimientoCredito: '2026-12-10',
         cuotas: [
-          { numeroCuota: 1, fechaPago: '2026-11-25', importe: 100 },
-          { numeroCuota: 2, fechaPago: '2026-12-10', importe: 100 },
+          { numeroCuota: 1, fechaPago: '2026-11-25', importe: 150 },
+          { numeroCuota: 2, fechaPago: '2026-12-10', importe: 150 },
         ],
       });
       expect(erroresCreditoFactura).toEqual({});
@@ -1341,17 +1341,17 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       await act(async () => root.unmount());
     });
 
-    it('15. FACTURA + CRÉDITO con cuotas -> mantiene funcionamiento sin regresiones', () => {
+    it('15. FACTURA + CRÉDITO puro con cuotas -> mantiene funcionamiento sin cobros ficticios', () => {
       const errores = validarPasoPago({
         tipoComprobante: 'FACTURA',
         condicionPago: 'CREDITO',
-        pagos: [{ importe: 50 }],
+        pagos: [],
         precioTotal: 150,
         fechaInicioCredito: '2026-11-10',
         fechaVencimientoCredito: '2026-12-10',
         cuotas: [
-          { numeroCuota: 1, fechaPago: '2026-11-25', importe: 50 },
-          { numeroCuota: 2, fechaPago: '2026-12-10', importe: 50 },
+          { numeroCuota: 1, fechaPago: '2026-11-25', importe: 75 },
+          { numeroCuota: 2, fechaPago: '2026-12-10', importe: 75 },
         ],
       });
       expect(errores).toEqual({});

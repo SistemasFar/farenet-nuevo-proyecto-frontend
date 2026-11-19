@@ -43,6 +43,7 @@ interface PagoStepProps {
   certificadoId?: number;
   descuentoActual?: ConsultaDescuentoResult | null;
   onDescuentoChange?: (descuento: ConsultaDescuentoResult | null) => void;
+  confirmarCambioACortesia?: () => Promise<boolean>;
 }
 
 export function PagoStep({
@@ -77,6 +78,7 @@ export function PagoStep({
   certificadoId,
   descuentoActual = null,
   onDescuentoChange = () => undefined,
+  confirmarCambioACortesia,
 }: PagoStepProps) {
 
   const [avisoPagoConfirmado, setAvisoPagoConfirmado] = useState<string>('');
@@ -158,7 +160,9 @@ export function PagoStep({
         <div>
           <h3 className="text-xl font-bold text-slate-800">Pago</h3>
           <p className="text-sm text-slate-500">
-            Registre uno o varios medios de pago. La información se guarda en el borrador Faregas.
+            {condicionPago === 'CREDITO'
+              ? 'Configure el período y las cuotas. No se registran cobros de caja para un crédito puro.'
+              : 'Registre uno o varios medios de pago. La información se guarda en el borrador Faregas.'}
           </p>
         </div>
       </div>
@@ -211,7 +215,15 @@ export function PagoStep({
                   </div>
                 </div>
 
-                {pendiente <= 0 ? (
+                {pagosAgregados.length > 0 ? (
+                  <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs font-semibold text-amber-900 shadow-sm">
+                    <div className="mb-1 flex items-center gap-2 font-bold text-amber-800">
+                      <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600" />
+                      <span>Hay cobros de caja previos</span>
+                    </div>
+                    <p>Se conservan los pagos por S/ {pagado.toFixed(2)}. El crédito puro no admite cobros iniciales; cambie a CONTADO o regularice esos pagos por el proceso autorizado antes de continuar.</p>
+                  </div>
+                ) : pendiente <= 0 ? (
                   <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs font-semibold text-amber-900 shadow-sm">
                     <div className="flex items-center gap-2 font-bold text-amber-800 mb-1">
                       <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -242,16 +254,22 @@ export function PagoStep({
             )}
           </div>
 
-          <div className="rounded-2xl border-2 border-slate-200 bg-white p-5 space-y-4">
+          {condicionPago === 'CONTADO' && <div className="rounded-2xl border-2 border-slate-200 bg-white p-5 space-y-4">
             <SelectorDescuento
               certificadoId={certificadoId}
               descuentoActual={descuentoActual}
               onDescuentoChange={onDescuentoChange}
               tienePagosRegistrados={pagosAgregados.length > 0}
+              confirmarCambioACortesia={confirmarCambioACortesia}
             />
-          </div>
+          </div>}
+          {condicionPago === 'CREDITO' && descuentoVisual > 0 && (
+            <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+              CRÉDITO no admite descuentos ni cortesías. Vuelva a CONTADO para retirar el beneficio antes de continuar; no se emitirán cuotas con el total descontado.
+            </div>
+          )}
 
-          <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden">
+          {condicionPago === 'CONTADO' && <div className="bg-white border-2 border-slate-200 rounded-2xl overflow-hidden">
             {esCortesia && (
               <div className="p-4 bg-emerald-50 border-b border-emerald-200 flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -385,9 +403,9 @@ export function PagoStep({
                 <PlusCircle className="w-5 h-5" /> AGREGAR PAGO
               </button>
             </div>
-          </div>
+          </div>}
 
-          <div
+          {condicionPago === 'CONTADO' && <div
             className={`rounded-2xl border-2 bg-white ${erroresCampo.pagos ? 'border-red-500' : 'border-slate-200'} ${compact ? 'p-4' : 'p-6'}`}
             data-campo-error={erroresCampo.pagos ? true : undefined}
           >
@@ -459,7 +477,7 @@ export function PagoStep({
               </div>
             )}
             <MensajeError campo="pagos" errores={erroresCampo} />
-          </div>
+          </div>}
         </div>
 
         {/* PANEL DERECHO: RESUMEN */}
@@ -469,7 +487,7 @@ export function PagoStep({
             
             <div className={compact ? 'space-y-3' : 'space-y-4'}>
               <div className="flex justify-between items-center"><span className="text-slate-500 font-semibold">{labelTarifaOriginal}</span><span className="font-bold text-slate-700">S/ {tarifaOriginal.toFixed(2)}</span></div>
-              {descuentoVisual > 0 && (
+              {condicionPago === 'CONTADO' && descuentoVisual > 0 && (
                 <div className="flex justify-between items-center">
                   <span className="text-emerald-700 font-semibold">{esCortesia ? 'Cortesía de taller:' : 'Descuento certificado:'}</span>
                   <span className="font-black text-emerald-700">- S/ {descuentoVisual.toFixed(2)}</span>
@@ -496,17 +514,32 @@ export function PagoStep({
                   </div>
                 </div>
               )}
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-semibold">Pagado en caja:</span>
-                <span className="text-green-600 font-bold text-lg">S/ {pagado.toFixed(2)}</span>
-              </div>
-              <div className={`h-px bg-slate-200 ${compact ? 'my-3' : 'my-4'}`} />
-              <div className="flex justify-between items-center">
-                <span className="text-slate-600 font-bold capitalize text-sm">Falta Pagar:</span>
-                <span className={`font-black text-2xl ${pendiente <= 0.009 ? 'text-green-600' : 'text-red-600'}`}>
-                  S/ {Math.max(0, pendiente).toFixed(2)}
-                </span>
-              </div>
+              {condicionPago === 'CREDITO' ? descuentoVisual > 0 ? (
+                <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                  Total a financiar pendiente de corrección: retire el descuento desde CONTADO.
+                </p>
+              ) : pagosAgregados.length === 0 ? (
+                <div className="flex justify-between items-center border-t border-slate-200 pt-3">
+                  <span className="text-slate-600 font-bold text-sm">Total a financiar:</span>
+                  <span className="text-[#052a79] font-black text-2xl">S/ {totalExigible.toFixed(2)}</span>
+                </div>
+              ) : (
+                <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                  Crédito bloqueado: hay cobros previos por S/ {pagado.toFixed(2)}. No se eliminaron ni se contarán como cuotas.
+                </p>
+              ) : <>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-semibold">Pagado en caja:</span>
+                  <span className="text-green-600 font-bold text-lg">S/ {pagado.toFixed(2)}</span>
+                </div>
+                <div className={`h-px bg-slate-200 ${compact ? 'my-3' : 'my-4'}`} />
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600 font-bold capitalize text-sm">Falta Pagar:</span>
+                  <span className={`font-black text-2xl ${pendiente <= 0.009 ? 'text-green-600' : 'text-red-600'}`}>
+                    S/ {Math.max(0, pendiente).toFixed(2)}
+                  </span>
+                </div>
+              </>}
             </div>
             {evaluacionSpot.aplica && (
               <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-center text-xs font-semibold text-amber-900 leading-tight">
@@ -549,11 +582,17 @@ export function PagoStep({
               <div className={`${compact ? 'mt-4' : 'mt-6'} rounded-lg border border-emerald-300 bg-emerald-100 p-3 text-center text-xs font-bold text-emerald-800`}>
                 Cortesía aplicada. Puede continuar sin registrar pagos.
               </div>
+            ) : condicionPago === 'CREDITO' && pagosAgregados.length > 0 ? (
+              <p className={`rounded-lg border border-amber-300 bg-amber-50 p-3 text-center text-xs font-bold text-amber-900 ${compact ? 'mt-4' : 'mt-6'}`}>
+                Cambie a CONTADO o regularice los cobros previos antes de continuar con crédito.
+              </p>
+            ) : condicionPago === 'CREDITO' ? (
+              <p className={`text-xs font-bold text-center text-blue-600 ${compact ? 'mt-4' : 'mt-6'}`}>
+                No se registra dinero en caja. El total se financiará en las cuotas programadas.
+              </p>
             ) : pendiente > 0.009 ? (
-              <p className={`text-xs font-bold text-center capitalize ${compact ? 'mt-4' : 'mt-6'} ${condicionPago === 'CREDITO' ? 'text-blue-600' : 'text-red-500'}`}>
-                {condicionPago === 'CREDITO'
-                  ? 'El saldo pendiente se registrará en cuotas'
-                  : 'Debe completar el saldo para continuar'}
+              <p className={`text-xs font-bold text-center capitalize ${compact ? 'mt-4' : 'mt-6'} text-red-500`}>
+                Debe completar el saldo para continuar
               </p>
             ) : (
               <div className={`${compact ? 'mt-4' : 'mt-6'} rounded-lg border border-green-200 bg-green-100 p-3 text-center text-xs font-bold capitalize text-green-700`}>

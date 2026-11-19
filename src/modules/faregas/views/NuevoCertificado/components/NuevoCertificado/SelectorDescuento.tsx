@@ -16,6 +16,8 @@ interface SelectorDescuentoProps {
   descuentoActual?: ConsultaDescuentoResult | null;
   onDescuentoChange?: (descuento: ConsultaDescuentoResult | null) => void;
   tienePagosRegistrados?: boolean;
+  confirmarCambioACortesia?: () => Promise<boolean>;
+  disabled?: boolean;
 }
 
 type ModoDescuento = 'sin' | 'con' | 'cortesia';
@@ -25,6 +27,8 @@ export function SelectorDescuento({
   descuentoActual,
   onDescuentoChange,
   tienePagosRegistrados = false,
+  confirmarCambioACortesia,
+  disabled = false,
 }: SelectorDescuentoProps) {
   const [descuentosDisponibles, setDescuentosDisponibles] = useState<DescuentoDisponible[]>([]);
   const [cargandoLista, setCargandoLista] = useState(false);
@@ -43,9 +47,13 @@ export function SelectorDescuento({
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
   const onChangeRef = useRef(onDescuentoChange);
+  const descuentoActualRef = useRef(descuentoActual);
   useEffect(() => {
     onChangeRef.current = onDescuentoChange;
   }, [onDescuentoChange]);
+  useEffect(() => {
+    descuentoActualRef.current = descuentoActual;
+  }, [descuentoActual]);
 
   useEffect(() => {
     if (!certificadoId) return;
@@ -65,10 +73,11 @@ export function SelectorDescuento({
           setDescuentoSeleccionadoId(String(guardado.descuentoId));
           setModoDescuento(guardado.autorizaGratuidad ? 'cortesia' : 'con');
           onChangeRef.current?.(guardado);
-        } else if (descuentoActual) {
-          setDescuentoAplicado(descuentoActual);
-          setDescuentoSeleccionadoId(String(descuentoActual.descuentoId));
-          setModoDescuento(descuentoActual.autorizaGratuidad ? 'cortesia' : 'con');
+        } else if (descuentoActualRef.current) {
+          const descuento = descuentoActualRef.current;
+          setDescuentoAplicado(descuento);
+          setDescuentoSeleccionadoId(String(descuento.descuentoId));
+          setModoDescuento(descuento.autorizaGratuidad ? 'cortesia' : 'con');
         }
       })
       .catch((err: unknown) => {
@@ -141,6 +150,8 @@ export function SelectorDescuento({
       return;
     }
 
+    if (confirmarCambioACortesia && !(await confirmarCambioACortesia())) return;
+
     if (!certificadoId) return;
 
     const modoAnterior = modoDescuento;
@@ -209,6 +220,11 @@ export function SelectorDescuento({
 
   return (
     <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+      {disabled && (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+          CRÉDITO no admite descuentos ni cortesías. Cambie a CONTADO para administrar el beneficio.
+        </p>
+      )}
       <div className="space-y-1.5">
         <label htmlFor="selector-descuento-directo" className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
           <Tag className="h-3.5 w-3.5 text-[#052a79]" />
@@ -222,6 +238,7 @@ export function SelectorDescuento({
               name="tipoDescuento"
               checked={modoDescuento === 'sin'}
               onChange={() => void seleccionarSinDescuento()}
+              disabled={disabled || aplicando}
               className="h-4 w-4 text-[#052a79] focus:ring-[#052a79]"
             />
             <span className="text-sm font-bold text-slate-700">SIN DESCUENTO</span>
@@ -232,6 +249,7 @@ export function SelectorDescuento({
               name="tipoDescuento"
               checked={modoDescuento === 'con'}
               onChange={() => void seleccionarConDescuento()}
+              disabled={disabled || aplicando}
               className="h-4 w-4 text-[#052a79] focus:ring-[#052a79]"
             />
             <span className="text-sm font-bold text-slate-700">CON DESCUENTO</span>
@@ -242,6 +260,7 @@ export function SelectorDescuento({
                 name="tipoDescuento"
                 checked={modoDescuento === 'cortesia'}
                 onChange={() => void handleSeleccionarCortesia()}
+                disabled={disabled || aplicando}
                 className="h-4 w-4 text-[#052a79] focus:ring-[#052a79]"
               />
               <span className="text-sm font-bold text-emerald-700 flex items-center gap-1">
@@ -263,7 +282,7 @@ export function SelectorDescuento({
           </div>
         ) : modoDescuento === 'con' && descuentosDisponibles.length === 0 ? (
           <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-xs font-medium text-amber-800">
-            No existen descuentos vigentes configurados para este servicio en esta sede.
+            No hay descuentos disponibles para este certificado.
           </div>
         ) : modoDescuento === 'con' ? (
           <div className="relative">
@@ -271,7 +290,7 @@ export function SelectorDescuento({
               id="selector-descuento-directo"
               value={descuentoSeleccionadoId}
               onChange={(e) => void handleSeleccionarDescuento(e.target.value)}
-              disabled={aplicando}
+              disabled={disabled || aplicando}
               className="h-[44px] w-full rounded-xl border-2 border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 transition-colors focus:border-[#f59e0b] focus:ring-0 disabled:opacity-60 cursor-pointer"
             >
               <option value="">-- Seleccione un descuento de la lista --</option>
@@ -297,11 +316,13 @@ export function SelectorDescuento({
               <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
               <div>
                 <h5 className="text-xs font-black text-emerald-900 uppercase tracking-wide">
-                  {descuentoAplicado.nombre}
+                  {descuentoAplicado.autorizaGratuidad ? 'CORTESÍA FAREGAS' : descuentoAplicado.nombre}
                 </h5>
                 <p className="text-[11px] font-semibold text-emerald-700">
-                  {descuentoAplicado.beneficio || (descuentoAplicado.tipoCalculo === 'PORCENTAJE' ? `${descuentoAplicado.valor}% de descuento` : `Monto fijo -S/ ${descuentoAplicado.importeDescuento.toFixed(2)}`)}
-                  {descuentoAplicado.empresaAliada ? ` • ${descuentoAplicado.empresaAliada}` : ''}
+                  {descuentoAplicado.autorizaGratuidad
+                    ? 'Operación gratuita autorizada; se mantiene separada de los descuentos comerciales.'
+                    : descuentoAplicado.beneficio || (descuentoAplicado.tipoCalculo === 'PORCENTAJE' ? `${descuentoAplicado.valor}% de descuento` : `Monto fijo -S/ ${descuentoAplicado.importeDescuento.toFixed(2)}`)}
+                  {!descuentoAplicado.autorizaGratuidad && descuentoAplicado.empresaAliada ? ` • ${descuentoAplicado.empresaAliada}` : ''}
                 </p>
               </div>
             </div>

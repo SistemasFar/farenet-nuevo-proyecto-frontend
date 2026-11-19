@@ -5,7 +5,7 @@ import { faregasCertificadosApi } from '../../../../services/faregas-certificado
 import type { FacturacionContextoFaregas, FacturacionFaregas, ResumenTributarioFaregas } from '../../../../types/faregas-api';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import { DocumentosElectronicosPanel } from './DocumentosElectronicosPanel';
-import { abrirPdfNubefact } from '../../../../services/faregas-comprobante-visor.service';
+import { abrirPdfFaregas, abrirPdfNubefact } from '../../../../services/faregas-comprobante-visor.service';
 
 const mensajeError = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message ? error.message : fallback;
@@ -388,6 +388,10 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
     if (!certificadoId) return;
     await abrirPdfNubefact(certificadoId);
   }, [certificadoId]);
+  const abrirComprobanteComercial = useCallback(async () => {
+    if (!certificadoId) return;
+    await abrirPdfFaregas(certificadoId);
+  }, [certificadoId]);
   const [isSaving, setIsSaving] = useState(false);
   const [isEmitting, setIsEmitting] = useState(false);
   const [integracion, setIntegracion] = useState<{ enabled: boolean; configured: boolean; simulationEnabled?: boolean; correlativosV2Enabled?: boolean } | null>(null);
@@ -667,7 +671,12 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
             <div className="font-bold">{facturacion.nroComprobante || 'SIN NUMERO RESERVADO'}</div>
             {Boolean(facturacion.enlacePdf) && (
               <button type="button" onClick={() => void abrirComprobanteOficial()} className="font-bold underline text-blue-700">
-                VER COMPROBANTE
+                PDF FISCAL NUBEFACT
+              </button>
+            )}
+            {Boolean(facturacion.enlacePdfFaregas) && (
+              <button type="button" onClick={() => void abrirComprobanteComercial()} className="font-bold underline text-cyan-700">
+                PDF COMERCIAL FAREGAS
               </button>
             )}
           </div>

@@ -1,22 +1,19 @@
 ﻿import { describe, expect, it } from 'vitest';
 import {
   reconstruirPaso2,
-  construirReglasValidas,
   aplicarBeneficioGeneral,
-  obtenerBeneficio,
-  claveServicioLogico,
   type ReglaDescuento,
   type ServicioPorPlanta,
 } from './descuentos-wizard.utils';
 
 // Simulate descuento 23's services (from PostgreSQL query)
 const disponibilidad: ServicioPorPlanta[] = [
-  { id: 328, codigo: '0438', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'CERTIFICACION', planta_key: '13', precio: 100 },
-  { id: 329, codigo: '0437', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '13', precio: 100 },
-  { id: 331, codigo: '0423', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '98', precio: 100 },
-  { id: 406, codigo: '0422', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '98', precio: 100 },
-  { id: 414, codigo: '0428', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '160', precio: 100 },
-  { id: 415, codigo: '0427', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', planta_key: '160', precio: 100 },
+  { id: 328, codigo: '0438', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', familia: 'GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'CERTIFICACION', formato_codigo_canonico: 'GNV_ANUAL', planta_key: '13', precio: 100 },
+  { id: 329, codigo: '0437', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', familia: 'GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GLP_ANUAL', planta_key: '13', precio: 100 },
+  { id: 331, codigo: '0423', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', familia: 'GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GNV_ANUAL', planta_key: '98', precio: 100 },
+  { id: 406, codigo: '0422', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', familia: 'GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GLP_ANUAL', planta_key: '98', precio: 100 },
+  { id: 414, codigo: '0428', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GNV', familia: 'GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GNV_ANUAL', planta_key: '160', precio: 100 },
+  { id: 415, codigo: '0427', nombre: 'CERTIFICADO ANUAL DE INSPECCIÓN DE TALLER GLP', familia: 'GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'TALLER_INSPECCION', formato_codigo_canonico: 'GLP_ANUAL', planta_key: '160', precio: 100 },
 ];
 
 // Simulate backend response (from obtenerDetalleAdministracion)
@@ -43,7 +40,9 @@ describe('descuento 23 - ciclo completo', () => {
     console.log('MODO PERSONALIZADO:', reconstruccion.modoPersonalizado);
     
     expect(reconstruccion.sedes).toEqual(['13', '98', '160']);
-    expect(reconstruccion.servicios).toHaveLength(6);
+    // El registro de GNV en CERTIFICACION no se mezcla con los dos registros
+    // de TALLER_INSPECCION: tienen distinto flujo operativo.
+    expect(reconstruccion.servicios).toHaveLength(3);
     expect(reconstruccion.beneficio.tipoCalculo).toBe('PORCENTAJE');
     expect(reconstruccion.beneficio.valor).toBe('100.00');
     expect(reconstruccion.excepciones).toHaveLength(0);

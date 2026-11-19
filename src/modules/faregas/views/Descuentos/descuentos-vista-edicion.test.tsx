@@ -7,9 +7,9 @@ import {
 } from './descuentos-wizard.utils';
 
 const disponibilidad: ServicioPorPlanta[] = [
-  { id: 101, codigo: '0101', nombre: 'CERTIFICADO ANUAL GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'CERTIFICACION', planta_key: 'SURCO', precio: 90 },
-  { id: 102, codigo: '0181', nombre: 'CERTIFICADO ANUAL GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'CERTIFICACION', planta_key: 'MIRAFLORES', precio: 90 },
-  { id: 201, codigo: '0102', nombre: 'CERTIFICADO INICIAL GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'INICIAL', tipo_flujo: 'CERTIFICACION', planta_key: 'SURCO', precio: 100 },
+  { id: 101, codigo: '0101', nombre: 'CERTIFICADO ANUAL GLP', familia: 'GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'CERTIFICACION', formato_codigo_canonico: 'GLP_ANUAL', planta_key: 'SURCO', precio: 90 },
+  { id: 102, codigo: '0181', nombre: 'CERTIFICADO ANUAL GLP', familia: 'GLP', categoria: 'GLP', tipo_certificado_clave: 'GLP_ANUAL', modalidad: 'ANUAL', tipo_flujo: 'CERTIFICACION', formato_codigo_canonico: 'GLP_ANUAL', planta_key: 'MIRAFLORES', precio: 90 },
+  { id: 201, codigo: '0102', nombre: 'CERTIFICADO INICIAL GNV', familia: 'GNV', categoria: 'GNV', tipo_certificado_clave: 'GNV_ANUAL', modalidad: 'INICIAL', tipo_flujo: 'CERTIFICACION', formato_codigo_canonico: 'GNV_INICIAL', planta_key: 'SURCO', precio: 100 },
 ];
 
 let guardadoReglas: unknown = null;

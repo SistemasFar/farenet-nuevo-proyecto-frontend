@@ -9,12 +9,13 @@ export const DASHBOARD_TAB_CONFIG: ReadonlyArray<{ id: DashboardTabId; label: st
 
 export function resolverPermisosDashboard(permisos: string[] = [], _perfilId?: string | null) {
   void _perfilId;
+  const tieneAcceso = tieneAccesoDashboard(permisos);
   return {
-    puedeVerGlobal: (permisos || []).includes('DASHBOARD_GLOBAL'),
-    puedeExportar: (permisos || []).includes('DASHBOARD_EXPORTAR')
+    puedeVerGlobal: tieneAcceso && (permisos || []).includes('DASHBOARD_GLOBAL'),
+    puedeExportar: tieneAcceso && (permisos || []).includes('DASHBOARD_EXPORTAR')
   };
 }
 
 export const tieneAccesoDashboard = (permisos: string[] = []): boolean => (
-  (permisos || []).some((permiso) => ['MENU_DASHBOARD', 'DASHBOARD_SEDE', 'DASHBOARD_GLOBAL'].includes(permiso))
+  (permisos || []).includes('MENU_DASHBOARD')
 );
