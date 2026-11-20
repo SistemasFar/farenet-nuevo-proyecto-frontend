@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { AlertTriangle, CheckCircle2, Copy, Download, Edit, Eye, EyeOff, FileSpreadsheet, Key, Lock, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, Download, Edit, Eye, EyeOff, FileSpreadsheet, Key, Loader2, Lock, ShieldAlert, ShieldCheck, Trash2, X } from 'lucide-react';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
 import type { MaestroUsuario } from '../../types/faregas-api';
 import {
@@ -10,9 +10,6 @@ import {
 import {
   perfilTieneAccesoGlobalSedes,
 } from './acceso-global-sedes';
-import {
-  descargarExcelUsuariosFaregas,
-} from './usuarios-exportacion';
 
 import {
   atributosDocumento,
@@ -106,12 +103,17 @@ export function UsuariosView() {
   const [mostrarPasswordConsultada, setMostrarPasswordConsultada] = useState(false);
   const [credencialConsultadaCopiada, setCredencialConsultadaCopiada] = useState(false);
   const [generandoTemporal, setGenerandoTemporal] = useState(false);
-  const [solicitandoReautenticacion, setSolicitandoReautenticacion] = useState(false);
-  const [passwordAdminReautenticacion, setPasswordAdminReautenticacion] = useState('');
-  const [mostrarPasswordAdminReautenticacion, setMostrarPasswordAdminReautenticacion] = useState(false);
-  const [reautenticando, setReautenticando] = useState(false);
-  const [errorReautenticacion, setErrorReautenticacion] = useState<string | null>(null);
+  const [revelandoCredencial, setRevelandoCredencial] = useState(false);
+  const [errorRevelacion, setErrorRevelacion] = useState<string | null>(null);
   const [mensajeExito, setMensajeExito] = useState<string | null>(null);
+
+  const cerrarModalCredencial = () => {
+    setModalCredencialConsultada(null);
+    setMostrarPasswordConsultada(false);
+    setCredencialConsultadaCopiada(false);
+    setErrorRevelacion(null);
+    setRevelandoCredencial(false);
+  };
 
   // Filtro de estado del listado de usuarios. Por defecto sólo los activos: los
   // inactivos se conservan (su auditoría es real) pero no se ven en el día a día.
@@ -202,9 +204,8 @@ export function UsuariosView() {
     setModalCredencialConsultada({ cargando: true });
     setMostrarPasswordConsultada(false);
     setCredencialConsultadaCopiada(false);
-    setSolicitandoReautenticacion(false);
-    setPasswordAdminReautenticacion('');
-    setErrorReautenticacion(null);
+    setErrorRevelacion(null);
+    setRevelandoCredencial(false);
     try {
       const resp = await faregasUsuariosApi.consultarCredencialAsignada(username);
       setModalCredencialConsultada({ cargando: false, datos: resp });
@@ -213,37 +214,46 @@ export function UsuariosView() {
     }
   };
 
-  const handleRevelarCredencial = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!passwordAdminReautenticacion) {
-      setErrorReautenticacion('Ingrese su contraseña de administrador para continuar.');
-      return;
+  const handleToggleEyeRevelar = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
     const targetUsername = modalCredencialConsultada?.datos?.username;
     if (!targetUsername) return;
 
-    setReautenticando(true);
-    setErrorReautenticacion(null);
+    // Si la contraseña ya fue revelada, alternar visibilidad sin solicitudes adicionales
+    if (modalCredencialConsultada.datos.password) {
+      setMostrarPasswordConsultada((prev) => !prev);
+      return;
+    }
+
+    // Consultar la credencial en custodia bajo la sesión administrativa autorizada
+    setRevelandoCredencial(true);
+    setErrorRevelacion(null);
     try {
-      const resp = await faregasUsuariosApi.revelarCredencialCustodiada(targetUsername, passwordAdminReautenticacion);
+      const resp = await faregasUsuariosApi.revelarCredencialCustodiada(targetUsername);
+      const revealedPassword = resp?.password ?? resp?.data?.password;
+      if (!revealedPassword) {
+        throw new Error('No se recibió la contraseña custodiada desde el servidor.');
+      }
       setModalCredencialConsultada((prev) => prev ? ({
         ...prev,
         datos: {
           ...prev.datos,
-          password: resp.password,
+          password: revealedPassword,
           disponible: true,
-          fechaAsignacion: resp.fechaActualizacion
-            ? new Date(resp.fechaActualizacion).toLocaleString('es-PE', { timeZone: 'America/Lima' })
+          fechaAsignacion: (resp.fechaActualizacion || resp.data?.fechaActualizacion)
+            ? new Date(resp.fechaActualizacion || resp.data?.fechaActualizacion).toLocaleString('es-PE', { timeZone: 'America/Lima' })
             : prev.datos?.fechaAsignacion
         }
       }) : null);
-      setPasswordAdminReautenticacion('');
-      setSolicitandoReautenticacion(false);
       setMostrarPasswordConsultada(true);
     } catch (err: any) {
-      setErrorReautenticacion(err.message || 'Contraseña de administrador incorrecta o límite de consultas excedido.');
+      const msg = err.detalles?.message || err.message || 'Error al consultar la contraseña custodiada.';
+      setErrorRevelacion(msg);
     } finally {
-      setReautenticando(false);
+      setRevelandoCredencial(false);
     }
   };
 
@@ -871,17 +881,6 @@ ${separador}
           </span>
           {activeTab === 'usuarios' ? (
             <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => descargarExcelUsuariosFaregas(filteredUsuarios, perfiles, {
-                  estado: estadoFiltro,
-                  busqueda: searchQuery,
-                })}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#052A79] bg-white px-4 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-50/50 disabled:opacity-50"
-              >
-                <Download size={16} /> EXPORTAR EXCEL
-              </button>
               {puedeGestionarCredenciales && (
                 <button
                   type="button"
@@ -896,9 +895,6 @@ ${separador}
               <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
                 + Crear Usuario
               </button>
-              <p className="basis-full text-right text-xs text-slate-500" role="note">
-                EXPORTAR EXCEL contiene únicamente datos administrativos; nunca incluye contraseñas ni hashes.
-              </p>
             </div>
           ) : (
             <button onClick={() => {
@@ -1003,9 +999,10 @@ ${separador}
                         {puedeGestionarCredenciales && (
                           <button
                             type="button"
+                            data-testid={`btn-credencial-${u.username}`}
                             onClick={() => consultarCredencialUsuario(u.username)}
                             title="Consultar / entregar credencial administrada"
-                            className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-base text-amber-700 hover:bg-amber-100 transition-colors"
+                            className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-base text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
                           >
                             <Key size={18} />
                           </button>
@@ -1134,6 +1131,14 @@ ${separador}
                   Gestión de Credencial Administrada
                 </h2>
               </div>
+              <button
+                type="button"
+                onClick={cerrarModalCredencial}
+                aria-label="Cerrar modal de credencial"
+                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {modalCredencialConsultada.cargando ? (
@@ -1207,7 +1212,9 @@ ${separador}
 
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-bold text-slate-600">Contraseña administrada</label>
+                        <label htmlFor="input-contrasenha-administrada" className="block text-xs font-bold text-slate-600">
+                          Contraseña administrada
+                        </label>
                         {!modalCredencialConsultada.datos.password && (
                           <span className="text-[11px] text-blue-700 font-medium flex items-center gap-1">
                             <Lock size={12} /> Clic en el ojo para revelar
@@ -1217,62 +1224,58 @@ ${separador}
                       <div className="flex gap-2">
                         <div className="relative flex-1">
                           <input
+                            id="input-contrasenha-administrada"
                             readOnly
                             type={(modalCredencialConsultada.datos.password && mostrarPasswordConsultada) ? 'text' : 'password'}
-                            value={modalCredencialConsultada.datos.password || '••••••••••••••••'}
+                            value={(modalCredencialConsultada.datos.password && mostrarPasswordConsultada) ? modalCredencialConsultada.datos.password : '••••••••••••••••'}
                             aria-label="Contraseña administrada asignada"
-                            className="w-full rounded border border-slate-300 p-2 pr-10 font-mono text-sm bg-slate-50"
+                            className="w-full rounded border border-slate-300 p-2 pr-10 font-mono text-sm bg-slate-50 cursor-pointer"
+                            onClick={handleToggleEyeRevelar}
                             onFocus={(event) => {
-                              if (modalCredencialConsultada.datos?.password) {
+                              if (modalCredencialConsultada.datos?.password && mostrarPasswordConsultada) {
                                 event.currentTarget.select();
                               }
                             }}
                           />
                           <button
                             type="button"
+                            data-testid="btn-toggle-eye"
+                            disabled={revelandoCredencial}
                             aria-label={modalCredencialConsultada.datos.password && mostrarPasswordConsultada ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                            onClick={() => {
-                              if (!modalCredencialConsultada.datos?.password) {
-                                setSolicitandoReautenticacion(true);
-                                setPasswordAdminReautenticacion('');
-                                setErrorReautenticacion(null);
-                              } else {
-                                setMostrarPasswordConsultada((v) => !v);
-                              }
-                            }}
-                            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
-                            title={!modalCredencialConsultada.datos.password ? 'Presione para reautenticar y revelar' : (mostrarPasswordConsultada ? 'Ocultar' : 'Mostrar')}
+                            onClick={handleToggleEyeRevelar}
+                            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79] z-10 cursor-pointer focus:outline-none disabled:opacity-50"
+                            title={!modalCredencialConsultada.datos.password ? 'Presione para consultar la contraseña custodiada' : (mostrarPasswordConsultada ? 'Ocultar' : 'Mostrar')}
                           >
-                            {modalCredencialConsultada.datos.password && mostrarPasswordConsultada ? <EyeOff size={17} /> : <Eye size={17} />}
+                            {revelandoCredencial ? (
+                              <Loader2 size={17} className="animate-spin text-[#052A79]" />
+                            ) : modalCredencialConsultada.datos.password && mostrarPasswordConsultada ? (
+                              <EyeOff size={17} data-testid="icon-eye-off" />
+                            ) : (
+                              <Eye size={17} data-testid="icon-eye" />
+                            )}
                           </button>
                         </div>
                         <button
                           type="button"
+                          disabled={!modalCredencialConsultada.datos?.password}
                           onClick={async () => {
-                            if (!modalCredencialConsultada.datos?.password) {
-                              setSolicitandoReautenticacion(true);
-                              setPasswordAdminReautenticacion('');
-                              setErrorReautenticacion(null);
-                              return;
-                            }
+                            if (!modalCredencialConsultada.datos?.password) return;
                             await navigator.clipboard.writeText(modalCredencialConsultada.datos.password);
                             setCredencialConsultadaCopiada(true);
                             setTimeout(() => setCredencialConsultadaCopiada(false), 2000);
                           }}
-                          className="inline-flex items-center gap-2 rounded bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900"
-                          title={!modalCredencialConsultada.datos.password ? 'Requiere reautenticación previa' : 'Copiar'}
+                          className={!modalCredencialConsultada.datos?.password
+                            ? 'inline-flex items-center gap-2 rounded bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-400 cursor-not-allowed'
+                            : 'inline-flex items-center gap-2 rounded bg-[#052A79] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900 cursor-pointer shadow-sm'}
+                          title={!modalCredencialConsultada.datos.password ? 'Debe revelar la contraseña con el ícono del ojo para habilitar Copiar' : 'Copiar'}
                         >
                           <Copy size={16} /> {credencialConsultadaCopiada ? '¡Copiada!' : 'Copiar'}
                         </button>
                         <button
                           type="button"
+                          disabled={!modalCredencialConsultada.datos?.password}
                           onClick={() => {
-                            if (!modalCredencialConsultada.datos?.password) {
-                              setSolicitandoReautenticacion(true);
-                              setPasswordAdminReautenticacion('');
-                              setErrorReautenticacion(null);
-                              return;
-                            }
+                            if (!modalCredencialConsultada.datos?.password) return;
                             descargarComprobanteEntrega({
                               username: modalCredencialConsultada.datos.username,
                               password: modalCredencialConsultada.datos.password,
@@ -1282,65 +1285,21 @@ ${separador}
                               accion: 'Entrega de credencial administrada'
                             });
                           }}
-                          className="inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                          title={!modalCredencialConsultada.datos.password ? 'Requiere reautenticación previa' : 'Descargar comprobante'}
+                          className={!modalCredencialConsultada.datos?.password
+                            ? 'inline-flex items-center gap-2 rounded border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-400 cursor-not-allowed'
+                            : 'inline-flex items-center gap-2 rounded border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-sm'}
+                          title={!modalCredencialConsultada.datos.password ? 'Debe revelar la contraseña con el ícono del ojo para descargar el comprobante' : 'Descargar comprobante'}
                         >
                           <Download size={16} /> Descargar comprobante (.txt)
                         </button>
                       </div>
                     </div>
 
-                    {solicitandoReautenticacion && !modalCredencialConsultada.datos.password && (
-                      <form onSubmit={handleRevelarCredencial} className="rounded-lg border border-blue-200 bg-blue-50/80 p-3 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-xs font-bold text-blue-950 flex items-center gap-1.5">
-                            <Lock size={14} className="text-blue-700" />
-                            Para revelar la credencial, confirme su contraseña de administrador:
-                          </label>
-                          <span className="text-[10px] text-blue-700 font-semibold">Reautenticación de seguridad</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <input
-                              type={mostrarPasswordAdminReautenticacion ? 'text' : 'password'}
-                              value={passwordAdminReautenticacion}
-                              onChange={(e) => setPasswordAdminReautenticacion(e.target.value)}
-                              placeholder="Ingrese su contraseña actual..."
-                              autoFocus
-                              className="w-full rounded border border-blue-300 p-2 pr-10 text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setMostrarPasswordAdminReautenticacion((v) => !v)}
-                              className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-blue-900"
-                              aria-label={mostrarPasswordAdminReautenticacion ? 'Ocultar clave' : 'Mostrar clave'}
-                            >
-                              {mostrarPasswordAdminReautenticacion ? <EyeOff size={15} /> : <Eye size={15} />}
-                            </button>
-                          </div>
-                          <button
-                            type="submit"
-                            disabled={reautenticando || !passwordAdminReautenticacion}
-                            className="inline-flex items-center gap-1.5 rounded bg-[#052A79] px-4 py-2 text-xs font-bold text-white hover:bg-blue-900 disabled:opacity-50 shadow-sm"
-                          >
-                            {reautenticando ? 'Verificando...' : 'Confirmar y Revelar'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSolicitandoReautenticacion(false);
-                              setPasswordAdminReautenticacion('');
-                              setErrorReautenticacion(null);
-                            }}
-                            className="rounded border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
-                        {errorReautenticacion && (
-                          <p className="text-xs text-red-600 font-semibold">{errorReautenticacion}</p>
-                        )}
-                      </form>
+                    {errorRevelacion && (
+                      <div role="alert" className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 p-3 rounded-lg">
+                        <AlertTriangle size={15} className="shrink-0 text-red-600" />
+                        <span className="font-semibold">{errorRevelacion}</span>
+                      </div>
                     )}
 
                     <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
@@ -1348,12 +1307,12 @@ ${separador}
                         type="button"
                         onClick={() => {
                           const uObj = usuarios.find(u => u.username?.toLowerCase() === modalCredencialConsultada.datos?.username?.toLowerCase());
-                          setModalCredencialConsultada(null);
+                          cerrarModalCredencial();
                           if (uObj) {
                             handleOpenUsuario(uObj, true);
                           }
                         }}
-                        className="text-slate-600 hover:text-[#052A79] underline font-medium"
+                        className="text-slate-600 hover:text-[#052A79] underline font-medium cursor-pointer"
                       >
                         Editar manualmente...
                       </button>
@@ -1415,12 +1374,12 @@ ${separador}
                           type="button"
                           onClick={() => {
                             const uObj = usuarios.find(u => u.username?.toLowerCase() === modalCredencialConsultada.datos?.username?.toLowerCase());
-                            setModalCredencialConsultada(null);
+                            cerrarModalCredencial();
                             if (uObj) {
                               handleOpenUsuario(uObj, true);
                             }
                           }}
-                          className="text-xs text-slate-600 hover:text-[#052A79] underline font-medium"
+                          className="text-xs text-slate-600 hover:text-[#052A79] underline font-medium cursor-pointer"
                         >
                           Editar manualmente...
                         </button>
@@ -1452,15 +1411,8 @@ ${separador}
             <div className="mt-5 flex justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  setModalCredencialConsultada(null);
-                  setMostrarPasswordConsultada(false);
-                  setCredencialConsultadaCopiada(false);
-                  setSolicitandoReautenticacion(false);
-                  setPasswordAdminReautenticacion('');
-                  setErrorReautenticacion(null);
-                }}
-                className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={cerrarModalCredencial}
+                className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
               >
                 Cerrar
               </button>
@@ -1468,6 +1420,7 @@ ${separador}
           </div>
         </div>
       )}
+
       {bajaPerfil && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div role="dialog" aria-modal="true" aria-labelledby="titulo-baja-perfil" className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl">

@@ -11,11 +11,26 @@ export const faregasUsuariosApi = {
   obtenerUsuarios: () => fetchWithToken('/usuarios'),
   obtenerPoliticaPassword: () => fetchWithToken('/usuarios/politica-password'),
   consultarCredencialAsignada: (username: string) => fetchWithToken(`/usuarios/${username}/credencial-asignada`),
-  revelarCredencialCustodiada: (username: string, passwordAdmin: string) =>
-    fetchWithToken(`/usuarios/${username}/revelar-credencial`, {
+  obtenerEstadoMfa: () => fetchWithToken('/usuarios/mfa/estado'),
+  iniciarConfiguracionMfa: () => fetchWithToken('/usuarios/mfa/iniciar-configuracion', { method: 'POST' }),
+  confirmarConfiguracionMfa: (codigoTotp: string) => fetchWithToken('/usuarios/mfa/confirmar-configuracion', {
+    method: 'POST',
+    body: JSON.stringify({ codigoTotp })
+  }),
+  desactivarMfa: (datos: { passwordAdmin?: string; codigoTotp?: string }) => fetchWithToken('/usuarios/mfa/desactivar', {
+    method: 'POST',
+    body: JSON.stringify(datos)
+  }),
+  revelarCredencialCustodiada: (username: string, autorizacion?: { passwordAdmin?: string; codigoTotp?: string; codigoRecuperacion?: string } | string) => {
+    const body = typeof autorizacion === 'string'
+      ? { passwordAdmin: autorizacion }
+      : (autorizacion || {});
+    return fetchWithToken(`/usuarios/${username}/revelar-credencial`, {
       method: 'POST',
-      body: JSON.stringify({ passwordAdmin })
-    }),
+      body: JSON.stringify(body),
+      handleUnauthorized: false
+    });
+  },
   generarCredencialTemporal: (username: string) => fetchWithToken(`/usuarios/${username}/generar-credencial-temporal`, {
     method: 'POST'
   }),

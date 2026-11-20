@@ -4,7 +4,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UsuariosView } from './UsuariosView';
 import { faregasUsuariosApi } from '../../services/faregas-usuarios.api';
-import { exportarExcelVariasHojas } from '../../utils/exportar-excel';
 
 vi.mock('../../services/faregas-usuarios.api', () => ({ faregasUsuariosApi: {
   obtenerUsuarios: vi.fn(), obtenerPerfiles: vi.fn(), obtenerPlantas: vi.fn(), obtenerPermisos: vi.fn(),
@@ -13,15 +12,13 @@ vi.mock('../../services/faregas-usuarios.api', () => ({ faregasUsuariosApi: {
   crearUsuario: vi.fn(), actualizarUsuario: vi.fn(), cambiarPassword: vi.fn(),
   consultarCredencialAsignada: vi.fn(), descargarInventarioRenovadoBlob: vi.fn(),
 } }));
-vi.mock('../../utils/exportar-excel', () => ({ exportarExcelVariasHojas: vi.fn() }));
 
 const api = vi.mocked(faregasUsuariosApi);
-const exportar = vi.mocked(exportarExcelVariasHojas);
 let root: Root;
 let host: HTMLDivElement;
 const click = async (element: Element) => { await act(async () => { (element as HTMLElement).click(); }); };
 
-describe('exportación desde Administración de Usuarios', () => {
+describe('Administración de Usuarios', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -52,16 +49,8 @@ describe('exportación desde Administración de Usuarios', () => {
     vi.unstubAllGlobals();
   });
 
-  it('exporta todos los usuarios que cumplen los filtros activos, no solo la página visible', async () => {
-    const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.includes('EXPORTAR EXCEL'))!;
-    await click(button);
-    expect(exportar).toHaveBeenCalledTimes(1);
-    const [nombre, hojas] = exportar.mock.calls[0];
-    expect(nombre).toBe('USUARIOS_FAREGAS');
-    expect(hojas[0].rows).toHaveLength(11);
-    expect(hojas[0].rows[0]).toMatchObject({ username: 'wilber', estado: 'Activo' });
-    expect(hojas[0].rows[0]).not.toHaveProperty('password');
-    expect(hojas[0].columns.some((columna) => columna.key === 'password')).toBe(false);
+  it('omite la exportación de usuarios del listado', () => {
+    expect(host.textContent).not.toContain('EXPORTAR EXCEL');
   });
 
   it('elimina la generación masiva y sus casillas de selección exclusivas', () => {
