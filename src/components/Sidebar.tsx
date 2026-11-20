@@ -395,14 +395,13 @@ export function Sidebar({
     menuVisible = sorted;
   }
 
-  const rutaLogoFaregas = isFaregas ? (resolverRutaInicialFaregas(permisos) || '/faregas/inicio') : '/inicio';
+  const rutaLogoFaregas = isFaregas ? (resolverRutaInicialFaregas(permisos) || '/sin-acceso') : '/inicio';
   return (
     <aside
       onMouseEnter={onMouseEnterSidebar}
       onMouseLeave={onMouseLeaveSidebar}
-      aria-hidden={!mobileOpen ? undefined : false}
       className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(82vw,300px)] flex-col overflow-hidden border-r border-blue-900 bg-[#052a79] px-4 shadow-2xl transition-[transform,width,padding] duration-300 ease-in-out md:relative md:z-auto md:h-screen md:translate-x-0 md:shadow-xl ${
-        mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        mobileOpen ? 'visible translate-x-0' : 'invisible -translate-x-full md:visible'
       } ${
         collapsed ? 'md:w-[90px] md:px-2' : 'md:w-[290px] md:px-5'
       }`}
@@ -411,6 +410,7 @@ export function Sidebar({
         <Link
           to={isFaregas ? rutaLogoFaregas : '/inicio'}
           onClick={onCloseMobile}
+          aria-label={isFaregas ? 'Inicio de FAREGAS' : 'Inicio de FARENET'}
           className="flex w-full items-center justify-center cursor-pointer"
         >
           {!showExpandedContent ? (
@@ -440,7 +440,7 @@ export function Sidebar({
       </div>
 
       <div className="flex-1 overflow-y-auto px-1 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        <nav>
+        <nav aria-label="Menú principal">
           <ul className="flex flex-col gap-1.5">
             {menuVisible.map((item) => {
               const isActive = activeMenu === item.key;
@@ -450,14 +450,15 @@ export function Sidebar({
                 <li key={item.key}>
                   <Link to={linkPath}
                     onClick={onCloseMobile}
-                    
+                    aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
                     className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
                       isActive
                         ? 'bg-gold-3d text-white shadow-lg scale-[1.01]'
                         : 'text-slate-100 hover:bg-blue-800/60'
                     }`}
                   >
-                    <span className={isActive ? 'text-white' : 'text-slate-300'}>
+                    <span aria-hidden="true" className={isActive ? 'text-white' : 'text-slate-300'}>
                       {item.icon}
                     </span>
 

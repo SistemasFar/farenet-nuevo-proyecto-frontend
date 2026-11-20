@@ -4,7 +4,7 @@ import { useEmpresa } from '@/context/EmpresaContext';
 import { plantaSession } from '@/services/api';
 import type { EmpresaAsignada } from '@/types/auth';
 
-import bgFarenet from '@/assets/images/farenet1.png';
+import bgFarenet from '@/assets/images/farenet1.webp';
 
 // Configuración visual local
 const EMPRESA_THEME: Record<string, { colorPrincipal: string; colorHover: string }> = {

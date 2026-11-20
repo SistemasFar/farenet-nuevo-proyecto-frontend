@@ -205,7 +205,7 @@ export function ConsultaDescuento({ certificadoId, disabled, onDescuentoChange }
                   <span className="text-[10px] font-bold capitalize text-slate-500">Descuento</span>
                   <span className="text-sm font-black text-emerald-600">- S/ {resultadoConsulta.importeDescuento.toFixed(2)}</span>
                 </div>
-                {resultadoConsulta.usosDisponibles < 100 && (
+                {resultadoConsulta.usosDisponibles !== undefined && resultadoConsulta.usosDisponibles < 100 && (
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold capitalize text-slate-500">Usos Restantes</span>
                     <span className="text-sm font-bold text-slate-700">{resultadoConsulta.usosDisponibles}</span>

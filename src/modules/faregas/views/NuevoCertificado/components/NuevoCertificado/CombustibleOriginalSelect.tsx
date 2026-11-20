@@ -1,8 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import Select from 'react-select';
+import { useEffect, useMemo, useState } from 'react';
+import Select, { type StylesConfig } from 'react-select';
 import type { MaestroOption } from '@/types/maestros';
 import { maestrosApi } from '@/services/api';
 import { combustiblesSonEquivalentes, combustiblesGnvSonEquivalentes } from '../../gnv-conversion';
+
+type OpcionSelect = { value: string; label: string };
+type CombustibleCatalogo = MaestroOption | OpcionSelect;
 
 export const COMBUSTIBLES_GLP_INICIAL = ['GASOLINA', 'DIESEL'] as const;
 
@@ -15,10 +18,10 @@ export interface CombustibleOriginalSelectProps {
   value: string;
   onChange: (value: string) => void;
   maestrosVehiculo?: {
-    combustibles?: MaestroOption[];
+    combustibles?: CombustibleCatalogo[];
     [key: string]: unknown;
   } | null;
-  combustibles?: MaestroOption[];
+  combustibles?: CombustibleCatalogo[];
   esError?: boolean;
   disabled?: boolean;
   id?: string;
@@ -37,7 +40,7 @@ export function CombustibleOriginalSelect({
   name = 'combustible',
   esGlpInicial = false,
 }: CombustibleOriginalSelectProps) {
-  const [combustiblesApi, setCombustiblesApi] = useState<MaestroOption[]>([]);
+  const [combustiblesApi, setCombustiblesApi] = useState<CombustibleCatalogo[]>([]);
 
   useEffect(() => {
     if (esGlpInicial) return;
@@ -79,8 +82,11 @@ export function CombustibleOriginalSelect({
     const vistos = new Set<string>();
 
     for (const item of listaBase) {
-      const nombre = String(item?.nombre || item?.label || '').trim().toUpperCase();
-      const clave = String(item?.key || item?.value || '').trim();
+      if (!item) continue;
+      const nombreMaestro = 'nombre' in item ? item.nombre : '';
+      const claveMaestro = 'key' in item ? item.key : '';
+      const nombre = String(nombreMaestro || ('label' in item ? item.label : '') || '').trim().toUpperCase();
+      const clave = String(claveMaestro || ('value' in item ? item.value : '') || '').trim();
 
       if (!nombre) continue;
       if (
@@ -164,9 +170,9 @@ export function CombustibleOriginalSelect({
     return null;
   }, [esGlpInicial, valorLimpio, opcionSeleccionada, esValorHistoricoFueraDeCatalogo]);
 
-  const customStyles = useMemo(
+  const customStyles = useMemo<StylesConfig<OpcionSelect, false>>(
     () => ({
-      control: (base: any, state: any) => ({
+      control: (base, state) => ({
         ...base,
         minHeight: '36px',
         height: '36px',
@@ -191,12 +197,12 @@ export function CombustibleOriginalSelect({
         color: '#1e293b',
         cursor: disabled ? 'not-allowed' : 'pointer',
       }),
-      valueContainer: (base: any) => ({
+      valueContainer: (base) => ({
         ...base,
         padding: '0 8px',
         height: '32px',
       }),
-      input: (base: any) => ({
+      input: (base) => ({
         ...base,
         margin: 0,
         padding: 0,
@@ -205,36 +211,36 @@ export function CombustibleOriginalSelect({
         fontSize: '0.875rem',
         textTransform: 'uppercase',
       }),
-      singleValue: (base: any) => ({
+      singleValue: (base) => ({
         ...base,
         color: '#1e293b',
         fontWeight: '600',
         fontSize: '0.875rem',
         textTransform: 'uppercase',
       }),
-      placeholder: (base: any) => ({
+      placeholder: (base) => ({
         ...base,
         color: '#94a3b8',
         fontSize: '0.875rem',
         fontWeight: '500',
       }),
-      menu: (base: any) => ({
+      menu: (base) => ({
         ...base,
         zIndex: 60,
         borderRadius: '0.5rem',
         border: '1px solid #e2e8f0',
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
       }),
-      menuPortal: (base: any) => ({
+      menuPortal: (base) => ({
         ...base,
         zIndex: 9999,
       }),
-      menuList: (base: any) => ({
+      menuList: (base) => ({
         ...base,
         maxHeight: '220px',
         padding: '4px',
       }),
-      option: (base: any, state: any) => ({
+      option: (base, state) => ({
         ...base,
         borderRadius: '0.375rem',
         padding: '6px 10px',
@@ -268,7 +274,7 @@ export function CombustibleOriginalSelect({
         isClearable={false}
         options={opcionesTotales}
         value={valorActualSelect}
-        onChange={(opt: any) => {
+        onChange={(opt) => {
           onChange(opt ? String(opt.value).toUpperCase() : '');
         }}
         placeholder="Buscar o seleccionar combustible..."

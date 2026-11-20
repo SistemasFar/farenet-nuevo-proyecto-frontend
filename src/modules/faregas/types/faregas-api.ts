@@ -141,6 +141,7 @@ export interface FacturacionFaregas {
   razonSocialEmisor: NullableText;
   entornoFacturador: NullableText;
   codigoUnico: NullableText;
+  codigoHash?: NullableText;
   aceptadaSunat: boolean | null;
   sunatDescription: NullableText;
   motivoLimiteDemo?: NullableText;
@@ -602,7 +603,7 @@ export interface CampoFormatoDinamicoFaregas {
   maxLength?: number;
   pattern?: string;
   patternError?: string;
-  inputMode?: string;
+  inputMode?: 'none' | 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url';
   soloDigitos?: boolean;
   valor: string;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, useCallback, useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { LoginView } from './core/views/LoginView';
 import { SelectPlantaView } from './core/views/SelectPlantaView';
@@ -18,18 +18,7 @@ import { NuevoDuplicadoView } from './modules/farenet/views/NuevoDuplicado/Nuevo
 import { LineaView } from './modules/farenet/views/Linea';
 
 import { MainLayout as FaregasMainLayout } from './modules/faregas/views/Dashboard/MainLayout';
-import { InicioView as FaregasInicioView } from './modules/faregas/views/Inicio/InicioView';
-import { NuevoCertificadoView as FaregasNuevoCertificadoView } from './modules/faregas/views/NuevoCertificado/NuevoCertificadoView';
-import { UsuariosView as FaregasUsuariosView } from './modules/faregas/views/Usuarios/UsuariosView';
-import { AuditoriaView as FaregasAuditoriaView } from './modules/faregas/views/Auditoria/AuditoriaView';
-import { SolicitudesOperacionView as FaregasSolicitudesOperacionView } from './modules/faregas/views/SolicitudesOperacion/SolicitudesOperacionView';
-import { FaregasConfiguracionView } from './modules/faregas/views/Configuracion/FaregasConfiguracionView';
-import { FaregasFacturacionView } from './modules/faregas/views/Facturacion/FaregasFacturacionView';
-import { DescuentosView as FaregasDescuentosView } from './modules/faregas/views/Descuentos/DescuentosView';
-import { FaregasDashboardView } from './modules/faregas/views/Dashboard/FaregasDashboardView';
-import { ReportesFinancierosView } from './modules/faregas/views/Dashboard/ReportesFinancierosView';
 import { tieneAccesoDashboard } from './modules/faregas/views/Dashboard/dashboard-config';
-import { ChipsView as FaregasChipsView } from './modules/faregas/views/Chips/ChipsView';
 import { puedeAbrirChipsFaregas } from './modules/faregas/utils/chips-permisos';
 import { puedeAbrirFacturacionFaregas } from './modules/faregas/utils/facturacion-permisos';
 import { puedeAbrirConfiguracionFaregas } from './modules/faregas/utils/configuracion-permisos';
@@ -38,6 +27,18 @@ import { useEmpresa } from './context/EmpresaContext';
 
 import type { UserSession, PlantaAsignada, EmpresaAsignada } from './types/auth';
 import { authApi, authFaregasApi, plantaSession, permisosSession } from './services/api';
+
+const FaregasInicioView = lazy(() => import('./modules/faregas/views/Inicio/InicioView').then(({ InicioView }) => ({ default: InicioView })));
+const FaregasNuevoCertificadoView = lazy(() => import('./modules/faregas/views/NuevoCertificado/NuevoCertificadoView').then(({ NuevoCertificadoView }) => ({ default: NuevoCertificadoView })));
+const FaregasUsuariosView = lazy(() => import('./modules/faregas/views/Usuarios/UsuariosView').then(({ UsuariosView }) => ({ default: UsuariosView })));
+const FaregasAuditoriaView = lazy(() => import('./modules/faregas/views/Auditoria/AuditoriaView').then(({ AuditoriaView }) => ({ default: AuditoriaView })));
+const FaregasSolicitudesOperacionView = lazy(() => import('./modules/faregas/views/SolicitudesOperacion/SolicitudesOperacionView').then(({ SolicitudesOperacionView }) => ({ default: SolicitudesOperacionView })));
+const FaregasConfiguracionView = lazy(() => import('./modules/faregas/views/Configuracion/FaregasConfiguracionView').then(({ FaregasConfiguracionView }) => ({ default: FaregasConfiguracionView })));
+const FaregasFacturacionView = lazy(() => import('./modules/faregas/views/Facturacion/FaregasFacturacionView').then(({ FaregasFacturacionView }) => ({ default: FaregasFacturacionView })));
+const FaregasDescuentosView = lazy(() => import('./modules/faregas/views/Descuentos/DescuentosView').then(({ DescuentosView }) => ({ default: DescuentosView })));
+const FaregasDashboardView = lazy(() => import('./modules/faregas/views/Dashboard/FaregasDashboardView').then(({ FaregasDashboardView }) => ({ default: FaregasDashboardView })));
+const ReportesFinancierosView = lazy(() => import('./modules/faregas/views/Dashboard/ReportesFinancierosView').then(({ ReportesFinancierosView }) => ({ default: ReportesFinancierosView })));
+const FaregasChipsView = lazy(() => import('./modules/faregas/views/Chips/ChipsView').then(({ ChipsView }) => ({ default: ChipsView })));
 
 type FaregasUserSession = UserSession & { permisos?: string[] };
 
@@ -144,7 +145,7 @@ export default function App() {
       const currentPath = window.location.pathname;
       if (currentPath.startsWith('/faregas') && currentPath !== '/faregas/seleccionar-planta') {
         const nuevosPermisos = usuarioActualizado.permisos || [];
-        if (!tieneAccesoRutaFaregas(currentPath, nuevosPermisos)) {
+        if (!tieneAccesoRutaFaregas(currentPath, nuevosPermisos, { dejarRutaDesconocida: true })) {
           const rutaNueva = resolverRutaInicialFaregas(nuevosPermisos) || '/sin-acceso';
           navigate(rutaNueva, { replace: true });
         }
@@ -809,7 +810,7 @@ export default function App() {
                   })()
                 }
               />
-              <Route path="*" element={<NotFoundView />} />
+              <Route path="*" element={<NotFoundView destino={resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || []) || '/sin-acceso'} />} />
             </Route>
           </Routes>
         }
@@ -853,7 +854,7 @@ export default function App() {
 
       <Route path="/sin-acceso" element={<ForbiddenView />} />
       <Route path="/" element={<Navigate to={isDashboardReady ? (isFaregas ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso') : "/inicio") : "/login"} replace />} />
-      <Route path="*" element={<NotFoundView />} />
+      <Route path="*" element={<NotFoundView destino={faregasAccessToken ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || []) || '/sin-acceso') : isDashboardReady ? '/inicio' : '/login'} />} />
     </Routes>
   );
 }

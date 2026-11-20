@@ -101,7 +101,11 @@ export function resolverRutaInicialFaregas(permisos: readonly string[] = []): st
 /**
  * Comprueba si una ruta específica de FAREGAS está autorizada para un conjunto de permisos.
  */
-export function tieneAccesoRutaFaregas(pathname: string, permisos: readonly string[] = []): boolean {
+export function tieneAccesoRutaFaregas(
+  pathname: string,
+  permisos: readonly string[] = [],
+  { dejarRutaDesconocida = false } = {},
+): boolean {
   const lista = Array.isArray(permisos) ? permisos : [];
   const normalizado = pathname.replace(/\/+$/, '') || '/';
 
@@ -179,7 +183,8 @@ export function tieneAccesoRutaFaregas(pathname: string, permisos: readonly stri
     );
   }
 
-  return false;
+  // El enrutador muestra su 404 para una sesión autorizada.
+  return dejarRutaDesconocida;
 }
 
 /**

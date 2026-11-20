@@ -87,6 +87,8 @@ const renderGlpInicial = () => renderToStaticMarkup(
     }]}
     setTitulares={() => undefined}
     formFacturacion={{
+      nombresFac: '', apellidosFac: '', paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '',
+      condicionPagoFac: 'CONTADO', fechaInicioCreditoFac: '', fechaVencimientoFac: '', medioPagoFac: '', cuotasFac: [],
       tipoDocFac: 'BOLETA',
       nroDocFac: '74045612',
       razonSocialFac: 'JUAN PEREZ DUEÑO',

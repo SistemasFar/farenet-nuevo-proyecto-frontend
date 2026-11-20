@@ -3,14 +3,12 @@ import {
   validarDatosFacturacionCampos,
   validarDatosInicialesCampos,
   validarDatosEspecificos,
-  validarFormularioVehiculoVisible,
   validarTitulares,
   obtenerFechaHoyPeru,
   CAMPOS_VISIBLES_FACTURACION,
 } from './faregas-wizard.validation';
 import {
   estructurarErroresPaso,
-  ETIQUETAS_CAMPOS_WIZARD,
 } from './faregas-wizard-errores';
 
 describe('FAREGAS — MEJORAS WIZARD NUEVO CERTIFICADO', () => {

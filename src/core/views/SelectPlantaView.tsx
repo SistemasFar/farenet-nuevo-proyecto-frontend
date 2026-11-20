@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { PlantaAsignada } from '@/types/auth';
 import { useEmpresa } from '@/context/EmpresaContext';
 
-import bgFarenet from '@/assets/images/farenet1.png';
+import bgFarenet from '@/assets/images/farenet1.webp';
 import faregasLogo from '@/assets/images/faregas_logo.png';
 
 interface SelectPlantaViewProps {

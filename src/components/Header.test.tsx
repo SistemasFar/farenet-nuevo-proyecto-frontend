@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import React, { act } from 'react';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { UserAvatar } from './Header';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 describe('UserAvatar: Centrado y robustez visual', () => {
   let container: HTMLDivElement | null = null;

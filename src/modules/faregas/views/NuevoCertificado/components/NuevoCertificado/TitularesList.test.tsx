@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import React, { act, useState } from 'react';
+import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
@@ -20,7 +20,7 @@ vi.mock('../../../../services/faregas-clientes.api', () => ({
   },
 }));
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const titular: TitularState = {
   _uuid: 'principal-1',
@@ -48,6 +48,7 @@ const facturacionInicial: FormFacturacionState = {
   telefonoFac: '912344423',
   usarTitularPrincipalFac: false,
   condicionPagoFac: 'CONTADO',
+  fechaInicioCreditoFac: '',
   fechaVencimientoFac: '',
   medioPagoFac: '',
   cuotasFac: [],

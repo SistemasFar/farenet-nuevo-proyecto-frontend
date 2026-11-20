@@ -168,5 +168,13 @@ describe('Navegación y Redirección inicial según permisos de perfil FAREGAS',
     expect(tieneAccesoRutaFaregas('/faregas/facturacion', permisosSoloVentas)).toBe(false);
     expect(tieneAccesoRutaFaregas('/faregas/inicio', permisosSoloVentas)).toBe(false);
   });
+
+  it('permite mostrar el 404 durante el refresco sin habilitar módulos restringidos', () => {
+    const permisos = ['MENU_INICIO'];
+    const opcionesRefresco = { dejarRutaDesconocida: true };
+    expect(tieneAccesoRutaFaregas('/faregas/ruta-inexistente', permisos)).toBe(false);
+    expect(tieneAccesoRutaFaregas('/faregas/ruta-inexistente', permisos, opcionesRefresco)).toBe(true);
+    expect(tieneAccesoRutaFaregas('/faregas/usuarios', permisos, opcionesRefresco)).toBe(false);
+  });
 });
 

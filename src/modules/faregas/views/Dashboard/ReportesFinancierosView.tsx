@@ -24,7 +24,6 @@ export const ReportesFinancierosView: React.FC = () => {
   const [hasta, setHasta] = useState(hoyLima);
   const [plantaKey, setPlantaKey] = useState('');
   const [reporte, setReporte] = useState<string>(REPORTES[0].id);
-  const [exportando, setExportando] = useState(false);
   const [tipoExportacion, setTipoExportacion] = useState<'documentos' | 'resumen' | 'dashboard' | null>(null);
   const reporteSeleccionado = useMemo(() => REPORTES.find((item) => item.id === reporte), [reporte]);
   const validacionRango = useMemo(() => validarRangoFechasDashboard(desde, hasta), [desde, hasta]);
@@ -123,8 +122,8 @@ export const ReportesFinancierosView: React.FC = () => {
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-          <button type="button" disabled={!habilitado || exportando || Boolean(tipoExportacion)} onClick={descargarReporteSeleccionado} className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white ${habilitado && !exportando && !tipoExportacion ? 'bg-emerald-700 hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-300'}`}>
-            {exportando || tipoExportacion ? 'Generando Excel…' : 'Descargar reporte'}
+          <button type="button" disabled={!habilitado || Boolean(tipoExportacion)} onClick={descargarReporteSeleccionado} className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white ${habilitado && !tipoExportacion ? 'bg-emerald-700 hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-300'}`}>
+            {tipoExportacion ? 'Generando Excel…' : 'Descargar reporte'}
           </button>
           {reporteSeleccionado && !reporteSeleccionado.disponible && <span className="text-sm font-medium text-amber-700">Próximamente</span>}
           {reporteSeleccionado?.disponible && !puedeExportar && <span className="text-sm text-slate-500">No tienes permiso para exportar este reporte.</span>}

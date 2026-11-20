@@ -134,6 +134,8 @@ describe('Asteriscos (*****) y Uso Original (MERCANCÍAS)', () => {
     it('Acepta MERCANCÍAS con tilde como uso original válido', () => {
       const errores = validarDatosEspecificos({
         tipo: 'CONFORMIDAD',
+      gnv: {},
+      glp: {},
         conformidad: {
           caracteristicaRegistrable: 'CAMBIO DE MOTOR',
           usoOriginalVehiculo: 'MERCANCÍAS'
@@ -145,6 +147,8 @@ describe('Asteriscos (*****) y Uso Original (MERCANCÍAS)', () => {
     it('Acepta MERCANCIAS sin tilde y lo normaliza sin error', () => {
       const errores = validarDatosEspecificos({
         tipo: 'CONFORMIDAD',
+      gnv: {},
+      glp: {},
         conformidad: {
           caracteristicaRegistrable: 'CAMBIO DE MOTOR',
           usoOriginalVehiculo: 'MERCANCIAS'
@@ -156,6 +160,8 @@ describe('Asteriscos (*****) y Uso Original (MERCANCÍAS)', () => {
     it('Acepta PERSONAS como uso original válido', () => {
       const errores = validarDatosEspecificos({
         tipo: 'CONFORMIDAD',
+      gnv: {},
+      glp: {},
         conformidad: {
           caracteristicaRegistrable: 'CAMBIO DE MOTOR',
           usoOriginalVehiculo: 'PERSONAS'
@@ -167,6 +173,8 @@ describe('Asteriscos (*****) y Uso Original (MERCANCÍAS)', () => {
     it('Rechaza valores históricos no permitidos como MIXTO', () => {
       const errores = validarDatosEspecificos({
         tipo: 'CONFORMIDAD',
+      gnv: {},
+      glp: {},
         conformidad: {
           caracteristicaRegistrable: 'CAMBIO DE MOTOR',
           usoOriginalVehiculo: 'MIXTO'

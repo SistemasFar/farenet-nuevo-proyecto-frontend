@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import React, { act } from 'react';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DuplicadoCertificadoModal } from './DuplicadoCertificadoModal';
@@ -51,7 +51,7 @@ vi.mock('../../services/faregas-pagos.api', () => ({
   },
 }));
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const cambiarValorInput = (input: HTMLInputElement | null, valor: string) => {
   if (!input) return;

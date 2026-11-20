@@ -100,7 +100,7 @@ export const TallerStep: React.FC<TallerStepProps> = ({
                     errorStr = campo.patternError || 'Formato inválido';
                   }
 
-                  const handleChange = (event) => {
+                  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                     let val = event.target.value;
                     if (campo.soloDigitos) val = normalizarEnteroCertificado(val, campo.maxLength);
                     if (campo.maxLength) val = val.slice(0, campo.maxLength);

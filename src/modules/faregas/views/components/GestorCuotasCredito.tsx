@@ -1,4 +1,3 @@
-import React from 'react';
 import { Calendar, AlertCircle, CheckCircle2, PlusCircle, Trash2 } from 'lucide-react';
 
 export interface CuotaCreditoItem {

@@ -154,18 +154,20 @@ describe('Dashboard FAREGAS — Fase B', () => {
 
   it('respeta permisos de alcance global y exportación', () => {
     expect(resolverPermisosDashboard([], 'OPERADOR')).toEqual({ puedeVerGlobal: false, puedeExportar: false });
-    expect(resolverPermisosDashboard(['DASHBOARD_GLOBAL'], 'OPERADOR')).toEqual({ puedeVerGlobal: true, puedeExportar: false });
-    expect(resolverPermisosDashboard(['DASHBOARD_EXPORTAR'], 'OPERADOR')).toEqual({ puedeVerGlobal: false, puedeExportar: true });
+    expect(resolverPermisosDashboard(['DASHBOARD_GLOBAL', 'DASHBOARD_EXPORTAR'], 'OPERADOR'))
+      .toEqual({ puedeVerGlobal: false, puedeExportar: false });
+    expect(resolverPermisosDashboard(['MENU_DASHBOARD', 'DASHBOARD_GLOBAL'], 'OPERADOR')).toEqual({ puedeVerGlobal: true, puedeExportar: false });
+    expect(resolverPermisosDashboard(['MENU_DASHBOARD', 'DASHBOARD_EXPORTAR'], 'OPERADOR')).toEqual({ puedeVerGlobal: false, puedeExportar: true });
     expect(resolverPermisosDashboard([], 'SISTEMAS')).toEqual({ puedeVerGlobal: false, puedeExportar: false });
-    expect(resolverPermisosDashboard(['DASHBOARD_GLOBAL', 'DASHBOARD_EXPORTAR'], 'SISTEMAS'))
+    expect(resolverPermisosDashboard(['MENU_DASHBOARD', 'DASHBOARD_GLOBAL', 'DASHBOARD_EXPORTAR'], 'SISTEMAS'))
       .toEqual({ puedeVerGlobal: true, puedeExportar: true });
   });
 
-  it('requiere permiso de módulo o de alcance para entrar al Dashboard', () => {
+  it('requiere permiso de módulo para entrar al Dashboard', () => {
     expect(tieneAccesoDashboard([])).toBe(false);
     expect(tieneAccesoDashboard(['MENU_DASHBOARD'])).toBe(true);
-    expect(tieneAccesoDashboard(['DASHBOARD_SEDE'])).toBe(true);
-    expect(tieneAccesoDashboard(['DASHBOARD_GLOBAL'])).toBe(true);
+    expect(tieneAccesoDashboard(['DASHBOARD_SEDE'])).toBe(false);
+    expect(tieneAccesoDashboard(['DASHBOARD_GLOBAL'])).toBe(false);
     expect(tieneAccesoDashboard(['DASHBOARD_EXPORTAR'])).toBe(false);
   });
 

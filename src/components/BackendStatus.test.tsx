@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BackendStatus } from './BackendStatus';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 describe('BackendStatus', () => {
   afterEach(() => {

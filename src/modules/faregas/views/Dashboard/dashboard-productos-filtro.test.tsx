@@ -9,6 +9,11 @@ const resumen: DashboardResumenResponse = {
   rango: { desde: '2026-10-01', hasta: '2026-10-16', inicioActual: '', finActual: '' },
   plantasConsultadas: ['98'],
   kpis: {
+    duplicadosEmitidos: kpi,
+    ventaDuplicados: kpi,
+    totalCobradoDuplicados: kpi,
+    saldoPendienteDuplicados: kpi,
+    ticketPromedioDuplicados: kpi,
     ventaOperativaGenerada: kpi,
     ventaPagada: kpi,
     ventaBruta: kpi,
@@ -37,7 +42,8 @@ const resumen: DashboardResumenResponse = {
     { id: 25, sku: 'CHIP-SURCO', descripcion: 'CHIP + PORTA CHIP', unidad: 'NIU', unidadesVendidas: 6, totalSoles: 1080, operaciones: 6, precioPromedio: 180 },
     { id: 2335, sku: 'CHIP-COLINA', descripcion: 'CHIP + PORTA CHIP', unidad: 'NIU', unidadesVendidas: 1, totalSoles: 180, operaciones: 1, precioPromedio: 180 }
   ],
-  distribucionPagos: []
+  distribucionPagos: [],
+  alertas: []
 };
 
 describe('Dashboard FAREGAS — Filtro de Productos Vendidos', () => {

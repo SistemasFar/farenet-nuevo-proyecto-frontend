@@ -971,7 +971,6 @@ export function InicioView() {
                   // refrescado. Cada acción vuelve a consultar la facturación completa antes
                   // de abrir/enviar algo, por lo que no debilita la validación tributaria.
                   const puedeVerComprobante = Boolean(ins.enlacePdf);
-                  const puedeVerComprobanteFaregas = Boolean(ins.enlacePdfFaregas);
                   const puedeVerNotaCredito = Boolean(ins.notaCreditoId && ins.notaCreditoPdfDisponible);
 
                   return (

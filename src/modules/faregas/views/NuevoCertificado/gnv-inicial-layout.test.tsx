@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React, { act, useState, useEffect } from 'react';
+import { act, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -62,6 +62,9 @@ const vehiculoValido = {
 };
 
 const facturacionValida = {
+  tipoDocFac: 'BOLETA', razonSocialFac: 'CLIENTE DE PRUEBA',
+  nombresFac: '', apellidosFac: '', paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '',
+  condicionPagoFac: 'CONTADO' as const, fechaInicioCreditoFac: '', fechaVencimientoFac: '', medioPagoFac: '', cuotasFac: [],
   tipoComprobanteFac: 'BOLETA',
   tipoDocumentoFac: 'DNI',
   nroDocFac: '74045612',

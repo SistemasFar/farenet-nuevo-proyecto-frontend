@@ -1,23 +1,22 @@
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
-export function NotFoundView() {
-  const navigate = useNavigate();
-
+export function NotFoundView({ destino = '/inicio' }: { destino?: string }) {
   return (
-    <div className="flex h-screen flex-col items-center justify-center bg-slate-50 p-4">
-      <div className="text-center">
-        <h1 className="mb-4 text-9xl font-extrabold text-slate-800">404</h1>
-        <h2 className="mb-8 text-2xl font-bold text-slate-600">Página no encontrada</h2>
+    <section className="grid min-h-[65dvh] place-items-center bg-slate-50 p-4">
+      <div className="w-full max-w-md text-center">
+        <p className="mb-2 text-5xl font-extrabold text-[#052a79] sm:text-7xl">404</p>
+        <h1 className="mb-4 text-2xl font-bold text-slate-800">Página no encontrada</h1>
         <p className="mb-8 text-slate-500">
           La ruta a la que intentas acceder no existe o fue movida.
         </p>
-        <button
-          onClick={() => navigate('/inicio', { replace: true })}
-          className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow-md transition hover:bg-blue-700"
+        <Link
+          to={destino}
+          replace
+          className="inline-flex min-h-11 items-center rounded-lg bg-[#052a79] px-6 py-3 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#052a79]"
         >
-          Volver al Inicio
-        </button>
+          {destino === '/login' ? 'Ir al inicio de sesión' : 'Volver a mi inicio'}
+        </Link>
       </div>
-    </div>
+    </section>
   );
 }

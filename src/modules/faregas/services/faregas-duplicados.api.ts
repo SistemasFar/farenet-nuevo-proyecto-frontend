@@ -62,6 +62,7 @@ export interface SolicitudDuplicado {
   operacionId: number;
   facturacionId: number | null;
   numeroCertificado: string;
+  numeroDuplicado?: number | null;
   placa: string;
   tipoNombre: string;
   fechaEmision: string;

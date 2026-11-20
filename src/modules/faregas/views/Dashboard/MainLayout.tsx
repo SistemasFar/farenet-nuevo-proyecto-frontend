@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
@@ -71,15 +71,15 @@ export function MainLayout({
   else if (path.startsWith('/maestros/usuarios') || path.startsWith('/faregas/usuarios')) activeMenu = 'usuarios';
   else if (path.startsWith('/maestros/empresas')) activeMenu = 'empresas';
   else if (path.startsWith('/maestros/descuentos') || path.startsWith('/faregas/descuentos')) activeMenu = 'descuentos';
-  else if (path.startsWith('/auditoria') || path.startsWith('/faregas/auditoria')) activeMenu = 'auditoria';
+  else if (path.startsWith('/auditoria') || path.startsWith('/faregas/auditoria') || path.startsWith('/faregas/solicitudes-operacion/')) activeMenu = 'auditoria';
   else if (path.startsWith('/configuracion') || path.startsWith('/faregas/configuracion')) activeMenu = 'configuracion';
   else if (path.startsWith('/faregas/facturacion')) activeMenu = 'facturacion';
   else if (path.startsWith('/faregas/chips')) activeMenu = 'chips';
-  else if (path.startsWith('/faregas/dashboard')) activeMenu = 'dashboard';
+  else if (path.startsWith('/faregas/dashboard') || path === '/faregas/reportes-financieros') activeMenu = 'dashboard';
   
 
   const isCertificadoWizard =
-    path.startsWith('/faregas/nuevo-certificado') ||
+    path === '/faregas/certificados/nuevo' ||
     /^\/faregas\/certificados\/[^/]+\/(continuar|rectificar)\/?$/.test(path);
 
   if (isCertificadoWizard) activeMenu = 'nuevo_certificado';
@@ -104,6 +104,9 @@ export function MainLayout({
 
   return (
     <div className="fixed inset-0 flex bg-slate-100 font-sans antialiased overflow-hidden">
+      <a href="#contenido-faregas" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[60] focus:rounded focus:bg-white focus:px-4 focus:py-2 focus:text-[#052a79]">
+        Ir al contenido
+      </a>
       <Sidebar
         isFaregas={true}
         collapsed={sidebarCollapsed}
@@ -136,10 +139,12 @@ export function MainLayout({
           isFaregas={true}
         />
 
-        <main className={`flex-1 min-h-0 overflow-y-auto px-3 pb-0 pt-3 transition-all duration-300 sm:px-4 sm:pt-4 md:px-6 md:pt-6 ${
+        <main id="contenido-faregas" tabIndex={-1} className={`flex-1 min-h-0 overflow-y-auto px-3 pb-0 pt-3 transition-all duration-300 sm:px-4 sm:pt-4 md:px-6 md:pt-6 ${
           isCertificadoWizard ? 'bg-white' : 'bg-slate-50'
         }`}>
-          <Outlet context={contextValue} />
+          <Suspense fallback={<p role="status" className="p-4 text-sm text-slate-700">Cargando módulo…</p>}>
+            <Outlet context={contextValue} />
+          </Suspense>
         </main>
       </div>
     </div>

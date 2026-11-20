@@ -46,6 +46,7 @@ const baseFacturacion: FormFacturacionState = {
   telefonoFac: '999999999',
   usarTitularPrincipalFac: false,
   condicionPagoFac: 'CONTADO',
+  fechaInicioCreditoFac: '',
   fechaVencimientoFac: '',
   medioPagoFac: '',
   cuotasFac: [],
@@ -205,9 +206,9 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = { ...baseFacturacion, nroDocFac: '74045612' };
+      let estadoActual: FormFacturacionState = { ...baseFacturacion, nroDocFac: '74045612' };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return (
           <DatosFacturacion
@@ -263,9 +264,9 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = { ...baseFacturacion, tipoDocumentoFac: 'RUC', nroDocFac: '20123456789' };
+      let estadoActual: FormFacturacionState = { ...baseFacturacion, tipoDocumentoFac: 'RUC', nroDocFac: '20123456789' };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return (
           <DatosFacturacion
@@ -314,7 +315,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = {
+      let estadoActual: FormFacturacionState = {
         ...baseFacturacion,
         tipoDocumentoFac: 'RUC',
         nroDocFac: '20601234567',
@@ -322,7 +323,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
         telefonoFac: '911222333',
       };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return (
           <DatosFacturacion
@@ -369,7 +370,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       const root = createRoot(contenedor);
 
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState({ ...baseFacturacion, nroDocFac: '70261331' });
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>({ ...baseFacturacion, nroDocFac: '70261331' });
         return (
           <DatosFacturacion
             titulares={[]}
@@ -408,7 +409,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState({
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>({
           ...baseFacturacion,
           tipoDocumentoFac: 'CARNETEXTRANJERIA',
           nroDocFac: 'CE123456',
@@ -460,7 +461,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
         contenedores.push(contenedor);
         const root = createRoot(contenedor);
         const Caso = () => {
-          const [facturacion, setFacturacion] = useState({
+          const [facturacion, setFacturacion] = useState<FormFacturacionState>({
             ...baseFacturacion,
             nroDocFac: '70261331',
           });
@@ -485,9 +486,9 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       document.body.appendChild(contenedor);
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
-      let estadoActual = { ...baseFacturacion };
+      let estadoActual: FormFacturacionState = { ...baseFacturacion };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
       };
@@ -519,7 +520,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
         contenedores.push(contenedor);
         const root = createRoot(contenedor);
         const Caso = () => {
-          const [facturacion, setFacturacion] = useState({ ...baseFacturacion, tipoDocumentoFac, nroDocFac });
+          const [facturacion, setFacturacion] = useState<FormFacturacionState>({ ...baseFacturacion, tipoDocumentoFac, nroDocFac });
           return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
         };
         await act(async () => root.render(<Caso />));
@@ -546,9 +547,9 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = { ...baseFacturacion, nroDocFac: '99999999' };
+      let estadoActual: FormFacturacionState = { ...baseFacturacion, nroDocFac: '99999999' };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return (
           <DatosFacturacion
@@ -582,7 +583,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       const root = createRoot(contenedor);
 
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState({ ...baseFacturacion, nroDocFac: '74045612' });
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>({ ...baseFacturacion, nroDocFac: '74045612' });
         return (
           <DatosFacturacion
             titulares={[]}
@@ -620,7 +621,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
         usarTitularPrincipalFac: false,
       };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         return (
           <DatosFacturacion
             titulares={titularesMock}
@@ -647,14 +648,14 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = {
+      let estadoActual: FormFacturacionState = {
         ...baseFacturacion,
         tipoDocFac: 'FACTURA',
         tipoDocumentoFac: 'RUC',
         nroDocFac: '20600444531',
       };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
       };
@@ -679,14 +680,14 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = {
+      let estadoActual: FormFacturacionState = {
         ...baseFacturacion,
         tipoDocFac: 'BOLETA',
         tipoDocumentoFac: 'DNI',
         nroDocFac: '74045612',
       };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
       };
@@ -711,7 +712,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = {
+      let estadoActual: FormFacturacionState = {
         ...baseFacturacion,
         tipoDocFac: 'BOLETA',
         tipoDocumentoFac: 'DNI',
@@ -722,7 +723,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
         telefonoFac: '987654321',
       };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
       };
@@ -963,7 +964,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       };
 
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
       };
@@ -1037,7 +1038,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       };
 
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return <DatosFacturacion titulares={titularesMock} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
       };
@@ -1145,7 +1146,7 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       const root = createRoot(contenedor);
 
       const Caso = () => {
-        const [estadoFacturacion, setEstadoFacturacion] = useState(facturacion);
+        const [estadoFacturacion, setEstadoFacturacion] = useState<FormFacturacionState>(facturacion);
         return (
           <VehiculoStep
             tipoCertificado={tipo}
@@ -1320,9 +1321,9 @@ describe('MEJORA GENERAL — DATOS PARA FACTURACIÓN EN TODOS LOS CERTIFICADOS F
       contenedores.push(contenedor);
       const root = createRoot(contenedor);
 
-      let estadoActual = { ...baseVacia };
+      let estadoActual: FormFacturacionState = { ...baseVacia };
       const Caso = () => {
-        const [facturacion, setFacturacion] = useState(estadoActual);
+        const [facturacion, setFacturacion] = useState<FormFacturacionState>(estadoActual);
         estadoActual = facturacion;
         return <DatosFacturacion titulares={[]} formFacturacion={facturacion} setFormFacturacion={setFacturacion} />;
       };

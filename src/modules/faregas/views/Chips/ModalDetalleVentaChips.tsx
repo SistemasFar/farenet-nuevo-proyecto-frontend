@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, FileText, Loader2, RefreshCw, X, Ban } from 'lucide-react';
+import { AlertTriangle, FileText, Loader2, RefreshCw, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { faregasChipsApi, type DetalleVentaChip } from '../../services/faregas-chips.api';
 import { esComprobanteReintentable } from './facturacionReintento';
 
 const money = (value: number | null | undefined) => `S/ ${Number(value || 0).toFixed(2)}`;
-const dateTime = (value: string | null | undefined) => value ? new Date(value).toLocaleString('es-PE') : '—';
 
 const estadoClass = (estado: string | null | undefined) => {
     if (estado === 'ACEPTADO' || estado === 'PAGADO') return 'bg-emerald-100 text-emerald-700';
@@ -16,10 +15,7 @@ const estadoClass = (estado: string | null | undefined) => {
 
 export function ModalDetalleVentaChips({
   operacionId,
-  onClose,
-  onAnular,
-  puedeVender,
-  anulando
+  onClose
 }: {
   operacionId: number;
   onClose: () => void;

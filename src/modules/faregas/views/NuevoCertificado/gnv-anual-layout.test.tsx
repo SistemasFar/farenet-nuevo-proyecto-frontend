@@ -34,6 +34,8 @@ const renderGnvAnual = () => renderToStaticMarkup(
     titulares={[]}
     setTitulares={() => undefined}
     formFacturacion={{
+      nombresFac: '', apellidosFac: '', paisFac: '', departamentoFac: '', provinciaFac: '', distritoFac: '',
+      condicionPagoFac: 'CONTADO', fechaInicioCreditoFac: '', fechaVencimientoFac: '', medioPagoFac: '', cuotasFac: [],
       tipoDocFac: 'BOLETA', tipoDocumentoFac: 'DNI', nroDocFac: '74045612',
       razonSocialFac: 'CLIENTE FACTURACIÓN', direccionFac: 'AV. PRUEBA 123',
       emailFac: 'prueba@faregas.pe', telefonoFac: '999888777', usarTitularPrincipalFac: false,

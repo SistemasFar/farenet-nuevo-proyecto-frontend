@@ -12,7 +12,7 @@ import type {
 
 import { useEmpresa } from '@/context/EmpresaContext';
 
-import bgFarenet from '@/assets/images/farenet1.png';
+import bgFarenet from '@/assets/images/farenet1.webp';
 
 interface LoginViewProps {
   onRequireEmpresa: (
@@ -108,7 +108,7 @@ export function LoginView({
 
         {sessionExpired && (
           <div className="mb-4 w-full rounded bg-amber-500/90 p-3 text-center border-l-4 border-amber-600 shadow-lg backdrop-blur-sm animate-in fade-in slide-in-from-top-4 duration-500">
-            <p className="text-sm font-semibold text-white">
+            <p role="status" className="text-sm font-semibold text-slate-950">
               Tu sesión ha expirado. Inicia sesión nuevamente para continuar.
             </p>
           </div>
@@ -117,9 +117,9 @@ export function LoginView({
         
 
         <div className="w-full rounded-2xl border border-white/20 bg-slate-950/35 p-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] backdrop-blur-md sm:p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-4">
             {error && (
-              <div className="rounded bg-red-500/20 backdrop-blur-sm p-3 text-center border-l-4 border-red-500">
+              <div role="alert" className="rounded bg-red-500/20 backdrop-blur-sm p-3 text-center border-l-4 border-red-500">
                 <p className="text-xs font-semibold text-red-200">
                   {error}
                 </p>
@@ -127,7 +127,9 @@ export function LoginView({
             )}
 
             <div>
+              <label htmlFor="login-username" className="sr-only">Usuario</label>
               <input
+                id="login-username"
                 type="text"
                 placeholder="Usuario"
                 value={username}
@@ -139,7 +141,9 @@ export function LoginView({
             </div>
 
             <div>
+              <label htmlFor="login-password" className="sr-only">Contraseña</label>
               <input
+                id="login-password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
@@ -153,9 +157,9 @@ export function LoginView({
             <button
                 type="submit"
                 disabled={loading}
-                className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gold-3d px-4 py-3 text-base font-black tracking-wide transition disabled:opacity-50"
+                className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 px-4 py-3 text-base font-black tracking-wide text-slate-950 shadow-md transition hover:to-amber-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 disabled:opacity-50"
               >
-              {loading ? 'Procesando...' : 'Ok'}
+              {loading ? 'Procesando…' : 'Iniciar sesión'}
             </button>
           </form>
         </div>
