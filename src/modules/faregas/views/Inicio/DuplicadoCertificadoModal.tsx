@@ -3,7 +3,8 @@ import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Copy, Download, F
 import Swal from 'sweetalert2';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import { faregasPagosApi } from '../../services/faregas-pagos.api';
-import { esRucValido } from '../NuevoCertificado/faregas-wizard.validation';
+import { actualizarVencimientosCuotas, distribuirCuotasAutomaticas, GestorCuotasCredito, type CuotaCreditoItem } from '../components/GestorCuotasCredito';
+import { esRucValido, validarPasoPago } from '../NuevoCertificado/faregas-wizard.validation';
 import {
   faregasDuplicadosApi,
   type CandidatoDuplicado,
@@ -117,6 +118,10 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [pagosAgregados, setPagosAgregados] = useState<PagoAgregado[]>([]);
+  const [condicionPago, setCondicionPago] = useState<'CONTADO' | 'CREDITO'>('CONTADO');
+  const [fechaInicio, setFechaInicio] = useState(fechaHoy);
+  const [fechaVencimiento, setFechaVencimiento] = useState('');
+  const [cuotas, setCuotas] = useState<CuotaCreditoItem[]>([]);
   const [pagoTab, setPagoTab] = useState<MedioPago>('EFECTIVO');
   const [montoPago, setMontoPago] = useState('50.00');
   const [tarjetaKey, setTarjetaKey] = useState('');
@@ -142,6 +147,15 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
     () => Math.abs(totalPagado - totalDuplicado) < 0.009,
     [totalPagado, totalDuplicado]
   );
+  const esCredito = tipoComprobante === 'FACTURA' && condicionPago === 'CREDITO';
+  const facturacionIniciada = Boolean(solicitud?.planConfirmado || (solicitud?.facturacionEstado && solicitud.facturacionEstado !== 'BORRADOR'));
+  const cuotasEfectivas = cuotas.length ? cuotas : distribuirCuotasAutomaticas(totalDuplicado, 1, fechaInicio, fechaVencimiento);
+  const cargarPlanCredito = (item: SolicitudDuplicado) => {
+    setCondicionPago(item.condicionPago || 'CONTADO');
+    setFechaInicio(item.fechaInicioCredito || fechaHoy());
+    setFechaVencimiento(item.fechaVencimiento || '');
+    setCuotas(item.cuotas || []);
+  };
   const tarjetaSeleccionada = maestros?.tarjetas?.find((item) => item.key === tarjetaKey);
   const nombreTarjetaSeleccionada = String(tarjetaSeleccionada?.nombre || '').toUpperCase();
   const esCuponidad = nombreTarjetaSeleccionada.includes('CUPONIDAD');
@@ -266,7 +280,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
     setErroresCampos({});
     try {
       const creada = await faregasDuplicadosApi.crear(candidato.certificadoId);
-      const cliente = candidato.cliente;
+      const cliente = creada.clienteFacturacion || candidato.cliente;
       const documentoTipo = String(cliente.tipoDocumento || '').toUpperCase();
       const tipoDoc = (['DNI', 'RUC', 'CARNETEXTRANJERIA'].includes(documentoTipo)
         ? documentoTipo
@@ -274,7 +288,8 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
       setSeleccionado(candidato);
       setSolicitud(creada);
       setTipoDocumento(tipoDoc);
-      setTipoComprobante(tipoDoc === 'RUC' ? 'FACTURA' : 'BOLETA');
+      setTipoComprobante(creada.tipoComprobante || (tipoDoc === 'RUC' ? 'FACTURA' : 'BOLETA'));
+      cargarPlanCredito(creada);
       setDocumento(cliente.nroDocumento || '');
       setNombre(cliente.nombreRazonSocial || '');
       setDireccion(cliente.direccion || '');
@@ -482,12 +497,15 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
       errores.telefono = 'El teléfono admite hasta 30 caracteres.';
     }
 
-    // 6. Validación de pago completo antes de emitir
-    if (!pagoYaRegistrado && !pagoCompleto) {
+    if (esCredito && !facturacionIniciada) {
+      Object.assign(errores, validarPasoPago({ tipoComprobante, condicionPago, pagos: pagosAgregados,
+        precioTotal: totalDuplicado, fechaInicioCredito: fechaInicio, fechaVencimientoCredito: fechaVencimiento,
+        cuotas: cuotasEfectivas }));
+    } else if (!esCredito && !pagoYaRegistrado && !pagoCompleto) {
       errores.pagos = `Falta registrar S/ ${saldoPendiente.toFixed(2)} para completar el total del duplicado.`;
     }
 
-    const listaErrores = Object.values(errores);
+    const listaErrores = facturacionIniciada ? [] : Object.values(errores);
     if (listaErrores.length > 0) {
       setErroresCampos(errores);
 
@@ -517,7 +535,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
 
     try {
       const actualizada = await faregasDuplicadosApi.procesar(solicitud.id, {
-        pagos: pagosAgregados.map((p) => ({
+        pagos: (esCredito ? [] : pagosAgregados).map((p) => ({
           tipo: p.tipo,
           importe: parseFloat(p.importe),
           tarjetaKey: p.tarjetaKey,
@@ -535,9 +553,11 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
           direccion: direccion.trim(),
           email: email.trim() || null,
           telefono: telefono.trim() || null,
-          condicionPago: 'CONTADO',
-          cuotas: [],
-          medioPago: pagosAgregados.map((p) => p.tipo).join(', ') || 'EFECTIVO',
+          condicionPago: esCredito ? 'CREDITO' : 'CONTADO',
+          fechaInicioCredito: esCredito ? fechaInicio : null,
+          fechaVencimiento: esCredito ? fechaVencimiento : null,
+          cuotas: esCredito ? cuotasEfectivas.map(cuota => ({ ...cuota, importe: Number(cuota.importe) })) : [],
+          medioPago: esCredito ? null : pagosAgregados.map((p) => p.tipo).join(', ') || 'EFECTIVO',
         },
       });
       setSolicitud(actualizada);
@@ -550,7 +570,9 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
       }
     } catch (err) {
       try {
-        setSolicitud(await faregasDuplicadosApi.obtener(solicitud.id));
+        const guardada = await faregasDuplicadosApi.obtener(solicitud.id);
+        setSolicitud(guardada);
+        if (guardada.planConfirmado || (guardada.facturacionEstado && guardada.facturacionEstado !== 'BORRADOR')) cargarPlanCredito(guardada);
       } catch {
         // Se conserva la solicitud local para permitir reintentar.
       }
@@ -590,6 +612,8 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
   const abrirHistorial = (item: SolicitudDuplicado) => {
     setSeleccionado(null);
     setSolicitud(item);
+    cargarPlanCredito(item);
+    if (item.tipoComprobante) setTipoComprobante(item.tipoComprobante);
     setError('');
     setErroresCampos({});
   };
@@ -816,7 +840,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
 
               {solicitud.estado !== 'DISPONIBLE' && (
                 <>
-                  {pagoYaRegistrado && (
+                  {pagoYaRegistrado && !esCredito && (
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">
                       El pago de S/ 50.00 ya está registrado. Al continuar no se cobrará nuevamente; sólo se confirmará el comprobante y se habilitará la descarga.
                     </div>
@@ -828,7 +852,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                         Los datos precargados pertenecen al cliente asociado al certificado. Confirme o edite el RUC, nombre o razón social y dirección fiscal antes de emitir.
                       </p>
                     )}
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <fieldset disabled={procesando || facturacionIniciada} className="mt-3 grid gap-3 md:grid-cols-2">
                       <div>
                         <label className="text-xs font-bold text-slate-600 block mb-1">COMPROBANTE</label>
                         <select
@@ -837,6 +861,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                           onChange={(event) => {
                             const valor = event.target.value as 'BOLETA' | 'FACTURA';
                             setTipoComprobante(valor);
+                            if (valor === 'BOLETA') setCondicionPago('CONTADO');
                             limpiarError('tipoComprobante');
                             if (valor === 'FACTURA') {
                               if (tipoDocumento !== 'RUC') {
@@ -978,10 +1003,68 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                           <p className="mt-1 text-xs font-semibold text-red-600">{erroresCampos.telefono}</p>
                         )}
                       </div>
-                    </div>
+                    </fieldset>
                   </section>
 
-                  <section className="rounded-xl border border-slate-200 p-4">
+                  {tipoComprobante === 'FACTURA' && (
+                    <section className="space-y-2 rounded-xl border border-slate-200 p-4">
+                      <label className="block text-xs font-bold text-slate-600" htmlFor="duplicado-condicion">CONDICIÓN DE PAGO</label>
+                      <select
+                        id="duplicado-condicion"
+                        value={condicionPago}
+                        disabled={procesando || facturacionIniciada}
+                        onChange={(event) => {
+                          setCondicionPago(event.target.value as 'CONTADO' | 'CREDITO');
+                          limpiarError('pagos');
+                          limpiarError('cuotas');
+                        }}
+                        className={inputClase('pagos')}
+                      >
+                        <option value="CONTADO">Contado</option>
+                        <option value="CREDITO" disabled={pagoYaRegistrado || pagosAgregados.length > 0}>Crédito en cuotas</option>
+                      </select>
+                      {!facturacionIniciada && (pagoYaRegistrado || pagosAgregados.length > 0) && (
+                        <p className="text-xs text-slate-600">El crédito requiere financiar el total. Retira los medios de pago que aún no confirmaste para seleccionarlo.</p>
+                      )}
+                    </section>
+                  )}
+
+                  {esCredito ? (
+                    <section className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                      <h3 className="font-black text-slate-800">Pago al crédito</h3>
+                      <p className="text-xs text-slate-600">Se financiará el total del duplicado, S/ {totalDuplicado.toFixed(2)}.</p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="space-y-1 text-xs font-bold text-slate-600">
+                          INICIO DEL CRÉDITO
+                          <input type="date" value={fechaInicio} disabled={procesando || facturacionIniciada}
+                            className={inputClase('fechaInicioCredito', 'bg-white')}
+                            onChange={(event) => {
+                              const fecha = event.target.value;
+                              setFechaInicio(fecha);
+                              limpiarError('fechaInicioCredito');
+                              setCuotas(actuales => actualizarVencimientosCuotas(actuales, fecha, fechaVencimiento));
+                            }} />
+                        </label>
+                        <label className="space-y-1 text-xs font-bold text-slate-600">
+                          VENCIMIENTO GENERAL
+                          <input type="date" min={fechaInicio || undefined} value={fechaVencimiento} disabled={procesando || facturacionIniciada}
+                            className={inputClase('fechaVencimientoCredito', 'bg-white')}
+                            onChange={(event) => {
+                              const fecha = event.target.value;
+                              setFechaVencimiento(fecha);
+                              limpiarError('fechaVencimientoCredito');
+                              limpiarError('cuotas');
+                              setCuotas(actuales => actualizarVencimientosCuotas(actuales, fechaInicio, fecha));
+                            }} />
+                        </label>
+                      </div>
+                      <GestorCuotasCredito saldoAFinanciar={totalDuplicado} fechaInicioCredito={fechaInicio}
+                        fechaVencimientoCredito={fechaVencimiento} cuotas={cuotasEfectivas}
+                        onChangeCuotas={(nuevas) => { setCuotas(nuevas); limpiarError('cuotas'); }}
+                        disabled={procesando || facturacionIniciada} error={erroresCampos.cuotas} compact />
+                    </section>
+                  ) : (
+                  <fieldset disabled={procesando || facturacionIniciada} className="min-w-0 rounded-xl border border-slate-200 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
                       <div>
                         <h3 className="font-black text-slate-800">Pago al contado</h3>
@@ -1252,7 +1335,8 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                         </div>
                       )}
                     </div>
-                  </section>
+                  </fieldset>
+                  )}
                 </>
               )}
 
@@ -1289,7 +1373,7 @@ export function DuplicadoCertificadoModal({ onClose }: { onClose: () => void }) 
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-black text-white transition hover:bg-emerald-700 disabled:opacity-40"
                   >
                     {procesando && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {pagoYaRegistrado
+                    {esCredito ? 'Emitir factura a crédito y habilitar duplicado' : pagoYaRegistrado
                       ? 'Confirmar comprobante y habilitar duplicado'
                       : saldoPendiente > 0
                         ? `Falta pagar S/ ${saldoPendiente.toFixed(2)}`

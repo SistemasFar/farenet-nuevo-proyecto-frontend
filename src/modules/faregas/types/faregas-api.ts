@@ -143,6 +143,9 @@ export interface FacturacionFaregas {
   codigoUnico: NullableText;
   aceptadaSunat: boolean | null;
   sunatDescription: NullableText;
+  motivoLimiteDemo?: NullableText;
+  esRechazoDefinitivo?: boolean;
+  esFalloTemporal?: boolean;
   enlacePdf: NullableText;
   tieneNotaCredito?: boolean;
   enlacePdfFaregas?: NullableText;

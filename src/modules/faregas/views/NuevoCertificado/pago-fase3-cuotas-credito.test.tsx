@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
 import { resolverCuotasCredito, validarPasoPago } from './faregas-wizard.validation';
 import {
-  distribuirCuotasAutomaticas,
-  generarFechasDistribuidas,
-  GestorCuotasCredito
+  actualizarVencimientosCuotas,
+  distribuirCuotasAutomaticas
 } from '../components/GestorCuotasCredito';
 
 describe('FAREGAS - Fase 3: Pruebas Exhaustivas de Cuotas y Crédito', () => {
@@ -101,6 +100,20 @@ describe('FAREGAS - Fase 3: Pruebas Exhaustivas de Cuotas y Crédito', () => {
     expect(cuotasConResiduo[2].importe).toBe('33.34');
     const sumaConResiduo = cuotasConResiduo.reduce((acc, c) => acc + Number(c.importe), 0);
     expect(sumaConResiduo).toBe(100.00);
+  });
+
+  it('completa y recalcula las fechas cuando ya se eligieron las tres cuotas', () => {
+    const inicio = '2026-11-20';
+    const cuotas = distribuirCuotasAutomaticas(80, 3, inicio, '');
+    expect(cuotas.map(cuota => cuota.fechaPago)).toEqual(['', '', '']);
+
+    const programadas = actualizarVencimientosCuotas(cuotas, inicio, '2026-12-18');
+    expect(programadas.map(cuota => cuota.fechaPago)).toEqual(['2026-11-29', '2026-12-09', '2026-12-18']);
+    expect(programadas.map(cuota => cuota.importe)).toEqual(['26.66', '26.66', '26.68']);
+
+    const ajustadas = actualizarVencimientosCuotas(programadas, inicio, '2026-12-20');
+    expect(ajustadas.map(cuota => cuota.fechaPago)).toEqual(['2026-11-30', '2026-12-10', '2026-12-20']);
+    expect(ajustadas.map(cuota => cuota.importe)).toEqual(programadas.map(cuota => cuota.importe));
   });
 
   // ---------------------------------------------------------------------------

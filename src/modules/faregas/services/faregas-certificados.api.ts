@@ -17,6 +17,32 @@ import type {
   VehiculoBorradorFaregasRequest,
 } from '../types/faregas-api';
 
+export interface DiagnosticoContingencia {
+  proveedor: string;
+  categoria: string;
+  codigoProveedor?: string | null;
+  mensajeOriginalNormalizado?: string | null;
+  descripcion: string;
+  recuperable: boolean;
+  ausenciaConfirmada: boolean;
+  seguimiento?: string | null;
+}
+
+export interface ContextoContingencia {
+  habilitada: boolean;
+  permiteSoloCertificado: boolean;
+  motivo?: string | null;
+  diagnostico?: DiagnosticoContingencia | null;
+  estadoRegularizacion?: string | null;
+}
+
+export const leerDiagnosticoContingencia = (error: unknown): DiagnosticoContingencia | null => {
+  if (!error || typeof error !== 'object' || !('detalles' in error)) return null;
+  const detalles = error.detalles;
+  if (!detalles || typeof detalles !== 'object' || !('contingencia' in detalles)) return null;
+  return (detalles.contingencia as DiagnosticoContingencia | null) || null;
+};
+
 export const faregasCertificadosApi = {
   obtenerCorrelativos: (plantaKey?: string, tipo?: string) => {
     const params = new URLSearchParams();
@@ -156,6 +182,10 @@ export const faregasCertificadosApi = {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
+  obtenerContingencia: (id: number): Promise<{ data: ContextoContingencia }> =>
+    fetchWithToken('/certificados/borradores/' + id + '/contingencia'),
+  emitirSoloCertificado: (id: number): Promise<{ data: { numero_certificado: string; estado: string; estadoRegularizacion: string } }> =>
+    fetchWithToken('/certificados/borradores/' + id + '/contingencia/emitir-certificado', { method: 'POST' }),
   obtenerFacturacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion`),
   preflightFacturacion: (id: number) => fetchWithToken(`/certificados/borradores/${id}/facturacion/preflight`),
   guardarFacturacion: (id: number, data: GuardarFacturacionFaregasRequest) => fetchWithToken(`/certificados/borradores/${id}/facturacion`, {

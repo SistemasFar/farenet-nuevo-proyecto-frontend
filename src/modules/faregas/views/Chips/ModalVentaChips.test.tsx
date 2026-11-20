@@ -21,8 +21,6 @@ vi.mock('./ChipScannerInput', async () => {
   const ReactModule = await vi.importActual<typeof import('react')>('react');
   return { ChipScannerInput: () => ReactModule.createElement('textarea', { 'data-testid': 'chip-scanner' }) };
 });
-vi.mock('../NuevoCertificado/components/NuevoCertificado/PagoStep', () => ({ PagoStep: () => null }));
-vi.mock('../components/GestorCuotasCredito', () => ({ GestorCuotasCredito: () => null }));
 vi.mock('sweetalert2', () => ({ default: { fire: vi.fn() } }));
 
 import { ModalVentaChips } from './ModalVentaChips';
@@ -143,6 +141,37 @@ describe('ModalVentaChips — venta serializada y por cantidad', () => {
     await act(async () => { validar.click(); await Promise.resolve(); });
     expect(api.validarVentaDirecta).toHaveBeenCalledWith({ productoInventariableId: 2, cantidad: 100 });
     expect(container.textContent).toContain('100');
+  });
+
+  it('muestra un solo plan y guarda las fechas de las tres cuotas editadas desde Pago', async () => {
+    await cargarProductos();
+    await seleccionar(2);
+    const validar = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('VALIDAR STOCK'))!;
+    await act(async () => validar.click());
+    const seleccionarValor = async (valor: string) => {
+      const control = [...container.querySelectorAll('select')].find(item => [...item.options].some(option => option.value === valor))!;
+      await act(async () => {
+        control.value = valor;
+        control.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    };
+    await seleccionarValor('FACTURA');
+    await seleccionarValor('CREDITO');
+    const tresCuotas = [...container.querySelectorAll('button')].find(button => button.textContent?.trim() === '3 Cuotas')!;
+    await act(async () => tresCuotas.click());
+    expect(container.textContent?.match(/PLAN DE CUOTAS/g)).toHaveLength(1);
+    const [inicio, vencimiento] = [...container.querySelectorAll<HTMLInputElement>('input[type="date"]')];
+    const cambiarFecha = async (campo: HTMLInputElement, valor: string) => {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(campo, valor);
+        campo.dispatchEvent(new Event('input', { bubbles: true }));
+        campo.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    };
+    await cambiarFecha(inicio, '2027-01-01');
+    await cambiarFecha(vencimiento, '2027-01-31');
+    expect([...container.querySelectorAll<HTMLInputElement>('input[type="date"]')].slice(2).map(campo => campo.value))
+      .toEqual(['2027-01-11', '2027-01-21', '2027-01-31']);
   });
 
   it('la respuesta de stock insuficiente mantiene bloqueada la venta', async () => {

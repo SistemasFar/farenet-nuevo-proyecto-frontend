@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { AlertCircle, CheckCircle2, Loader2, PencilLine } from 'lucide-react';
 import Swal from 'sweetalert2';
 import type { TipoCertificadoFaregas } from '../../../../types/faregas';
 import type { FacturacionFaregas } from '../../../../types/faregas-api';
-import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
-import { abrirPdfNubefact, mostrarCargaComprobanteNubefact } from '../../../../services/faregas-comprobante-visor.service';
+import { faregasCertificadosApi, leerDiagnosticoContingencia, type ContextoContingencia } from '../../../../services/faregas-certificados.api';
+import { abrirPdfNubefact, descargarCertificadoFaregas, mostrarCargaComprobanteNubefact } from '../../../../services/faregas-comprobante-visor.service';
 import type { PagoAgregado, FormFacturacionState } from '../../NuevoCertificadoView';
 import {
   ejecutarEmisionCertificado,
@@ -56,6 +56,29 @@ const mensajeError = (error: unknown, fallback: string): string =>
  * PDF en un iframe), así que este es el único visor y puede ocupar todo el
  * ancho con una altura cómoda y su propio scroll interno.
  */
+const explicarRestriccion = (codigo: string) => ({
+  TIPO_SIN_AUTORIZACION_DEMO: 'Esta modalidad carece de autorización para la prueba DEMO.',
+  OPERADOR_CONTINGENCIA_NO_AUTORIZADO: 'Tu cuenta no está habilitada para la emisión excepcional.',
+  RESULTADO_REMOTO_NO_RESUELTO: 'Todavía se debe verificar si el comprobante fue generado.',
+  IDENTIDAD_FISCAL_INCOMPLETA: 'La identidad fiscal no quedó reservada de forma verificable.',
+  FECHA_FISCAL_REQUIERE_REVISION: 'Facturación debe revisar la fecha fiscal original.',
+  CERTIFICADO_CON_OBSERVACIONES: 'Resuelve las observaciones del certificado antes de continuar.',
+  ESTADO_NO_ELEGIBLE: 'El estado actual requiere verificación antes de emitir.',
+  CONTINGENCIA_NO_HABILITADA: 'La emisión excepcional está desactivada en este ambiente.',
+  CONTEXTO_CONTINGENCIA_NO_DISPONIBLE: 'No se pudo verificar si este certificado puede emitirse por separado. Consulta Facturación antes de reintentar.'
+} as Record<string,string>)[codigo] || 'Consulte con Facturación antes de emitir.';
+
+const contextoLimiteDemo = (descripcion: string, contexto: ContextoContingencia | null): ContextoContingencia => ({
+  habilitada: contexto?.habilitada ?? false,
+  permiteSoloCertificado: contexto?.habilitada === true && contexto.permiteSoloCertificado === true,
+  motivo: contexto?.motivo ?? (!contexto ? 'CONTEXTO_CONTINGENCIA_NO_DISPONIBLE'
+    : !contexto.habilitada ? 'CONTINGENCIA_NO_HABILITADA' : null),
+  diagnostico: contexto?.diagnostico?.categoria === 'LIMITE_DEMO_AGOTADO' ? contexto.diagnostico : {
+    proveedor: 'NubeFact', categoria: 'LIMITE_DEMO_AGOTADO', descripcion,
+    recuperable: true, ausenciaConfirmada: true,
+  },
+});
+
 const ALTO_DOCUMENTO = 'h-[680px] min-h-[420px]';
 
 const detalleError = (error: unknown): string | null => {
@@ -98,11 +121,44 @@ export function FacturacionEmisionStep({
   const facturacionStepRef = useRef<FacturacionStepHandle>(null);
   const verificacionStepRef = useRef<VerificacionStepHandle>(null);
   const emisionLockRef = useRef(false);
+  const avisoContingenciaRef = useRef<HTMLElement>(null);
+  const enfocarContingenciaRef = useRef(false);
   const [isEmitting, setIsEmitting] = useState(false);
   const [errorEmision, setErrorEmision] = useState('');
+  const [contingencia, setContingencia] = useState<ContextoContingencia | null>(null);
+  const [estadoRegularizacion, setEstadoRegularizacion] = useState<string | null>(null);
   const [resultadoEmision, setResultadoEmision] = useState<ResultadoEmisionCertificado | null>(null);
 
   const certificadoEmitido = certificadoEstado === 'EMITIDO' || Boolean(resultadoEmision);
+
+  useEffect(() => {
+    if (!certificadoId || (!certificadoEmitido && !['ERROR', 'RECHAZADO', 'PENDIENTE'].includes(facturacion?.estado || ''))) return;
+    let vigente = true;
+    void faregasCertificadosApi.obtenerContingencia(certificadoId).then(({ data }) => {
+      if (!vigente) return;
+      setEstadoRegularizacion(data.estadoRegularizacion ?? null);
+      if (data?.habilitada && !certificadoEmitido) {
+        if (facturacion?.motivoLimiteDemo) {
+          setContingencia(contextoLimiteDemo(facturacion.motivoLimiteDemo, data));
+        } else if (data.diagnostico) {
+          setContingencia(data);
+        }
+      } else {
+        setContingencia(null);
+      }
+    }).catch(() => {
+      if (vigente) setContingencia(null);
+    });
+    return () => { vigente = false; };
+  }, [certificadoId, certificadoEmitido, facturacion?.estado, facturacion?.motivoLimiteDemo]);
+
+  useEffect(() => {
+    const aviso = avisoContingenciaRef.current;
+    if (!aviso || !enfocarContingenciaRef.current) return;
+    enfocarContingenciaRef.current = false;
+    aviso.focus({ preventScroll: true });
+    aviso.scrollIntoView?.({ block: 'nearest' });
+  }, [contingencia]);
 
   // Sólo presentación de la cabecera: suma de lo efectivamente pagado.
   const totalPagado = pagosAgregados.reduce(
@@ -113,6 +169,7 @@ export function FacturacionEmisionStep({
   const handleEmitirTodo = async () => {
     if (!certificadoId || soloLectura || certificadoEmitido || emisionLockRef.current) return;
 
+    setContingencia(null);
     emisionLockRef.current = true;
     setIsEmitting(true);
     setErrorEmision('');
@@ -142,11 +199,11 @@ export function FacturacionEmisionStep({
             if (!facturacionStepRef.current) {
               throw new Error('No se pudo preparar la facturación.');
             }
-            if (facturacion?.estado === 'RECHAZADO') {
-              throw new Error('NUBEFACT_RECHAZADO: el comprobante fue rechazado y requiere revisión operativa.');
-            }
             if (facturacion?.estado === 'ANULADO') {
               throw new Error('El comprobante está anulado y no puede utilizarse para emitir un certificado.');
+            }
+            if (facturacion?.esRechazoDefinitivo) {
+              throw new Error(facturacion.sunatDescription || 'El comprobante tiene un rechazo fiscal definitivo de SUNAT y requiere revisión operativa.');
             }
             if (facturacionStepRef.current.estaEnSimulacion()) {
               const contexto = await facturacionStepRef.current.guardar(false);
@@ -244,6 +301,30 @@ export function FacturacionEmisionStep({
         }
       }
 
+      const diagnostico = leerDiagnosticoContingencia(error);
+      const motivoLimiteDemo = diagnostico?.categoria === 'LIMITE_DEMO_AGOTADO'
+        ? diagnostico.descripcion : null;
+      const contexto = diagnostico
+        ? await faregasCertificadosApi.obtenerContingencia(certificadoId).then(response => response.data).catch(() => null)
+        : null;
+      if (contexto?.habilitada && motivoLimiteDemo) {
+        enfocarContingenciaRef.current = true;
+        setErrorEmision('');
+        setContingencia(contextoLimiteDemo(motivoLimiteDemo, contexto));
+        return;
+      }
+      if (contexto?.habilitada && (diagnostico || contexto?.diagnostico)) {
+        enfocarContingenciaRef.current = true;
+        setErrorEmision('');
+        setContingencia({
+          habilitada: true,
+          permiteSoloCertificado: contexto?.permiteSoloCertificado === true,
+          motivo: contexto?.motivo,
+          diagnostico: diagnostico || contexto?.diagnostico
+        });
+        return;
+      }
+
       const comprobanteYaEmitido = Boolean(
         error && typeof error === 'object' && 'comprobanteEmitido' in error
           && (error as { comprobanteEmitido?: boolean }).comprobanteEmitido,
@@ -255,6 +336,37 @@ export function FacturacionEmisionStep({
 
       setErrorEmision(mensaje);
       await Swal.fire('No se completó la emisión', mensaje, 'error');
+    } finally {
+      emisionLockRef.current = false;
+      setIsEmitting(false);
+    }
+  };
+
+  const handleEmitirSolo = async () => {
+    if (!certificadoId || !contingencia?.permiteSoloCertificado || soloLectura || certificadoEmitido || emisionLockRef.current) return;
+    emisionLockRef.current = true;
+    setIsEmitting(true);
+    try {
+      const confirmacion = await Swal.fire({ title: 'Emitir solo el certificado en DEMO',
+        text: 'El certificado tendrá su número definitivo y el comprobante quedará pendiente de regularización.',
+        icon: 'warning', showCancelButton: true, confirmButtonText: 'EMITIR SOLO CERTIFICADO', cancelButtonText: 'Cancelar' });
+      if (!confirmacion.isConfirmed) return;
+      const { data } = await faregasCertificadosApi.emitirSoloCertificado(certificadoId);
+      setResultadoEmision(data);
+      setEstadoRegularizacion(data.estadoRegularizacion);
+      setContingencia(null);
+      setErrorEmision('');
+      const actual = await faregasCertificadosApi.obtenerFacturacion(certificadoId).catch(() => null);
+      if (actual?.data?.facturacion) onFacturacionChange(actual.data.facturacion);
+      await verificacionStepRef.current?.cargarDocumento().catch(() => {});
+      await Swal.fire('Certificado emitido', data.estadoRegularizacion === 'REGULARIZADO'
+        ? 'El comprobante ya está regularizado.' : 'El comprobante quedó pendiente de regularización. Consulte su avance en Facturación.', 'success');
+      await descargarCertificadoFaregas(certificadoId);
+      onEmisionExitosa?.();
+    } catch (error: unknown) {
+      const actual = await faregasCertificadosApi.obtenerContingencia(certificadoId).catch(() => null);
+      setContingencia(actual?.data?.diagnostico ? actual.data : null);
+      setErrorEmision(mensajeError(error, 'Revise el estado del certificado antes de volver a intentar.'));
     } finally {
       emisionLockRef.current = false;
       setIsEmitting(false);
@@ -336,13 +448,6 @@ export function FacturacionEmisionStep({
         )}
       </section>
 
-      {errorEmision && (
-        <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
-          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          <span>{errorEmision}</span>
-        </div>
-      )}
-
       <fieldset disabled={isEmitting} className="m-0 min-w-0 w-full space-y-3 border-0 p-0">
         {/* Información tributaria. El cliente ya no se repite aquí. */}
         <FacturacionStep
@@ -359,6 +464,7 @@ export function FacturacionEmisionStep({
           mostrarBotonEmision={false}
           mostrarEncabezado={false}
           mostrarCliente={false}
+          ocultarDetalleProveedor={Boolean(contingencia?.diagnostico)}
         />
 
         {/*
@@ -391,6 +497,43 @@ export function FacturacionEmisionStep({
           altoPreview={ALTO_DOCUMENTO}
         />
       </fieldset>
+
+      {(estadoRegularizacion === 'PENDIENTE' || estadoRegularizacion === 'REVISION') && (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          {estadoRegularizacion === 'PENDIENTE'
+            ? 'Certificado emitido. El comprobante electrónico está pendiente de regularización.'
+            : 'Certificado emitido. El comprobante electrónico requiere revisión de Facturación.'}
+        </p>
+      )}
+      {contingencia?.diagnostico && (
+        <section ref={avisoContingenciaRef} role="alert" tabIndex={-1} className="scroll-mb-24 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          <h3 className="font-bold">{contingencia.diagnostico.categoria === 'LIMITE_DEMO_AGOTADO'
+            ? 'Límite de NubeFact DEMO alcanzado' : 'No se pudo emitir el comprobante electrónico'}</h3>
+          <p>{contingencia.diagnostico.proveedor} · {contingencia.diagnostico.categoria}
+            {contingencia.diagnostico.codigoProveedor && ' · ' + contingencia.diagnostico.codigoProveedor}</p>
+          <p>{contingencia.diagnostico.descripcion}</p>
+          {contingencia.diagnostico.mensajeOriginalNormalizado && <p>{contingencia.diagnostico.mensajeOriginalNormalizado}</p>}
+          {contingencia.diagnostico.seguimiento && <p>Seguimiento {contingencia.diagnostico.seguimiento}</p>}
+          <p>{contingencia.permiteSoloCertificado ? 'Puede emitir el certificado y dejar el comprobante para regularización automática.'
+            : contingencia.diagnostico.categoria === 'LIMITE_DEMO_AGOTADO' ? 'Pide a Sistemas restablecer el cupo de la cuenta DEMO.'
+            : contingencia.diagnostico.recuperable ? 'Verifique el estado fiscal antes de reintentar.' : 'Corrija los datos o solicite una revisión.'}</p>
+          {contingencia.motivo && <p>{explicarRestriccion(contingencia.motivo)}</p>}
+          <div className="flex flex-wrap gap-2">
+            {contingencia.diagnostico.recuperable && (contingencia.diagnostico.ausenciaConfirmada || contingencia.diagnostico.codigoProveedor === 'NUBEFACT_VALIDACION_CORRELATIVO_NO_DISPONIBLE') &&
+              <button type="button" disabled={isEmitting} onClick={() => void handleEmitirTodo()} className="rounded border border-amber-600 px-3 py-2">Reintentar emisión</button>}
+            {contingencia.permiteSoloCertificado &&
+              <button type="button" disabled={isEmitting} onClick={() => void handleEmitirSolo()} className="rounded bg-[#052a79] px-3 py-2 font-bold text-white">EMITIR SOLO CERTIFICADO</button>}
+            <button type="button" disabled={isEmitting} onClick={() => setContingencia(null)} className="rounded px-3 py-2">Cerrar</button>
+          </div>
+        </section>
+      )}
+
+      {errorEmision && (
+        <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>{errorEmision}</span>
+        </div>
+      )}
 
       {!soloLectura && !certificadoEmitido && (
         <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">

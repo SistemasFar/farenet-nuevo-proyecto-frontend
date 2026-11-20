@@ -10,6 +10,9 @@ import {
 import {
   perfilTieneAccesoGlobalSedes,
 } from './acceso-global-sedes';
+import {
+  descargarExcelUsuariosFaregas,
+} from './usuarios-exportacion';
 
 import {
   atributosDocumento,
@@ -71,10 +74,9 @@ export function UsuariosView() {
 
   /** Clases del input: sólo cambia el borde cuando el campo tiene error. */
   const claseInput = (campo: CampoUsuario) =>
-    `w-full border rounded p-2 text-sm focus:outline-none ${
-      erroresCampo[campo]
-        ? 'border-red-400 focus:border-red-500 bg-red-50/40'
-        : 'border-slate-300 focus:border-[#052a79]'
+    `w-full border rounded p-2 text-sm focus:outline-none ${erroresCampo[campo]
+      ? 'border-red-400 focus:border-red-500 bg-red-50/40'
+      : 'border-slate-300 focus:border-[#052a79]'
     }`;
 
   const mensajeCampo = (campo: CampoUsuario) =>
@@ -394,7 +396,7 @@ ${separador}
       setMostrarPassword(false);
       setMostrarConfirmPassword(false);
       setSelectedUsername(usuario.username);
-      
+
       // Cargar jerarquía geográfica si la tiene
       if (usuario.paisKey) {
         const deps = await faregasUsuariosApi.getDepartamentos(usuario.paisKey);
@@ -775,7 +777,7 @@ ${separador}
   }, [totalPages, page]);
 
   const paginatedData = activeData.slice((page - 1) * limit, page * limit);
-  
+
   const mostrandoInicio = totalRegistros === 0 ? 0 : (page - 1) * limit + 1;
   const mostrandoFin = Math.min(page * limit, totalRegistros);
 
@@ -881,6 +883,17 @@ ${separador}
           </span>
           {activeTab === 'usuarios' ? (
             <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => descargarExcelUsuariosFaregas(filteredUsuarios, perfiles, {
+                  estado: estadoFiltro,
+                  busqueda: searchQuery,
+                })}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#052A79] bg-white px-4 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-50/50 disabled:opacity-50"
+              >
+                <Download size={16} /> EXPORTAR EXCEL
+              </button>
               {puedeGestionarCredenciales && (
                 <button
                   type="button"
@@ -895,6 +908,9 @@ ${separador}
               <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
                 + Crear Usuario
               </button>
+              <p className="basis-full text-right text-xs text-slate-500" role="note">
+                EXPORTAR EXCEL contiene únicamente datos administrativos; nunca incluye contraseñas ni hashes.
+              </p>
             </div>
           ) : (
             <button onClick={() => {
@@ -953,7 +969,7 @@ ${separador}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                          {esRuc(u.tipoDocumentoKey) ? u.nombreRazonSocial : `${u.nombres || ''} ${u.apellidos || ''}`.trim()}
+                        {esRuc(u.tipoDocumentoKey) ? u.nombreRazonSocial : `${u.nombres || ''} ${u.apellidos || ''}`.trim()}
                       </td>
                       <td className="px-4 py-3">{u.nroDocumento || '-'}</td>
                       <td className="px-4 py-3">{u.user_type}</td>
@@ -1451,580 +1467,580 @@ ${separador}
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
             <div className="p-6 border-b border-gray-200">
-                <h2 className="text-xl font-bold text-[#052a79]">
+              <h2 className="text-xl font-bold text-[#052a79]">
                 {activeTab === 'usuarios'
-                    ? (modalMode === 'crear' ? 'Crear Usuario' : 'Editar Usuario')
-                    : (modalMode === 'crear' ? 'Crear Perfil' : 'Editar Perfil')
+                  ? (modalMode === 'crear' ? 'Crear Usuario' : 'Editar Usuario')
+                  : (modalMode === 'crear' ? 'Crear Perfil' : 'Editar Perfil')
                 }
-                </h2>
+              </h2>
             </div>
-            
+
             <div className="p-6 overflow-y-auto flex-1">
-                {error && (
-                    <div className="mb-4 bg-red-50 text-red-700 p-3 rounded-lg shadow-sm border border-red-200 text-sm space-y-2">
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
-                        <div>{error}</div>
-                      </div>
-                      {(error.toLowerCase().includes('inactivo') || error.toLowerCase().includes('inactivos')) && (
-                        <div className="pt-2 border-t border-red-200 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const usernameABuscar = formData.username;
-                              setShowModal(false);
-                              setEstadoFiltro('INACTIVOS');
-                              setSearchQuery(usernameABuscar);
-                            }}
-                            className="rounded bg-[#052A79] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-900 transition-colors"
-                          >
-                            Ir a filtro Inactivos y localizar cuenta
-                          </button>
-                        </div>
-                      )}
+              {error && (
+                <div className="mb-4 bg-red-50 text-red-700 p-3 rounded-lg shadow-sm border border-red-200 text-sm space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
+                    <div>{error}</div>
+                  </div>
+                  {(error.toLowerCase().includes('inactivo') || error.toLowerCase().includes('inactivos')) && (
+                    <div className="pt-2 border-t border-red-200 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const usernameABuscar = formData.username;
+                          setShowModal(false);
+                          setEstadoFiltro('INACTIVOS');
+                          setSearchQuery(usernameABuscar);
+                        }}
+                        className="rounded bg-[#052A79] px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-900 transition-colors"
+                      >
+                        Ir a filtro Inactivos y localizar cuenta
+                      </button>
                     </div>
-                )}
-                <form id="main-form" noValidate onSubmit={activeTab === 'usuarios' ? handleSaveUsuario : async (e) => {
+                  )}
+                </div>
+              )}
+              <form id="main-form" noValidate onSubmit={activeTab === 'usuarios' ? handleSaveUsuario : async (e) => {
                 e.preventDefault();
                 try {
-                    setSaving(true);
-                    const payload = {
+                  setSaving(true);
+                  const payload = {
                     ...formData,
                     permisos: filtrarPermisosDelCatalogo(formData.permisos || [], permisos)
-                    };
-                    if (modalMode === 'crear') {
+                  };
+                  if (modalMode === 'crear') {
                     await faregasUsuariosApi.crearPerfil(payload);
-                    } else {
+                  } else {
                     await faregasUsuariosApi.actualizarPerfil(payload.clave, payload);
-                    }
-                    localStorage.setItem('faregas_permisos_updated_at', String(Date.now()));
-                    window.dispatchEvent(new CustomEvent('faregasPermisosActualizados'));
-                    setShowModal(false);
-                    await cargarDatos();
-                    setMensajeExito(`Perfil ${payload.nombre || payload.clave} guardado correctamente.`);
-                    setTimeout(() => setMensajeExito(null), 5000);
+                  }
+                  localStorage.setItem('faregas_permisos_updated_at', String(Date.now()));
+                  window.dispatchEvent(new CustomEvent('faregasPermisosActualizados'));
+                  setShowModal(false);
+                  await cargarDatos();
+                  setMensajeExito(`Perfil ${payload.nombre || payload.clave} guardado correctamente.`);
+                  setTimeout(() => setMensajeExito(null), 5000);
                 } catch (err: any) {
-                    const mensajes: Record<string, string> = {
+                  const mensajes: Record<string, string> = {
                     PERFILES_NO_AUTORIZADO:
-                        'No tienes autorización para administrar perfiles.',
+                      'No tienes autorización para administrar perfiles.',
                     PERMISOS_NO_DISPONIBLES:
-                        'No se pudo guardar el perfil porque uno o más permisos no están registrados o no están activos.',
+                      'No se pudo guardar el perfil porque uno o más permisos no están registrados o no están activos.',
                     PERMISOS_SENSIBLES_NO_DISPONIBLES:
-                        'No se pudo guardar el perfil porque uno o más permisos sensibles no están registrados o no están activos.',
+                      'No se pudo guardar el perfil porque uno o más permisos sensibles no están registrados o no están activos.',
                     PERMISOS_SENSIBLES_INVALIDOS:
-                        'No se pudo guardar el perfil porque la lista de permisos sensibles contiene claves inválidas.',
+                      'No se pudo guardar el perfil porque la lista de permisos sensibles contiene claves inválidas.',
                     PERMISOS_NO_GESTIONABLES:
-                        'No se pudo guardar el perfil porque uno o más permisos no se administran desde este editor.'
-                    };
-                    const clavesInvalidas = Array.isArray(err?.detalles?.claves)
-                        ? err.detalles.claves.filter((clave: unknown): clave is string => typeof clave === 'string')
-                        : [];
-                    const detalleClaves = clavesInvalidas.length > 0
-                        ? ` Permisos afectados: ${clavesInvalidas.join(', ')}.`
-                        : '';
-                    setError(`${mensajes[err?.codigo] || err.message || 'Error al guardar perfil'}${detalleClaves}`);
+                      'No se pudo guardar el perfil porque uno o más permisos no se administran desde este editor.'
+                  };
+                  const clavesInvalidas = Array.isArray(err?.detalles?.claves)
+                    ? err.detalles.claves.filter((clave: unknown): clave is string => typeof clave === 'string')
+                    : [];
+                  const detalleClaves = clavesInvalidas.length > 0
+                    ? ` Permisos afectados: ${clavesInvalidas.join(', ')}.`
+                    : '';
+                  setError(`${mensajes[err?.codigo] || err.message || 'Error al guardar perfil'}${detalleClaves}`);
                 } finally {
-                    setSaving(false);
+                  setSaving(false);
                 }
-                }} className="faregas-user-form space-y-6">
-                
+              }} className="faregas-user-form space-y-6">
+
                 {activeTab === 'usuarios' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {/* COLUMNA IZQUIERDA */}
-                        <div className="space-y-6">
-                            {/* SECCIÓN CUENTA */}
-                            <div className="bg-white p-4 rounded-lg border border-slate-200">
-                                <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Cuenta</h3>
-                                <div className="grid grid-cols-1 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Username <span className="text-red-500">*</span></label>
-                                        <input type="text" ref={registrarRef('username')} className={claseInput('username')}
-                                            aria-invalid={erroresCampo.username ? true : undefined}
-                                            value={formData.username}
-                                            onChange={e => {
-                                                const valor = e.target.value.trim();
-                                                setFormData({ ...formData, username: valor });
-                                                if (valor) registrarError('username', validarUsername(valor), false);
-                                            }}
-                                            onBlur={e => registrarError('username', validarUsername(e.target.value.trim()))}
-                                            disabled={modalMode === 'editar'} />
-                                        {mensajeCampo('username')}
-                                    </div>
-                                </div>
-                            </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* COLUMNA IZQUIERDA */}
+                    <div className="space-y-6">
+                      {/* SECCIÓN CUENTA */}
+                      <div className="bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Cuenta</h3>
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Username <span className="text-red-500">*</span></label>
+                            <input type="text" ref={registrarRef('username')} className={claseInput('username')}
+                              aria-invalid={erroresCampo.username ? true : undefined}
+                              value={formData.username}
+                              onChange={e => {
+                                const valor = e.target.value.trim();
+                                setFormData({ ...formData, username: valor });
+                                if (valor) registrarError('username', validarUsername(valor), false);
+                              }}
+                              onBlur={e => registrarError('username', validarUsername(e.target.value.trim()))}
+                              disabled={modalMode === 'editar'} />
+                            {mensajeCampo('username')}
+                          </div>
+                        </div>
+                      </div>
 
-                            {/* SECCIÓN IDENTIDAD */}
-                            <div className="bg-white p-4 rounded-lg border border-slate-200">
-                                <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Identidad</h3>
-                                <p className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                                    FAREGAS guarda este perfil en su propio almacenamiento. Hasta aplicar la migración de perfiles, las altas independientes y los cambios personales estarán temporalmente bloqueados; no se modificará el padrón de FARENET.
-                                </p>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Tipo de Documento <span className="text-red-500">*</span></label>
-                                        <select ref={registrarRef('tipoDocumentoKey')} className={`${claseInput('tipoDocumentoKey')} bg-white`}
-                                            aria-invalid={erroresCampo.tipoDocumentoKey ? true : undefined}
-                                            value={formData.tipoDocumentoKey}
-                                            onChange={e => {
-                                                // Al cambiar de tipo, el documento ya escrito puede
-                                                // dejar de ser valido: se revalida en el momento.
-                                                const tipoDocumentoKey = e.target.value;
-                                                setFormData({ ...formData, tipoDocumentoKey });
-                                                setErroresCampo((actual) => {
-                                                    const siguiente = { ...actual };
-                                                    const errorDoc = validarDocumento(tipoDocumentoKey, formData.nroDocumento);
-                                                    if (errorDoc) siguiente.nroDocumento = errorDoc;
-                                                    else delete siguiente.nroDocumento;
-                                                    return siguiente;
-                                                });
-                                            }}>
-                                            <option value="">Seleccione...</option>
-                                            {tiposDocumento.map(t => <option key={t.key} value={t.key}>{t.nombre}</option>)}
-                                        </select>
-                                        {mensajeCampo('tipoDocumentoKey')}
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nro Documento <span className="text-red-500">*</span></label>
-                                        <input type="text" ref={registrarRef('nroDocumento')} className={claseInput('nroDocumento')}
-                                            inputMode={atributosDocumento(formData.tipoDocumentoKey).inputMode}
-                                            maxLength={atributosDocumento(formData.tipoDocumentoKey).maxLength}
-                                            aria-invalid={erroresCampo.nroDocumento ? true : undefined}
-                                            value={formData.nroDocumento}
-                                            onChange={e => {
-                                                // En DNI y RUC se deja solo lo digitado: no
-                                                // tiene sentido que el campo acepte letras.
-                                                const numerico = REGLAS_DOCUMENTO[String(formData.tipoDocumentoKey || '').toLowerCase()]?.soloDigitos;
-                                                const valor = numerico ? normalizarSoloDigitos(e.target.value) : e.target.value;
-                                                setFormData({ ...formData, nroDocumento: valor });
-                                                if (valor) registrarError('nroDocumento', validarDocumento(formData.tipoDocumentoKey, valor), false);
-                                            }}
-                                            onBlur={e => registrarError('nroDocumento', validarDocumento(formData.tipoDocumentoKey, e.target.value))} />
-                                        {mensajeCampo('nroDocumento')}
-                                    </div>
-                                </div>
-
-                                {!esRuc(formData.tipoDocumentoKey) ? (
-                                    <div className="grid grid-cols-2 gap-4 mb-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nombres <span className="text-red-500">*</span></label>
-                                            <input type="text" ref={registrarRef('nombres')} className={claseInput('nombres')}
-                                                aria-invalid={erroresCampo.nombres ? true : undefined}
-                                                value={formData.nombres}
-                                                onChange={e => setFormData({ ...formData, nombres: e.target.value })}
-                                                onBlur={e => registrarError('nombres', validarNombre(e.target.value, 'nombre'))} />
-                                            {mensajeCampo('nombres')}
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Apellidos <span className="text-red-500">*</span></label>
-                                            <input type="text" ref={registrarRef('apellidos')} className={claseInput('apellidos')}
-                                                aria-invalid={erroresCampo.apellidos ? true : undefined}
-                                                value={formData.apellidos}
-                                                onChange={e => setFormData({ ...formData, apellidos: e.target.value })}
-                                                onBlur={e => registrarError('apellidos', validarNombre(e.target.value, 'apellido'))} />
-                                            {mensajeCampo('apellidos')}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="mb-4">
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Razón Social <span className="text-red-500">*</span></label>
-                                        <input type="text" ref={registrarRef('nombreRazonSocial')} className={claseInput('nombreRazonSocial')}
-                                            aria-invalid={erroresCampo.nombreRazonSocial ? true : undefined}
-                                            value={formData.nombreRazonSocial}
-                                            onChange={e => setFormData({ ...formData, nombreRazonSocial: e.target.value })} />
-                                        {mensajeCampo('nombreRazonSocial')}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* SECCIÓN SEGURIDAD */}
-                            <div className="bg-white p-4 rounded-lg border border-slate-200">
-                                <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Seguridad</h3>
-                                {modalMode === 'editar' && (
-                                    <div className="mb-4">
-                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                className="h-4 w-4 text-[#052a79]"
-                                                checked={crearNuevaPassword}
-                                                onChange={(e) => {
-                                                    const check = e.target.checked;
-                                                    setCrearNuevaPassword(check);
-                                                    setFormData({
-                                                        ...formData,
-                                                        requierePassword: check,
-                                                        password: '',
-                                                        confirmPassword: ''
-                                                    });
-                                                }}
-                                            />
-                                            <span>Crear nueva contraseña</span>
-                                        </label>
-                                    </div>
-                                )}
-
-                                {(modalMode === 'crear' || crearNuevaPassword) && (
-                                    <div className="grid grid-cols-2 gap-4 mb-4">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">
-                                                Contraseña {modalMode === 'crear' && <span className="text-red-500">*</span>}
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type={mostrarPassword ? 'text' : 'password'}
-                                                    ref={registrarRef('password')}
-                                                    className={`${claseInput('password')} pr-10`}
-                                                    aria-invalid={erroresCampo.password ? true : undefined}
-                                                    autoComplete="new-password"
-                                                    value={formData.password}
-                                                    onChange={e => {
-                                                        const val = e.target.value;
-                                                        setFormData({ ...formData, password: val });
-                                                        if (val) {
-                                                            const evalRes = evaluarPasswordSegura(val, formData.username, {
-                                                                minLongitud: politicaPassword?.minLongitud,
-                                                                esProduccion: politicaPassword?.esProduccion,
-                                                                esAdmin: formData.perfil_id === 'ADMINISTRADOR',
-                                                            });
-                                                            setAdvertenciaPassword(evalRes.advertencia);
-                                                        } else {
-                                                            setAdvertenciaPassword(null);
-                                                        }
-                                                    }}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                                    onClick={() => setMostrarPassword((v) => !v)}
-                                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
-                                                >
-                                                    {mostrarPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                                </button>
-                                            </div>
-                                            {advertenciaPassword && !erroresCampo.password && (
-                                                <div className="mt-1 flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 border border-amber-200">
-                                                    <ShieldAlert size={14} className="text-amber-600 shrink-0" />
-                                                    <span>{advertenciaPassword}</span>
-                                                </div>
-                                            )}
-                                            {mensajeCampo('password')}
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">
-                                                Confirmar Contraseña {modalMode === 'crear' && <span className="text-red-500">*</span>}
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    type={mostrarConfirmPassword ? 'text' : 'password'}
-                                                    ref={registrarRef('confirmPassword')}
-                                                    className={`${claseInput('confirmPassword')} pr-10`}
-                                                    aria-invalid={erroresCampo.confirmPassword ? true : undefined}
-                                                    autoComplete="new-password"
-                                                    value={formData.confirmPassword}
-                                                    onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    aria-label={mostrarConfirmPassword ? 'Ocultar confirmar contraseña' : 'Mostrar confirmar contraseña'}
-                                                    onClick={() => setMostrarConfirmPassword((v) => !v)}
-                                                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
-                                                >
-                                                    {mostrarConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                                </button>
-                                            </div>
-                                            {mensajeCampo('confirmPassword')}
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2">
-                                    <input type="checkbox" id="estadoCheck" className="h-4 w-4 text-[#052a79]"
-                                        disabled={modalMode === 'editar' && formData.username === currentUsername}
-                                        checked={formData.estado} onChange={e => setFormData({ ...formData, estado: e.target.checked })} />
-                                    <label htmlFor="estadoCheck" className={`text-sm font-semibold ${modalMode === 'editar' && formData.username === currentUsername ? 'text-slate-400' : 'text-slate-700'}`}>Usuario Activo</label>
-                                </div>
-                            </div>
+                      {/* SECCIÓN IDENTIDAD */}
+                      <div className="bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Identidad</h3>
+                        <p className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                          FAREGAS guarda este perfil en su propio almacenamiento. Hasta aplicar la migración de perfiles, las altas independientes y los cambios personales estarán temporalmente bloqueados; no se modificará el padrón de FARENET.
+                        </p>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Tipo de Documento <span className="text-red-500">*</span></label>
+                            <select ref={registrarRef('tipoDocumentoKey')} className={`${claseInput('tipoDocumentoKey')} bg-white`}
+                              aria-invalid={erroresCampo.tipoDocumentoKey ? true : undefined}
+                              value={formData.tipoDocumentoKey}
+                              onChange={e => {
+                                // Al cambiar de tipo, el documento ya escrito puede
+                                // dejar de ser valido: se revalida en el momento.
+                                const tipoDocumentoKey = e.target.value;
+                                setFormData({ ...formData, tipoDocumentoKey });
+                                setErroresCampo((actual) => {
+                                  const siguiente = { ...actual };
+                                  const errorDoc = validarDocumento(tipoDocumentoKey, formData.nroDocumento);
+                                  if (errorDoc) siguiente.nroDocumento = errorDoc;
+                                  else delete siguiente.nroDocumento;
+                                  return siguiente;
+                                });
+                              }}>
+                              <option value="">Seleccione...</option>
+                              {tiposDocumento.map(t => <option key={t.key} value={t.key}>{t.nombre}</option>)}
+                            </select>
+                            {mensajeCampo('tipoDocumentoKey')}
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nro Documento <span className="text-red-500">*</span></label>
+                            <input type="text" ref={registrarRef('nroDocumento')} className={claseInput('nroDocumento')}
+                              inputMode={atributosDocumento(formData.tipoDocumentoKey).inputMode}
+                              maxLength={atributosDocumento(formData.tipoDocumentoKey).maxLength}
+                              aria-invalid={erroresCampo.nroDocumento ? true : undefined}
+                              value={formData.nroDocumento}
+                              onChange={e => {
+                                // En DNI y RUC se deja solo lo digitado: no
+                                // tiene sentido que el campo acepte letras.
+                                const numerico = REGLAS_DOCUMENTO[String(formData.tipoDocumentoKey || '').toLowerCase()]?.soloDigitos;
+                                const valor = numerico ? normalizarSoloDigitos(e.target.value) : e.target.value;
+                                setFormData({ ...formData, nroDocumento: valor });
+                                if (valor) registrarError('nroDocumento', validarDocumento(formData.tipoDocumentoKey, valor), false);
+                              }}
+                              onBlur={e => registrarError('nroDocumento', validarDocumento(formData.tipoDocumentoKey, e.target.value))} />
+                            {mensajeCampo('nroDocumento')}
+                          </div>
                         </div>
 
-                        {/* COLUMNA DERECHA */}
-                        <div className="space-y-6">
-                            {/* SECCIÓN UBICACIÓN Y CONTACTO */}
-                            <div className="bg-white p-4 rounded-lg border border-slate-200">
-                                <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Ubicación y Contacto</h3>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">País <span className="text-red-500">*</span></label>
-                                        <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                                            value={formData.paisKey} onChange={e => handlePaisChange(e.target.value)}>
-                                            <option value="">Seleccione...</option>
-                                            {paises.map(p => <option key={p.key} value={p.key}>{p.nombre}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Departamento <span className="text-red-500">*</span></label>
-                                        <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                                            value={formData.departamentoKey} onChange={e => handleDepartamentoChange(e.target.value)} disabled={!formData.paisKey}>
-                                            <option value="">Seleccione...</option>
-                                            {departamentos.map(d => <option key={d.key} value={d.key}>{d.nombre}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Provincia <span className="text-red-500">*</span></label>
-                                        <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                                            value={formData.provinciaKey} onChange={e => handleProvinciaChange(e.target.value)} disabled={!formData.departamentoKey}>
-                                            <option value="">Seleccione...</option>
-                                            {provincias.map(p => <option key={p.key} value={p.key}>{p.nombre}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Distrito <span className="text-red-500">*</span></label>
-                                        <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                                            value={formData.distritoKey} onChange={e => setFormData({ ...formData, distritoKey: e.target.value })} disabled={!formData.provinciaKey}>
-                                            <option value="">Seleccione...</option>
-                                            {distritos.map(d => <option key={d.key} value={d.key}>{d.nombre}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="mb-4">
-                                    <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Dirección <span className="text-red-500">*</span></label>
-                                    <input type="text" ref={registrarRef('direccion')} className={claseInput('direccion')}
-                                        aria-invalid={erroresCampo.direccion ? true : undefined}
-                                        value={formData.direccion}
-                                        onChange={e => setFormData({ ...formData, direccion: e.target.value })}
-                                        onBlur={e => registrarError('direccion', validarDireccion(e.target.value))} />
-                                    {mensajeCampo('direccion')}
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 mb-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Teléfono <span className="text-red-500">*</span></label>
-                                        <input type="tel" ref={registrarRef('telefono')} className={claseInput('telefono')}
-                                            inputMode="numeric"
-                                            maxLength={TELEFONO_MAXIMO}
-                                            aria-invalid={erroresCampo.telefono ? true : undefined}
-                                            value={formData.telefono}
-                                            onChange={e => {
-                                                // Solo digitos y como maximo 9: no se pueden
-                                                // escribir letras, espacios ni signos, ni un
-                                                // digito de mas.
-                                                const valor = normalizarTelefono(e.target.value);
-                                                setFormData({ ...formData, telefono: valor });
-                                                if (valor) registrarError('telefono', validarTelefono(valor), false);
-                                            }}
-                                            onBlur={e => registrarError('telefono', validarTelefono(e.target.value))} />
-                                        {mensajeCampo('telefono')}
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Email</label>
-                                        <input type="email" ref={registrarRef('email')} className={claseInput('email')}
-                                            maxLength={EMAIL_MAXIMO}
-                                            aria-invalid={erroresCampo.email ? true : undefined}
-                                            value={formData.email}
-                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                            onBlur={e => registrarError('email', validarEmail(e.target.value))} />
-                                        {mensajeCampo('email')}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* SECCIÓN PERFIL Y SEDES */}
-                            <div className="bg-white p-4 rounded-lg border border-slate-200">
-                                <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Perfil y Sedes</h3>
-                                <div className="mb-4">
-                                    <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Perfil <span className="text-red-500">*</span></label>
-                                    <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
-                                        value={formData.perfil_id} onChange={e => handlePerfilUsuarioChange(e.target.value)}>
-                                        {perfiles.map(p => <option key={p.clave} value={p.clave}>{p.nombre}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    {perfilTieneAccesoGlobalSedes(perfiles, formData.perfil_id) ? (
-                                    <>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Asignadas</label>
-                                        <div className="text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded p-3 text-center">
-                                        ACCESO A TODAS LAS SEDES
-                                        </div>
-                                    </>
-                                    ) : (
-                                    <>
-                                        <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Disponibles para este Perfil</label>
-                                        <div className="mb-2">
-                                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                            <input type="checkbox"
-                                            className="h-4 w-4 text-[#052a79]"
-                                            checked={(formData.sedes || []).length === (perfiles.find(p => p.clave === formData.perfil_id)?.sedes || []).length && (formData.sedes || []).length > 0}
-                                            onChange={(e) => {
-                                                const allowedSedes = perfiles.find(p => p.clave === formData.perfil_id)?.sedes || [];
-                                                setFormData({ ...formData, sedes: e.target.checked ? allowedSedes : [] });
-                                            }}
-                                            />
-                                            <span className="font-bold text-[#052a79]">Seleccionar todas</span>
-                                        </label>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
-                                        {plantas.filter(p => (perfiles.find(pf => pf.clave === formData.perfil_id)?.sedes || []).includes(p.key)).map(p => (
-                                            <label key={p.key} className={`flex items-center gap-2 text-sm bg-white p-2 rounded border border-slate-200 ${!p.activo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
-                                            <input type="checkbox"
-                                                className="h-4 w-4 text-[#052A79]"
-                                                checked={(formData.sedes || []).includes(p.key)}
-                                                onChange={() => toggleSede(p.key)}
-                                                disabled={!p.activo}
-                                            />
-                                            <span className="font-medium text-slate-700 truncate">
-                                                {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
-                                            </span>
-                                            </label>
-                                        ))}
-                                        </div>
-                                    </>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    // PERFIL FORM
-                    <>
-                        <div className="grid grid-cols-2 gap-4">
+                        {!esRuc(formData.tipoDocumentoKey) ? (
+                          <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
-                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Clave</label>
-                            <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required disabled={modalMode === 'editar'}
-                                value={formData.clave || ''} onChange={e => setFormData({ ...formData, clave: e.target.value.toUpperCase() })} />
+                              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nombres <span className="text-red-500">*</span></label>
+                              <input type="text" ref={registrarRef('nombres')} className={claseInput('nombres')}
+                                aria-invalid={erroresCampo.nombres ? true : undefined}
+                                value={formData.nombres}
+                                onChange={e => setFormData({ ...formData, nombres: e.target.value })}
+                                onBlur={e => registrarError('nombres', validarNombre(e.target.value, 'nombre'))} />
+                              {mensajeCampo('nombres')}
                             </div>
                             <div>
-                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nombre</label>
-                            <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
-                                value={formData.nombre || ''} onChange={e => setFormData({ ...formData, nombre: e.target.value })} />
+                              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Apellidos <span className="text-red-500">*</span></label>
+                              <input type="text" ref={registrarRef('apellidos')} className={claseInput('apellidos')}
+                                aria-invalid={erroresCampo.apellidos ? true : undefined}
+                                value={formData.apellidos}
+                                onChange={e => setFormData({ ...formData, apellidos: e.target.value })}
+                                onBlur={e => registrarError('apellidos', validarNombre(e.target.value, 'apellido'))} />
+                              {mensajeCampo('apellidos')}
                             </div>
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="mb-4">
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Razón Social <span className="text-red-500">*</span></label>
+                            <input type="text" ref={registrarRef('nombreRazonSocial')} className={claseInput('nombreRazonSocial')}
+                              aria-invalid={erroresCampo.nombreRazonSocial ? true : undefined}
+                              value={formData.nombreRazonSocial}
+                              onChange={e => setFormData({ ...formData, nombreRazonSocial: e.target.value })} />
+                            {mensajeCampo('nombreRazonSocial')}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SECCIÓN SEGURIDAD */}
+                      <div className="bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Seguridad</h3>
+                        {modalMode === 'editar' && (
+                          <div className="mb-4">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 text-[#052a79]"
+                                checked={crearNuevaPassword}
+                                onChange={(e) => {
+                                  const check = e.target.checked;
+                                  setCrearNuevaPassword(check);
+                                  setFormData({
+                                    ...formData,
+                                    requierePassword: check,
+                                    password: '',
+                                    confirmPassword: ''
+                                  });
+                                }}
+                              />
+                              <span>Crear nueva contraseña</span>
+                            </label>
+                          </div>
+                        )}
+
+                        {(modalMode === 'crear' || crearNuevaPassword) && (
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">
+                                Contraseña {modalMode === 'crear' && <span className="text-red-500">*</span>}
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type={mostrarPassword ? 'text' : 'password'}
+                                  ref={registrarRef('password')}
+                                  className={`${claseInput('password')} pr-10`}
+                                  aria-invalid={erroresCampo.password ? true : undefined}
+                                  autoComplete="new-password"
+                                  value={formData.password}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setFormData({ ...formData, password: val });
+                                    if (val) {
+                                      const evalRes = evaluarPasswordSegura(val, formData.username, {
+                                        minLongitud: politicaPassword?.minLongitud,
+                                        esProduccion: politicaPassword?.esProduccion,
+                                        esAdmin: formData.perfil_id === 'ADMINISTRADOR',
+                                      });
+                                      setAdvertenciaPassword(evalRes.advertencia);
+                                    } else {
+                                      setAdvertenciaPassword(null);
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                  onClick={() => setMostrarPassword((v) => !v)}
+                                  className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
+                                >
+                                  {mostrarPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                              </div>
+                              {advertenciaPassword && !erroresCampo.password && (
+                                <div className="mt-1 flex items-center gap-1.5 rounded bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 border border-amber-200">
+                                  <ShieldAlert size={14} className="text-amber-600 shrink-0" />
+                                  <span>{advertenciaPassword}</span>
+                                </div>
+                              )}
+                              {mensajeCampo('password')}
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 capitalize mb-1">
+                                Confirmar Contraseña {modalMode === 'crear' && <span className="text-red-500">*</span>}
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type={mostrarConfirmPassword ? 'text' : 'password'}
+                                  ref={registrarRef('confirmPassword')}
+                                  className={`${claseInput('confirmPassword')} pr-10`}
+                                  aria-invalid={erroresCampo.confirmPassword ? true : undefined}
+                                  autoComplete="new-password"
+                                  value={formData.confirmPassword}
+                                  onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                />
+                                <button
+                                  type="button"
+                                  aria-label={mostrarConfirmPassword ? 'Ocultar confirmar contraseña' : 'Mostrar confirmar contraseña'}
+                                  onClick={() => setMostrarConfirmPassword((v) => !v)}
+                                  className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-500 hover:text-[#052A79]"
+                                >
+                                  {mostrarConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                              </div>
+                              {mensajeCampo('confirmPassword')}
+                            </div>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
-                            <input type="checkbox" id="visibleCheck" className="h-4 w-4 text-[#052a79]"
-                            checked={formData.visible} onChange={e => setFormData({ ...formData, visible: e.target.checked })} />
-                            <label htmlFor="visibleCheck" className="text-sm font-semibold text-slate-700">Perfil Visible</label>
+                          <input type="checkbox" id="estadoCheck" className="h-4 w-4 text-[#052a79]"
+                            disabled={modalMode === 'editar' && formData.username === currentUsername}
+                            checked={formData.estado} onChange={e => setFormData({ ...formData, estado: e.target.checked })} />
+                          <label htmlFor="estadoCheck" className={`text-sm font-semibold ${modalMode === 'editar' && formData.username === currentUsername ? 'text-slate-400' : 'text-slate-700'}`}>Usuario Activo</label>
                         </div>
+                      </div>
+                    </div>
 
-                        <div className="border-t pt-4 mt-4">
-                            <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Disponibles</label>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {plantas.map(p => {
-                                const isSistemas = formData.clave === 'SISTEMAS';
-                                const isChecked = isSistemas || (formData.sedes || []).includes(p.key);
-                                const isDisabled = isSistemas || !p.activo;
-                                
-                                return (
-                                <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
+                    {/* COLUMNA DERECHA */}
+                    <div className="space-y-6">
+                      {/* SECCIÓN UBICACIÓN Y CONTACTO */}
+                      <div className="bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Ubicación y Contacto</h3>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">País <span className="text-red-500">*</span></label>
+                            <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
+                              value={formData.paisKey} onChange={e => handlePaisChange(e.target.value)}>
+                              <option value="">Seleccione...</option>
+                              {paises.map(p => <option key={p.key} value={p.key}>{p.nombre}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Departamento <span className="text-red-500">*</span></label>
+                            <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
+                              value={formData.departamentoKey} onChange={e => handleDepartamentoChange(e.target.value)} disabled={!formData.paisKey}>
+                              <option value="">Seleccione...</option>
+                              {departamentos.map(d => <option key={d.key} value={d.key}>{d.nombre}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Provincia <span className="text-red-500">*</span></label>
+                            <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
+                              value={formData.provinciaKey} onChange={e => handleProvinciaChange(e.target.value)} disabled={!formData.departamentoKey}>
+                              <option value="">Seleccione...</option>
+                              {provincias.map(p => <option key={p.key} value={p.key}>{p.nombre}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Distrito <span className="text-red-500">*</span></label>
+                            <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
+                              value={formData.distritoKey} onChange={e => setFormData({ ...formData, distritoKey: e.target.value })} disabled={!formData.provinciaKey}>
+                              <option value="">Seleccione...</option>
+                              {distritos.map(d => <option key={d.key} value={d.key}>{d.nombre}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="mb-4">
+                          <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Dirección <span className="text-red-500">*</span></label>
+                          <input type="text" ref={registrarRef('direccion')} className={claseInput('direccion')}
+                            aria-invalid={erroresCampo.direccion ? true : undefined}
+                            value={formData.direccion}
+                            onChange={e => setFormData({ ...formData, direccion: e.target.value })}
+                            onBlur={e => registrarError('direccion', validarDireccion(e.target.value))} />
+                          {mensajeCampo('direccion')}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Teléfono <span className="text-red-500">*</span></label>
+                            <input type="tel" ref={registrarRef('telefono')} className={claseInput('telefono')}
+                              inputMode="numeric"
+                              maxLength={TELEFONO_MAXIMO}
+                              aria-invalid={erroresCampo.telefono ? true : undefined}
+                              value={formData.telefono}
+                              onChange={e => {
+                                // Solo digitos y como maximo 9: no se pueden
+                                // escribir letras, espacios ni signos, ni un
+                                // digito de mas.
+                                const valor = normalizarTelefono(e.target.value);
+                                setFormData({ ...formData, telefono: valor });
+                                if (valor) registrarError('telefono', validarTelefono(valor), false);
+                              }}
+                              onBlur={e => registrarError('telefono', validarTelefono(e.target.value))} />
+                            {mensajeCampo('telefono')}
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Email</label>
+                            <input type="email" ref={registrarRef('email')} className={claseInput('email')}
+                              maxLength={EMAIL_MAXIMO}
+                              aria-invalid={erroresCampo.email ? true : undefined}
+                              value={formData.email}
+                              onChange={e => setFormData({ ...formData, email: e.target.value })}
+                              onBlur={e => registrarError('email', validarEmail(e.target.value))} />
+                            {mensajeCampo('email')}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* SECCIÓN PERFIL Y SEDES */}
+                      <div className="bg-white p-4 rounded-lg border border-slate-200">
+                        <h3 className="font-bold text-slate-700 mb-3 border-b pb-2">Perfil y Sedes</h3>
+                        <div className="mb-4">
+                          <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Perfil <span className="text-red-500">*</span></label>
+                          <select className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none bg-white" required
+                            value={formData.perfil_id} onChange={e => handlePerfilUsuarioChange(e.target.value)}>
+                            {perfiles.map(p => <option key={p.clave} value={p.clave}>{p.nombre}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          {perfilTieneAccesoGlobalSedes(perfiles, formData.perfil_id) ? (
+                            <>
+                              <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Asignadas</label>
+                              <div className="text-xs font-bold text-slate-500 bg-white border border-slate-200 rounded p-3 text-center">
+                                ACCESO A TODAS LAS SEDES
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Disponibles para este Perfil</label>
+                              <div className="mb-2">
+                                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                  <input type="checkbox"
+                                    className="h-4 w-4 text-[#052a79]"
+                                    checked={(formData.sedes || []).length === (perfiles.find(p => p.clave === formData.perfil_id)?.sedes || []).length && (formData.sedes || []).length > 0}
+                                    onChange={(e) => {
+                                      const allowedSedes = perfiles.find(p => p.clave === formData.perfil_id)?.sedes || [];
+                                      setFormData({ ...formData, sedes: e.target.checked ? allowedSedes : [] });
+                                    }}
+                                  />
+                                  <span className="font-bold text-[#052a79]">Seleccionar todas</span>
+                                </label>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
+                                {plantas.filter(p => (perfiles.find(pf => pf.clave === formData.perfil_id)?.sedes || []).includes(p.key)).map(p => (
+                                  <label key={p.key} className={`flex items-center gap-2 text-sm bg-white p-2 rounded border border-slate-200 ${!p.activo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
                                     <input type="checkbox"
-                                    className="h-4 w-4 text-[#052A79]"
-                                    checked={isChecked}
-                                    onChange={() => !isSistemas && toggleSede(p.key)}
-                                    disabled={isDisabled}
+                                      className="h-4 w-4 text-[#052A79]"
+                                      checked={(formData.sedes || []).includes(p.key)}
+                                      onChange={() => toggleSede(p.key)}
+                                      disabled={!p.activo}
                                     />
                                     <span className="font-medium text-slate-700 truncate">
-                                    {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
+                                      {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
                                     </span>
-                                </label>
-                                );
-                            })}
-                            </div>
+                                  </label>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // PERFIL FORM
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Clave</label>
+                        <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required disabled={modalMode === 'editar'}
+                          value={formData.clave || ''} onChange={e => setFormData({ ...formData, clave: e.target.value.toUpperCase() })} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 capitalize mb-1">Nombre</label>
+                        <input type="text" className="w-full border border-slate-300 rounded p-2 text-sm focus:border-[#052a79] focus:outline-none" required
+                          value={formData.nombre || ''} onChange={e => setFormData({ ...formData, nombre: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="visibleCheck" className="h-4 w-4 text-[#052a79]"
+                        checked={formData.visible} onChange={e => setFormData({ ...formData, visible: e.target.checked })} />
+                      <label htmlFor="visibleCheck" className="text-sm font-semibold text-slate-700">Perfil Visible</label>
+                    </div>
 
-                        <div className="border-t pt-4 mt-4">
-                            <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Módulos / Menú</label>
-                            {(() => {
-                                const marcados = formData.permisos || [];
-                                const esSubmodulo = (clave: string) =>
-                                    MODULOS_CON_SUBMODULOS.some((m) => m.hijos.includes(clave));
-                                // Los submódulos no se listan sueltos: se anidan bajo su padre.
-                                const lista = permisos.filter((p) => !esSubmodulo(p.clave));
-                                const otros = lista.filter((p) =>
-                                    !MODULOS_CON_SUBMODULOS.some((m) => m.padre === p.clave));
+                    <div className="border-t pt-4 mt-4">
+                      <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Sedes Disponibles</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {plantas.map(p => {
+                          const isSistemas = formData.clave === 'SISTEMAS';
+                          const isChecked = isSistemas || (formData.sedes || []).includes(p.key);
+                          const isDisabled = isSistemas || !p.activo;
 
-                                const casilla = (p: PermisoPerfil, hijo: boolean, padreActivo: boolean) => {
-                                    const permisoSensible = esPermisoSensible(p.clave);
-                                    const activo = marcados.includes(p.clave);
-                                    // Un submódulo sólo se bloquea para marcarlo si su
-                                    // módulo padre no está activo. Si ya estaba marcado,
-                                    // se permite desmarcarlo para poder revocar cualquier
-                                    // permiso, incluidos los sensibles.
-                                    const bloqueado = hijo && !padreActivo && !activo;
-                                    const clavePadre = MODULOS_CON_SUBMODULOS.find(
-                                        (o) => o.hijos.includes(p.clave))?.padre;
-                                    const etiquetaPadre = clavePadre === PERMISO_FACTURACION
-                                        ? 'Facturación'
-                                        : clavePadre === PERMISO_CONFIGURACION
-                                            ? 'Configuración'
-                                            : clavePadre === PERMISO_INICIO
-                                                ? 'Inicio'
-                                                : clavePadre === PERMISO_DASHBOARD
-                                                    ? 'Dashboard'
-                                                    : 'Inventario';
-                                    return (
-                                        <label key={p.clave}
-                                            className={`flex items-center gap-2 text-sm p-2 rounded border ${permisoSensible ? 'border-red-200 bg-red-50/60' : hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
-                                            title={bloqueado ? `Active primero ${etiquetaPadre}` : undefined}>
-                                            <input type="checkbox"
-                                                className="h-4 w-4 text-[#052a79]"
-                                                checked={activo}
-                                                onChange={() => !bloqueado && togglePermiso(p.clave)}
-                                                disabled={bloqueado}
-                                            />
-                                            <span className={`font-medium ${hijo ? 'text-slate-600 text-xs' : 'text-slate-700'}`}>
-                                                {NOMBRES_PERMISOS_INICIO[p.clave] || NOMBRES_MENU_INVENTARIO[p.clave] || NOMBRES_PERMISOS_DASHBOARD[p.clave] || p.nombre}
-                                            </span>
-                                            {permisoSensible && <span className="ml-auto rounded-full border border-red-200 bg-white px-2 py-0.5 text-[10px] font-bold text-red-700">Sensible</span>}
-                                        </label>
-                                    );
-                                };
+                          return (
+                            <label key={p.key} className={`flex items-center gap-2 text-sm bg-slate-50 p-2 rounded border border-slate-200 ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}>
+                              <input type="checkbox"
+                                className="h-4 w-4 text-[#052A79]"
+                                checked={isChecked}
+                                onChange={() => !isSistemas && toggleSede(p.key)}
+                                disabled={isDisabled}
+                              />
+                              <span className="font-medium text-slate-700 truncate">
+                                {p.nombre} {!p.activo && <span className="text-[10px] text-red-500 font-bold ml-1">(Inactiva)</span>}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
 
-                                // Cada módulo con submódulos sale de la grilla y ocupa su
-                                // propio bloque de ancho completo, para que sus hijos
-                                // queden debajo y no se mezclen con otros módulos.
-                                const bloqueModulo = (modulo: { padre: string; hijos: readonly string[] }) => {
-                                    const padre = lista.find((p) => p.clave === modulo.padre);
-                                    const hijos = modulo.hijos
-                                        .map((clave) => permisos.find((p) => p.clave === clave))
-                                        .filter((p): p is PermisoPerfil => Boolean(p));
-                                    if (!padre && modulo.padre !== PERMISO_INICIO) return null;
-                                    const padreActivo = padre ? marcados.includes(modulo.padre) : true;
-                                    return (
-                                        <div key={modulo.padre} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                            {padre ? (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                    {casilla(padre, false, padreActivo)}
-                                                </div>
-                                            ) : <p className="text-sm font-bold text-slate-700">Inicio</p>}
-                                            {/* La línea vertical es la guía visual de la
+                    <div className="border-t pt-4 mt-4">
+                      <label className="block text-xs font-bold text-slate-600 capitalize mb-2">Módulos / Menú</label>
+                      {(() => {
+                        const marcados = formData.permisos || [];
+                        const esSubmodulo = (clave: string) =>
+                          MODULOS_CON_SUBMODULOS.some((m) => m.hijos.includes(clave));
+                        // Los submódulos no se listan sueltos: se anidan bajo su padre.
+                        const lista = permisos.filter((p) => !esSubmodulo(p.clave));
+                        const otros = lista.filter((p) =>
+                          !MODULOS_CON_SUBMODULOS.some((m) => m.padre === p.clave));
+
+                        const casilla = (p: PermisoPerfil, hijo: boolean, padreActivo: boolean) => {
+                          const permisoSensible = esPermisoSensible(p.clave);
+                          const activo = marcados.includes(p.clave);
+                          // Un submódulo sólo se bloquea para marcarlo si su
+                          // módulo padre no está activo. Si ya estaba marcado,
+                          // se permite desmarcarlo para poder revocar cualquier
+                          // permiso, incluidos los sensibles.
+                          const bloqueado = hijo && !padreActivo && !activo;
+                          const clavePadre = MODULOS_CON_SUBMODULOS.find(
+                            (o) => o.hijos.includes(p.clave))?.padre;
+                          const etiquetaPadre = clavePadre === PERMISO_FACTURACION
+                            ? 'Facturación'
+                            : clavePadre === PERMISO_CONFIGURACION
+                              ? 'Configuración'
+                              : clavePadre === PERMISO_INICIO
+                                ? 'Inicio'
+                                : clavePadre === PERMISO_DASHBOARD
+                                  ? 'Dashboard'
+                                  : 'Inventario';
+                          return (
+                            <label key={p.clave}
+                              className={`flex items-center gap-2 text-sm p-2 rounded border ${permisoSensible ? 'border-red-200 bg-red-50/60' : hijo ? 'border-slate-200 bg-white' : 'bg-slate-50 border-slate-200'} ${bloqueado ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
+                              title={bloqueado ? `Active primero ${etiquetaPadre}` : undefined}>
+                              <input type="checkbox"
+                                className="h-4 w-4 text-[#052a79]"
+                                checked={activo}
+                                onChange={() => !bloqueado && togglePermiso(p.clave)}
+                                disabled={bloqueado}
+                              />
+                              <span className={`font-medium ${hijo ? 'text-slate-600 text-xs' : 'text-slate-700'}`}>
+                                {NOMBRES_PERMISOS_INICIO[p.clave] || NOMBRES_MENU_INVENTARIO[p.clave] || NOMBRES_PERMISOS_DASHBOARD[p.clave] || p.nombre}
+                              </span>
+                              {permisoSensible && <span className="ml-auto rounded-full border border-red-200 bg-white px-2 py-0.5 text-[10px] font-bold text-red-700">Sensible</span>}
+                            </label>
+                          );
+                        };
+
+                        // Cada módulo con submódulos sale de la grilla y ocupa su
+                        // propio bloque de ancho completo, para que sus hijos
+                        // queden debajo y no se mezclen con otros módulos.
+                        const bloqueModulo = (modulo: { padre: string; hijos: readonly string[] }) => {
+                          const padre = lista.find((p) => p.clave === modulo.padre);
+                          const hijos = modulo.hijos
+                            .map((clave) => permisos.find((p) => p.clave === clave))
+                            .filter((p): p is PermisoPerfil => Boolean(p));
+                          if (!padre && modulo.padre !== PERMISO_INICIO) return null;
+                          const padreActivo = padre ? marcados.includes(modulo.padre) : true;
+                          return (
+                            <div key={modulo.padre} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                              {padre ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {casilla(padre, false, padreActivo)}
+                                </div>
+                              ) : <p className="text-sm font-bold text-slate-700">Inicio</p>}
+                              {/* La línea vertical es la guía visual de la
                                                 jerarquía: los hijos cuelgan del padre. */}
-                                            <div className="mt-2 ml-3 space-y-1.5 border-l-2 border-slate-300 pl-3">
-                                                {hijos.map((h) => casilla(h, true, padreActivo))}
-                                            </div>
-                                        </div>
-                                    );
-                                };
+                              <div className="mt-2 ml-3 space-y-1.5 border-l-2 border-slate-300 pl-3">
+                                {hijos.map((h) => casilla(h, true, padreActivo))}
+                              </div>
+                            </div>
+                          );
+                        };
 
-                                return (
-                                    <div className="space-y-3">
-                                        <p className="rounded border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">Todos los usuarios activos pueden consultar el Dashboard de su sede y solicitar notas de crédito sobre operaciones autorizadas. Aprobar, emitir, exportar y consultar alcance global requieren sus permisos específicos.</p>
-                                        {MODULOS_CON_SUBMODULOS.map(bloqueModulo)}
-                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                            {otros.map((p) => casilla(p, false, true))}
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-                        </div>
-                    </>
+                        return (
+                          <div className="space-y-3">
+                            <p className="rounded border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">Todos los usuarios activos pueden consultar el Dashboard de su sede y solicitar notas de crédito sobre operaciones autorizadas. Aprobar, emitir, exportar y consultar alcance global requieren sus permisos específicos.</p>
+                            {MODULOS_CON_SUBMODULOS.map(bloqueModulo)}
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              {otros.map((p) => casilla(p, false, true))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </>
                 )}
-                </form>
+              </form>
             </div>
-            
+
             <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-2 rounded-b-xl">
-                <button type="button" onClick={() => {
-                  setShowModal(false);
-                  setFormData((actual: Record<string, unknown>) => ({ ...actual, password: '', confirmPassword: '' }));
-                }} className="px-6 py-2 border border-slate-300 bg-white rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
-                <button type="submit" form="main-form" className="px-6 py-2 bg-[#052a79] text-white rounded-lg font-semibold hover:bg-blue-900 transition-colors shadow-sm disabled:opacity-50" disabled={saving}>
-                    {saving ? 'Guardando...' : 'Guardar'}
-                </button>
+              <button type="button" onClick={() => {
+                setShowModal(false);
+                setFormData((actual: Record<string, unknown>) => ({ ...actual, password: '', confirmPassword: '' }));
+              }} className="px-6 py-2 border border-slate-300 bg-white rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition-colors" disabled={saving}>Cancelar</button>
+              <button type="submit" form="main-form" className="px-6 py-2 bg-[#052a79] text-white rounded-lg font-semibold hover:bg-blue-900 transition-colors shadow-sm disabled:opacity-50" disabled={saving}>
+                {saving ? 'Guardando...' : 'Guardar'}
+              </button>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { ChipScannerInput } from './ChipScannerInput';
 import { parseChipScan } from './chips-ingreso-masivo';
 import { esComprobanteReintentable } from './facturacionReintento';
 import { PagoStep } from '../NuevoCertificado/components/NuevoCertificado/PagoStep';
-import { GestorCuotasCredito } from '../components/GestorCuotasCredito';
+import { actualizarVencimientosCuotas } from '../components/GestorCuotasCredito';
 import { faregasPagosApi } from '../../services/faregas-pagos.api';
 import type { MaestrosPagoResponse } from '@/types/maestros';
 import type { FormPagoState, PagoAgregado } from '../NuevoCertificado/NuevoCertificadoView';
@@ -176,14 +176,16 @@ export function ModalVentaChips({
   const diferenciaCuotas = Math.round((totalCuotasProgramado - saldoAFinanciar) * 100) / 100;
   const cuotasCuadran = Math.abs(diferenciaCuotas) <= toleranciaMonto;
 
+  const periodoCreditoValido = Boolean(fechaInicioCredito && fechaVencimiento && fechaVencimiento >= fechaInicioCredito);
   const creditoValido = Boolean(
     condicionPago === 'CREDITO'
     && tipoComprobante === 'FACTURA'
     && saldoAFinanciar > 0.009
+    && pagosAgregados.length === 0
     && cuotasEfectivas.length > 0
     && cuotasCuadran
     && cuotasEfectivas.every(c => Number(c.importe) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(c.fechaPago))
-    && (!fechaInicioCredito || !fechaVencimiento || fechaVencimiento >= fechaInicioCredito)
+    && periodoCreditoValido
   );
 
   const pagoValido = condicionPago === 'CONTADO' ? pagoCompleto : (validacionCompleta && creditoValido);
@@ -217,7 +219,7 @@ export function ModalVentaChips({
     cantidadCuotas: cuotasEfectivas.length,
     cuotasCuadran,
     cuotasConDatosInvalidos,
-    fechaCreditoValida: !fechaInicioCredito || !fechaVencimiento || fechaVencimiento >= fechaInicioCredito,
+    fechaCreditoValida: periodoCreditoValido,
     spotError
   });
 
@@ -225,8 +227,7 @@ export function ModalVentaChips({
     faregasPagosApi.obtenerMaestros()
       .then(res => setMaestrosPago(res.data))
       .catch(err => {
-        console.error("Error al cargar maestros pago:", err);
-        setErrorPago('No se pudieron cargar los medios de pago.');
+        setErrorPago(err instanceof Error ? err.message : 'No se pudieron cargar los medios de pago. Vuelve a abrir la venta.');
       });
   }, []);
 
@@ -240,7 +241,8 @@ export function ModalVentaChips({
         const inicial = lista.find((producto) => producto.codigo === 'CHIP') || lista[0];
         if (inicial) setProductoInventariableId(inicial.id);
       })
-      .catch(() => setErrorValidacion('No se pudieron cargar los productos disponibles para esta sede.'));
+      .catch((error: unknown) => setErrorValidacion(error instanceof Error ? error.message
+        : 'No se pudieron cargar los productos disponibles. Revisa la sede activa y vuelve a abrir la venta.'));
   }, []);
 
   const limpiarPagos = () => {
@@ -417,6 +419,12 @@ export function ModalVentaChips({
         if (tipoComprobante !== 'FACTURA') {
           throw new Error('Solo las FACTURAS pueden emitirse al crédito.');
         }
+        if (!periodoCreditoValido) {
+          throw new Error('Completa la fecha de inicio y el vencimiento. El vencimiento debe ser igual o posterior al inicio.');
+        }
+        if (pagosAgregados.length) {
+          throw new Error('Retira los medios de pago de caja antes de confirmar una factura a crédito.');
+        }
         if (saldoAFinanciar <= toleranciaMonto) {
           throw new Error('Una venta a crédito debe conservar saldo pendiente.');
         }
@@ -471,6 +479,7 @@ export function ModalVentaChips({
         codigo?: string;
         detalles?: {
           operacionId?: number;
+          operacionEstado?: string;
           ventaRegistrada?: boolean;
           facturacion?: VentaDirectaFacturacion;
         } | string[];
@@ -485,7 +494,7 @@ export function ModalVentaChips({
         const response: VentaDirectaResponse = {
           success: false,
           operacionId: detalles.operacionId,
-          operacionEstado: 'PAGADO',
+          operacionEstado: detalles.operacionEstado || (condicionPago === 'CREDITO' ? 'PENDIENTE_PAGO' : 'PAGADO'),
           facturacion: detalles.facturacion,
           facturacionEstado: detalles.facturacion?.estado || 'ERROR',
           message: e instanceof Error ? e.message : errorConDetalles.message
@@ -750,31 +759,14 @@ export function ModalVentaChips({
               fechaInicioCredito={fechaInicioCredito}
               fechaVencimientoCredito={fechaVencimiento}
               cuotasCredito={cuotasEfectivas}
+              onCuotasCreditoChange={(nuevas) => setCuotas(nuevas.map(cuota => ({ ...cuota, importe: String(cuota.importe) })))}
               onFechaInicioCreditoChange={setFechaInicioCredito}
               onFechaVencimientoCreditoChange={(f) => {
                 setFechaVencimiento(f);
-                if (cuotas.length <= 1) {
-                  setCuotas([{ numeroCuota: 1, fechaPago: f, importe: saldoAFinanciar.toFixed(2) }]);
-                }
+                setCuotas((actuales) => actualizarVencimientosCuotas(actuales, fechaInicioCredito, f));
               }}
               compact
             />
-            {condicionPago === 'CREDITO' && (
-              <div className="mt-4">
-                <GestorCuotasCredito
-                  saldoAFinanciar={saldoAFinanciar}
-                  fechaInicioCredito={fechaInicioCredito}
-                  fechaVencimientoCredito={fechaVencimiento}
-                  cuotas={cuotasEfectivas}
-                  onChangeCuotas={(nuevas) => setCuotas(nuevas.map(c => ({
-                    numeroCuota: c.numeroCuota,
-                    fechaPago: c.fechaPago,
-                    importe: String(c.importe)
-                  })))}
-                  compact
-                />
-              </div>
-            )}
           </fieldset>
         </div>
 

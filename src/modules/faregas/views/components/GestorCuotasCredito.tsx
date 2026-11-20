@@ -51,6 +51,16 @@ export function generarFechasDistribuidas(
   return fechas;
 }
 
+export function actualizarVencimientosCuotas<T extends CuotaCreditoItem>(
+  cuotas: readonly T[],
+  fechaInicio: string,
+  fechaVencimiento: string
+): T[] {
+  if (!cuotas.length) return [];
+  const fechas = generarFechasDistribuidas(fechaInicio, fechaVencimiento, cuotas.length);
+  return cuotas.map((cuota, indice) => ({ ...cuota, fechaPago: fechas[indice] }));
+}
+
 export function distribuirCuotasAutomaticas(
   saldoAFinanciar: number,
   n: 1 | 2 | 3,

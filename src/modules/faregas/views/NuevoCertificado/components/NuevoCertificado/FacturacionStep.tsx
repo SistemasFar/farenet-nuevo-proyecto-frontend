@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState, type Dispatch, type SetStateAction } from 'react';
 import { AlertTriangle, Building2, CheckCircle2, FileText, Loader2, PencilLine, ReceiptText, Send } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { faregasCertificadosApi } from '../../../../services/faregas-certificados.api';
+import { faregasCertificadosApi, leerDiagnosticoContingencia } from '../../../../services/faregas-certificados.api';
 import type { FacturacionContextoFaregas, FacturacionFaregas, ResumenTributarioFaregas } from '../../../../types/faregas-api';
 import type { FormFacturacionState } from '../../NuevoCertificadoView';
 import { DocumentosElectronicosPanel } from './DocumentosElectronicosPanel';
@@ -352,6 +352,7 @@ interface FacturacionStepProps {
    * EDITAR EN TITULARES se traslada a la cabecera, así que no se pierde.
    */
   mostrarCliente?: boolean;
+  ocultarDetalleProveedor?: boolean;
 }
 
 interface ResultadoPreflightFacturacion {
@@ -381,6 +382,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
   mostrarBotonEmision = true,
   mostrarEncabezado = true,
   mostrarCliente = true,
+  ocultarDetalleProveedor = false,
 }, ref) {
   const [isLoading, setIsLoading] = useState(Boolean(certificadoId));
 
@@ -542,10 +544,11 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
 
     setIsEmitting(true);
     try {
-      // ERROR/PENDIENTE ya tienen serie reservada y deben reintentarse con el
-      // mismo contenido para no generar un comprobante diferente.
+      // ERROR/PENDIENTE/RECHAZADO o con correlativo ya tienen serie reservada y deben reintentarse
+      // con el mismo contenido para no generar un comprobante diferente.
       let resumenActual = resumenTributario;
-      if (facturacion?.estado !== 'ERROR' && facturacion?.estado !== 'PENDIENTE') {
+      const tieneCorrelativoReservado = Boolean(facturacion?.nroComprobante || (facturacion?.serie && facturacion?.numero !== null));
+      if (!['ERROR', 'PENDIENTE', 'RECHAZADO'].includes(facturacion?.estado || '') && !tieneCorrelativoReservado) {
         const contexto = await guardar(false);
         resumenActual = contexto.resumenTributario;
       }
@@ -577,6 +580,13 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
       return emitida;
     } catch (error: unknown) {
       if (propagarErrores) throw error;
+      const diagnostico = leerDiagnosticoContingencia(error);
+      if (diagnostico) {
+        const texto = [diagnostico.proveedor, diagnostico.categoria, diagnostico.codigoProveedor,
+          diagnostico.descripcion, diagnostico.seguimiento].filter(Boolean).join(' · ');
+        await Swal.fire('No se emitió el comprobante', texto, 'error');
+        return null;
+      }
       const detalle = detallesError(error) || mensajeError(error, 'Revise la configuracion o respuesta de Nubefact.');
       await Swal.fire('No se emitio el comprobante', detalle, 'error');
       return null;
@@ -624,7 +634,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
             <ul className="mt-1 list-disc space-y-0.5 pl-4">{preflight.checks.filter(check => check.estado !== 'OK').map(check => <li key={check.codigo}>{check.mensaje}</li>)}</ul>
           </div>
         )}
-        {facturacion?.sunatDescription && facturacion.estado !== 'ACEPTADO' && (
+        {!ocultarDetalleProveedor && facturacion?.sunatDescription && facturacion.estado !== 'ACEPTADO' && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-[10px] text-red-700">{facturacion.sunatDescription}</div>
         )}
         {integracion?.simulationEnabled ? (
@@ -785,7 +795,7 @@ export const FacturacionStep = forwardRef<FacturacionStepHandle, FacturacionStep
           </div>
         )}
 
-        {facturacion?.sunatDescription && facturacion.estado !== 'ACEPTADO' && (
+        {!ocultarDetalleProveedor && facturacion?.sunatDescription && facturacion.estado !== 'ACEPTADO' && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{facturacion.sunatDescription}</div>
         )}
 

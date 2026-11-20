@@ -55,9 +55,7 @@ export function PreviewCertificadoCompacto({
   error,
   frameRef,
   onPrint,
-  onDownload,
   mostrarImprimir,
-  downloading,
   emitted,
   altoPreview = 'h-[44vh] min-h-[320px]',
 }: {
@@ -66,9 +64,7 @@ export function PreviewCertificadoCompacto({
   error: string;
   frameRef: RefObject<HTMLIFrameElement | null>;
   onPrint: () => void;
-  onDownload: () => void;
   mostrarImprimir: boolean;
-  downloading: boolean;
   emitted: boolean;
   /** Altura del iframe. Sólo presentación: el contenido no cambia. */
   altoPreview?: string;
@@ -89,14 +85,9 @@ export function PreviewCertificadoCompacto({
         <div className="flex items-center gap-2">
           {!emitted && <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-black text-amber-800">PENDIENTE DE EMISIÓN</span>}
           {mostrarImprimir && (
-            <>
-              <button type="button" onClick={onPrint} disabled={!html || loading} className="inline-flex items-center gap-1.5 rounded-md bg-amber-400 px-2.5 py-1.5 text-[10px] font-black text-slate-900 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50">
-                <Printer className="h-3.5 w-3.5" /> IMPRIMIR CERTIFICADO
-              </button>
-              <button type="button" onClick={onDownload} disabled={!html || loading || downloading} className="inline-flex items-center gap-1.5 rounded-md border border-white/40 bg-white px-2.5 py-1.5 text-[10px] font-black text-[#052a79] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
-                {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} DESCARGAR CERTIFICADO
-              </button>
-            </>
+            <button type="button" onClick={onPrint} disabled={!html || loading} className="inline-flex items-center gap-1.5 rounded-md bg-amber-400 px-2.5 py-1.5 text-[10px] font-black text-slate-900 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50">
+              <Printer className="h-3.5 w-3.5" /> IMPRIMIR CERTIFICADO
+            </button>
           )}
         </div>
       </div>
@@ -407,9 +398,7 @@ export const VerificacionStep = forwardRef<VerificacionStepHandle, VerificacionS
           error={certificadoError}
           frameRef={certificadoFrameRef}
           onPrint={imprimirCertificado}
-          onDownload={() => void descargarCertificado()}
           mostrarImprimir={Boolean(resultadoVisible || certificadoEstado === 'EMITIDO')}
-          downloading={isDownloadingCertificado}
           emitted={Boolean(resultadoVisible || certificadoEstado === 'EMITIDO')}
           altoPreview={altoPreview}
         />

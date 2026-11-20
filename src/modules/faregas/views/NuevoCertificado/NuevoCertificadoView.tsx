@@ -12,6 +12,7 @@ import type { MaestrosCajaResponse, MaestrosPagoResponse, MaestrosVehiculoRespon
 import { CheckCircle2, FileText, CreditCard, ArrowLeft, Search, Loader2, Save, Eye, PencilLine, History, Send } from 'lucide-react';
 import { CajaStep } from './components/NuevoCertificado/CajaStep';
 import { PagoStep } from './components/NuevoCertificado/PagoStep';
+import { actualizarVencimientosCuotas } from '../components/GestorCuotasCredito';
 import { VehiculoStep } from './components/NuevoCertificado/VehiculoStep';
 import { TallerStep } from './components/NuevoCertificado/TallerStep';
 import { CertificateChipSection } from './components/NuevoCertificado/CertificateChipSection';
@@ -3417,12 +3418,11 @@ function NuevoCertificadoWizard() {
               onFechaVencimientoCreditoChange={(fecha) => {
                 limpiarErrorCampo('fechaVencimientoCredito');
                 limpiarErrorCampo('cuotas');
-                setFormFacturacion((prev) => {
-                  const cuotasActualizadas = prev.cuotasFac.length <= 1
-                    ? prev.cuotasFac.map((c) => ({ ...c, fechaPago: fecha }))
-                    : prev.cuotasFac;
-                  return { ...prev, fechaVencimientoFac: fecha, cuotasFac: cuotasActualizadas };
-                });
+                setFormFacturacion((prev) => ({
+                  ...prev,
+                  fechaVencimientoFac: fecha,
+                  cuotasFac: actualizarVencimientosCuotas(prev.cuotasFac, prev.fechaInicioCreditoFac, fecha),
+                }));
               }}
             />
           )}

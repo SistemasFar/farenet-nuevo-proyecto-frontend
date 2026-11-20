@@ -370,6 +370,7 @@ export const puedeCrearNotaCreditoPanel = (item: BorradorPanel, permisos: string
 };
 
 export const puedeSolicitarNotaCreditoPanel = (item: BorradorPanel, hoyLima = obtenerFechaHoyLima()) => {
+  if (certificadoImporteFinalCero(item)) return false;
   if (!fechaFiscalEsAnteriorALima(item.fechaDocumentoFiscal, hoyLima)) return false;
 
   if (esSolicitudActivaAnulacion(item.solicitudOperacionEstado) || esSolicitudCompletadaAnulacion(item.solicitudOperacionEstado)) return false;
@@ -380,7 +381,7 @@ export const puedeSolicitarNotaCreditoPanel = (item: BorradorPanel, hoyLima = ob
 };
 
 export const motivoNotaCreditoNoDisponible = (item: BorradorPanel, permisos: string[], hoyLima = obtenerFechaHoyLima()): string | null => {
-  if (!permisos.includes('FAREGAS_NOTA_CREDITO')) return null;
+  if (certificadoImporteFinalCero(item) || !permisos.includes('FAREGAS_NOTA_CREDITO')) return null;
   if (!item.facturacionId) return 'Sin comprobante fiscal asociado.';
   if (!parsearFechaFiscal(item.fechaDocumentoFiscal)) return 'Falta una fecha fiscal verificable; no se habilitan acciones fiscales.';
   if (!fechaFiscalEsAnteriorALima(item.fechaDocumentoFiscal, hoyLima)) return 'La nota de crédito se habilita desde el día siguiente a la fecha fiscal de emisión.';
@@ -869,7 +870,7 @@ export function InicioView() {
                 onClick={() => navigate('/faregas/auditoria/solicitudes')}
                 className="rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-100"
               >
-                Solicitudes de anulación
+                Solicitudes para revisión
               </button>
             )}
             <button
@@ -1107,9 +1108,7 @@ export function InicioView() {
                                   : undefined
                               )}
                               title={certificadoAnulacionBloqueadaPorImporte(ins)
-                                ? (ins.anulacionImporteNoDeterminable === true
-                                  ? 'Solo corrección: no se pudo determinar el importe final del certificado'
-                                  : 'Solo corrección: el importe final es S/ 0.00 y no admite notas de anulación')
+                                ? 'Solo corrección: no se pudo determinar el importe final del certificado'
                                 : 'Crear nota de crédito'}
                               className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[#052A79] hover:bg-violet-100 disabled:opacity-50"
                             ><FileEdit size={16} /></button>
@@ -1142,7 +1141,7 @@ export function InicioView() {
                               {etiquetaSolicitudOperacionPanel(ins)}
                             </button>
                           )}
-                          {!solicitudCompletada && accionesCongeladas && tienePermisoNotaCredito && (
+                          {!solicitudCompletada && accionesCongeladas && tienePermisoNotaCredito && !certificadoImporteFinalCero(ins) && (
                             <button
                               type="button"
                               disabled
@@ -1299,7 +1298,7 @@ export function InicioView() {
                       )}
                     </div>
                   )}
-                  {!solicitudCompletada && (puedeSolicitarNotaCreditoPanel(ins) || puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar || motivoAccionFiscal) && (
+                  {!solicitudCompletada && (puedeSolicitarNotaCreditoPanel(ins) || puedeCrearNotaCredito || accionesCongeladas || puedeSolicitar || motivoAccionFiscal || (anulacionBloqueadaPorImporte && !solicitudActiva)) && (
                     <div className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
                       {anulacionPendiente && ins.anulacionId && (
                         <button

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { faregasFetchBlob, faregasFetchWithStatus } from './faregas-http-client';
+import { faregasFetchBlob, faregasFetchWithStatus, leerErrorFaregas } from './faregas-http-client';
 
 describe('faregasFetchBlob', () => {
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('faregasFetchBlob', () => {
       .rejects.toMatchObject({ status: 502, message: expect.stringContaining('HTTP 502') });
   });
 
-  it.each([401, 403, 409, 422, 500])('conserva el estado y el mensaje HTTP %i del backend', async (status) => {
+  it.each([401, 403, 409, 422])('conserva el estado y el mensaje HTTP %i del backend', async (status) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
       message: `Error controlado ${status}`,
       codigo: `CASO_${status}`,
@@ -76,5 +76,48 @@ describe('faregasFetchBlob', () => {
 
     await expect(faregasFetchWithStatus('/certificados/borradores/821/vehiculo'))
       .rejects.toMatchObject({ status, message: `Error controlado ${status}`, codigo: `CASO_${status}` });
+  });
+});
+
+describe('avisos compartidos de FAREGAS', () => {
+  const respuesta = (status: number, data: unknown, headers?: HeadersInit) =>
+    new Response(JSON.stringify(data), { status, headers });
+
+  it('conserva la causa y explica cómo revisar los permisos de sede', async () => {
+    const error = await leerErrorFaregas(respuesta(403, {
+      message: 'No tienes acceso a la sede de este certificado.', code: 'PLANTA_NO_AUTORIZADA',
+    }));
+    expect(error.message).toContain('No tienes acceso a la sede de este certificado.');
+    expect(error.message).toContain('Verifica la sede activa');
+    expect(error.codigo).toBe('PLANTA_NO_AUTORIZADA');
+  });
+
+  it('incluye validaciones por campo sin alterar los detalles que usan los formularios', async () => {
+    const detalles = { errores: [{ campo: 'placa', mensaje: 'La placa es obligatoria.' }] };
+    const error = await leerErrorFaregas(respuesta(422, { message: 'Revisa los datos del vehículo.', detalles }));
+    expect(error.detalles).toEqual(detalles);
+    expect(error.message).toContain('La placa es obligatoria.');
+  });
+
+  it('explica el motivo fiscal confirmado de la nota', async () => {
+    const error = await leerErrorFaregas(respuesta(422, {
+      codigo: 'NUBEFACT_NOTA_NO_ACEPTADA',
+      message: 'NubeFact rechazó la nota.',
+      detalles: { contingencia: {
+        descripcion: 'El proveedor comunicó un rechazo fiscal.',
+        mensajeOriginalNormalizado: 'El documento referenciado no está registrado.',
+      } },
+    }));
+    expect(error.message).toContain('El documento referenciado no está registrado.');
+    expect(error.message).toContain('Abre el historial de la nota');
+  });
+
+  it('muestra la referencia de soporte sin publicar un error interno de PostgreSQL', async () => {
+    const error = await leerErrorFaregas(respuesta(500, { message: 'relation persona does not exist' }, {
+      'X-FAREGAS-Referencia': 'prueba-123',
+    }));
+    expect(error.referencia).toBe('prueba-123');
+    expect(error.message).toContain('Referencia prueba-123');
+    expect(error.message).not.toContain('persona');
   });
 });

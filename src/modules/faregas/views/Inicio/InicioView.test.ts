@@ -20,6 +20,7 @@ import {
   etiquetaSolicitudOperacionPanel,
   puedeSolicitarAnulacionCertificado,
   puedeCrearNotaCreditoPanel,
+  puedeSolicitarNotaCreditoPanel,
   motivoNotaCreditoNoDisponible,
   certificadoImporteFinalCero,
   certificadoAnulacionBloqueadaPorImporte,
@@ -149,7 +150,7 @@ describe('InicioView - tieneCertificadoDefinitivo y visualización del número D
     const auditoriaCode = fs.readFileSync(path.resolve(__dirname, '../Auditoria/AuditoriaView.tsx'), 'utf8');
     const usuariosCode = fs.readFileSync(path.resolve(__dirname, '../Usuarios/UsuariosView.tsx'), 'utf8');
 
-    expect(inicioViewCode).toContain('Solicitudes de anulación');
+    expect(inicioViewCode).toContain('Solicitudes para revisión');
     expect(inicioViewCode).toContain("navigate('/faregas/auditoria/solicitudes')");
     expect(inicioViewCode).not.toContain('Mis solicitudes');
     expect(auditoriaCode).not.toContain('Solicitudes de Anulación y Rectificación');
@@ -382,12 +383,21 @@ describe('InicioView - simulación temporal y aislada de Nota de Crédito', () =
 
 
 describe('solicitud universal de nota de crédito', () => {
-  it('permite solicitar sin permiso de emisión y conserva restricciones fiscales', async () => {
-    const { puedeSolicitarNotaCreditoPanel, puedeCrearNotaCreditoPanel } = await import('./InicioView');
+  it('permite solicitar sin permiso de emisión y conserva restricciones fiscales', () => {
     const item: BorradorPanel = { id: 10, estado: 'EMITIDO', numeroCertificado: 'DG-TEST', facturacionId: 20, estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, fechaDocumentoFiscal: '2026-11-16', nroComprobante: 'BTEST-1' };
     expect(puedeSolicitarNotaCreditoPanel(item, '2026-11-17')).toBe(true);
     expect(puedeCrearNotaCreditoPanel(item, [], '2026-11-17')).toBe(false);
     expect(puedeSolicitarNotaCreditoPanel({ ...item, solicitudOperacionEstado: 'PENDIENTE_APROBACION' }, '2026-11-17')).toBe(false);
     expect(puedeSolicitarNotaCreditoPanel(item, '2026-11-16')).toBe(false);
+  });
+
+  it.each([{ importeFinal: '0.00' }, { anulacionImporteCero: true }])('oculta las nuevas notas de crédito para %j', (importe) => {
+    const item: BorradorPanel = { id: 10, estado: 'EMITIDO', facturacionId: 20, estadoFacturacion: 'ACEPTADO', aceptadaSunat: true, fechaDocumentoFiscal: '2026-11-16', nroComprobante: 'BTEST-1' };
+    const permisos = ['FAREGAS_NOTA_CREDITO'];
+    const fechaSiguiente = '2026-11-17';
+    expect(puedeSolicitarNotaCreditoPanel({ ...item, importeFinal: '12.00' }, fechaSiguiente)).toBe(true);
+    expect(puedeSolicitarNotaCreditoPanel({ ...item, ...importe }, fechaSiguiente)).toBe(false);
+    expect(puedeCrearNotaCreditoPanel({ ...item, ...importe }, permisos, fechaSiguiente)).toBe(false);
+    expect(motivoNotaCreditoNoDisponible({ ...item, ...importe }, permisos, '2026-11-16')).toBeNull();
   });
 });

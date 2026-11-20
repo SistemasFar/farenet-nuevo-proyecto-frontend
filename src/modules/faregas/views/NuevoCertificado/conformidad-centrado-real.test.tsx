@@ -87,15 +87,15 @@ describe('FAREGAS — Verificación de Centrado y Ausencia de ReferenceError', (
           error=""
           frameRef={{ current: null }}
           onPrint={() => {}}
-          onDownload={() => {}}
           mostrarImprimir={true}
-          downloading={false}
           emitted={true}
         />
       );
     }).not.toThrow();
 
     expect(markup).toContain('Documento definitivo');
+    expect(markup).toContain('IMPRIMIR CERTIFICADO');
+    expect(markup).not.toContain('DESCARGAR CERTIFICADO');
     expect(markup).toContain('<iframe');
     // Verifica que el iframe contiene el html normalizado con la regla de centrado
     expect(markup).toContain('faregas-preview-centrado');
@@ -114,9 +114,7 @@ describe('FAREGAS — Verificación de Centrado y Ausencia de ReferenceError', (
           error=""
           frameRef={{ current: null }}
           onPrint={() => {}}
-          onDownload={() => {}}
           mostrarImprimir={false}
-          downloading={false}
           emitted={false}
         />
       );

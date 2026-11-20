@@ -50,6 +50,12 @@ export interface PagoDuplicadoItem {
   fechaDeposito?: string;
 }
 
+interface CuotaDuplicado {
+  numeroCuota: number;
+  fechaPago: string;
+  importe: number;
+}
+
 export interface SolicitudDuplicado {
   id: number;
   certificadoOriginalId: number;
@@ -64,6 +70,8 @@ export interface SolicitudDuplicado {
   estado: 'PENDIENTE_PAGO' | 'PENDIENTE_COMPROBANTE' | 'DISPONIBLE' | 'ANULADO';
   operacionEstado: string;
   facturacionEstado: string | null;
+  planConfirmado?: boolean;
+  clienteFacturacion?: ClienteDuplicado | null;
   nroComprobante: string | null;
   tipoComprobante: 'BOLETA' | 'FACTURA' | null;
   fechaSolicitud: string | null;
@@ -72,6 +80,10 @@ export interface SolicitudDuplicado {
   enlacePdf?: string | null;
   enlacePdfFaregas?: string | null;
   pagos?: PagoDuplicadoItem[];
+  condicionPago?: 'CONTADO' | 'CREDITO';
+  fechaInicioCredito?: string | null;
+  fechaVencimiento?: string | null;
+  cuotas?: CuotaDuplicado[];
 }
 
 export interface VistaDuplicado {
@@ -108,9 +120,11 @@ export interface ProcesarDuplicadoRequest {
     direccion: string;
     email: string | null;
     telefono: string | null;
-    condicionPago: 'CONTADO';
-    cuotas: [];
-    medioPago: string;
+    condicionPago: 'CONTADO' | 'CREDITO';
+    fechaInicioCredito?: string | null;
+    fechaVencimiento?: string | null;
+    cuotas: CuotaDuplicado[];
+    medioPago: string | null;
   };
 }
 

@@ -10,6 +10,8 @@ import type {
   BuscarInspeccionesResponse
 } from '@/types/operacion';
 
+import { leerErrorFaregas } from '@/modules/faregas/services/faregas-http-client';
+
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
   '/api';
@@ -42,21 +44,18 @@ async function getErrorMessage(
   if (response.status === 401) {
     return 'Sesión expirada o no autenticada. Vuelva a iniciar sesión.';
   }
-  if (response.status === 403) {
-    return 'No tiene permisos para acceder a inspecciones de esta planta.';
-  }
-  if (response.status === 404) {
-    return 'No se encontró la inspección.';
-  }
-  if (response.status === 500) {
-    return 'Error interno al cargar Línea. Revise backend.';
+  if (response.status >= 500) {
+    return defaultMessage + ' El servidor no pudo completar la operación. Comunícate con Sistemas.';
   }
 
   const errorData = await response
     .json()
     .catch(() => ({}));
 
-  return errorData.message || defaultMessage;
+  if (errorData.message) return errorData.message;
+  if (response.status === 403) return defaultMessage + ' Verifica tus permisos y la sede activa.';
+  if (response.status === 404) return defaultMessage + ' Actualiza el listado y verifica el registro solicitado.';
+  return defaultMessage;
 }
 
 async function fetchWithTimeout(
@@ -1321,8 +1320,7 @@ export const authFaregasApi = {
       body: JSON.stringify({ username, password })
     });
     if (!response.ok) {
-      const error = await getErrorMessage(response, 'Error en inicio de sesión FAREGAS');
-      throw new Error(error);
+      throw await leerErrorFaregas(response);
     }
     return response.json();
   },
@@ -1336,8 +1334,7 @@ export const authFaregasApi = {
       body: JSON.stringify({ plantaKey })
     });
     if (!response.ok) {
-      const error = await getErrorMessage(response, 'Error al confirmar planta en FAREGAS');
-      throw new Error(error);
+      throw await leerErrorFaregas(response);
     }
     return response.json();
   },
@@ -1351,8 +1348,7 @@ export const authFaregasApi = {
       body: JSON.stringify({ plantaKey })
     });
     if (!response.ok) {
-      const error = await getErrorMessage(response, 'Error al cambiar de planta en FAREGAS');
-      throw new Error(error);
+      throw await leerErrorFaregas(response);
     }
     return response.json();
   },
@@ -1364,8 +1360,7 @@ export const authFaregasApi = {
       }
     });
     if (!response.ok) {
-      const error = await getErrorMessage(response, 'La sesión FAREGAS expiró o ya no es válida');
-      throw new Error(error);
+      throw await leerErrorFaregas(response);
     }
     return response.json();
   },
@@ -1390,8 +1385,7 @@ export const authFaregasApi = {
       })
     });
     if (!response.ok) {
-      const error = await getErrorMessage(response, 'Error al cambiar contraseña en FAREGAS');
-      throw new Error(error);
+      throw await leerErrorFaregas(response);
     }
     return response.json();
   }

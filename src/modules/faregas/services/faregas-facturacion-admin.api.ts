@@ -72,7 +72,32 @@ export interface FiltrosFacturacionAdmin {
   limite?: number;
 }
 
+export interface TrabajoContingenciaAdmin {
+  facturacion_id: string;
+  certificado_id: string;
+  numero_certificado: string | null;
+  nro_comprobante: string | null;
+  planta_key: string;
+  estado: string;
+  estado_fiscal: string;
+  diagnostico: { categoria?: string; seguimiento?: string };
+  intentos: number;
+  ultimo_intento: string | null;
+  siguiente_intento: string;
+  ultimo_resultado: string | null;
+  correo_estado: string;
+  correo_intentos: number;
+  correo_ultimo_error: string | null;
+  fecha_regularizacion: string | null;
+  prioridad: boolean;
+}
+
 export const faregasFacturacionAdminApi = {
+  listarContingencia: (estado: string, pagina: number) => {
+    const query = new URLSearchParams({ estado, pagina: String(pagina) });
+    return request<{ data: { habilitada: boolean; items: TrabajoContingenciaAdmin[]; hayMas?: boolean } }>('/facturacion/admin/contingencia?' + query);
+  },
+  reintentarContingencia: (id: string) => faregasFetch('/certificados/facturacion/admin/contingencia/' + id + '/reintentar', { method: 'POST' }),
   listar: async (filtros: FiltrosFacturacionAdmin) => {
     const params = new URLSearchParams();
     Object.entries(filtros).forEach(([key, value]) => {
