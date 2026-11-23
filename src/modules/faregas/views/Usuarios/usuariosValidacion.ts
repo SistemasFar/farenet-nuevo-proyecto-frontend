@@ -46,6 +46,7 @@ export const DIRECCION_MAXIMA = 500;
 export const EMAIL_MAXIMO = 120;      // mas estricto que el varchar(150) de persona.email
 export const TELEFONO_MAXIMO = 9;    // exactamente 9 digitos, sin signos ni espacios
 export const USERNAME_MAXIMO = 255; // fg_usuario.username
+const USERNAME_MAXIMO_ALTA = 100; // columnas de inventario y custodia
 
 export interface ReglaDocumento {
   longitud: number | null;
@@ -129,15 +130,15 @@ export function validarDocumento(tipoKey: string, valor: string): string | null 
  * formulario (`[a-zA-Z0-9_.-]`); sólo se le añade el trim y el rechazo de
  * "sólo espacios", que antes pasaban.
  */
-export function validarUsername(valor: string): string | null {
+export function validarUsername(valor: string, maximo = USERNAME_MAXIMO): string | null {
   const username = texto(valor);
   if (!username) return 'El username es obligatorio.';
   if (!RE_USERNAME.test(username)) {
     return 'El username admite letras, números, punto, guion y guion bajo.';
   }
   if (username.length < 3) return 'El username debe tener al menos 3 caracteres.';
-  if (username.length > USERNAME_MAXIMO) {
-    return `El username no puede superar los ${USERNAME_MAXIMO} caracteres.`;
+  if (username.length > maximo) {
+    return `El username no puede superar los ${maximo} caracteres.`;
   }
   return null;
 }
@@ -342,7 +343,7 @@ export function validarFormularioUsuario(
   const errores: ErroresUsuario = {};
   const esCrear = modo !== 'editar';
 
-  const errorUsername = validarUsername(form.username || '');
+  const errorUsername = validarUsername(form.username || '', esCrear ? USERNAME_MAXIMO_ALTA : USERNAME_MAXIMO);
   if (errorUsername) errores.username = errorUsername;
 
   const tipoDocumentoKey = texto(form.tipoDocumentoKey);

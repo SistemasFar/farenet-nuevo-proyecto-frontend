@@ -134,6 +134,20 @@ describe('Edición y guardado de usuarios y perfiles FAREGAS', () => {
     expect(nombresInput).not.toBeNull();
   });
 
+  it('ignora un segundo envío antes de que responda el primero', async () => {
+    let completar!: (valor: { username: string }) => void;
+    api.actualizarUsuario.mockImplementationOnce(() => new Promise(resolve => { completar = resolve; }));
+    const editar = host.querySelector<HTMLButtonElement>('button[title="Editar"]')!;
+    await act(async () => { editar.click(); });
+    const formulario = host.querySelector<HTMLFormElement>('#main-form')!;
+    await act(async () => {
+      formulario.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      formulario.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(api.actualizarUsuario).toHaveBeenCalledTimes(1);
+    await act(async () => { completar({ username: 'wdonayre' }); });
+  });
+
   it('si falla la validación local, muestra banner de error sin cerrar el modal', async () => {
     const editBtn = host.querySelector('button[title="Editar"]') as HTMLButtonElement;
     await act(async () => {

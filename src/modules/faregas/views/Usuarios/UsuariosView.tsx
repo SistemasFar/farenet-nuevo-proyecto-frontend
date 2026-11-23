@@ -84,6 +84,7 @@ export function UsuariosView() {
       <p className="mt-1 text-[11px] font-semibold text-red-600">{erroresCampo[campo]}</p>
     ) : null;
   const [saving, setSaving] = useState(false);
+  const guardadoEnCurso = useRef(false);
   const [crearNuevaPassword, setCrearNuevaPassword] = useState(false);
   const [mostrarPassword, setMostrarPassword] = useState(false);
   const [mostrarConfirmPassword, setMostrarConfirmPassword] = useState(false);
@@ -528,6 +529,7 @@ ${separador}
 
   const handleSaveUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (guardadoEnCurso.current) return;
     setError('');
 
     // Se valida el formulario COMPLETO antes de tocar la red. Si algo falla no
@@ -561,6 +563,7 @@ ${separador}
       `La contraseña actual de ${formData.username} dejará de funcionar y se revocarán sus sesiones activas. La nueva contraseña quedará disponible una sola vez para descargar. ¿Confirmar?`
     )) return;
 
+    guardadoEnCurso.current = true;
     setSaving(true);
     try {
       const payloadUsuario = { ...formData };
@@ -592,8 +595,9 @@ ${separador}
       // la validación local para que el mensaje no se pierda.
       const delBackend = e.errores || e.response?.data?.errores;
       if (delBackend && typeof delBackend === 'object') setErroresCampo(delBackend);
-      setError(e.response?.data?.message || e.message || 'Error al guardar');
+      setError(e.response?.data?.message || e.message || 'No se pudo completar el registro del usuario.');
     } finally {
+      guardadoEnCurso.current = false;
       setSaving(false);
     }
   };
