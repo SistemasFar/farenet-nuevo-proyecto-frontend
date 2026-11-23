@@ -116,7 +116,15 @@ export default function App() {
     window.addEventListener('updatePlantasDisponibles', handleUpdate);
     return () => window.removeEventListener('updatePlantasDisponibles', handleUpdate);
   }, []);
-  const handleLogoutFaregas = useCallback(() => {
+  const handleLogoutFaregas = useCallback(async () => {
+    const fToken = sessionStorage.getItem('faregasAccessToken');
+    if (fToken) {
+      try {
+        await authFaregasApi.logoutAsync(fToken);
+      } catch (err) {
+        console.warn('[FAREGAS] Advertencia al revocar sesión en backend:', err);
+      }
+    }
     sessionStorage.removeItem('faregasAccessToken');
     sessionStorage.removeItem('faregasUser');
     sessionStorage.removeItem('faregasPlanta');

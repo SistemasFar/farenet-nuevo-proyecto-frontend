@@ -1388,5 +1388,18 @@ export const authFaregasApi = {
       throw await leerErrorFaregas(response);
     }
     return response.json();
+  },
+  logoutAsync: async (token: string): Promise<any> => {
+    const response = await fetchWithTimeout(`${BASE_URL}/faregas/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!response.ok) {
+      throw await leerErrorFaregas(response);
+    }
+    return response.json();
   }
 };
