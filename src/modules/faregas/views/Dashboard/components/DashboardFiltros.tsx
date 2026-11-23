@@ -76,8 +76,8 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
 
         {/* Acciones principales */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50 text-sm font-medium">
-            {puedeVerGlobal && (
+          {puedeVerGlobal && (
+            <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50 text-sm font-medium">
               <button
                 type="button"
                 onClick={() => onCambiarFiltros({ alcance: 'GLOBAL', plantaKey: undefined })}
@@ -90,20 +90,8 @@ export const DashboardFiltros: React.FC<DashboardFiltrosProps> = ({
               >
                 Global Multi-Sede
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => onCambiarFiltros({ alcance: 'SEDE', plantaKey: undefined })}
-              aria-pressed={filtros.alcance === 'SEDE'}
-              className={`px-3 py-1.5 rounded-md transition ${
-                filtros.alcance === 'SEDE'
-                  ? 'bg-blue-700 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Por Sede
-            </button>
-          </div>
+            </div>
+          )}
 
           <button
             type="button"

@@ -171,7 +171,7 @@ describe('Dashboard FAREGAS — Fase B', () => {
     expect(tieneAccesoDashboard(['DASHBOARD_EXPORTAR'])).toBe(false);
   });
 
-  it('muestra Por Sede a cualquier usuario autorizado y reserva Global/Reportes a sus permisos', () => {
+  it('omite el botón Por Sede y reserva Global/Reportes a sus permisos', () => {
     const html = renderToStaticMarkup(
       <DashboardFiltros
         filtros={{ alcance: 'SEDE', desde: '2026-11-01', hasta: '2026-11-06' }}
@@ -185,7 +185,7 @@ describe('Dashboard FAREGAS — Fase B', () => {
         puedeExportar={false}
       />
     );
-    expect(html).toContain('Por Sede');
+    expect(html).not.toContain('Por Sede');
     expect(html).not.toContain('Global Multi-Sede');
     expect(html).not.toContain('Reportes financieros');
   });
@@ -204,7 +204,7 @@ describe('Dashboard FAREGAS — Fase B', () => {
         puedeExportar
       />
     );
-    expect(html).toContain('Por Sede');
+    expect(html).not.toContain('Por Sede');
     expect(html).toContain('Global Multi-Sede');
     expect(html).toContain('Reportes financieros');
   });
