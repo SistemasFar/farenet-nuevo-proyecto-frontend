@@ -8,14 +8,7 @@ import { ForbiddenView } from './core/views/ForbiddenView';
 import { resolverRutaInicialFaregas, tieneAccesoRutaFaregas } from './modules/faregas/utils/navegacion-permisos';
 import { SeleccionEmpresaView } from './core/views/SeleccionEmpresaView';
 
-import { MainLayout } from './modules/farenet/views/Dashboard/MainLayout';
-import { InicioView } from './modules/farenet/views/Inicio/InicioView';
-import { AuditoriaView } from './modules/farenet/views/Auditoria/AuditoriaView';
-import { GenericView } from './modules/farenet/views/Dashboard/GenericView';
-import InspeccionesView from './modules/farenet/views/Inspecciones/InspeccionesView';
-import { NuevaInspeccionView } from './modules/farenet/views/NuevaInspeccion/NuevaInspeccionView';
-import { NuevoDuplicadoView } from './modules/farenet/views/NuevoDuplicado/NuevoDuplicadoView';
-import { LineaView } from './modules/farenet/views/Linea';
+
 
 import { MainLayout as FaregasMainLayout } from './modules/faregas/views/Dashboard/MainLayout';
 import { tieneAccesoDashboard } from './modules/faregas/views/Dashboard/dashboard-config';
@@ -515,26 +508,7 @@ export default function App() {
     }, 0);
   };
 
-  const handleCambiarPlanta = async (plantaKey: string) => {
-    if (!user?.username) {
-      throw new Error('No se encontró usuario activo.');
-    }
 
-    const resp = await authApi.cambiarPlantaAsync(user.username, plantaKey);
-
-    if (!resp.plantaSeleccionada) {
-      throw new Error('El backend no retornó la nueva sede.');
-    }
-
-    const permisosActualizados = resp.permisos || permisos;
-    if (resp.accessToken) {
-      sessionStorage.setItem('accessToken', resp.accessToken);
-    }
-    plantaSession.guardar(resp.plantaSeleccionada);
-    permisosSession.guardar(permisosActualizados);
-    setPlanta(resp.plantaSeleccionada);
-    setPermisos(permisosActualizados);
-  };
 
   const handleCambiarPlantaFaregas = async (plantaKey: string) => {
     const token = faregasAccessToken || sessionStorage.getItem('faregasAccessToken');
@@ -849,46 +823,9 @@ export default function App() {
         }
       />
 
-      {rutasFarenetHabilitadas && (
-        <Route
-          element={
-            !isDashboardReady ? (
-              <Navigate to="/login" replace />
-            ) : isFaregas ? (
-              <Navigate to={resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso'} replace />
-            ) : (
-              <MainLayout
-                user={user}
-                permisos={permisos}
-                plantaSeleccionada={planta}
-                plantasDisponibles={plantasDisponibles}
-                onCambiarPlanta={handleCambiarPlanta}
-                onLogout={handleLogout}
-              />
-            )
-          }
-        >
-          <Route path="inicio" element={<InicioView />} />
-          <Route path="inspecciones" element={<InspeccionesView />} />
-          <Route path="inspecciones/nueva" element={<NuevaInspeccionView />} />
-          <Route path="inspecciones/:nroInspeccion/continuar" element={<NuevaInspeccionView />} />
-          <Route path="inspecciones/duplicado" element={<NuevoDuplicadoView />} />
-          <Route path="linea/:nroInspeccion" element={<LineaView />} />
-          <Route path="auditoria" element={<AuditoriaView />} />
-          <Route path="maestros/personas" element={<GenericView title="Control de Personas" description="Administración de clientes, inspectores y personal autorizado." />} />
-          <Route path="maestros/vehiculos" element={<GenericView title="Registro de Vehículos" description="Búsqueda e historial vehicular filtrado." />} />
-          <Route path="maestros/caja" element={<GenericView title="Módulo de Caja" description="Control de cobros, cierres de caja diaria y transacciones." />} />
-          <Route path="maestros/correlativos" element={<GenericView title="Gestión de Correlativos" description="Mantenimiento de numeración y series de comprobantes." />} />
-          <Route path="maestros/recibos" element={<GenericView title="Historial de Recibos" description="Búsqueda, visualización e impresión de recibos emitidos." />} />
-          <Route path="maestros/usuarios" element={<GenericView title="Control de Usuarios" description="Administración de cuentas, perfiles y asignaciones de planta." />} />
-          <Route path="maestros/empresas" element={<GenericView title="Catálogo de Empresas" description="Mantenimiento de convenios corporativos y entidades asociadas." />} />
-          <Route path="maestros/descuentos" element={<GenericView title="Reglas de Descuentos" description="Configuración de campañas, promociones y tarifas especiales." />} />
-        </Route>
-      )}
-
       <Route path="/sin-acceso" element={<ForbiddenView />} />
-      <Route path="/" element={<Navigate to={isDashboardReady ? (isFaregas ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso') : "/inicio") : "/login"} replace />} />
-      <Route path="*" element={<NotFoundView destino={faregasAccessToken ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || []) || '/sin-acceso') : isDashboardReady ? '/inicio' : '/login'} />} />
+      <Route path="/" element={<Navigate to={isDashboardReady ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso') : "/login"} replace />} />
+      <Route path="*" element={<NotFoundView destino={faregasAccessToken ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || []) || '/sin-acceso') : '/login'} />} />
     </Routes>
   );
 }
