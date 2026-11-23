@@ -10,9 +10,6 @@ import {
 import {
   perfilTieneAccesoGlobalSedes,
 } from './acceso-global-sedes';
-import {
-  descargarExcelUsuariosFaregas,
-} from './usuarios-exportacion';
 
 import {
   atributosDocumento,
@@ -886,18 +883,7 @@ ${separador}
             {activeTab === 'usuarios' ? 'Usuarios registrados' : 'Perfiles registrados'}
           </span>
           {activeTab === 'usuarios' ? (
-            <div className="flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => descargarExcelUsuariosFaregas(filteredUsuarios, perfiles, {
-                  estado: estadoFiltro,
-                  busqueda: searchQuery,
-                })}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#052A79] bg-white px-4 py-2 text-sm font-semibold text-[#052A79] hover:bg-blue-50/50 disabled:opacity-50"
-              >
-                <Download size={16} /> EXPORTAR EXCEL
-              </button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {puedeGestionarCredenciales && (
                 <button
                   type="button"
@@ -912,9 +898,6 @@ ${separador}
               <button onClick={() => handleOpenUsuario()} className="rounded-lg bg-[#052A79] px-4 py-2 text-sm font-semibold text-white">
                 + Crear Usuario
               </button>
-              <p className="basis-full text-right text-xs text-slate-500" role="note">
-                EXPORTAR EXCEL contiene únicamente datos administrativos; nunca incluye contraseñas ni hashes.
-              </p>
             </div>
           ) : (
             <button onClick={() => {
