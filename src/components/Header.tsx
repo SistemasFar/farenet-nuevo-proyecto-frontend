@@ -19,6 +19,7 @@ interface HeaderProps {
   onToggleSidebar: () => void;
   onLogout: () => void;
   isFaregas?: boolean;
+  faregasAccessToken?: string;
 }
 
 interface FaregasUsuarioResumen {
@@ -61,7 +62,8 @@ export function Header({
   onCambiarPlanta,
   onToggleSidebar,
   onLogout,
-  isFaregas
+  isFaregas,
+  faregasAccessToken
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [changingPlanta, setChangingPlanta] = useState(false);
@@ -154,7 +156,7 @@ export function Header({
           <div className="hidden items-center gap-3 sm:flex">
             <NetworkStatus />
             <BackendStatus />
-            <FaregasNotificationBell user={user} plantaSeleccionada={plantaSeleccionada} />
+            <FaregasNotificationBell user={user} accessToken={faregasAccessToken || ''} />
           </div>
 
           <div className="relative" ref={dropdownRef}>

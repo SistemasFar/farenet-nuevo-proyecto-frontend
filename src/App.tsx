@@ -40,6 +40,8 @@ const FaregasDashboardView = lazy(() => import('./modules/faregas/views/Dashboar
 const ReportesFinancierosView = lazy(() => import('./modules/faregas/views/Dashboard/ReportesFinancierosView').then(({ ReportesFinancierosView }) => ({ default: ReportesFinancierosView })));
 const FaregasChipsView = lazy(() => import('./modules/faregas/views/Chips/ChipsView').then(({ ChipsView }) => ({ default: ChipsView })));
 
+const rutasFarenetHabilitadas = import.meta.env.VITE_FARENET_LEGACY_ROUTES_ENABLED !== "false";
+
 type FaregasUserSession = UserSession & { permisos?: string[] };
 
 interface PlantaUpdateDetail {
@@ -97,7 +99,7 @@ export default function App() {
   const [faregasUser, setFaregasUser] = useState<FaregasUserSession | null>(null);
   const [faregasPlanta, setFaregasPlanta] = useState<PlantaAsignada | null>(null);
 
-  const { empresasDisponibles, establecerEmpresasDisponibles, limpiarEmpresa, empresaSeleccionada } = useEmpresa();
+  const { empresasDisponibles, establecerEmpresasDisponibles, seleccionarEmpresa, limpiarEmpresa, empresaSeleccionada } = useEmpresa();
 
   const isFaregas = empresaSeleccionada?.nombre?.toUpperCase().includes('FAREGAS');
 
@@ -121,11 +123,27 @@ export default function App() {
     window.addEventListener('updatePlantasDisponibles', handleUpdate);
     return () => window.removeEventListener('updatePlantasDisponibles', handleUpdate);
   }, []);
+  const handleLogoutFaregas = useCallback(() => {
+    sessionStorage.removeItem('faregasAccessToken');
+    sessionStorage.removeItem('faregasUser');
+    sessionStorage.removeItem('faregasPlanta');
+    sessionStorage.removeItem('faregasPreToken');
+    setFaregasAccessToken('');
+    setFaregasUser(null);
+    setFaregasPlanta(null);
+    setFaregasPreToken('');
+    setFaregasPlantasDisponibles([]);
+    sessionStorage.removeItem('faregasPlantasDisponibles');
+    limpiarEmpresa();
+    navigate('/login', { replace: true });
+  }, [limpiarEmpresa, navigate]);
+
   const refrescarSesionFaregasSilencioso = useCallback(async () => {
     const fToken = sessionStorage.getItem('faregasAccessToken');
     if (!fToken) return;
     try {
       const sesionFaregas = await authFaregasApi.refrescarSesionAsync(fToken);
+      if (sessionStorage.getItem('faregasAccessToken') !== fToken) return;
       const usuarioActualizado = sesionFaregas.user as FaregasUserSession;
       const plantaActualizada = sesionFaregas.plantaSeleccionada as PlantaAsignada;
       const plantasActualizadas = Array.isArray(sesionFaregas.plantas)
@@ -150,10 +168,13 @@ export default function App() {
           navigate(rutaNueva, { replace: true });
         }
       }
-    } catch {
-      // Fallo silencioso en refresco de permisos
+    } catch (error) {
+      const status = (error as { status?: number } | null)?.status;
+      if ((status === 401 || status === 403) && sessionStorage.getItem('faregasAccessToken') === fToken) {
+        handleLogoutFaregas();
+      }
     }
-  }, [navigate]);
+  }, [handleLogoutFaregas, navigate]);
 
   useEffect(() => {
     const onActualizar = () => {
@@ -188,6 +209,11 @@ export default function App() {
     setPlanta(null);
     setUsernameContext('');
     setPlantasDisponibles([]);
+    setFaregasAccessToken('');
+    setFaregasUser(null);
+    setFaregasPlanta(null);
+    setFaregasPreToken('');
+    setFaregasPlantasDisponibles([]);
     navigate('/login', { replace: true });
   }, [limpiarEmpresa, navigate]);
 
@@ -201,6 +227,10 @@ export default function App() {
       if (fToken) {
         try {
           const sesionFaregas = await authFaregasApi.refrescarSesionAsync(fToken);
+          if (sessionStorage.getItem('faregasAccessToken') !== fToken) {
+            setIsInitializing(false);
+            return;
+          }
           const usuarioActualizado = sesionFaregas.user as FaregasUserSession;
           const plantaActualizada = sesionFaregas.plantaSeleccionada as PlantaAsignada;
           const plantasActualizadas = Array.isArray(sesionFaregas.plantas)
@@ -216,12 +246,21 @@ export default function App() {
           sessionStorage.setItem('faregasPlanta', JSON.stringify(plantaActualizada));
           sessionStorage.setItem('faregasPlantasDisponibles', JSON.stringify(plantasActualizadas));
         } catch (error) {
+          if (sessionStorage.getItem('faregasAccessToken') !== fToken) {
+            setIsInitializing(false);
+            return;
+          }
           console.error('Sesión FAREGAS expirada o inválida:', error);
           limpiarSesionFrontend();
           setIsInitializing(false);
           return;
         }
       }
+      if (!rutasFarenetHabilitadas) {
+        setIsInitializing(false);
+        return;
+      }
+
       const token = sessionStorage.getItem('accessToken');
       const userRaw = sessionStorage.getItem('user');
       const plantasRaw = sessionStorage.getItem('plantasDisponibles');
@@ -315,6 +354,7 @@ export default function App() {
     if (esFaregas) {
       try {
         const resp = await authFaregasApi.loginAsync(userToUse, passToUse);
+        seleccionarEmpresa(empresa);
 
         setFaregasPreToken(resp.preToken);
         sessionStorage.setItem('faregasPreToken', resp.preToken);
@@ -501,6 +541,7 @@ export default function App() {
     if (!token) throw new Error('No hay sesión activa en FAREGAS.');
 
     const resp = await authFaregasApi.cambiarPlantaAsync(plantaKey, token);
+    if (!sessionStorage.getItem('faregasAccessToken')) return;
 
     setFaregasAccessToken(resp.accessToken);
     sessionStorage.setItem('faregasAccessToken', resp.accessToken);
@@ -517,18 +558,6 @@ export default function App() {
     }, 0);
   };
 
-  const handleLogoutFaregas = () => {
-    sessionStorage.removeItem('faregasAccessToken');
-    sessionStorage.removeItem('faregasUser');
-    sessionStorage.removeItem('faregasPlanta');
-    sessionStorage.removeItem('faregasPreToken');
-    setFaregasAccessToken('');
-    setFaregasUser(null);
-    setFaregasPlanta(null);
-    setFaregasPreToken('');
-    setFaregasPlantasDisponibles([]);
-    navigate('/login', { replace: true });
-  };
 
   const handleLogout = async () => {
     setPendingPassword('');
@@ -570,36 +599,39 @@ export default function App() {
         }
       />
 
-      <Route
-        path="/seleccionar-empresa"
-        element={
-          !(isAuthenticated || empresasDisponibles.length > 0) ? (
-            <Navigate to="/login" replace />
-          ) : (
-            <SeleccionEmpresaView
-              onLogout={handleLogout}
-              onSelect={async (empresa) => {
-                await ejecutarLoginEmpresa(empresa);
-              }}
-            />
-          )
-        }
-      />
-
-      <Route
-        path="/seleccionar-planta"
-        element={
-          !isAuthenticated ? (
-            <Navigate to="/login" replace />
-          ) : (
-            <SelectPlantaView
-              plantas={plantasDisponibles}
-              onConfirmPlanta={handleConfirmPlanta}
-              onCancel={limpiarSesionFrontend}
-            />
-          )
-        }
-      />
+      {rutasFarenetHabilitadas && (
+        <>
+          <Route
+            path="/seleccionar-empresa"
+            element={
+              !(isAuthenticated || empresasDisponibles.length > 0) ? (
+                <Navigate to="/login" replace />
+              ) : (
+                <SeleccionEmpresaView
+                  onLogout={handleLogout}
+                  onSelect={async (empresa) => {
+                    await ejecutarLoginEmpresa(empresa);
+                  }}
+                />
+              )
+            }
+          />
+          <Route
+            path="/seleccionar-planta"
+            element={
+              !isAuthenticated ? (
+                <Navigate to="/login" replace />
+              ) : (
+                <SelectPlantaView
+                  plantas={plantasDisponibles}
+                  onConfirmPlanta={handleConfirmPlanta}
+                  onCancel={limpiarSesionFrontend}
+                />
+              )
+            }
+          />
+        </>
+      )}
 
       {/* RUTAS DE FAREGAS */}
       <Route
@@ -646,6 +678,7 @@ export default function App() {
                   <Navigate to="/login" replace />
                 ) : (
                   <FaregasMainLayout
+                    accessToken={faregasAccessToken || sessionStorage.getItem('faregasAccessToken') || ''}
                     user={faregasUser || leerUsuarioFaregas()}
                     permisos={(faregasUser || leerUsuarioFaregas())?.permisos || []}
                     plantaSeleccionada={faregasPlanta || JSON.parse(sessionStorage.getItem('faregasPlanta') || 'null')}
@@ -816,41 +849,42 @@ export default function App() {
         }
       />
 
-      {/* RUTAS DE FARENET */}
-      <Route
-        element={
-          !isDashboardReady ? (
-            <Navigate to="/login" replace />
-          ) : isFaregas ? (
-            <Navigate to={resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso'} replace />
-          ) : (
-            <MainLayout
-              user={user}
-              permisos={permisos}
-              plantaSeleccionada={planta}
-              plantasDisponibles={plantasDisponibles}
-              onCambiarPlanta={handleCambiarPlanta}
-              onLogout={handleLogout}
-            />
-          )
-        }
-      >
-        <Route path="inicio" element={<InicioView />} />
-        <Route path="inspecciones" element={<InspeccionesView />} />
-        <Route path="inspecciones/nueva" element={<NuevaInspeccionView />} />
-        <Route path="inspecciones/:nroInspeccion/continuar" element={<NuevaInspeccionView />} />
-        <Route path="inspecciones/duplicado" element={<NuevoDuplicadoView />} />
-        <Route path="linea/:nroInspeccion" element={<LineaView />} />
-        <Route path="auditoria" element={<AuditoriaView />} />
-        <Route path="maestros/personas" element={<GenericView title="Control de Personas" description="Administración de clientes, inspectores y personal autorizado." />} />
-        <Route path="maestros/vehiculos" element={<GenericView title="Registro de Vehículos" description="Búsqueda e historial vehicular filtrado." />} />
-        <Route path="maestros/caja" element={<GenericView title="Módulo de Caja" description="Control de cobros, cierres de caja diaria y transacciones." />} />
-        <Route path="maestros/correlativos" element={<GenericView title="Gestión de Correlativos" description="Mantenimiento de numeración y series de comprobantes." />} />
-        <Route path="maestros/recibos" element={<GenericView title="Historial de Recibos" description="Búsqueda, visualización e impresión de recibos emitidos." />} />
-        <Route path="maestros/usuarios" element={<GenericView title="Control de Usuarios" description="Administración de cuentas, perfiles y asignaciones de planta." />} />
-        <Route path="maestros/empresas" element={<GenericView title="Catálogo de Empresas" description="Mantenimiento de convenios corporativos y entidades asociadas." />} />
-        <Route path="maestros/descuentos" element={<GenericView title="Reglas de Descuentos" description="Configuración de campañas, promociones y tarifas especiales." />} />
-      </Route>
+      {rutasFarenetHabilitadas && (
+        <Route
+          element={
+            !isDashboardReady ? (
+              <Navigate to="/login" replace />
+            ) : isFaregas ? (
+              <Navigate to={resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso'} replace />
+            ) : (
+              <MainLayout
+                user={user}
+                permisos={permisos}
+                plantaSeleccionada={planta}
+                plantasDisponibles={plantasDisponibles}
+                onCambiarPlanta={handleCambiarPlanta}
+                onLogout={handleLogout}
+              />
+            )
+          }
+        >
+          <Route path="inicio" element={<InicioView />} />
+          <Route path="inspecciones" element={<InspeccionesView />} />
+          <Route path="inspecciones/nueva" element={<NuevaInspeccionView />} />
+          <Route path="inspecciones/:nroInspeccion/continuar" element={<NuevaInspeccionView />} />
+          <Route path="inspecciones/duplicado" element={<NuevoDuplicadoView />} />
+          <Route path="linea/:nroInspeccion" element={<LineaView />} />
+          <Route path="auditoria" element={<AuditoriaView />} />
+          <Route path="maestros/personas" element={<GenericView title="Control de Personas" description="Administración de clientes, inspectores y personal autorizado." />} />
+          <Route path="maestros/vehiculos" element={<GenericView title="Registro de Vehículos" description="Búsqueda e historial vehicular filtrado." />} />
+          <Route path="maestros/caja" element={<GenericView title="Módulo de Caja" description="Control de cobros, cierres de caja diaria y transacciones." />} />
+          <Route path="maestros/correlativos" element={<GenericView title="Gestión de Correlativos" description="Mantenimiento de numeración y series de comprobantes." />} />
+          <Route path="maestros/recibos" element={<GenericView title="Historial de Recibos" description="Búsqueda, visualización e impresión de recibos emitidos." />} />
+          <Route path="maestros/usuarios" element={<GenericView title="Control de Usuarios" description="Administración de cuentas, perfiles y asignaciones de planta." />} />
+          <Route path="maestros/empresas" element={<GenericView title="Catálogo de Empresas" description="Mantenimiento de convenios corporativos y entidades asociadas." />} />
+          <Route path="maestros/descuentos" element={<GenericView title="Reglas de Descuentos" description="Configuración de campañas, promociones y tarifas especiales." />} />
+        </Route>
+      )}
 
       <Route path="/sin-acceso" element={<ForbiddenView />} />
       <Route path="/" element={<Navigate to={isDashboardReady ? (isFaregas ? (resolverRutaInicialFaregas((faregasUser || leerUsuarioFaregas())?.permisos || permisos) || '/sin-acceso') : "/inicio") : "/login"} replace />} />

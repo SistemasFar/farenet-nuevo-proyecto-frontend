@@ -97,10 +97,10 @@ const textoEstado = (leida: boolean): string => (leida ? 'Leída' : 'Nueva');
 
 export function FaregasNotificationBell({
   user,
-  plantaSeleccionada: _plantaSeleccionada,
+  accessToken,
 }: {
   user: { username: string } | null;
-  plantaSeleccionada: string;
+  accessToken: string;
 }) {
   const [notificaciones, setNotificaciones] = useState<NotificacionFaregas[]>([]);
   const [sinLeer, setSinLeer] = useState(0);
@@ -108,10 +108,9 @@ export function FaregasNotificationBell({
   const [panelOpen, setPanelOpen] = useState(false);
   const [historialOpen, setHistorialOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toastMostrado, setToastMostrado] = useState<number[]>([]);
+  const toastMostrado = useRef(new Set<number>());
   const mountedRef = useRef(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const socketRef = useRef<ReturnType<typeof io> | null>(null);
   const notificacionesPreviasRef = useRef<NotificacionFaregas[]>([]);
   const usuarioRef = useRef(user?.username || '');
   const visibleRef = useRef(true);
@@ -121,6 +120,7 @@ export function FaregasNotificationBell({
 
   const cargarNotificaciones = useCallback(async () => {
     if (!mountedRef.current) return;
+    const token = sessionStorage.getItem('faregasAccessToken');
     setCargando(true);
     setError(null);
     try {
@@ -128,6 +128,7 @@ export function FaregasNotificationBell({
         method: 'GET',
         headers,
       });
+      if (!mountedRef.current || sessionStorage.getItem('faregasAccessToken') !== token) return;
       const datos = (res as unknown as NotificacionesRespuesta).data ?? [];
       const ordenadas = datos.sort(
         (a, b) =>
@@ -140,10 +141,10 @@ export function FaregasNotificationBell({
       const nuevas = ordenadas.filter((n) => !previasIds.has(n.id) && !n.leida);
       if (previas.length > 0 && nuevas.length > 0) {
         const idsMostrar = nuevas
-          .filter((n) => !toastMostrado.includes(n.id))
+          .filter((n) => !toastMostrado.current.has(n.id))
           .map((n) => n.id);
         if (idsMostrar.length > 0) {
-          setToastMostrado((prev) => [...prev, ...idsMostrar]);
+          idsMostrar.forEach(id => toastMostrado.current.add(id));
           void Swal.fire({
             toast: true,
             position: 'top-end',
@@ -167,15 +168,17 @@ export function FaregasNotificationBell({
     } finally {
       if (mountedRef.current) setCargando(false);
     }
-  }, [headers, toastMostrado]);
+  }, [headers]);
 
   const contarSinLeer = useCallback(async () => {
     if (!mountedRef.current) return;
+    const token = sessionStorage.getItem('faregasAccessToken');
     try {
       const res = await faregasFetch('/notificaciones/sin-leer', {
         method: 'GET',
         headers,
       });
+      if (!mountedRef.current || sessionStorage.getItem('faregasAccessToken') !== token) return;
       const count = (res as unknown as SinLeerRespuesta).count ?? 0;
       setSinLeer(Number(count));
     } catch {
@@ -187,7 +190,7 @@ export function FaregasNotificationBell({
     setNotificaciones([]);
     setSinLeer(0);
     setError(null);
-    setToastMostrado([]);
+    toastMostrado.current.clear();
     notificacionesPreviasRef.current = [];
   }, []);
 
@@ -212,20 +215,24 @@ export function FaregasNotificationBell({
     void contarSinLeer();
   }, [cargarNotificaciones, contarSinLeer]);
 
-  const conectarSocket = useCallback(() => {
-    if (socketRef.current || !user?.username) return;
-    const socket = io(SOCKET_URL, { withCredentials: true });
-    socket.on('notificacionActualizada', manejarEventoSocket);
-    socketRef.current = socket;
-  }, [manejarEventoSocket, user?.username]);
+  useEffect(() => {
+    if (!accessToken || !user?.username) return;
 
-  const desconectarSocket = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.off('notificacionActualizada', manejarEventoSocket);
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-  }, [manejarEventoSocket]);
+    const socket = io(SOCKET_URL, { withCredentials: true, auth: { token: accessToken } });
+    let conectado = false;
+    const alConectar = () => {
+      if (conectado) manejarEventoSocket();
+      conectado = true;
+    };
+    socket.on('notificacionActualizada', manejarEventoSocket);
+    socket.on('connect', alConectar);
+
+    return () => {
+      socket.off('notificacionActualizada', manejarEventoSocket);
+      socket.off('connect', alConectar);
+      socket.disconnect();
+    };
+  }, [accessToken, user?.username, manejarEventoSocket]);
 
   const marcarLeida = useCallback(async (id: number) => {
     if (!mountedRef.current) return;
@@ -290,25 +297,21 @@ export function FaregasNotificationBell({
     const usuarioActual = user?.username || '';
     if (usuarioActual !== usuarioRef.current) {
       limpiarEstado();
-      desconectarSocket();
       usuarioRef.current = usuarioActual;
     }
     if (usuarioActual) {
       void cargarNotificaciones();
       void contarSinLeer();
-      conectarSocket();
       iniciarPolling();
     } else {
       detenerPolling();
-      desconectarSocket();
       limpiarEstado();
     }
     return () => {
       mountedRef.current = false;
       detenerPolling();
-      desconectarSocket();
     };
-  }, [user?.username, cargarNotificaciones, contarSinLeer, conectarSocket, desconectarSocket, iniciarPolling, detenerPolling, limpiarEstado]);
+  }, [user?.username, cargarNotificaciones, contarSinLeer, iniciarPolling, detenerPolling, limpiarEstado]);
 
   // Pausar/reanudar polling según visibilidad de la pestaña
   useEffect(() => {

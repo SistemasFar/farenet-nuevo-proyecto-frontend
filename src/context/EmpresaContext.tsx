@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { EmpresaAsignada } from '@/types/auth';
 
 interface EmpresaContextProps {
@@ -52,7 +52,8 @@ export const EmpresaProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (empresaSeleccionada) {
       const pertenece = empresas.some(e => e.key === empresaSeleccionada.key);
       if (!pertenece) {
-        limpiarEmpresa();
+        setEmpresaSeleccionadaState(null);
+        sessionStorage.removeItem('empresaSeleccionada');
       }
     }
   };
@@ -62,12 +63,12 @@ export const EmpresaProvider: React.FC<{ children: React.ReactNode }> = ({ child
     sessionStorage.setItem('empresaSeleccionada', JSON.stringify(empresa));
   };
 
-  const limpiarEmpresa = () => {
+  const limpiarEmpresa = useCallback(() => {
     setEmpresasDisponiblesState([]);
     setEmpresaSeleccionadaState(null);
     sessionStorage.removeItem('empresasDisponibles');
     sessionStorage.removeItem('empresaSeleccionada');
-  };
+  }, []);
 
   return (
     <EmpresaContext.Provider

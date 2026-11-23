@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import { FaregasNotificationBell } from './FaregasNotificationBell';
 import Swal from 'sweetalert2';
+import { io } from 'socket.io-client';
 
 const socketOn = vi.fn();
 const socketOff = vi.fn();
@@ -34,7 +35,7 @@ const renderBell = (user = mockUser) => {
   const root = createRoot(container);
   root.render(
     <BrowserRouter>
-      <FaregasNotificationBell user={user} plantaSeleccionada="SURCO" />
+      <FaregasNotificationBell user={user} accessToken="test-token" />
     </BrowserRouter>
   );
   return { container, root };
@@ -53,6 +54,27 @@ describe('FaregasNotificationBell', () => {
     vi.restoreAllMocks();
     sessionStorage.removeItem('faregasAccessToken');
     document.body.innerHTML = '';
+  });
+
+  it('autentica el socket y lo desconecta al desmontar la campana', async () => {
+    vi.mocked(io).mockClear();
+    socketOn.mockClear();
+    socketOff.mockClear();
+    socketDisconnect.mockClear();
+    vi.mocked(fetch).mockResolvedValue(mockFetchResponse({ ok: true, data: [], count: 0 }));
+    let root!: ReturnType<typeof createRoot>;
+    await act(async () => { ({ root } = renderBell()); });
+    expect(io).toHaveBeenCalledExactlyOnceWith(expect.any(String), {
+      withCredentials: true,
+      auth: { token: 'test-token' },
+    });
+    const registro = socketOn.mock.calls.find(([event]) => event === 'notificacionActualizada');
+    expect(registro).toBeTruthy();
+    await act(async () => { registro![1](); });
+    expect(io).toHaveBeenCalledTimes(1);
+    await act(async () => root.unmount());
+    expect(socketOff).toHaveBeenCalledWith('notificacionActualizada', registro![1]);
+    expect(socketDisconnect).toHaveBeenCalledTimes(1);
   });
 
   it('1. renderiza el icono de campana sin fallar', async () => {

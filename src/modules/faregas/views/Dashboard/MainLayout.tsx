@@ -9,6 +9,7 @@ import type {
 } from '@/types/auth';
 
 interface MainLayoutProps {
+  accessToken?: string;
   user: UserSession | null;
   permisos: string[];
   plantaSeleccionada: PlantaAsignada | null;
@@ -27,6 +28,7 @@ export interface MainLayoutContext {
 }
 
 export function MainLayout({
+  accessToken,
   user,
   permisos,
   plantaSeleccionada,
@@ -128,6 +130,7 @@ export function MainLayout({
       )}
       <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <Header
+          faregasAccessToken={accessToken}
           user={user}
           plantaName={plantaNombre}
           plantaSeleccionada={plantaKey}
