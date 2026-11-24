@@ -11,10 +11,11 @@ describe('solicitud de nota de crédito sin permisos fiscales', () => {
  beforeEach(() => {host=document.createElement('div');document.body.append(host);root=createRoot(host);vi.clearAllMocks();});
  afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
  it('registra únicamente solicitud pendiente y conserva una clave de idempotencia', async()=>{
-  vi.mocked(faregasSolicitudesOperacionApi.contextoNotaCredito).mockResolvedValue({comprobante:{numero:'BTEST-1'},planta:{nombre:'SURCO'}} as never);
+  vi.mocked(faregasSolicitudesOperacionApi.contextoNotaCredito).mockResolvedValue({comprobante:{numero:'BTEST-1',fechaEmision:'2026-11-10'},planta:{nombre:'SURCO'}} as never);
   vi.mocked(faregasSolicitudesOperacionApi.crear).mockResolvedValue({ok:true,data:{id:12},creada:true} as never);
   const creada=vi.fn();await act(async()=>root.render(<SolicitudNotaCreditoModal certificadoId={10} onCerrar={()=>{}} onCreada={creada}/>));
   expect(host.textContent).toContain('Solicitar nota de crédito');
+  expect(host.textContent).toContain('Fecha de emisión del documento relacionado: 10/11/2026');
   const textarea=host.querySelector('textarea')!;
   await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!.call(textarea,'Sustento de corrección');textarea.dispatchEvent(new Event('input',{bubbles:true}));});
   // React DOM reconoce el evento change mediante input en textarea.

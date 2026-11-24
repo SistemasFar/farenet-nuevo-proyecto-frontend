@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ClipboardX, Loader2, PlayCircle, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { formatearFechaDocumento } from './NotaCreditoModal';
 import {
   faregasSolicitudesOperacionApi,
   etiquetaEstadoFiscal,
@@ -492,7 +493,7 @@ export function SolicitudOperacionModal({
                   <div className="grid gap-3 text-sm md:grid-cols-2">
                     <div><span className="block text-xs font-semibold text-slate-500">TIPO</span>{mostrar(contexto.comprobante.tipo)}</div>
                     <div><span className="block text-xs font-semibold text-slate-500">SERIE Y NÚMERO</span>{mostrar(contexto.comprobante.numero || [contexto.comprobante.serie, contexto.comprobante.correlativo].filter(Boolean).join('-'))}</div>
-                    <div><span className="block text-xs font-semibold text-slate-500">FECHA FISCAL</span>{mostrar(contexto.comprobante.fechaEmision)}</div>
+                    <div><span className="block text-xs font-semibold text-slate-500">FECHA DE EMISIÓN DEL DOCUMENTO RELACIONADO</span>{mostrar(formatearFechaDocumento(contexto.comprobante.fechaEmision))}</div>
                     <div><span className="block text-xs font-semibold text-slate-500">IMPORTE</span>{contexto.comprobante.importeTotal === null ? '-' : `${contexto.comprobante.moneda || 'PEN'} ${contexto.comprobante.importeTotal.toFixed(2)}`}</div>
                     <div className="md:col-span-2"><span className="block text-xs font-semibold text-slate-500">ESTADO FISCAL</span>{mostrar(contexto.comprobante.aceptadaSunat === true ? 'ACEPTADO SUNAT' : contexto.comprobante.estado)}</div>
                   </div>

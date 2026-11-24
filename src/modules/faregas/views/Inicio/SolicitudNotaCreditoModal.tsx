@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { faregasSolicitudesOperacionApi, type ContextoSolicitudOperacion } from '../../services/faregas-solicitudes-operacion.api';
+import { formatearFechaDocumento } from './NotaCreditoModal';
 
 // getRandomValues funciona también en los accesos HTTP de la red local.
 const crearIdempotencia = () => {
@@ -48,7 +49,12 @@ export function SolicitudNotaCreditoModal({ certificadoId, onCerrar, onCreada }:
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {registrada ? <p role="status">Solicitud #{registrada} pendiente de aprobación. No se emitió ningún documento ni se modificó el comprobante original.</p> : <>
         <p className="text-sm">Esta acción registra una solicitud pendiente. La aprobación y la emisión requieren sus autorizaciones específicas.</p>
-        {!contexto ? <p>Cargando comprobante…</p> : <p className="text-sm">Comprobante: {contexto.comprobante?.numero || 'Sin número'} · Sede: {contexto.planta.nombre}</p>}
+        {!contexto ? <p>Cargando comprobante…</p> : (
+          <div className="space-y-1 rounded-lg border bg-slate-50 p-3 text-sm">
+            <p><strong>Comprobante:</strong> {contexto.comprobante?.numero || 'Sin número'} · <strong>Sede:</strong> {contexto.planta.nombre}</p>
+            <p><strong>Fecha de emisión del documento relacionado:</strong> {formatearFechaDocumento(contexto.comprobante?.fechaEmision)}</p>
+          </div>
+        )}
         <label className="block text-sm">Motivo SUNAT
           <select value={codigo} onChange={e => setCodigo(e.target.value)} disabled={guardando} className="mt-1 w-full rounded border p-2">
             <option value="01">01 · Anulación de la operación</option>

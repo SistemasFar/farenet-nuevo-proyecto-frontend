@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   construirSolicitudNotaCredito,
   contextoPermiteEmitirNota,
+  formatearFechaDocumento,
   motivoRequiereSolicitud,
   permiteOperacionEscrituraNotaCredito,
 } from './NotaCreditoModal';
@@ -66,5 +67,12 @@ describe('NotaCreditoModal - construcción segura de la solicitud', () => {
     expect(payload).not.toHaveProperty('baseImponible');
     expect(payload).not.toHaveProperty('igv');
     expect(payload).not.toHaveProperty('importeTotal');
+  });
+
+  it('formatea la fecha de emisión del documento relacionado sin desfase horario', () => {
+    expect(formatearFechaDocumento('2026-11-10')).toBe('10/11/2026');
+    expect(formatearFechaDocumento('10-11-2026')).toBe('10/11/2026');
+    expect(formatearFechaDocumento(null)).toBe('—');
+    expect(formatearFechaDocumento('')).toBe('—');
   });
 });

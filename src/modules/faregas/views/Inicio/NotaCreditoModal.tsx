@@ -138,6 +138,20 @@ const fecha = (valor?: string | null) => {
   return Number.isNaN(date.getTime()) ? valor : date.toLocaleString('es-PE');
 };
 
+export const formatearFechaDocumento = (valor?: string | null): string => {
+  if (!valor) return '—';
+  const limpio = String(valor).trim();
+  const matchIso = limpio.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (matchIso) {
+    return `${matchIso[3]}/${matchIso[2]}/${matchIso[1]}`;
+  }
+  const matchGuion = limpio.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (matchGuion) {
+    return `${matchGuion[1]}/${matchGuion[2]}/${matchGuion[3]}`;
+  }
+  return limpio;
+};
+
 const mensajeError = (error: unknown) => error instanceof Error
   ? error.message
   : 'No se pudo completar la operación.';
@@ -384,7 +398,7 @@ export function NotaCreditoModal({
                 </div>
               </div>
               <div className="grid gap-3 p-4 text-sm md:grid-cols-4">
-                <div><p className="text-xs font-bold text-slate-500">FECHA DE EMISIÓN</p><p>{contexto.comprobante.fechaEmision}</p></div>
+                <div><p className="text-xs font-bold text-slate-500">FECHA DE EMISIÓN DEL DOCUMENTO RELACIONADO</p><p className="font-semibold text-slate-800">{formatearFechaDocumento(contexto.comprobante.fechaEmision)}</p></div>
                 <div><p className="text-xs font-bold text-slate-500">MONEDA</p><p>{contexto.comprobante.moneda}</p></div>
                 <div className="md:col-span-2"><p className="text-xs font-bold text-slate-500">CLIENTE</p><p className="font-bold">{contexto.comprobante.cliente.nombreRazonSocial}</p><p className="text-slate-500">{contexto.comprobante.cliente.tipoDocumento}: {contexto.comprobante.cliente.numeroDocumento}</p></div>
               </div>
